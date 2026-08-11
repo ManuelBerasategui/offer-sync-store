@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-function target(offerEnd?: string) {
+function target(offerEnd?: string | undefined) {
   if (offerEnd) {
     const d = new Date(offerEnd);
     if (!isNaN(d.getTime())) return d;
@@ -10,7 +10,7 @@ function target(offerEnd?: string) {
   return d;
 }
 
-export function Countdown({ offerEnd }: { offerEnd?: string }) {
+export function Countdown({ offerEnd }: { offerEnd?: string | undefined }) {
   const [label, setLabel] = useState("--:--:--");
 
   useEffect(() => {
