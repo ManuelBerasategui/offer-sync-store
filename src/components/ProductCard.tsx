@@ -21,6 +21,7 @@ export function ProductCard({ p, config }: { p: Product; config: SiteConfig }) {
           src={imageUrl(p.imagen_url) || FALLBACK_IMAGE}
           alt={p.nombre ?? "Producto"}
           loading="lazy"
+          referrerPolicy="no-referrer"
           className="h-full w-full object-cover"
           onError={(e) => {
             e.currentTarget.src = FALLBACK_IMAGE;
