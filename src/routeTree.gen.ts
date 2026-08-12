@@ -10,11 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CarritoRouteImport } from './routes/carrito'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
+import { Route as GraciasRouteImport } from './routes/gracias'
+import { Route as ComboIndexRouteImport } from './routes/combo.$index'
+import { Route as ProductoIdRouteImport } from './routes/producto.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CarritoRoute = CarritoRouteImport.update({
+  id: '/carrito',
+  path: '/carrito',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CatalogoRoute = CatalogoRouteImport.update({
@@ -22,31 +31,81 @@ const CatalogoRoute = CatalogoRouteImport.update({
   path: '/catalogo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GraciasRoute = GraciasRouteImport.update({
+  id: '/gracias',
+  path: '/gracias',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComboIndexRoute = ComboIndexRouteImport.update({
+  id: '/combo/$index',
+  path: '/combo/$index',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductoIdRoute = ProductoIdRouteImport.update({
+  id: '/producto/$id',
+  path: '/producto/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
+  '/gracias': typeof GraciasRoute
+  '/combo/$index': typeof ComboIndexRoute
+  '/producto/$id': typeof ProductoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
+  '/gracias': typeof GraciasRoute
+  '/combo/$index': typeof ComboIndexRoute
+  '/producto/$id': typeof ProductoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
+  '/gracias': typeof GraciasRoute
+  '/combo/$index': typeof ComboIndexRoute
+  '/producto/$id': typeof ProductoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/catalogo'
+  fullPaths:
+    | '/'
+    | '/carrito'
+    | '/catalogo'
+    | '/gracias'
+    | '/combo/$index'
+    | '/producto/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/catalogo'
-  id: '__root__' | '/' | '/catalogo'
+  to:
+    | '/'
+    | '/carrito'
+    | '/catalogo'
+    | '/gracias'
+    | '/combo/$index'
+    | '/producto/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/carrito'
+    | '/catalogo'
+    | '/gracias'
+    | '/combo/$index'
+    | '/producto/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CarritoRoute: typeof CarritoRoute
   CatalogoRoute: typeof CatalogoRoute
+  GraciasRoute: typeof GraciasRoute
+  ComboIndexRoute: typeof ComboIndexRoute
+  ProductoIdRoute: typeof ProductoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +117,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/carrito': {
+      id: '/carrito'
+      path: '/carrito'
+      fullPath: '/carrito'
+      preLoaderRoute: typeof CarritoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/catalogo': {
       id: '/catalogo'
       path: '/catalogo'
@@ -65,12 +131,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CatalogoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/gracias': {
+      id: '/gracias'
+      path: '/gracias'
+      fullPath: '/gracias'
+      preLoaderRoute: typeof GraciasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/combo/$index': {
+      id: '/combo/$index'
+      path: '/combo/$index'
+      fullPath: '/combo/$index'
+      preLoaderRoute: typeof ComboIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/producto/$id': {
+      id: '/producto/$id'
+      path: '/producto/$id'
+      fullPath: '/producto/$id'
+      preLoaderRoute: typeof ProductoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CarritoRoute: CarritoRoute,
   CatalogoRoute: CatalogoRoute,
+  GraciasRoute: GraciasRoute,
+  ComboIndexRoute: ComboIndexRoute,
+  ProductoIdRoute: ProductoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

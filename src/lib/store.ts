@@ -9,6 +9,8 @@ export type Product = {
   destacado?: string;
   oferta?: string;
   stock?: string;
+  descuento?: string;
+  [key: string]: string | undefined;
 };
 
 export type Banner = {
@@ -17,6 +19,7 @@ export type Banner = {
   imagen_url?: string;
   link?: string;
   activo?: string;
+  precio?: string;
 };
 
 export type SiteConfig = Record<string, string>;
@@ -32,7 +35,8 @@ export const isYes = (v?: string) => String(v ?? "").trim().toUpperCase() === "S
 export const toNumber = (v?: string) =>
   Number(String(v ?? "").replace(/[^\d.-]/g, "")) || 0;
 
-export const money = (v?: string) => "$" + toNumber(v).toLocaleString("es-AR");
+export const money = (v?: string | number) =>
+  "$" + Math.round(typeof v === "number" ? v : toNumber(v)).toLocaleString("es-AR");
 
 export const hasOffer = (p: Product) => isYes(p.oferta) && toNumber(p.precio_oferta) > 0;
 
@@ -48,13 +52,13 @@ export function imageUrl(raw?: string) {
     url.match(/[?&]id=([\w-]+)/) ||
     url.match(/\/d\/([\w-]+)/);
   if (url.includes("drive.google.com") && m) {
-    return `https://lh3.googleusercontent.com/d/${m[1]}=w800`;
+    return `https://lh3.googleusercontent.com/d/${m[1]}=w1200`;
   }
   return url;
 }
 
 export const FALLBACK_IMAGE =
-  "https://placehold.co/600x600/1c1c1f/f3ede0?text=Sin+imagen";
+  "https://placehold.co/600x600/f4f4f5/71717a?text=Sin+imagen";
 
 export function waLink(config: SiteConfig, productName?: string) {
   const phone = (config['whatsapp_individual'] ?? "").replace(/\D/g, "");
@@ -66,4 +70,35 @@ export function waLink(config: SiteConfig, productName?: string) {
 
 export function categoriesOf(products: Product[]) {
   return [...new Set(products.map((p) => (p.categoria ?? "").trim()).filter(Boolean))];
+}
+
+/* ---------- Descuentos por cantidad ---------- */
+
+export type Tier = { units: number; percent: number };
+
+/** Lee las columnas tipo "5 unidades" = "2.50%" de la planilla. */
+export function tiersOf(p: Product): Tier[] {
+  if (!isYes(p.descuento)) return [];
+  const tiers: Tier[] = [];
+  for (const [key, value] of Object.entries(p)) {
+    const m = key.match(/^(\d+)\s*unidad/i);
+    if (!m) continue;
+    const percent = Number(String(value ?? "").replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+    const units = Number(m[1]);
+    if (units > 0 && percent > 0) tiers.push({ units, percent });
+  }
+  return tiers.sort((a, b) => a.units - b.units);
+}
+
+/** Porcentaje de descuento que corresponde a esa cantidad. */
+export function discountFor(p: Product, qty: number) {
+  const tiers = tiersOf(p);
+  let percent = 0;
+  for (const t of tiers) if (qty >= t.units) percent = t.percent;
+  return percent;
+}
+
+export function unitPriceFor(p: Product, qty: number) {
+  const base = priceOf(p);
+  return base * (1 - discountFor(p, qty) / 100);
 }
