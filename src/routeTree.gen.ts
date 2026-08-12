@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CarritoRouteImport } from './routes/carrito'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
 import { Route as ComboIndexRouteImport } from './routes/combo.$index'
 import { Route as ProductoIdRouteImport } from './routes/producto.$id'
@@ -17,6 +18,11 @@ import { Route as ProductoIdRouteImport } from './routes/producto.$id'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CarritoRoute = CarritoRouteImport.update({
+  id: '/carrito',
+  path: '/carrito',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CatalogoRoute = CatalogoRouteImport.update({
@@ -37,12 +43,14 @@ const ProductoIdRoute = ProductoIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
   '/combo/$index': typeof ComboIndexRoute
   '/producto/$id': typeof ProductoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
   '/combo/$index': typeof ComboIndexRoute
   '/producto/$id': typeof ProductoIdRoute
@@ -50,20 +58,28 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
   '/combo/$index': typeof ComboIndexRoute
   '/producto/$id': typeof ProductoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/catalogo' | '/combo/$index' | '/producto/$id'
+  fullPaths: '/' | '/carrito' | '/catalogo' | '/combo/$index' | '/producto/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/catalogo' | '/combo/$index' | '/producto/$id'
-  id: '__root__' | '/' | '/catalogo' | '/combo/$index' | '/producto/$id'
+  to: '/' | '/carrito' | '/catalogo' | '/combo/$index' | '/producto/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/carrito'
+    | '/catalogo'
+    | '/combo/$index'
+    | '/producto/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CarritoRoute: typeof CarritoRoute
   CatalogoRoute: typeof CatalogoRoute
   ComboIndexRoute: typeof ComboIndexRoute
   ProductoIdRoute: typeof ProductoIdRoute
@@ -76,6 +92,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/carrito': {
+      id: '/carrito'
+      path: '/carrito'
+      fullPath: '/carrito'
+      preLoaderRoute: typeof CarritoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/catalogo': {
@@ -104,6 +127,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CarritoRoute: CarritoRoute,
   CatalogoRoute: CatalogoRoute,
   ComboIndexRoute: ComboIndexRoute,
   ProductoIdRoute: ProductoIdRoute,
