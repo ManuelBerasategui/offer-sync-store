@@ -16,7 +16,7 @@ export const createCheckout = createServerFn({ method: "POST" })
       })),
     };
   })
-  .handler(async ({ data }): Promise<{ url?: string; error?: string }> => {
+  .handler(async ({ data }): Promise<{ url?: string | undefined; error?: string | undefined }> => {
     const token = process.env['MERCADOPAGO_ACCESS_TOKEN'];
     if (!token) {
       return { error: "Falta configurar MercadoPago. Escribinos por WhatsApp para completar tu compra." };
