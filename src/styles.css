@@ -6,7 +6,7 @@
 
 /*
  * TE IMPORTAMOS — design system
- * Negro profundo + naranja/ámbar "import urgente" + crema.
+ * Tienda online limpia: blanco predominante, naranja de marca, texto grafito.
  * Display: Anton — Body: Inter — Precios: JetBrains Mono.
  */
 
@@ -44,31 +44,33 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.06), 0 8px 24px -16px oklch(0 0 0 / 0.18);
 }
 
 :root {
-  --radius: 0.875rem;
-  --background: oklch(0.145 0.005 285);
-  --foreground: oklch(0.938 0.019 88);
-  --surface: oklch(0.185 0.005 285);
-  --card: oklch(0.222 0.005 285);
-  --card-foreground: oklch(0.938 0.019 88);
-  --primary: oklch(0.687 0.201 42);
-  --primary-foreground: oklch(0.16 0.04 55);
-  --secondary: oklch(0.222 0.005 285);
-  --secondary-foreground: oklch(0.938 0.019 88);
-  --muted: oklch(0.26 0.005 285);
-  --muted-foreground: oklch(0.79 0.02 88);
-  --accent: oklch(0.575 0.216 32);
-  --accent-foreground: oklch(0.98 0.01 88);
-  --amber: oklch(0.828 0.163 79);
-  --whatsapp: oklch(0.79 0.184 148);
-  --whatsapp-foreground: oklch(0.24 0.07 152);
-  --destructive: oklch(0.62 0.22 25);
-  --destructive-foreground: oklch(0.98 0.01 88);
-  --border: oklch(0.31 0.005 285);
-  --input: oklch(0.31 0.005 285);
-  --ring: oklch(0.687 0.201 42);
+  --radius: 0.75rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.21 0.01 285);
+  --surface: oklch(0.976 0.002 285);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.01 285);
+  --primary: oklch(0.645 0.198 40);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.968 0.003 285);
+  --secondary-foreground: oklch(0.28 0.01 285);
+  --muted: oklch(0.968 0.003 285);
+  --muted-foreground: oklch(0.5 0.012 285);
+  --accent: oklch(0.585 0.213 30);
+  --accent-foreground: oklch(1 0 0);
+  --amber: oklch(0.77 0.155 72);
+  --whatsapp: oklch(0.63 0.152 150);
+  --whatsapp-foreground: oklch(1 0 0);
+  --destructive: oklch(0.6 0.22 25);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.918 0.004 285);
+  --input: oklch(0.895 0.004 285);
+  --ring: oklch(0.645 0.198 40);
 }
 
 @layer base {
@@ -93,30 +95,17 @@
   h3 {
     font-family: var(--font-display);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    line-height: 0.98;
+    letter-spacing: 0.3px;
+    line-height: 1;
   }
 }
 
 @utility grad-urgente {
-  background-image: linear-gradient(
-    100deg,
-    var(--amber) 0%,
-    var(--primary) 45%,
-    var(--accent) 100%
-  );
+  background-image: linear-gradient(100deg, var(--primary) 0%, var(--accent) 100%);
 }
 
 @utility text-grad {
-  background-image: linear-gradient(
-    100deg,
-    var(--amber) 0%,
-    var(--primary) 45%,
-    var(--accent) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--primary);
 }
 
 @utility btn-base {
@@ -125,17 +114,25 @@
   justify-content: center;
   gap: 0.5rem;
   border-radius: 999px;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 0.875rem;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
-  padding: 0.9rem 1.6rem;
+  padding: 0.85rem 1.5rem;
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease,
+    background-color 0.15s ease,
     color 0.15s ease,
     border-color 0.15s ease;
   cursor: pointer;
+}
+
+@utility card-soft {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.05);
 }
 
 @utility no-scrollbar {
