@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
+import { Route as ComboIndexRouteImport } from './routes/combo.$index'
 import { Route as ProductoIdRouteImport } from './routes/producto.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const CatalogoRoute = CatalogoRouteImport.update({
   path: '/catalogo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ComboIndexRoute = ComboIndexRouteImport.update({
+  id: '/combo/$index',
+  path: '/combo/$index',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductoIdRoute = ProductoIdRouteImport.update({
   id: '/producto/$id',
   path: '/producto/$id',
@@ -32,30 +38,34 @@ const ProductoIdRoute = ProductoIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/catalogo': typeof CatalogoRoute
+  '/combo/$index': typeof ComboIndexRoute
   '/producto/$id': typeof ProductoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/catalogo': typeof CatalogoRoute
+  '/combo/$index': typeof ComboIndexRoute
   '/producto/$id': typeof ProductoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/catalogo': typeof CatalogoRoute
+  '/combo/$index': typeof ComboIndexRoute
   '/producto/$id': typeof ProductoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/catalogo' | '/producto/$id'
+  fullPaths: '/' | '/catalogo' | '/combo/$index' | '/producto/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/catalogo' | '/producto/$id'
-  id: '__root__' | '/' | '/catalogo' | '/producto/$id'
+  to: '/' | '/catalogo' | '/combo/$index' | '/producto/$id'
+  id: '__root__' | '/' | '/catalogo' | '/combo/$index' | '/producto/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CatalogoRoute: typeof CatalogoRoute
+  ComboIndexRoute: typeof ComboIndexRoute
   ProductoIdRoute: typeof ProductoIdRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CatalogoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/combo/$index': {
+      id: '/combo/$index'
+      path: '/combo/$index'
+      fullPath: '/combo/$index'
+      preLoaderRoute: typeof ComboIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/producto/$id': {
       id: '/producto/$id'
       path: '/producto/$id'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CatalogoRoute: CatalogoRoute,
+  ComboIndexRoute: ComboIndexRoute,
   ProductoIdRoute: ProductoIdRoute,
 }
 export const routeTree = rootRouteImport
