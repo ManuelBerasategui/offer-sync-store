@@ -72,6 +72,34 @@ export function categoriesOf(products: Product[]) {
   return [...new Set(products.map((p) => (p.categoria ?? "").trim()).filter(Boolean))];
 }
 
+/** Lee la columna "Whatsapp" de la planilla, sin importar mayúsculas ni espacios. */
+export function isWhatsappOnly(p: Product) {
+  for (const [key, value] of Object.entries(p)) {
+    if (key.trim().toLowerCase().replace(/\s+/g, "") === "whatsapp") return isYes(value);
+  }
+  return false;
+}
+
+const slug = (v?: string) =>
+  String(v ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+/** Busca el producto por id (tolerando espacios) o por nombre, para que no falle si movés celdas. */
+export function findProduct(products: Product[], key: string) {
+  const k = String(key ?? "").trim();
+  return (
+    products.find((p) => String(p.id ?? "").trim() === k) ??
+    products.find((p) => slug(p.id) === slug(k)) ??
+    products.find((p) => slug(p.nombre) === slug(k)) ??
+    undefined
+  );
+}
+
+
 /* ---------- Descuentos por cantidad ---------- */
 
 export type Tier = { units: number; percent: number };

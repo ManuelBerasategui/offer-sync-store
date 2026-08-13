@@ -1,18 +1,27 @@
 import { Link } from "@tanstack/react-router";
-import { FALLBACK_IMAGE, hasOffer, imageUrl, isYes, money } from "@/lib/store";
-import type { Product } from "@/lib/store";
+import {
+  FALLBACK_IMAGE,
+  hasOffer,
+  imageUrl,
+  isWhatsappOnly,
+  isYes,
+  money,
+  waLink,
+} from "@/lib/store";
+import type { Product, SiteConfig } from "@/lib/store";
 
-export function ProductCard({ p }: { p: Product; config?: unknown }) {
+export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) {
   const offer = hasOffer(p);
+  const consultar = isWhatsappOnly(p);
 
   return (
-    <Link
-      to="/producto/$id"
-      params={{ id: String(p.id ?? "") }}
-      className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-[0_10px_30px_-18px_oklch(0_0_0/0.35)]"
-    >
-      <div className="relative aspect-square bg-surface">
-        {offer && (
+    <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-[0_10px_30px_-18px_oklch(0_0_0/0.35)]">
+      <Link
+        to="/producto/$id"
+        params={{ id: String(p.id ?? p.nombre ?? "") }}
+        className="relative block aspect-square bg-surface"
+      >
+        {offer && !consultar && (
           <span className="absolute left-2 top-2 z-10 rounded-md bg-primary px-2 py-1 text-[10px] font-bold uppercase text-primary-foreground">
             Oferta
           </span>
@@ -32,29 +41,56 @@ export function ProductCard({ p }: { p: Product; config?: unknown }) {
             e.currentTarget.src = FALLBACK_IMAGE;
           }}
         />
-      </div>
+      </Link>
 
       <div className="flex flex-1 flex-col gap-1 p-3 sm:p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[1px] text-muted-foreground">
           {p.categoria || "General"}
         </p>
-        <h3 className="font-sans text-[15px] font-semibold normal-case leading-snug tracking-normal">
+        <Link
+          to="/producto/$id"
+          params={{ id: String(p.id ?? p.nombre ?? "") }}
+          className="font-sans text-[15px] font-semibold normal-case leading-snug tracking-normal hover:text-primary"
+        >
           {p.nombre}
-        </h3>
-        <div className="mt-auto flex items-baseline gap-2 pt-2">
-          <span className="font-mono text-lg font-bold text-foreground">
-            {money(offer ? p.precio_oferta : p.precio)}
-          </span>
-          {offer && (
-            <span className="font-mono text-xs text-muted-foreground line-through">
-              {money(p.precio)}
-            </span>
+        </Link>
+
+        <div className="mt-auto pt-2">
+          {consultar ? (
+            <span className="text-sm font-semibold text-muted-foreground">Consultá el precio</span>
+          ) : (
+            <div className="flex items-baseline gap-2">
+              <span className="font-mono text-lg font-bold text-foreground">
+                {money(offer ? p.precio_oferta : p.precio)}
+              </span>
+              {offer && (
+                <span className="font-mono text-xs text-muted-foreground line-through">
+                  {money(p.precio)}
+                </span>
+              )}
+            </div>
           )}
         </div>
-        <span className="btn-base mt-2 w-full bg-foreground px-3 py-2.5 text-[11px] text-background">
+
+        <Link
+          to="/producto/$id"
+          params={{ id: String(p.id ?? p.nombre ?? "") }}
+          className="btn-base mt-2 w-full bg-foreground px-3 py-2.5 text-[11px] text-background"
+        >
           Ver producto
-        </span>
+        </Link>
+
+        {consultar && (
+          <a
+            className="btn-base mt-2 w-full bg-whatsapp px-3 py-2.5 text-[11px] text-whatsapp-foreground"
+            href={waLink(config ?? {}, p.nombre)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Consultar por WhatsApp
+          </a>
+        )}
       </div>
-    </Link>
+    </div>
   );
 }
