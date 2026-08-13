@@ -1,0 +1,243 @@
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { useState } from "react";
+
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { storeQueryOptions } from "@/lib/store-query";
+import { supabase } from "@/integrations/supabase/client";
+import { EMPTY_SHIPPING, useAuth, type ShippingData } from "@/hooks/useAuth";
+
+export const Route = createFileRoute("/auth")({
+  loader: ({ context }) => {
+    context.queryClient.ensureQueryData(storeQueryOptions);
+  },
+  head: () => ({
+    meta: [
+      { title: "Iniciar sesión — Te importamos" },
+      {
+        name: "description",
+        content:
+          "Iniciá sesión o creá tu cuenta para comprar más rápido, guardar tus datos de envío y acceder a descuentos exclusivos.",
+      },
+      { property: "og:title", content: "Iniciar sesión — Te importamos" },
+      {
+        property: "og:description",
+        content: "Tu cuenta para comprar productos importados con envío a todo el país.",
+      },
+    ],
+  }),
+  component: AuthPage,
+});
+
+const inputClass =
+  "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
+
+type Mode = "login" | "register" | "forgot";
+
+const FIELDS: { key: keyof ShippingData; label: string }[] = [
+  { key: "nombre", label: "Nombre y apellido" },
+  { key: "dni", label: "DNI" },
+  { key: "telefono", label: "Teléfono" },
+  { key: "provincia", label: "Provincia" },
+  { key: "ciudad", label: "Ciudad" },
+  { key: "codigo_postal", label: "Código postal" },
+  { key: "sucursal_correo", label: "Suc. Correo Argentino más cercana" },
+];
+
+function AuthPage() {
+  const { data } = useSuspenseQuery(storeQueryOptions);
+  const { config } = data;
+  const navigate = useNavigate();
+  const { user, profile, signOut } = useAuth();
+
+  const [mode, setMode] = useState<Mode>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [form, setForm] = useState<ShippingData>(EMPTY_SHIPPING);
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setMsg("");
+    setLoading(true);
+    try {
+      if (mode === "login") {
+        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        if (err) throw err;
+        navigate({ to: "/" });
+        return;
+      }
+      if (mode === "register") {
+        if (password.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");
+        const { error: err } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin, data: { ...form } },
+        });
+        if (err) throw err;
+        setMsg("¡Cuenta creada! Ya podés iniciar sesión.");
+        setMode("login");
+        return;
+      }
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+      if (err) throw err;
+      setMsg("Te enviamos un mail para restablecer tu contraseña.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos completar la operación.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen">
+      <SiteHeader config={config} />
+
+      <main className="mx-auto max-w-[460px] px-4 py-12 sm:px-6">
+        {user ? (
+          <div className="card-soft p-6">
+            <h1 className="font-sans text-xl font-bold normal-case tracking-tight">Mi cuenta</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{user.email}</p>
+            {profile && (
+              <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
+                {FIELDS.map((f) => (
+                  <li key={f.key}>
+                    <span className="font-semibold text-foreground">{f.label}:</span>{" "}
+                    {profile[f.key] || "—"}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-6 flex flex-col gap-3">
+              <Link to="/catalogo" className="btn-base grad-urgente text-primary-foreground">
+                Seguir comprando
+              </Link>
+              <button
+                onClick={() => void signOut()}
+                className="btn-base border border-border text-foreground"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="card-soft p-6">
+            <h1 className="font-sans text-xl font-bold normal-case tracking-tight">
+              {mode === "login"
+                ? "Iniciar sesión"
+                : mode === "register"
+                  ? "Crear cuenta"
+                  : "Recuperar contraseña"}
+            </h1>
+
+            <form className="mt-5 flex flex-col gap-4" onSubmit={submit}>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                  Usuario (email)
+                </span>
+                <input
+                  type="email"
+                  required
+                  className={inputClass}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </label>
+
+              {mode !== "forgot" && (
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                    Contraseña
+                  </span>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    className={inputClass}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </label>
+              )}
+
+              {mode === "register" &&
+                FIELDS.map((f) => (
+                  <label key={f.key} className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                      {f.label}
+                    </span>
+                    <input
+                      required
+                      className={inputClass}
+                      value={form[f.key]}
+                      onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                    />
+                  </label>
+                ))}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-base grad-urgente text-primary-foreground disabled:opacity-60"
+              >
+                {loading
+                  ? "Enviando..."
+                  : mode === "login"
+                    ? "Iniciar sesión"
+                    : mode === "register"
+                      ? "Crear mi cuenta"
+                      : "Enviar mail de recuperación"}
+              </button>
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              {msg && <p className="text-sm text-whatsapp">{msg}</p>}
+            </form>
+
+            <div className="mt-5 flex flex-col items-start gap-2 text-xs">
+              {mode !== "register" && (
+                <button
+                  onClick={() => {
+                    setMode("register");
+                    setError("");
+                  }}
+                  className="underline text-muted-foreground hover:text-primary"
+                >
+                  ¿No tenés cuenta? Registrarse
+                </button>
+              )}
+              {mode !== "forgot" && (
+                <button
+                  onClick={() => {
+                    setMode("forgot");
+                    setError("");
+                  }}
+                  className="underline text-muted-foreground hover:text-primary"
+                >
+                  Olvidé mi contraseña
+                </button>
+              )}
+              {mode !== "login" && (
+                <button
+                  onClick={() => {
+                    setMode("login");
+                    setError("");
+                  }}
+                  className="underline text-muted-foreground hover:text-primary"
+                >
+                  Ya tengo cuenta: iniciar sesión
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+
+      <SiteFooter config={config} />
+    </div>
+  );
+}
