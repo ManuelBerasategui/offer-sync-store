@@ -14,7 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      orders: {
+        Row: {
+          ciudad: string
+          codigo_postal: string
+          created_at: string
+          dni: string
+          email: string
+          estado: string
+          id: string
+          items: Json
+          metodo_pago: string
+          nombre: string
+          order_code: string
+          provincia: string
+          sucursal_correo: string
+          telefono: string
+          total: number
+          user_id: string | null
+        }
+        Insert: {
+          ciudad?: string
+          codigo_postal?: string
+          created_at?: string
+          dni?: string
+          email?: string
+          estado?: string
+          id?: string
+          items?: Json
+          metodo_pago?: string
+          nombre?: string
+          order_code: string
+          provincia?: string
+          sucursal_correo?: string
+          telefono?: string
+          total?: number
+          user_id?: string | null
+        }
+        Update: {
+          ciudad?: string
+          codigo_postal?: string
+          created_at?: string
+          dni?: string
+          email?: string
+          estado?: string
+          id?: string
+          items?: Json
+          metodo_pago?: string
+          nombre?: string
+          order_code?: string
+          provincia?: string
+          sucursal_correo?: string
+          telefono?: string
+          total?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          ciudad: string
+          codigo_postal: string
+          created_at: string
+          dni: string
+          id: string
+          nombre: string
+          provincia: string
+          sucursal_correo: string
+          telefono: string
+          updated_at: string
+        }
+        Insert: {
+          ciudad?: string
+          codigo_postal?: string
+          created_at?: string
+          dni?: string
+          id: string
+          nombre?: string
+          provincia?: string
+          sucursal_correo?: string
+          telefono?: string
+          updated_at?: string
+        }
+        Update: {
+          ciudad?: string
+          codigo_postal?: string
+          created_at?: string
+          dni?: string
+          id?: string
+          nombre?: string
+          provincia?: string
+          sucursal_correo?: string
+          telefono?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
