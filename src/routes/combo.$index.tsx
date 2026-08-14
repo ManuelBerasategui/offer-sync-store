@@ -6,7 +6,7 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
 import { createCheckout } from "@/lib/checkout.functions";
-import { FALLBACK_IMAGE, imageUrl, money, toNumber, waLink } from "@/lib/store";
+import { FALLBACK_IMAGE, imageUrl, onImageError, money, toNumber, waLink } from "@/lib/store";
 
 export const Route = createFileRoute("/combo/$index")({
   loader: ({ context }) => {
@@ -97,9 +97,7 @@ function ComboPage() {
               alt={banner.titulo ?? "Combo en oferta"}
               referrerPolicy="no-referrer"
               className="aspect-[4/3] w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.src = FALLBACK_IMAGE;
-              }}
+              onError={onImageError(banner.imagen_url)}
             />
           </div>
 
@@ -115,7 +113,7 @@ function ComboPage() {
             </p>
 
             {price > 0 && (
-              <p className="mt-6 font-mono text-3xl font-bold text-foreground">{money(price)}</p>
+              <p className="mt-6 tabular-nums text-3xl font-bold text-foreground">{money(price)}</p>
             )}
 
             <div className="mt-6 flex flex-col gap-3">

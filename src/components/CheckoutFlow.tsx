@@ -221,7 +221,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
             <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
               Total a pagar
             </span>
-            <span className="font-mono text-xl font-bold">{money(total)}</span>
+            <span className="tabular-nums text-xl font-bold">{money(total)}</span>
           </div>
 
           <div>

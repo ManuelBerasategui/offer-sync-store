@@ -6,7 +6,8 @@ import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { HowItWorks, ReviewsCarousel } from "@/components/Social";
 import { storeQueryOptions } from "@/lib/store-query";
-import { FALLBACK_IMAGE, imageUrl, isYes, money, toNumber, waLink, type SiteConfig } from "@/lib/store";
+import { FALLBACK_IMAGE, imageUrl,
+  onImageError, isYes, money, toNumber, waLink, type SiteConfig } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
   loader: ({ context }) => {
@@ -73,9 +74,7 @@ function Home() {
                     alt={b.titulo ?? ""}
                     referrerPolicy="no-referrer"
                     className="h-full w-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.src = FALLBACK_IMAGE;
-                    }}
+                    onError={onImageError(b.imagen_url)}
                   />
                   <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/25 to-transparent p-4">
                     <span className="mb-2 self-start rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase text-primary-foreground">
@@ -83,7 +82,7 @@ function Home() {
                     </span>
                     <h3 className="text-lg text-white">{b.titulo}</h3>
                     {toNumber(b.precio) > 0 && (
-                      <p className="font-mono text-base font-bold text-white">
+                      <p className="tabular-nums text-base font-bold text-white">
                         {money(b.precio)}
                       </p>
                     )}

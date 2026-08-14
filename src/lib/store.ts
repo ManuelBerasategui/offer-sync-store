@@ -1,3 +1,5 @@
+import type React from "react";
+
 export type Product = {
   id?: string;
   nombre?: string;
@@ -55,6 +57,38 @@ export function imageUrl(raw?: string) {
     return `https://lh3.googleusercontent.com/d/${m[1]}=w1200`;
   }
   return url;
+}
+
+/** Extrae el id de un archivo de Google Drive, si el link es de Drive. */
+export function driveId(raw?: string) {
+  const url = (raw ?? "").trim();
+  if (!url.includes("drive.google.com") && !url.includes("googleusercontent.com")) return "";
+  const m =
+    url.match(/\/file\/d\/([\w-]+)/) ||
+    url.match(/[?&]id=([\w-]+)/) ||
+    url.match(/\/d\/([\w-]+)/);
+  return m ? m[1]! : "";
+}
+
+/** Maneja el error de carga probando otras variantes de URL de Drive. */
+export function onImageError(raw?: string) {
+  return (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    const id = driveId(raw);
+    const step = Number(img.dataset['retry'] ?? "0");
+    const variants = id
+      ? [
+          `https://drive.google.com/thumbnail?id=${id}&sz=w1200`,
+          `https://lh3.googleusercontent.com/d/${id}=s1200`,
+        ]
+      : [];
+    if (step < variants.length) {
+      img.dataset['retry'] = String(step + 1);
+      img.src = variants[step]!;
+      return;
+    }
+    img.src = FALLBACK_IMAGE;
+  };
 }
 
 export const FALLBACK_IMAGE =

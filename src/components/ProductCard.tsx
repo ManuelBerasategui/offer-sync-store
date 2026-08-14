@@ -3,6 +3,7 @@ import {
   FALLBACK_IMAGE,
   hasOffer,
   imageUrl,
+  onImageError,
   isWhatsappOnly,
   isYes,
   money,
@@ -37,9 +38,7 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
           loading="lazy"
           referrerPolicy="no-referrer"
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-          onError={(e) => {
-            e.currentTarget.src = FALLBACK_IMAGE;
-          }}
+          onError={onImageError(p.imagen_url)}
         />
       </Link>
 
@@ -60,11 +59,11 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
             <span className="text-sm font-semibold text-muted-foreground">Consultá el precio</span>
           ) : (
             <div className="flex items-baseline gap-2">
-              <span className="font-mono text-lg font-bold text-foreground">
+              <span className="tabular-nums text-lg font-bold text-foreground">
                 {money(offer ? p.precio_oferta : p.precio)}
               </span>
               {offer && (
-                <span className="font-mono text-xs text-muted-foreground line-through">
+                <span className="tabular-nums text-xs text-muted-foreground line-through">
                   {money(p.precio)}
                 </span>
               )}

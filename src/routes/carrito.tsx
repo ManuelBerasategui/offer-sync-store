@@ -62,7 +62,7 @@ function CarritoPage() {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{i.nombre}</p>
-                    <p className="font-mono text-sm text-muted-foreground">
+                    <p className="tabular-nums text-sm text-muted-foreground">
                       {money(i.unitPrice)} c/u
                     </p>
                   </div>
@@ -73,7 +73,7 @@ function CarritoPage() {
                     onChange={(e) => cart.setQty(i.id, Number(e.target.value) || 1)}
                     className="w-16 rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
                   />
-                  <p className="w-24 shrink-0 text-right font-mono text-sm font-bold">
+                  <p className="w-24 shrink-0 text-right tabular-nums text-sm font-bold">
                     {money(i.unitPrice * i.qty)}
                   </p>
                   <button
@@ -90,7 +90,7 @@ function CarritoPage() {
               <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
                 Total
               </span>
-              <span className="font-mono text-2xl font-bold">{money(cart.total)}</span>
+              <span className="tabular-nums text-2xl font-bold">{money(cart.total)}</span>
             </div>
 
             <div className="mt-4">
