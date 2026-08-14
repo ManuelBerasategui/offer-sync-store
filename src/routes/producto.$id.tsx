@@ -9,6 +9,7 @@ import { useCart } from "@/lib/cart";
 import {
   FALLBACK_IMAGE,
   discountFor,
+  findProduct,
   hasOffer,
   imageUrl,
   isWhatsappOnly,
@@ -66,7 +67,7 @@ function ProductoPage() {
   const { products, config } = data;
   const cart = useCart();
 
-  const product = products.find((p) => String(p.id ?? "") === id);
+  const product = findProduct(products, id);
 
   const [qty, setQty] = useState(1);
   const [custom, setCustom] = useState(false);
