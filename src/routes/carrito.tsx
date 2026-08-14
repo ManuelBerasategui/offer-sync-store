@@ -1,11 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useState } from "react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { CheckoutFlow } from "@/components/CheckoutFlow";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
-import { createCheckout } from "@/lib/checkout.functions";
 import { FALLBACK_IMAGE, money, waLink } from "@/lib/store";
 
 export const Route = createFileRoute("/carrito")({
@@ -30,27 +29,8 @@ function CarritoPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { config } = data;
   const cart = useCart();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const checkout = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const res = await createCheckout({
-        data: {
-          items: cart.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice })),
-          origin: window.location.origin,
-        },
-      });
-      if (res.url) window.location.href = res.url;
-      else setError(res.error ?? "No pudimos iniciar el pago.");
-    } catch {
-      setError("No pudimos iniciar el pago. Probá de nuevo.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const items = cart.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice }));
 
   return (
     <div className="min-h-screen">
@@ -106,30 +86,25 @@ function CarritoPage() {
               ))}
             </ul>
 
-            <div className="mt-6 card-soft p-5">
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
-                  Total
-                </span>
-                <span className="font-mono text-2xl font-bold">{money(cart.total)}</span>
-              </div>
-              <button
-                onClick={checkout}
-                disabled={loading}
-                className="btn-base grad-urgente mt-4 w-full text-primary-foreground disabled:opacity-60"
-              >
-                {loading ? "Redirigiendo..." : "Pagar con MercadoPago"}
-              </button>
-              {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-              <a
-                className="btn-base mt-3 w-full bg-whatsapp text-whatsapp-foreground"
-                href={waLink(config)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Contactar por WhatsApp
-              </a>
+            <div className="mt-6 flex items-baseline justify-between rounded-xl border border-border bg-card p-5">
+              <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
+                Total
+              </span>
+              <span className="font-mono text-2xl font-bold">{money(cart.total)}</span>
             </div>
+
+            <div className="mt-4">
+              <CheckoutFlow items={items} total={cart.total} />
+            </div>
+
+            <a
+              className="btn-base mt-3 w-full bg-whatsapp text-whatsapp-foreground"
+              href={waLink(config)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Contactar por WhatsApp
+            </a>
           </>
         )}
       </main>
