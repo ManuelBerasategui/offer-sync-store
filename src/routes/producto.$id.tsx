@@ -3,14 +3,15 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { CheckoutFlow } from "@/components/CheckoutFlow";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
-import { createCheckout } from "@/lib/checkout.functions";
 import {
   FALLBACK_IMAGE,
   discountFor,
   hasOffer,
   imageUrl,
+  isWhatsappOnly,
   money,
   priceOf,
   tiersOf,
@@ -41,9 +42,21 @@ export const Route = createFileRoute("/producto/$id")({
 });
 
 const REVIEWS = [
-  { name: "Martina G.", stars: 5, text: "Excelente servicio, me llegó todo perfecto. Sigo trabajando con ellos." },
-  { name: "Nicolás P.", stars: 4.5, text: "Muy buena calidad y respondieron todas mis dudas al toque." },
-  { name: "Julieta R.", stars: 5, text: "Compré por mayor para revender y se vendió todo en una semana." },
+  {
+    name: "Martina G.",
+    stars: 5,
+    text: "Excelente servicio, me llegó todo perfecto. Sigo trabajando con ellos.",
+  },
+  {
+    name: "Nicolás P.",
+    stars: 4.5,
+    text: "Muy buena calidad y respondieron todas mis dudas al toque.",
+  },
+  {
+    name: "Julieta R.",
+    stars: 5,
+    text: "Compré por mayor para revender y se vendió todo en una semana.",
+  },
 ];
 
 function ProductoPage() {
@@ -57,8 +70,7 @@ function ProductoPage() {
 
   const [qty, setQty] = useState(1);
   const [custom, setCustom] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [showCheckout, setShowCheckout] = useState(false);
 
   const tiers = useMemo(() => (product ? tiersOf(product) : []), [product]);
 
@@ -77,6 +89,7 @@ function ProductoPage() {
     );
   }
 
+  const consultar = isWhatsappOnly(product);
   const percent = discountFor(product, qty);
   const unit = unitPriceFor(product, qty);
   const total = unit * qty;
@@ -89,31 +102,15 @@ function ProductoPage() {
     imagen: imageUrl(product.imagen_url),
   };
 
-  const buyNow = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const res = await createCheckout({
-        data: {
-          items: [{ nombre: cartItem.nombre, qty, unitPrice: cartItem.unitPrice }],
-          origin: window.location.origin,
-        },
-      });
-      if (res.url) window.location.href = res.url;
-      else setError(res.error ?? "No pudimos iniciar el pago.");
-    } catch {
-      setError("No pudimos iniciar el pago. Probá de nuevo.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen">
       <SiteHeader config={config} />
 
       <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6 sm:py-12">
-        <Link to="/catalogo" className="text-sm font-semibold text-muted-foreground hover:text-primary">
+        <Link
+          to="/catalogo"
+          className="text-sm font-semibold text-muted-foreground hover:text-primary"
+        >
           ← Volver al catálogo
         </Link>
 
@@ -138,22 +135,33 @@ function ProductoPage() {
               {product.nombre}
             </h1>
 
-            <div className="mt-4 flex flex-wrap items-baseline gap-3">
-              <span className="font-mono text-3xl font-bold text-foreground">{money(unit)}</span>
-              {(percent > 0 || hasOffer(product)) && (
-                <span className="font-mono text-base text-muted-foreground line-through">
-                  {money(percent > 0 ? priceOf(product) : product.precio)}
-                </span>
-              )}
-              {percent > 0 && (
-                <span className="rounded-md bg-primary px-2 py-1 text-xs font-bold text-primary-foreground">
-                  -{percent}% por {qty} u.
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Total por {qty} {qty === 1 ? "unidad" : "unidades"}: <strong>{money(total)}</strong>
-            </p>
+            {consultar ? (
+              <p className="mt-4 text-sm font-semibold text-muted-foreground">
+                Consultá el precio y disponibilidad por WhatsApp.
+              </p>
+            ) : (
+              <>
+                <div className="mt-4 flex flex-wrap items-baseline gap-3">
+                  <span className="font-mono text-3xl font-bold text-foreground">
+                    {money(unit)}
+                  </span>
+                  {(percent > 0 || hasOffer(product)) && (
+                    <span className="font-mono text-base text-muted-foreground line-through">
+                      {money(percent > 0 ? priceOf(product) : product.precio)}
+                    </span>
+                  )}
+                  {percent > 0 && (
+                    <span className="rounded-md bg-primary px-2 py-1 text-xs font-bold text-primary-foreground">
+                      -{percent}% por {qty} u.
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Total por {qty} {qty === 1 ? "unidad" : "unidades"}:{" "}
+                  <strong>{money(total)}</strong>
+                </p>
+              </>
+            )}
 
             {/* Cantidad */}
             <div className="mt-6">
@@ -217,26 +225,42 @@ function ProductoPage() {
             </div>
 
             <div className="mt-6 flex flex-col gap-3">
-              <button
-                onClick={buyNow}
-                disabled={loading}
-                className="btn-base grad-urgente text-primary-foreground disabled:opacity-60"
-              >
-                {loading ? "Redirigiendo..." : "Comprar ya"}
-              </button>
-              <button
-                onClick={() => {
-                  cart.add(cartItem);
-                  navigate({ to: "/carrito" });
-                }}
-                className="btn-base border border-border text-foreground hover:border-primary hover:text-primary"
-              >
-                Agregar al carrito
-              </button>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <p className="text-center text-xs text-muted-foreground">
-                Pagá con tarjeta, débito o dinero en cuenta vía MercadoPago.
-              </p>
+              {consultar ? (
+                <a
+                  className="btn-base bg-whatsapp text-whatsapp-foreground"
+                  href={waLink(config, product.nombre)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Consultar por WhatsApp
+                </a>
+              ) : showCheckout ? (
+                <CheckoutFlow
+                  items={[{ nombre: cartItem.nombre, qty, unitPrice: cartItem.unitPrice }]}
+                  total={total}
+                />
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowCheckout(true)}
+                    className="btn-base grad-urgente text-primary-foreground"
+                  >
+                    Comprar ya
+                  </button>
+                  <button
+                    onClick={() => {
+                      cart.add(cartItem);
+                      navigate({ to: "/carrito" });
+                    }}
+                    className="btn-base border border-border text-foreground hover:border-primary hover:text-primary"
+                  >
+                    Agregar al carrito
+                  </button>
+                  <p className="text-center text-xs text-muted-foreground">
+                    Pagá con tarjeta, débito o dinero en cuenta vía MercadoPago.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
