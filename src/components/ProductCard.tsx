@@ -78,17 +78,6 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
         >
           Ver producto
         </Link>
-
-        {consultar && (
-          <a
-            className="btn-base mt-2 w-full bg-whatsapp px-3 py-2.5 text-[11px] text-whatsapp-foreground"
-            href={waLink(config ?? {}, p.nombre)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Consultar por WhatsApp
-          </a>
-        )}
       </div>
     </div>
   );
