@@ -164,6 +164,7 @@ function ProductoPage() {
             )}
 
             {/* Cantidad */}
+            {!consultar && (
             <div className="mt-6">
               <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
                 Cantidad
@@ -223,6 +224,7 @@ function ProductoPage() {
                 </ul>
               )}
             </div>
+            )}
 
             <div className="mt-6 flex flex-col gap-3">
               {consultar ? (
