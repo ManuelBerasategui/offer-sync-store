@@ -224,6 +224,7 @@ function ProductoPage() {
                 </ul>
               )}
             </div>
+            )}
 
             <div className="mt-6 flex flex-col gap-3">
               {consultar ? (
