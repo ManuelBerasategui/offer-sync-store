@@ -1,13 +1,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { z } from "zod";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import { supabase } from "@/integrations/supabase/client";
 import { EMPTY_SHIPPING, useAuth, type ShippingData } from "@/hooks/useAuth";
 
+const authSearchSchema = z.object({
+  mode: z.enum(["login", "register", "forgot"]).optional(),
+});
+
 export const Route = createFileRoute("/auth")({
+  validateSearch: authSearchSchema,
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(storeQueryOptions);
   },
@@ -47,10 +53,11 @@ const FIELDS: { key: keyof ShippingData; label: string }[] = [
 function AuthPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { config } = data;
+  const search = Route.useSearch();
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
 
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>(search.mode ?? "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [form, setForm] = useState<ShippingData>(EMPTY_SHIPPING);
