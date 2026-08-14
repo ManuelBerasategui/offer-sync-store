@@ -143,11 +143,11 @@ function ProductoPage() {
             ) : (
               <>
                 <div className="mt-4 flex flex-wrap items-baseline gap-3">
-                  <span className="font-mono text-3xl font-bold text-foreground">
+                  <span className="tabular-nums text-3xl font-bold text-foreground">
                     {money(unit)}
                   </span>
                   {(percent > 0 || hasOffer(product)) && (
-                    <span className="font-mono text-base text-muted-foreground line-through">
+                    <span className="tabular-nums text-base text-muted-foreground line-through">
                       {money(percent > 0 ? priceOf(product) : product.precio)}
                     </span>
                   )}

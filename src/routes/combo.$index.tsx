@@ -115,7 +115,7 @@ function ComboPage() {
             </p>
 
             {price > 0 && (
-              <p className="mt-6 font-mono text-3xl font-bold text-foreground">{money(price)}</p>
+              <p className="mt-6 tabular-nums text-3xl font-bold text-foreground">{money(price)}</p>
             )}
 
             <div className="mt-6 flex flex-col gap-3">

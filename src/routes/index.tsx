@@ -83,7 +83,7 @@ function Home() {
                     </span>
                     <h3 className="text-lg text-white">{b.titulo}</h3>
                     {toNumber(b.precio) > 0 && (
-                      <p className="font-mono text-base font-bold text-white">
+                      <p className="tabular-nums text-base font-bold text-white">
                         {money(b.precio)}
                       </p>
                     )}

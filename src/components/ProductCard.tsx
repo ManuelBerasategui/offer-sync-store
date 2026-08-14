@@ -60,11 +60,11 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
             <span className="text-sm font-semibold text-muted-foreground">Consultá el precio</span>
           ) : (
             <div className="flex items-baseline gap-2">
-              <span className="font-mono text-lg font-bold text-foreground">
+              <span className="tabular-nums text-lg font-bold text-foreground">
                 {money(offer ? p.precio_oferta : p.precio)}
               </span>
               {offer && (
-                <span className="font-mono text-xs text-muted-foreground line-through">
+                <span className="tabular-nums text-xs text-muted-foreground line-through">
                   {money(p.precio)}
                 </span>
               )}
