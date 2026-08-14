@@ -10,7 +10,10 @@ export type CardFormData = {
   docNumber?: string | undefined;
 };
 
-const PUBLIC_KEY = import.meta.env["VITE_MERCADOPAGO_PUBLIC_KEY"] as string | undefined;
+// La Public Key de MercadoPago es pública por diseño (se usa en el navegador).
+const PUBLIC_KEY =
+  (import.meta.env["VITE_MERCADOPAGO_PUBLIC_KEY"] as string | undefined) ||
+  "TEST-9af6f77e-2e08-4ef5-924b-b67d9c0ba75d";
 
 declare global {
   interface Window {
