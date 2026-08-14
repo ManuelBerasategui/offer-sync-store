@@ -1,3 +1,5 @@
+import type React from "react";
+
 export type Product = {
   id?: string;
   nombre?: string;

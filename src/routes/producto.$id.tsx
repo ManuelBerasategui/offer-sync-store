@@ -12,6 +12,7 @@ import {
   findProduct,
   hasOffer,
   imageUrl,
+  onImageError,
   isWhatsappOnly,
   money,
   priceOf,
@@ -122,9 +123,7 @@ function ProductoPage() {
               alt={product.nombre ?? "Producto"}
               referrerPolicy="no-referrer"
               className="aspect-square w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.src = FALLBACK_IMAGE;
-              }}
+              onError={onImageError(product.imagen_url)}
             />
           </div>
 
