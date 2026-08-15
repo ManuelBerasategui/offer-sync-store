@@ -94,7 +94,22 @@ function CarritoPage() {
             </div>
 
             <div className="mt-4">
-              <CheckoutFlow items={items} total={cart.total} />
+              {suplementosTotal > 0 && suplementosTotal < SUPLEMENTOS_MIN ? (
+                <div className="card-soft p-5">
+                  <p className="text-sm font-semibold text-foreground">{SUPLEMENTOS_MSG}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Llevás {money(suplementosTotal)} en suplementos.
+                  </p>
+                  <Link
+                    to="/catalogo"
+                    className="btn-base grad-urgente mt-4 text-primary-foreground"
+                  >
+                    Seguir comprando
+                  </Link>
+                </div>
+              ) : (
+                <CheckoutFlow items={items} total={cart.total} />
+              )}
             </div>
 
             <a
