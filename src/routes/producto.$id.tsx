@@ -7,11 +7,21 @@ import { CheckoutFlow } from "@/components/CheckoutFlow";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   FALLBACK_IMAGE,
+  SUPLEMENTOS_MIN,
+  SUPLEMENTOS_MSG,
   discountFor,
   findProduct,
-  hasOffer,
   imageUrl,
+  isSuplemento,
   onImageError,
   isWhatsappOnly,
   money,
