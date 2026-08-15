@@ -31,6 +31,7 @@ export type Database = {
           sucursal_correo: string
           telefono: string
           total: number
+          transporte: string
           user_id: string | null
         }
         Insert: {
@@ -49,6 +50,7 @@ export type Database = {
           sucursal_correo?: string
           telefono?: string
           total?: number
+          transporte?: string
           user_id?: string | null
         }
         Update: {
@@ -67,6 +69,7 @@ export type Database = {
           sucursal_correo?: string
           telefono?: string
           total?: number
+          transporte?: string
           user_id?: string | null
         }
         Relationships: []
@@ -82,6 +85,7 @@ export type Database = {
           provincia: string
           sucursal_correo: string
           telefono: string
+          transporte: string
           updated_at: string
         }
         Insert: {
@@ -94,6 +98,7 @@ export type Database = {
           provincia?: string
           sucursal_correo?: string
           telefono?: string
+          transporte?: string
           updated_at?: string
         }
         Update: {
@@ -106,6 +111,7 @@ export type Database = {
           provincia?: string
           sucursal_correo?: string
           telefono?: string
+          transporte?: string
           updated_at?: string
         }
         Relationships: []
