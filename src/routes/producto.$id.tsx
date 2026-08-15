@@ -219,23 +219,6 @@ function ProductoPage() {
                   <option value="otro">Otro (personalizado)</option>
                 </select>
               )}
-
-              {tiers.length > 0 && (
-                <ul className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
-                  {tiers.map((t) => (
-                    <li
-                      key={t.units}
-                      className={`rounded-md border px-2 py-1 ${
-                        qty >= t.units
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground"
-                      }`}
-                    >
-                      {t.units}+ u. → -{t.percent}%
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
             )}
 
