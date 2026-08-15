@@ -39,6 +39,10 @@ function CarritoPage() {
 
   const items = cart.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice }));
 
+  const suplementosTotal = cart.items
+    .filter((i) => isSuplemento(i.categoria))
+    .reduce((a, i) => a + i.qty * i.unitPrice, 0);
+
   return (
     <div className="min-h-screen">
       <SiteHeader config={config} />
