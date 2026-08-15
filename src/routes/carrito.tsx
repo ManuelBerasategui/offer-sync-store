@@ -5,7 +5,14 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
-import { FALLBACK_IMAGE, money, waLink } from "@/lib/store";
+import {
+  FALLBACK_IMAGE,
+  SUPLEMENTOS_MIN,
+  SUPLEMENTOS_MSG,
+  isSuplemento,
+  money,
+  waLink,
+} from "@/lib/store";
 
 export const Route = createFileRoute("/carrito")({
   loader: ({ context }) => {
