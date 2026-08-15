@@ -112,7 +112,11 @@ function ProductoPage() {
     qty,
     unitPrice: Math.round(unit),
     imagen: imageUrl(product.imagen_url),
+    categoria: product.categoria ?? "",
   };
+
+  const suplemento = isSuplemento(product.categoria);
+  const bloqueaCompra = suplemento && total < SUPLEMENTOS_MIN;
 
   return (
     <div className="min-h-screen">
