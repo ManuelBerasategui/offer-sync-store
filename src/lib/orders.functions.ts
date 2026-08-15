@@ -11,6 +11,7 @@ type OrderInput = {
     provincia: string;
     ciudad: string;
     codigo_postal: string;
+    transporte: string;
     sucursal_correo: string;
   };
   items: OrderItem[];
@@ -37,6 +38,7 @@ function cleanOrder(data: OrderInput): OrderInput {
       provincia: text(s.provincia, 60),
       ciudad: text(s.ciudad, 80),
       codigo_postal: text(s.codigo_postal, 12),
+      transporte: text(s.transporte, 40) || "Correo Argentino",
       sucursal_correo: text(s.sucursal_correo, 160),
     },
     items: data.items.slice(0, 50).map((i) => ({
@@ -58,6 +60,13 @@ function makeCode() {
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator(cleanOrder)
   .handler(async ({ data }): Promise<{ orderId: string; orderCode: string; total: number }> => {
+    if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+      console.error("Falta configurar SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en el servidor");
+      throw new Error(
+        "El servidor no tiene configurada la base de datos (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).",
+      );
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
     const orderCode = makeCode();
@@ -76,7 +85,30 @@ export const createOrder = createServerFn({ method: "POST" })
 
     if (error || !row) {
       console.error("No se pudo crear el pedido", error);
-      throw new Error("No pudimos registrar el pedido. Probá de nuevo.");
+      throw new Error(
+        error?.message
+          ? `No pudimos registrar el pedido: ${error.message}`
+          : "No pudimos registrar el pedido. Probá de nuevo.",
+      );
+    }
+
+    // Guardamos/actualizamos el perfil del usuario logueado con los datos de envío.
+    if (data.userId) {
+      const { error: profileError } = await supabaseAdmin.from("profiles").upsert(
+        {
+          id: data.userId,
+          nombre: data.shipping.nombre,
+          dni: data.shipping.dni,
+          telefono: data.shipping.telefono,
+          provincia: data.shipping.provincia,
+          ciudad: data.shipping.ciudad,
+          codigo_postal: data.shipping.codigo_postal,
+          transporte: data.shipping.transporte,
+          sucursal_correo: data.shipping.sucursal_correo,
+        },
+        { onConflict: "id" },
+      );
+      if (profileError) console.error("No se pudo guardar el perfil", profileError);
     }
 
     return { orderId: row.id, orderCode: row.order_code, total };

@@ -5,7 +5,14 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
-import { FALLBACK_IMAGE, money, waLink } from "@/lib/store";
+import {
+  FALLBACK_IMAGE,
+  SUPLEMENTOS_MIN,
+  SUPLEMENTOS_MSG,
+  isSuplemento,
+  money,
+  waLink,
+} from "@/lib/store";
 
 export const Route = createFileRoute("/carrito")({
   loader: ({ context }) => {
@@ -31,6 +38,10 @@ function CarritoPage() {
   const cart = useCart();
 
   const items = cart.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice }));
+
+  const suplementosTotal = cart.items
+    .filter((i) => isSuplemento(i.categoria))
+    .reduce((a, i) => a + i.qty * i.unitPrice, 0);
 
   return (
     <div className="min-h-screen">
@@ -94,7 +105,22 @@ function CarritoPage() {
             </div>
 
             <div className="mt-4">
-              <CheckoutFlow items={items} total={cart.total} />
+              {suplementosTotal > 0 && suplementosTotal < SUPLEMENTOS_MIN ? (
+                <div className="card-soft p-5">
+                  <p className="text-sm font-semibold text-foreground">{SUPLEMENTOS_MSG}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Llevás {money(suplementosTotal)} en suplementos.
+                  </p>
+                  <Link
+                    to="/catalogo"
+                    className="btn-base grad-urgente mt-4 text-primary-foreground"
+                  >
+                    Seguir comprando
+                  </Link>
+                </div>
+              ) : (
+                <CheckoutFlow items={items} total={cart.total} />
+              )}
             </div>
 
             <a

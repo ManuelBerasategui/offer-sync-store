@@ -11,6 +11,7 @@ export type ShippingData = {
   provincia: string;
   ciudad: string;
   codigo_postal: string;
+  transporte: string;
   sucursal_correo: string;
 };
 
@@ -21,6 +22,7 @@ export const EMPTY_SHIPPING: ShippingData = {
   provincia: "",
   ciudad: "",
   codigo_postal: "",
+  transporte: "Correo Argentino",
   sucursal_correo: "",
 };
 
@@ -47,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { data } = await supabase
       .from("profiles")
-      .select("nombre, dni, telefono, provincia, ciudad, codigo_postal, sucursal_correo")
+      .select("nombre, dni, telefono, provincia, ciudad, codigo_postal, transporte, sucursal_correo")
       .eq("id", userId)
       .maybeSingle();
     setProfile(data ? { ...EMPTY_SHIPPING, ...data } : null);

@@ -7,6 +7,7 @@ export type CartItem = {
   qty: number;
   unitPrice: number;
   imagen?: string;
+  categoria?: string;
 };
 
 type CartCtx = {

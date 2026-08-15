@@ -7,11 +7,21 @@ import { CheckoutFlow } from "@/components/CheckoutFlow";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   FALLBACK_IMAGE,
+  SUPLEMENTOS_MIN,
+  SUPLEMENTOS_MSG,
   discountFor,
   findProduct,
-  hasOffer,
   imageUrl,
+  isSuplemento,
   onImageError,
   isWhatsappOnly,
   money,
@@ -73,6 +83,7 @@ function ProductoPage() {
   const [qty, setQty] = useState(1);
   const [custom, setCustom] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showMin, setShowMin] = useState(false);
 
   const tiers = useMemo(() => (product ? tiersOf(product) : []), [product]);
 
@@ -102,7 +113,11 @@ function ProductoPage() {
     qty,
     unitPrice: Math.round(unit),
     imagen: imageUrl(product.imagen_url),
+    categoria: product.categoria ?? "",
   };
+
+  const suplemento = isSuplemento(product.categoria);
+  const bloqueaCompra = suplemento && total < SUPLEMENTOS_MIN;
 
   return (
     <div className="min-h-screen">
@@ -141,19 +156,17 @@ function ProductoPage() {
               </p>
             ) : (
               <>
-                <div className="mt-4 flex flex-wrap items-baseline gap-3">
+                <div className="mt-4 flex flex-wrap items-baseline gap-2">
+                  {percent > 0 && (
+                    <span className="tabular-nums text-base text-muted-foreground line-through">
+                      {money(priceOf(product))}
+                    </span>
+                  )}
                   <span className="tabular-nums text-3xl font-bold text-foreground">
                     {money(unit)}
                   </span>
-                  {(percent > 0 || hasOffer(product)) && (
-                    <span className="tabular-nums text-base text-muted-foreground line-through">
-                      {money(percent > 0 ? priceOf(product) : product.precio)}
-                    </span>
-                  )}
                   {percent > 0 && (
-                    <span className="rounded-md bg-primary px-2 py-1 text-xs font-bold text-primary-foreground">
-                      -{percent}% por {qty} u.
-                    </span>
+                    <span className="text-xs font-bold text-primary">-{percent}%</span>
                   )}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -166,6 +179,11 @@ function ProductoPage() {
             {/* Cantidad */}
             {!consultar && (
             <div className="mt-6">
+              {tiers.length > 0 && (
+                <p className="mb-1 text-xs font-semibold text-muted-foreground">
+                  Llevá más, pagá menos!
+                </p>
+              )}
               <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
                 Cantidad
               </label>
@@ -206,23 +224,6 @@ function ProductoPage() {
                   <option value="otro">Otro (personalizado)</option>
                 </select>
               )}
-
-              {tiers.length > 0 && (
-                <ul className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
-                  {tiers.map((t) => (
-                    <li
-                      key={t.units}
-                      className={`rounded-md border px-2 py-1 ${
-                        qty >= t.units
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground"
-                      }`}
-                    >
-                      {t.units}+ u. → -{t.percent}%
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
             )}
 
@@ -244,7 +245,10 @@ function ProductoPage() {
               ) : (
                 <>
                   <button
-                    onClick={() => setShowCheckout(true)}
+                    onClick={() => {
+                      if (bloqueaCompra) setShowMin(true);
+                      else setShowCheckout(true);
+                    }}
                     className="btn-base grad-urgente text-primary-foreground"
                   >
                     Comprar ya
@@ -303,6 +307,26 @@ function ProductoPage() {
           Consultanos por stock, envíos o descuentos por cantidad.
         </p>
       </main>
+
+      <Dialog open={showMin} onOpenChange={setShowMin}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Compra mínima de suplementos</DialogTitle>
+            <DialogDescription>{SUPLEMENTOS_MSG}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={() => {
+                cart.add(cartItem);
+                navigate({ to: "/carrito" });
+              }}
+              className="btn-base grad-urgente text-primary-foreground"
+            >
+              Agregar al carrito
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SiteFooter config={config} />
     </div>

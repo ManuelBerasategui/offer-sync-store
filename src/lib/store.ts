@@ -164,3 +164,17 @@ export function unitPriceFor(p: Product, qty: number) {
   const base = priceOf(p);
   return base * (1 - discountFor(p, qty) / 100);
 }
+
+/* ---------- Suplementos: compra mínima ---------- */
+
+export const SUPLEMENTOS_MIN = 250000;
+
+export const SUPLEMENTOS_MSG =
+  "La compra mínima para suplementos es de $250.000. Agregá más productos al carrito y llevate todo junto!";
+
+/** ¿La categoría del producto (o del ítem del carrito) es suplementos? */
+export function isSuplemento(categoria?: string) {
+  return String(categoria ?? "")
+    .toLowerCase()
+    .includes("suplemento");
+}
