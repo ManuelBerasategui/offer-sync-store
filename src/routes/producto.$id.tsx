@@ -244,7 +244,10 @@ function ProductoPage() {
               ) : (
                 <>
                   <button
-                    onClick={() => setShowCheckout(true)}
+                    onClick={() => {
+                      if (bloqueaCompra) setShowMin(true);
+                      else setShowCheckout(true);
+                    }}
                     className="btn-base grad-urgente text-primary-foreground"
                   >
                     Comprar ya
