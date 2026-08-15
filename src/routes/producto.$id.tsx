@@ -151,19 +151,17 @@ function ProductoPage() {
               </p>
             ) : (
               <>
-                <div className="mt-4 flex flex-wrap items-baseline gap-3">
+                <div className="mt-4 flex flex-wrap items-baseline gap-2">
+                  {percent > 0 && (
+                    <span className="tabular-nums text-base text-muted-foreground line-through">
+                      {money(priceOf(product))}
+                    </span>
+                  )}
                   <span className="tabular-nums text-3xl font-bold text-foreground">
                     {money(unit)}
                   </span>
-                  {(percent > 0 || hasOffer(product)) && (
-                    <span className="tabular-nums text-base text-muted-foreground line-through">
-                      {money(percent > 0 ? priceOf(product) : product.precio)}
-                    </span>
-                  )}
                   {percent > 0 && (
-                    <span className="rounded-md bg-primary px-2 py-1 text-xs font-bold text-primary-foreground">
-                      -{percent}% por {qty} u.
-                    </span>
+                    <span className="text-xs font-bold text-primary">-{percent}%</span>
                   )}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
