@@ -308,6 +308,26 @@ function ProductoPage() {
         </p>
       </main>
 
+      <Dialog open={showMin} onOpenChange={setShowMin}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Compra mínima de suplementos</DialogTitle>
+            <DialogDescription>{SUPLEMENTOS_MSG}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={() => {
+                cart.add(cartItem);
+                navigate({ to: "/carrito" });
+              }}
+              className="btn-base grad-urgente text-primary-foreground"
+            >
+              Agregar al carrito
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <SiteFooter config={config} />
     </div>
   );
