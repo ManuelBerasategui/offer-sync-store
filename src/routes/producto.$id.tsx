@@ -174,6 +174,11 @@ function ProductoPage() {
             {/* Cantidad */}
             {!consultar && (
             <div className="mt-6">
+              {tiers.length > 0 && (
+                <p className="mb-1 text-xs font-semibold text-muted-foreground">
+                  Llevá más, pagá menos!
+                </p>
+              )}
               <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
                 Cantidad
               </label>
