@@ -83,6 +83,7 @@ function ProductoPage() {
   const [qty, setQty] = useState(1);
   const [custom, setCustom] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showMin, setShowMin] = useState(false);
 
   const tiers = useMemo(() => (product ? tiersOf(product) : []), [product]);
 
