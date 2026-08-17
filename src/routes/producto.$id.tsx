@@ -169,62 +169,58 @@ function ProductoPage() {
                     <span className="text-xs font-bold text-primary">-{percent}%</span>
                   )}
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Total por {qty} {qty === 1 ? "unidad" : "unidades"}:{" "}
-                  <strong>{money(total)}</strong>
-                </p>
               </>
             )}
 
             {/* Cantidad */}
             {!consultar && (
-            <div className="mt-6">
-              {tiers.length > 0 && (
-                <p className="mb-1 text-xs font-semibold text-muted-foreground">
-                  Llevá más, pagá menos!
-                </p>
-              )}
-              <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
-                Cantidad
-              </label>
-              {custom ? (
-                <div className="mt-2 flex gap-2">
-                  <input
-                    type="number"
-                    min={1}
+              <div className="mt-6">
+                {tiers.length > 0 && (
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">
+                    Llevá más, pagá menos!
+                  </p>
+                )}
+                <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                  Cantidad
+                </label>
+                {custom ? (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      value={qty}
+                      onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-32 rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustom(false);
+                        setQty(1);
+                      }}
+                      className="text-sm font-semibold text-muted-foreground hover:text-primary"
+                    >
+                      Volver a la lista
+                    </button>
+                  </div>
+                ) : (
+                  <select
                     value={qty}
-                    onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
-                    className="w-32 rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustom(false);
-                      setQty(1);
+                    onChange={(e) => {
+                      if (e.target.value === "otro") setCustom(true);
+                      else setQty(Number(e.target.value));
                     }}
-                    className="text-sm font-semibold text-muted-foreground hover:text-primary"
+                    className="mt-2 w-full max-w-[220px] rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
                   >
-                    Volver a la lista
-                  </button>
-                </div>
-              ) : (
-                <select
-                  value={qty}
-                  onChange={(e) => {
-                    if (e.target.value === "otro") setCustom(true);
-                    else setQty(Number(e.target.value));
-                  }}
-                  className="mt-2 w-full max-w-[220px] rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-                >
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>
-                      {n} {n === 1 ? "unidad" : "unidades"}
-                    </option>
-                  ))}
-                  <option value="otro">Otro (personalizado)</option>
-                </select>
-              )}
-            </div>
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? "unidad" : "unidades"}
+                      </option>
+                    ))}
+                    <option value="otro">Otro (personalizado)</option>
+                  </select>
+                )}
+              </div>
             )}
 
             <div className="mt-6 flex flex-col gap-3">
