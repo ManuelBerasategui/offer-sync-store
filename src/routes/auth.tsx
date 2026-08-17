@@ -111,12 +111,20 @@ function AuthPage() {
             <p className="mt-2 text-sm text-muted-foreground">{user.email}</p>
             {profile && (
               <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
-                {FIELDS.map((f) => (
+                {BASE_FIELDS.map((f) => (
                   <li key={f.key}>
                     <span className="font-semibold text-foreground">{f.label}:</span>{" "}
                     {profile[f.key] || "—"}
                   </li>
                 ))}
+                <li>
+                  <span className="font-semibold text-foreground">Transporte:</span>{" "}
+                  {profile.transporte || "—"}
+                </li>
+                <li>
+                  <span className="font-semibold text-foreground">Sucursal:</span>{" "}
+                  {profile.sucursal_correo || "—"}
+                </li>
               </ul>
             )}
             <div className="mt-6 flex flex-col gap-3">
