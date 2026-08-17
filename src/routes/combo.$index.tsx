@@ -3,9 +3,9 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { CheckoutFlow } from "@/components/CheckoutFlow";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
-import { createCheckout } from "@/lib/checkout.functions";
 import { FALLBACK_IMAGE, imageUrl, onImageError, money, toNumber, waLink } from "@/lib/store";
 
 export const Route = createFileRoute("/combo/$index")({
@@ -36,10 +36,9 @@ function ComboPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { banners, config } = data;
   const cart = useCart();
+  const [showCheckout, setShowCheckout] = useState(false);
 
   const banner = banners[Number(index)];
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   if (!banner) {
     return (
@@ -63,22 +62,6 @@ function ComboPage() {
     qty: 1,
     unitPrice: Math.round(price),
     imagen: imageUrl(banner.imagen_url),
-  };
-
-  const buyNow = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const res = await createCheckout({
-        data: { items: [{ nombre: item.nombre, qty: 1, unitPrice: item.unitPrice }], origin: window.location.origin },
-      });
-      if (res.url) window.location.href = res.url;
-      else setError(res.error ?? "No pudimos iniciar el pago.");
-    } catch {
-      setError("No pudimos iniciar el pago. Probá de nuevo.");
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -109,7 +92,9 @@ function ComboPage() {
               {banner.titulo}
             </h1>
             <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-muted-foreground">
-              {(banner.subtitulo ?? "").replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "").trim()}
+              {(banner.subtitulo ?? "")
+                .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+                .trim()}
             </p>
 
             {price > 0 && (
@@ -117,23 +102,31 @@ function ComboPage() {
             )}
 
             <div className="mt-6 flex flex-col gap-3">
-              <button
-                onClick={buyNow}
-                disabled={loading || price <= 0}
-                className="btn-base grad-urgente text-primary-foreground disabled:opacity-60"
-              >
-                {loading ? "Redirigiendo..." : "Comprar ya"}
-              </button>
-              <button
-                onClick={() => {
-                  cart.add(item);
-                  navigate({ to: "/carrito" });
-                }}
-                className="btn-base border border-border text-foreground hover:border-primary hover:text-primary"
-              >
-                Agregar al carrito
-              </button>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {showCheckout ? (
+                <CheckoutFlow
+                  items={[{ nombre: item.nombre, qty: 1, unitPrice: item.unitPrice }]}
+                  total={item.unitPrice}
+                />
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowCheckout(true)}
+                    disabled={price <= 0}
+                    className="btn-base grad-urgente text-primary-foreground disabled:opacity-60"
+                  >
+                    Comprar ya
+                  </button>
+                  <button
+                    onClick={() => {
+                      cart.add(item);
+                      navigate({ to: "/carrito" });
+                    }}
+                    className="btn-base border border-border text-foreground hover:border-primary hover:text-primary"
+                  >
+                    Agregar al carrito
+                  </button>
+                </>
+              )}
             </div>
 
             <a
