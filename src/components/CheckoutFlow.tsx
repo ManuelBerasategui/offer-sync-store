@@ -21,7 +21,7 @@ type CheckoutItem = { nombre: string; qty: number; unitPrice: number };
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
 
-const FIELDS: { key: keyof ShippingForm; label: string; type?: string }[] = [
+const BASE_FIELDS: { key: keyof ShippingForm; label: string; type?: string }[] = [
   { key: "nombre", label: "Nombre y apellido" },
   { key: "dni", label: "DNI" },
   { key: "telefono", label: "Teléfono" },
@@ -29,7 +29,6 @@ const FIELDS: { key: keyof ShippingForm; label: string; type?: string }[] = [
   { key: "provincia", label: "Provincia" },
   { key: "ciudad", label: "Ciudad" },
   { key: "codigo_postal", label: "Código postal" },
-  { key: "sucursal_correo", label: "Suc. Correo Argentino más cercana" },
 ];
 
 type ShippingForm = {
@@ -40,6 +39,7 @@ type ShippingForm = {
   provincia: string;
   ciudad: string;
   codigo_postal: string;
+  transporte: "Correo Argentino" | "Vía Cargo";
   sucursal_correo: string;
 };
 
@@ -51,6 +51,7 @@ const EMPTY: ShippingForm = {
   provincia: "",
   ciudad: "",
   codigo_postal: "",
+  transporte: "Correo Argentino",
   sucursal_correo: "",
 };
 
@@ -83,6 +84,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
         provincia: profile.provincia,
         ciudad: profile.ciudad,
         codigo_postal: profile.codigo_postal,
+        transporte: (profile.transporte as ShippingForm["transporte"]) || "Correo Argentino",
         sucursal_correo: profile.sucursal_correo,
       });
     }
@@ -109,6 +111,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
       form.provincia.trim() &&
       form.ciudad.trim() &&
       form.codigo_postal.trim() &&
+      form.transporte.trim() &&
       form.sucursal_correo.trim(),
     [form],
   );
@@ -192,8 +195,13 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
               Completamos tus datos automáticamente con tu cuenta.
             </p>
           )}
-          {FIELDS.map((f) => (
+          {BASE_FIELDS.map((f) => (
             <label key={f.key} className="flex flex-col gap-1.5">
+              {f.key === "dni" && (
+                <p className="text-xs text-muted-foreground">
+                  Ahora te pedimos unos datos para hacer el envío directo a domicilio.
+                </p>
+              )}
               <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
                 {f.label}
               </span>
@@ -206,6 +214,42 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
               />
             </label>
           ))}
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+              Transporte
+            </span>
+            <select
+              required
+              className={inputClass}
+              value={form.transporte}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  transporte: e.target.value as ShippingForm["transporte"],
+                })
+              }
+            >
+              <option value="Correo Argentino">Correo Argentino</option>
+              <option value="Vía Cargo">Vía Cargo</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+              {form.transporte === "Vía Cargo"
+                ? "Suc. Vía Cargo más cercana"
+                : "Suc. Correo Argentino más cercana"}
+            </span>
+            <input
+              type="text"
+              required
+              className={inputClass}
+              value={form.sucursal_correo}
+              onChange={(e) => setForm({ ...form, sucursal_correo: e.target.value })}
+            />
+          </label>
+
           <button
             type="submit"
             disabled={!canSubmit || creating}

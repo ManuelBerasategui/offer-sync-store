@@ -40,14 +40,13 @@ const inputClass =
 
 type Mode = "login" | "register" | "forgot";
 
-const FIELDS: { key: keyof ShippingData; label: string }[] = [
+const BASE_FIELDS: { key: keyof ShippingData; label: string }[] = [
   { key: "nombre", label: "Nombre y apellido" },
   { key: "dni", label: "DNI" },
   { key: "telefono", label: "Teléfono" },
   { key: "provincia", label: "Provincia" },
   { key: "ciudad", label: "Ciudad" },
   { key: "codigo_postal", label: "Código postal" },
-  { key: "sucursal_correo", label: "Suc. Correo Argentino más cercana" },
 ];
 
 function AuthPage() {
@@ -112,12 +111,20 @@ function AuthPage() {
             <p className="mt-2 text-sm text-muted-foreground">{user.email}</p>
             {profile && (
               <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
-                {FIELDS.map((f) => (
+                {BASE_FIELDS.map((f) => (
                   <li key={f.key}>
                     <span className="font-semibold text-foreground">{f.label}:</span>{" "}
                     {profile[f.key] || "—"}
                   </li>
                 ))}
+                <li>
+                  <span className="font-semibold text-foreground">Transporte:</span>{" "}
+                  {profile.transporte || "—"}
+                </li>
+                <li>
+                  <span className="font-semibold text-foreground">Sucursal:</span>{" "}
+                  {profile.sucursal_correo || "—"}
+                </li>
               </ul>
             )}
             <div className="mt-6 flex flex-col gap-3">
@@ -172,20 +179,62 @@ function AuthPage() {
                 </label>
               )}
 
-              {mode === "register" &&
-                FIELDS.map((f) => (
-                  <label key={f.key} className="flex flex-col gap-1.5">
+              {mode === "register" && (
+                <>
+                  {BASE_FIELDS.map((f) => (
+                    <label key={f.key} className="flex flex-col gap-1.5">
+                      {f.key === "dni" && (
+                        <p className="text-xs text-muted-foreground">
+                          Ahora te pedimos unos datos para hacer el envío directo a domicilio.
+                        </p>
+                      )}
+                      <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                        {f.label}
+                      </span>
+                      <input
+                        required
+                        className={inputClass}
+                        value={form[f.key]}
+                        onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                      />
+                    </label>
+                  ))}
+
+                  <label className="flex flex-col gap-1.5">
                     <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
-                      {f.label}
+                      Transporte
+                    </span>
+                    <select
+                      required
+                      className={inputClass}
+                      value={form.transporte}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          transporte: e.target.value as ShippingData["transporte"],
+                        })
+                      }
+                    >
+                      <option value="Correo Argentino">Correo Argentino</option>
+                      <option value="Vía Cargo">Vía Cargo</option>
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                      {form.transporte === "Vía Cargo"
+                        ? "Suc. Vía Cargo más cercana"
+                        : "Suc. Correo Argentino más cercana"}
                     </span>
                     <input
                       required
                       className={inputClass}
-                      value={form[f.key]}
-                      onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                      value={form.sucursal_correo}
+                      onChange={(e) => setForm({ ...form, sucursal_correo: e.target.value })}
                     />
                   </label>
-                ))}
+                </>
+              )}
 
               <button
                 type="submit"
