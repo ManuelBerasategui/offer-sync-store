@@ -84,6 +84,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
         provincia: profile.provincia,
         ciudad: profile.ciudad,
         codigo_postal: profile.codigo_postal,
+        transporte: (profile.transporte as ShippingForm["transporte"]) || "Correo Argentino",
         sucursal_correo: profile.sucursal_correo,
       });
     }
