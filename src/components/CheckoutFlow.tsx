@@ -194,8 +194,13 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
               Completamos tus datos automáticamente con tu cuenta.
             </p>
           )}
-          {FIELDS.map((f) => (
+          {BASE_FIELDS.map((f) => (
             <label key={f.key} className="flex flex-col gap-1.5">
+              {f.key === "dni" && (
+                <p className="text-xs text-muted-foreground">
+                  Ahora te pedimos unos datos para hacer el envío directo a domicilio.
+                </p>
+              )}
               <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
                 {f.label}
               </span>
@@ -208,6 +213,42 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
               />
             </label>
           ))}
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+              Transporte
+            </span>
+            <select
+              required
+              className={inputClass}
+              value={form.transporte}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  transporte: e.target.value as ShippingForm["transporte"],
+                })
+              }
+            >
+              <option value="Correo Argentino">Correo Argentino</option>
+              <option value="Vía Cargo">Vía Cargo</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+              {form.transporte === "Vía Cargo"
+                ? "Suc. Vía Cargo más cercana"
+                : "Suc. Correo Argentino más cercana"}
+            </span>
+            <input
+              type="text"
+              required
+              className={inputClass}
+              value={form.sucursal_correo}
+              onChange={(e) => setForm({ ...form, sucursal_correo: e.target.value })}
+            />
+          </label>
+
           <button
             type="submit"
             disabled={!canSubmit || creating}
