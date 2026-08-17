@@ -111,6 +111,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
       form.provincia.trim() &&
       form.ciudad.trim() &&
       form.codigo_postal.trim() &&
+      form.transporte.trim() &&
       form.sucursal_correo.trim(),
     [form],
   );
