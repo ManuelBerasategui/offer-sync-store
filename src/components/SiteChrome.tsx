@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ShoppingCart } from "lucide-react";
+import { LayoutGrid, ShoppingCart } from "lucide-react";
 import { waLink } from "@/lib/store";
 import type { SiteConfig } from "@/lib/store";
 import { useCart } from "@/lib/cart";
@@ -31,6 +31,13 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
               Contacto
             </Link>
           </nav>
+          <Link
+            to="/catalogo"
+            aria-label="Ver catálogo"
+            className="rounded-full border border-border p-2.5 text-foreground hover:border-primary hover:text-primary md:hidden"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Link>
           <HeaderAuth />
           <Link
             to="/carrito"
