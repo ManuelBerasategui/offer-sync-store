@@ -109,6 +109,7 @@ function ProductoPage() {
 
   const cartItem = {
     id: String(product.id ?? product.nombre ?? ""),
+    productId: product.id ? String(product.id) : undefined,
     nombre: product.nombre ?? "Producto",
     qty,
     unitPrice: Math.round(unit),

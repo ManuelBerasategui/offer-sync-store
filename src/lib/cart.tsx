@@ -1,13 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { storeQueryOptions } from "./store-query";
+import { findProduct, unitPriceFor } from "./store";
 
 export type CartItem = {
   id: string;
+  productId?: string | undefined;
   nombre: string;
   qty: number;
   unitPrice: number;
-  imagen?: string;
-  categoria?: string;
+  imagen?: string | undefined;
+  categoria?: string | undefined;
 };
 
 type CartCtx = {
@@ -25,6 +29,7 @@ const Ctx = createContext<CartCtx | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const { data } = useQuery(storeQueryOptions);
 
   useEffect(() => {
     try {
@@ -35,13 +40,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Recalcula dinámicamente el precio unitario según la cantidad actual y las reglas de descuento por tramos del producto
+  const resolvedItems = useMemo(() => {
+    const products = data?.products;
+    if (!products || products.length === 0) return items;
+
+    return items.map((item) => {
+      const product = findProduct(products, item.productId || item.id || item.nombre);
+      if (!product) return item;
+      const computedUnitPrice = Math.round(unitPriceFor(product, item.qty));
+      if (computedUnitPrice !== item.unitPrice) {
+        return { ...item, unitPrice: computedUnitPrice };
+      }
+      return item;
+    });
+  }, [items, data?.products]);
+
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(resolvedItems));
     } catch {
       /* ignore */
     }
-  }, [items]);
+  }, [resolvedItems]);
 
   const add = useCallback((item: CartItem) => {
     setItems((prev) => {
@@ -68,15 +89,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<CartCtx>(
     () => ({
-      items,
-      count: items.reduce((a, x) => a + x.qty, 0),
-      total: items.reduce((a, x) => a + x.qty * x.unitPrice, 0),
+      items: resolvedItems,
+      count: resolvedItems.reduce((a, x) => a + x.qty, 0),
+      total: resolvedItems.reduce((a, x) => a + x.qty * x.unitPrice, 0),
       add,
       remove,
       setQty,
       clear,
     }),
-    [items, add, remove, setQty, clear],
+    [resolvedItems, add, remove, setQty, clear],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -87,3 +108,4 @@ export function useCart() {
   if (!ctx) throw new Error("useCart debe usarse dentro de CartProvider");
   return ctx;
 }
+

@@ -9,8 +9,11 @@ import {
   FALLBACK_IMAGE,
   SUPLEMENTOS_MIN,
   SUPLEMENTOS_MSG,
+  discountFor,
+  findProduct,
   isSuplemento,
   money,
+  priceOf,
   waLink,
 } from "@/lib/store";
 
@@ -34,7 +37,7 @@ export const Route = createFileRoute("/carrito")({
 
 function CarritoPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
-  const { config } = data;
+  const { products, config } = data;
   const cart = useCart();
 
   const items = cart.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice }));
@@ -60,41 +63,55 @@ function CarritoPage() {
         ) : (
           <>
             <ul className="mt-6 flex flex-col gap-3">
-              {cart.items.map((i) => (
-                <li key={i.id} className="card-soft flex items-center gap-3 p-3">
-                  <img
-                    src={i.imagen || FALLBACK_IMAGE}
-                    alt={i.nombre}
-                    referrerPolicy="no-referrer"
-                    className="h-16 w-16 shrink-0 rounded-lg object-cover"
-                    onError={(e) => {
-                      e.currentTarget.src = FALLBACK_IMAGE;
-                    }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{i.nombre}</p>
-                    <p className="tabular-nums text-sm text-muted-foreground">
-                      {money(i.unitPrice)} c/u
+              {cart.items.map((i) => {
+                const product = findProduct(products, i.productId || i.id || i.nombre);
+                const percent = product ? discountFor(product, i.qty) : 0;
+                const basePrice = product ? priceOf(product) : i.unitPrice;
+
+                return (
+                  <li key={i.id} className="card-soft flex items-center gap-3 p-3">
+                    <img
+                      src={i.imagen || FALLBACK_IMAGE}
+                      alt={i.nombre}
+                      referrerPolicy="no-referrer"
+                      className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = FALLBACK_IMAGE;
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{i.nombre}</p>
+                      <p className="tabular-nums text-sm text-muted-foreground">
+                        {percent > 0 ? (
+                          <>
+                            <span className="mr-1 text-xs line-through">{money(basePrice)}</span>
+                            <span className="font-semibold text-foreground">{money(i.unitPrice)}</span> c/u{" "}
+                            <span className="text-[11px] font-bold text-primary">(-{percent}%)</span>
+                          </>
+                        ) : (
+                          <>{money(i.unitPrice)} c/u</>
+                        )}
+                      </p>
+                    </div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={i.qty}
+                      onChange={(e) => cart.setQty(i.id, Number(e.target.value) || 1)}
+                      className="w-16 rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+                    />
+                    <p className="w-24 shrink-0 text-right tabular-nums text-sm font-bold">
+                      {money(i.unitPrice * i.qty)}
                     </p>
-                  </div>
-                  <input
-                    type="number"
-                    min={1}
-                    value={i.qty}
-                    onChange={(e) => cart.setQty(i.id, Number(e.target.value) || 1)}
-                    className="w-16 rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
-                  />
-                  <p className="w-24 shrink-0 text-right tabular-nums text-sm font-bold">
-                    {money(i.unitPrice * i.qty)}
-                  </p>
-                  <button
-                    onClick={() => cart.remove(i.id)}
-                    className="text-xs font-semibold text-muted-foreground hover:text-destructive"
-                  >
-                    Quitar
-                  </button>
-                </li>
-              ))}
+                    <button
+                      onClick={() => cart.remove(i.id)}
+                      className="text-xs font-semibold text-muted-foreground hover:text-destructive"
+                    >
+                      Quitar
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
 
             <div className="mt-6 flex items-baseline justify-between rounded-xl border border-border bg-card p-5">
