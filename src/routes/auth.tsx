@@ -40,14 +40,13 @@ const inputClass =
 
 type Mode = "login" | "register" | "forgot";
 
-const FIELDS: { key: keyof ShippingData; label: string }[] = [
+const BASE_FIELDS: { key: keyof ShippingData; label: string }[] = [
   { key: "nombre", label: "Nombre y apellido" },
   { key: "dni", label: "DNI" },
   { key: "telefono", label: "Teléfono" },
   { key: "provincia", label: "Provincia" },
   { key: "ciudad", label: "Ciudad" },
   { key: "codigo_postal", label: "Código postal" },
-  { key: "sucursal_correo", label: "Suc. Correo Argentino más cercana" },
 ];
 
 function AuthPage() {
