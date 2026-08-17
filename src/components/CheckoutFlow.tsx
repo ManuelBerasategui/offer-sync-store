@@ -21,7 +21,7 @@ type CheckoutItem = { nombre: string; qty: number; unitPrice: number };
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
 
-const FIELDS: { key: keyof ShippingForm; label: string; type?: string }[] = [
+const BASE_FIELDS: { key: keyof ShippingForm; label: string; type?: string }[] = [
   { key: "nombre", label: "Nombre y apellido" },
   { key: "dni", label: "DNI" },
   { key: "telefono", label: "Teléfono" },
@@ -29,7 +29,6 @@ const FIELDS: { key: keyof ShippingForm; label: string; type?: string }[] = [
   { key: "provincia", label: "Provincia" },
   { key: "ciudad", label: "Ciudad" },
   { key: "codigo_postal", label: "Código postal" },
-  { key: "sucursal_correo", label: "Suc. Correo Argentino más cercana" },
 ];
 
 type ShippingForm = {
@@ -40,6 +39,7 @@ type ShippingForm = {
   provincia: string;
   ciudad: string;
   codigo_postal: string;
+  transporte: "Correo Argentino" | "Vía Cargo";
   sucursal_correo: string;
 };
 
@@ -51,6 +51,7 @@ const EMPTY: ShippingForm = {
   provincia: "",
   ciudad: "",
   codigo_postal: "",
+  transporte: "Correo Argentino",
   sucursal_correo: "",
 };
 
