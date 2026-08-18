@@ -116,57 +116,55 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
     [form],
   );
 
-  const submitShipping = async (e: React.FormEvent) => {
+  const submitShipping = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
     setError("");
-    setCreating(true);
-    try {
-      const res = await createOrder({
-        data: {
-          shipping: form,
-          items,
-          userId: user?.id,
-        },
-      });
-      setOrder({ orderId: res.orderId, orderCode: res.orderCode });
-      setStep("payment");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No pudimos registrar el pedido.");
-    } finally {
-      setCreating(false);
-    }
+    setStep("payment");
+  };
+
+  const ensureOrder = async () => {
+    if (order) return order;
+    const res = await createOrder({
+      data: {
+        shipping: form,
+        items,
+        userId: user?.id,
+      },
+    });
+    const created = { orderId: res.orderId, orderCode: res.orderCode };
+    setOrder(created);
+    return created;
   };
 
   const goMercadoPago = async () => {
     setError("");
     setMpLoading(true);
     try {
+      const activeOrder = await ensureOrder();
       const res = await createCheckout({
         data: {
           items,
           origin: window.location.origin,
-          ...(order?.orderCode ? { orderCode: order.orderCode } : {}),
+          orderCode: activeOrder.orderCode,
         },
       });
       if (res.url) window.location.href = res.url;
       else setError(res.error ?? "No pudimos iniciar el pago.");
-    } catch {
-      setError("No pudimos iniciar el pago. Probá de nuevo.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos iniciar el pago. Probá de nuevo.");
     } finally {
       setMpLoading(false);
     }
   };
 
   const payWithCard = async (cardData: CardFormData) => {
-    if (!order) return;
     setCardMsg("");
     try {
-      const res = await payOrderWithCard({ data: { ...cardData, orderId: order.orderId } });
-      if (res.status === "approved") {
-        navigate({ to: "/gracias", search: { code: order.orderCode } });
-      } else if (res.status === "pending") {
-        navigate({ to: "/gracias", search: { code: order.orderCode } });
+      const activeOrder = await ensureOrder();
+      const res = await payOrderWithCard({ data: { ...cardData, orderId: activeOrder.orderId } });
+      if (res.status === "approved" || res.status === "pending") {
+        navigate({ to: "/gracias", search: { code: activeOrder.orderCode } });
       } else {
         setCardMsg(res.message ?? "No pudimos procesar el pago con tarjeta.");
       }
@@ -252,10 +250,10 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
 
           <button
             type="submit"
-            disabled={!canSubmit || creating}
+            disabled={!canSubmit}
             className="btn-base grad-urgente mt-2 text-primary-foreground disabled:opacity-60"
           >
-            {creating ? "Guardando..." : "Continuar al pago"}
+            Continuar al pago
           </button>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </form>
