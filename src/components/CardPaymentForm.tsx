@@ -15,11 +15,15 @@ const PUBLIC_KEY =
   (import.meta.env["VITE_MERCADOPAGO_PUBLIC_KEY"] as string | undefined) ||
   "TEST-9af6f77e-2e08-4ef5-924b-b67d9c0ba75d";
 
+interface BrickController {
+  unmount: () => void;
+}
+
 declare global {
   interface Window {
     MercadoPago?: new (key: string, opts?: { locale?: string }) => {
       bricks: () => {
-        create: (type: string, container: string, settings: unknown) => Promise<unknown>;
+        create: (type: string, container: string, settings: unknown) => Promise<BrickController>;
       };
     };
   }
@@ -27,9 +31,11 @@ declare global {
 
 function loadSdk() {
   return new Promise<void>((resolve, reject) => {
+    if (typeof window === "undefined") return resolve();
     if (window.MercadoPago) return resolve();
     const existing = document.querySelector<HTMLScriptElement>("script[data-mp-sdk]");
     if (existing) {
+      if (window.MercadoPago) return resolve();
       existing.addEventListener("load", () => resolve());
       existing.addEventListener("error", () => reject(new Error("sdk")));
       return;
@@ -43,6 +49,11 @@ function loadSdk() {
   });
 }
 
+// Pre-cargar el SDK de Mercado Pago en segundo plano de inmediato si estamos en el navegador
+if (typeof window !== "undefined") {
+  loadSdk().catch(() => {});
+}
+
 /** Formulario de tarjeta (número, vencimiento, código de seguridad) de MercadoPago. */
 export function CardPaymentForm({
   amount,
@@ -54,26 +65,45 @@ export function CardPaymentForm({
   onPay: (data: CardFormData) => Promise<void>;
 }) {
   const containerId = "mp-card-brick";
-  const mounted = useRef(false);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const brickControllerRef = useRef<BrickController | null>(null);
 
   useEffect(() => {
-    if (!PUBLIC_KEY || mounted.current || amount <= 0) return;
-    mounted.current = true;
-    let cancelled = false;
+    if (!PUBLIC_KEY || amount <= 0) return;
+    let isCancelled = false;
 
-    (async () => {
+    const renderBrick = async () => {
       try {
+        setFailed(false);
+        setReady(false);
         await loadSdk();
-        if (cancelled || !window.MercadoPago) return;
+        if (isCancelled || !window.MercadoPago) return;
+
+        const containerElem = document.getElementById(containerId);
+        if (!containerElem || isCancelled) return;
+
+        // Limpiar controller previo si existe
+        if (brickControllerRef.current) {
+          try {
+            brickControllerRef.current.unmount();
+          } catch {}
+          brickControllerRef.current = null;
+        }
+        containerElem.innerHTML = "";
+
         const mp = new window.MercadoPago(PUBLIC_KEY, { locale: "es-AR" });
-        await mp.bricks().create("cardPayment", containerId, {
+        const controller = await mp.bricks().create("cardPayment", containerId, {
           initialization: { amount, payer: { email } },
           customization: { visual: { style: { theme: "default" } } },
           callbacks: {
-            onReady: () => setReady(true),
-            onError: () => setFailed(true),
+            onReady: () => {
+              if (!isCancelled) setReady(true);
+            },
+            onError: (err: unknown) => {
+              console.error("Error inicializando Brick de Mercado Pago:", err);
+              if (!isCancelled) setFailed(true);
+            },
             onSubmit: async (formData: {
               token: string;
               payment_method_id: string;
@@ -93,16 +123,32 @@ export function CardPaymentForm({
             },
           },
         });
-      } catch {
-        setFailed(true);
+
+        if (isCancelled) {
+          try {
+            controller.unmount();
+          } catch {}
+        } else {
+          brickControllerRef.current = controller;
+        }
+      } catch (err) {
+        console.error("Error al cargar formulario de tarjeta MP:", err);
+        if (!isCancelled) setFailed(true);
       }
-    })();
+    };
+
+    renderBrick();
 
     return () => {
-      cancelled = true;
+      isCancelled = true;
+      if (brickControllerRef.current) {
+        try {
+          brickControllerRef.current.unmount();
+        } catch {}
+        brickControllerRef.current = null;
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [amount, email]);
 
   if (!PUBLIC_KEY) {
     return (
@@ -114,15 +160,19 @@ export function CardPaymentForm({
   }
 
   return (
-    <div>
+    <div className="min-h-[160px]">
       <div id={containerId} />
       {!ready && !failed && (
-        <p className="text-sm text-muted-foreground">Cargando formulario de tarjeta...</p>
+        <p className="py-4 text-center text-sm text-muted-foreground">
+          Cargando formulario de tarjeta...
+        </p>
       )}
       {failed && (
-        <p className="text-sm text-destructive">
-          No pudimos cargar el formulario de tarjeta. Usá el botón de Mercado Pago.
-        </p>
+        <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-center">
+          <p className="text-sm text-destructive">
+            No pudimos cargar el formulario de tarjeta. Podés usar el botón de Mercado Pago abajo.
+          </p>
+        </div>
       )}
     </div>
   );

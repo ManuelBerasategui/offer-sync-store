@@ -68,19 +68,33 @@ function CarritoPage() {
                 const percent = product ? discountFor(product, i.qty) : 0;
                 const basePrice = product ? priceOf(product) : i.unitPrice;
 
+                const targetId = String(i.productId || i.id || i.nombre || "");
+
                 return (
                   <li key={i.id} className="card-soft flex items-center gap-3 p-3">
-                    <img
-                      src={i.imagen || FALLBACK_IMAGE}
-                      alt={i.nombre}
-                      referrerPolicy="no-referrer"
-                      className="h-16 w-16 shrink-0 rounded-lg object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = FALLBACK_IMAGE;
-                      }}
-                    />
+                    <Link
+                      to="/producto/$id"
+                      params={{ id: targetId }}
+                      className="shrink-0 transition-opacity hover:opacity-80"
+                    >
+                      <img
+                        src={i.imagen || FALLBACK_IMAGE}
+                        alt={i.nombre}
+                        referrerPolicy="no-referrer"
+                        className="h-16 w-16 rounded-lg object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = FALLBACK_IMAGE;
+                        }}
+                      />
+                    </Link>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{i.nombre}</p>
+                      <Link
+                        to="/producto/$id"
+                        params={{ id: targetId }}
+                        className="block truncate text-sm font-semibold hover:text-primary transition-colors"
+                      >
+                        {i.nombre}
+                      </Link>
                       <p className="tabular-nums text-sm text-muted-foreground">
                         {percent > 0 ? (
                           <>

@@ -10,8 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CardPaymentForm, type CardFormData } from "@/components/CardPaymentForm";
-import { createOrder } from "@/lib/orders.functions";
-import { payOrderWithCard } from "@/lib/orders.functions";
+import { createOrder, payOrderWithCard } from "@/lib/orders.functions";
 import { createCheckout } from "@/lib/checkout.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { money } from "@/lib/store";
@@ -119,6 +118,27 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
   const submitShipping = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
+
+    // Validación de DNI
+    const dniClean = form.dni.trim();
+    if (!/^\d{7,8}$/.test(dniClean)) {
+      setError("El DNI debe contener entre 7 y 8 números (sin puntos ni letras).");
+      return;
+    }
+
+    // Validación de Email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setError("Ingresá un correo electrónico válido (ej: nombre@gmail.com).");
+      return;
+    }
+
+    // Validación de Teléfono
+    const telDigits = form.telefono.replace(/\D/g, "");
+    if (telDigits.length < 8) {
+      setError("Ingresá un número de teléfono válido con caracteristica.");
+      return;
+    }
+
     setError("");
     setStep("payment");
   };
@@ -205,10 +225,18 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
               </span>
               <input
                 type={f.type ?? "text"}
+                inputMode={f.key === "dni" ? "numeric" : f.key === "telefono" ? "tel" : undefined}
+                maxLength={f.key === "dni" ? 8 : undefined}
                 required
                 className={inputClass}
                 value={form[f.key]}
-                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (f.key === "dni") {
+                    val = val.replace(/\D/g, "").slice(0, 8);
+                  }
+                  setForm({ ...form, [f.key]: val });
+                }}
               />
             </label>
           ))}
@@ -270,7 +298,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
             <p className="mb-2 text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
               Pagar con tarjeta
             </p>
-            {order && <CardPaymentForm amount={total} email={form.email} onPay={payWithCard} />}
+            <CardPaymentForm amount={total} email={form.email} onPay={payWithCard} />
             {cardMsg && <p className="mt-2 text-sm text-destructive">{cardMsg}</p>}
           </div>
 

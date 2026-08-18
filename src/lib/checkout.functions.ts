@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 type CheckoutItem = { nombre: string; qty: number; unitPrice: number };
 
 export const createCheckout = createServerFn({ method: "POST" })
-  .inputValidator((data: { items: CheckoutItem[]; origin: string; orderCode?: string }) => {
+  .validator((data: { items: CheckoutItem[]; origin: string; orderCode?: string }) => {
     if (!data || !Array.isArray(data.items) || data.items.length === 0) {
       throw new Error("Carrito vacío");
     }

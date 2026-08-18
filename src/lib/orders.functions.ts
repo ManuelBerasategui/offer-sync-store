@@ -58,7 +58,7 @@ function makeCode() {
 
 /** Crea el pedido en la base y devuelve el número de pedido. */
 export const createOrder = createServerFn({ method: "POST" })
-  .inputValidator(cleanOrder)
+  .validator(cleanOrder)
   .handler(async ({ data }): Promise<{ orderId: string; orderCode: string; total: number }> => {
     if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
       console.error("Falta configurar SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en el servidor");
@@ -116,7 +116,7 @@ export const createOrder = createServerFn({ method: "POST" })
 
 /** Cobro con tarjeta usando el token generado en el navegador por MercadoPago. */
 export const payOrderWithCard = createServerFn({ method: "POST" })
-  .inputValidator(
+  .validator(
     (data: {
       orderId: string;
       token: string;
@@ -199,7 +199,7 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
 
 /** Verifica y sincroniza el estado del pedido cuando el usuario vuelve de Mercado Pago. */
 export const verifyOrderPayment = createServerFn({ method: "POST" })
-  .inputValidator(
+  .validator(
     (data: {
       code?: string | undefined;
       status?: string | undefined;
