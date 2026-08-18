@@ -196,3 +196,66 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
         : { status, orderCode: order.order_code };
     },
   );
+
+/** Verifica y sincroniza el estado del pedido cuando el usuario vuelve de Mercado Pago. */
+export const verifyOrderPayment = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      code?: string | undefined;
+      status?: string | undefined;
+      collectionStatus?: string | undefined;
+      paymentId?: string | undefined;
+    }) => ({
+      code: data.code ? text(data.code, 60) : undefined,
+      status: text(data.status || data.collectionStatus, 40),
+      paymentId: data.paymentId ? text(data.paymentId, 60) : undefined,
+    }),
+  )
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      orderCode?: string;
+      estado: "pagado" | "pendiente" | "rechazado" | "desconocido";
+      total?: number;
+    }> => {
+      if (!data.code) return { estado: "desconocido" };
+      if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+        return { estado: "desconocido" };
+      }
+
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: order } = await supabaseAdmin
+        .from("orders")
+        .select("id, order_code, estado, total")
+        .eq("order_code", data.code)
+        .maybeSingle();
+
+      if (!order) return { estado: "desconocido" };
+
+      const mpStatus = data.status.toLowerCase();
+      let newStatus = order.estado;
+
+      if (mpStatus === "approved") {
+        newStatus = "pagado";
+      } else if (mpStatus === "pending" || mpStatus === "in_process") {
+        newStatus = "pendiente";
+      } else if (mpStatus === "rejected" || mpStatus === "cancelled") {
+        newStatus = "rechazado";
+      }
+
+      if (newStatus !== order.estado) {
+        await supabaseAdmin
+          .from("orders")
+          .update({ estado: newStatus, metodo_pago: "mercadopago" })
+          .eq("id", order.id);
+      }
+
+      return {
+        orderCode: order.order_code,
+        estado: newStatus as "pagado" | "pendiente" | "rechazado",
+        total: Number(order.total),
+      };
+    },
+  );
+
