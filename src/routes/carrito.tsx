@@ -128,11 +128,15 @@ function CarritoPage() {
                           <Minus className="h-3 w-3" />
                         </button>
                         <input
-                          type="number"
-                          min={1}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={i.qty}
-                          onChange={(e) => cart.setQty(i.id, Number(e.target.value) || 1)}
-                          className="h-8 w-8 border-x border-input bg-background text-center text-xs outline-none focus:border-primary [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, "");
+                            cart.setQty(i.id, digits ? Number(digits) : 1);
+                          }}
+                          className="h-8 w-8 border-x border-input bg-background text-center text-xs outline-none focus:border-primary"
                           aria-label={`Cantidad de ${i.nombre}`}
                         />
                         <button
