@@ -78,6 +78,20 @@ function AuthPage() {
       }
       if (mode === "register") {
         if (password.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");
+        // Validación de DNI
+        const dniClean = form.dni.trim();
+        if (!/^\d{7,8}$/.test(dniClean)) {
+          throw new Error("El DNI debe contener entre 7 y 8 números (sin puntos ni letras).");
+        }
+        // Validación de Email
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+          throw new Error("Ingresá un correo electrónico válido (ej: nombre@gmail.com).");
+        }
+        // Validación de Teléfono
+        const telDigits = form.telefono.replace(/\D/g, "");
+        if (telDigits.length < 8) {
+          throw new Error("Ingresá un número de teléfono válido con característica.");
+        }
         const { error: err } = await supabase.auth.signUp({
           email,
           password,
@@ -195,7 +209,15 @@ function AuthPage() {
                         required
                         className={inputClass}
                         value={form[f.key]}
-                        onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                        inputMode={f.key === "dni" ? "numeric" : f.key === "telefono" ? "tel" : undefined}
+                        maxLength={f.key === "dni" ? 8 : undefined}
+                        onChange={(e) => {
+                          let val = e.target.value;
+                          if (f.key === "dni") {
+                            val = val.replace(/\D/g, "").slice(0, 8);
+                          }
+                          setForm({ ...form, [f.key]: val });
+                        }}
                       />
                     </label>
                   ))}
