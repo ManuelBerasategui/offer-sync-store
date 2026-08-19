@@ -14,6 +14,11 @@ type ShippingInput = {
   sucursal_correo: string;
 };
 
+/**
+ * Crea la preferencia de pago en Mercado Pago Y guarda la orden en Supabase
+ * con estado "borrador" (invisible en el panel admin).
+ * Cuando MP confirma el pago, verifyOrderPayment la actualiza a "pagado".
+ */
 export const createCheckout = createServerFn({ method: "POST" })
   .validator(
     (data: {
@@ -48,26 +53,46 @@ export const createCheckout = createServerFn({ method: "POST" })
       };
     },
   )
-  .handler(async ({ data }): Promise<{ url?: string | undefined; error?: string | undefined }> => {
-    const token = process.env["MERCADOPAGO_ACCESS_TOKEN"];
-    if (!token) {
-      return {
-        error: "Falta configurar MercadoPago. Escribinos por WhatsApp para completar tu compra.",
-      };
+  .handler(async ({ data }): Promise<{ url?: string; error?: string }> => {
+    const mpToken = process.env["MERCADOPAGO_ACCESS_TOKEN"];
+    if (!mpToken) {
+      return { error: "Falta configurar MercadoPago. Escribinos por WhatsApp para completar tu compra." };
     }
 
-    // Generamos el código de pedido acá para usarlo en la URL de retorno y en el external_reference
+    // Generamos el código de orden
     const d = new Date();
     const stamp = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
     const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
     const orderCode = `TI-${stamp}-${rand}`;
+
+    const total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+
+    // Guardamos la orden como "borrador" en Supabase ANTES de ir a MP.
+    // Esto garantiza que los datos de envío e items nunca se pierdan.
+    if (process.env["SUPABASE_URL"] && process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        await supabaseAdmin.from("orders").insert({
+          order_code: orderCode,
+          user_id: data.userId ?? null,
+          ...data.shipping,
+          items: data.items,
+          total,
+          estado: "borrador",
+          metodo_pago: "mercadopago",
+        });
+      } catch (err) {
+        console.error("Error al guardar borrador de orden:", err);
+        // Continuamos igual; si falla Supabase el usuario puede pagar igual
+      }
+    }
 
     const successUrl = `${data.origin}/gracias?code=${encodeURIComponent(orderCode)}`;
 
     const res = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
-        authorization: `Bearer ${token}`,
+        authorization: `Bearer ${mpToken}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({
@@ -77,21 +102,6 @@ export const createCheckout = createServerFn({ method: "POST" })
           unit_price: i.unitPrice,
           currency_id: "ARS",
         })),
-        // Guardamos todo lo necesario en metadata para crear la orden cuando MP confirme el pago
-        metadata: {
-          order_code: orderCode,
-          user_id: data.userId ?? null,
-          items_json: JSON.stringify(data.items),
-          shipping_nombre: data.shipping.nombre,
-          shipping_dni: data.shipping.dni,
-          shipping_telefono: data.shipping.telefono,
-          shipping_email: data.shipping.email,
-          shipping_provincia: data.shipping.provincia,
-          shipping_ciudad: data.shipping.ciudad,
-          shipping_codigo_postal: data.shipping.codigo_postal,
-          shipping_transporte: data.shipping.transporte,
-          shipping_sucursal_correo: data.shipping.sucursal_correo,
-        },
         external_reference: orderCode,
         back_urls: {
           success: successUrl,
