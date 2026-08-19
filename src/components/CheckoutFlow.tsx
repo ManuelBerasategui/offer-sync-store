@@ -308,7 +308,12 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
             <p className="mb-2 text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
               Pagar con tarjeta
             </p>
-            <CardPaymentForm amount={total} email={form.email} onPay={payWithCard} />
+            <CardPaymentForm
+              amount={total}
+              email={form.email}
+              documentNumber={form.dni}
+              onPay={payWithCard}
+            />
             {cardMsg && <p className="mt-2 text-sm text-destructive">{cardMsg}</p>}
           </div>
 

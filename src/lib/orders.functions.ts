@@ -49,6 +49,21 @@ function cleanItems(items: OrderItem[]): OrderItem[] {
   }));
 }
 
+function paymentErrorMessage(body: string): string {
+  try {
+    const response = JSON.parse(body) as {
+      message?: string;
+      cause?: Array<{ description?: string }>;
+    };
+    const detail =
+      response.cause?.find((cause) => cause.description)?.description ?? response.message;
+    if (detail) return `Mercado Pago informó: ${text(detail, 180)}`;
+  } catch {
+    // La respuesta no siempre es JSON; el detalle completo queda en el log del servidor.
+  }
+  return "No pudimos procesar la tarjeta. Probá con Mercado Pago.";
+}
+
 /**
  * Cobro con tarjeta usando el token generado por MercadoPago en el browser.
  * La orden se crea primero como pendiente para que cada intento de cobro quede
@@ -94,6 +109,10 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
 
       const total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
       const orderCode = makeCode();
+      const identification =
+        data.docType && data.docNumber
+          ? { type: data.docType, number: data.docNumber }
+          : { type: "DNI", number: data.shipping.dni };
 
       if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
         console.error("Supabase no está configurado para crear la orden pendiente.");
@@ -146,9 +165,7 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
           external_reference: orderCode,
           payer: {
             email: data.email,
-            ...(data.docType && data.docNumber
-              ? { identification: { type: data.docType, number: data.docNumber } }
-              : {}),
+            identification,
           },
         }),
       });
@@ -158,7 +175,7 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
         console.error(`MercadoPago card error [${res.status}]: ${body}`);
         return {
           status: "error",
-          message: "No pudimos procesar la tarjeta. Probá con Mercado Pago.",
+          message: paymentErrorMessage(body),
         };
       }
 

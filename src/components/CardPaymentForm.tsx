@@ -59,10 +59,12 @@ if (typeof window !== "undefined") {
 export function CardPaymentForm({
   amount,
   email,
+  documentNumber,
   onPay,
 }: {
   amount: number;
   email: string;
+  documentNumber: string;
   onPay: (data: CardFormData) => Promise<void>;
 }) {
   const containerId = "mp-card-brick";
@@ -95,7 +97,13 @@ export function CardPaymentForm({
 
         const mp = new window.MercadoPago(PUBLIC_KEY, { locale: "es-AR" });
         const controller = await mp.bricks().create("cardPayment", containerId, {
-          initialization: { amount, payer: { email } },
+          initialization: {
+            amount,
+            payer: {
+              email,
+              identification: { type: "DNI", number: documentNumber },
+            },
+          },
           customization: { visual: { style: { theme: "default" } } },
           callbacks: {
             onReady: () => {
@@ -149,7 +157,7 @@ export function CardPaymentForm({
         brickControllerRef.current = null;
       }
     };
-  }, [amount, email]);
+  }, [amount, documentNumber, email]);
 
   if (!PUBLIC_KEY) {
     return (
