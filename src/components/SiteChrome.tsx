@@ -34,9 +34,10 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
           <Link
             to="/catalogo"
             aria-label="Ver catálogo"
-            className="rounded-full border border-border p-2.5 text-foreground hover:border-primary hover:text-primary md:hidden"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
           >
             <LayoutGrid className="h-4 w-4" />
+            <span>Catálogo</span>
           </Link>
           <HeaderAuth />
           <Link
