@@ -288,17 +288,7 @@ function AuthPage() {
                   ¿No tenés cuenta? Registrarse
                 </button>
               )}
-              {mode !== "forgot" && (
-                <button
-                  onClick={() => {
-                    setMode("forgot");
-                    setError("");
-                  }}
-                  className="underline text-muted-foreground hover:text-primary"
-                >
-                  Olvidé mi contraseña
-                </button>
-              )}
+
               {mode !== "login" && (
                 <button
                   onClick={() => {
