@@ -37,6 +37,9 @@ export const Route = createFileRoute("/auth")({
 
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
+const MAX_FIELD_LENGTH = 40;
+const MAX_EMAIL_LENGTH = 254;
+const MAX_PASSWORD_LENGTH = 72;
 
 type Mode = "login" | "register" | "forgot";
 
@@ -50,6 +53,9 @@ const BASE_FIELDS: { key: keyof ShippingData; label: string }[] = [
 ];
 
 function validateShippingData(form: ShippingData) {
+  if (Object.values(form).some((value) => value.length > MAX_FIELD_LENGTH)) {
+    return `Cada dato de perfil puede tener hasta ${MAX_FIELD_LENGTH} caracteres.`;
+  }
   if (BASE_FIELDS.some((field) => !form[field.key].trim()) || !form.sucursal_correo.trim()) {
     return "Completá todos los datos de envío.";
   }
@@ -134,12 +140,16 @@ function AuthPage() {
       }
       if (mode === "register") {
         if (password.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");
+        if (password.length > MAX_PASSWORD_LENGTH) {
+          throw new Error(`La contraseña puede tener hasta ${MAX_PASSWORD_LENGTH} caracteres.`);
+        }
         const shippingError = validateShippingData(form);
         if (shippingError) throw new Error(shippingError);
         // Validación de Email
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
           throw new Error("Ingresá un correo electrónico válido (ej: nombre@gmail.com).");
         }
+        if (email.length > MAX_EMAIL_LENGTH) throw new Error("El email es demasiado largo.");
         const { error: err } = await supabase.auth.signUp({
           email,
           password,
@@ -198,6 +208,10 @@ function AuthPage() {
       setError("La contraseña debe tener al menos 6 caracteres.");
       return;
     }
+    if (newPassword.length > MAX_PASSWORD_LENGTH) {
+      setError(`La contraseña puede tener hasta ${MAX_PASSWORD_LENGTH} caracteres.`);
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setError("Las contraseñas no coinciden.");
       return;
@@ -248,6 +262,7 @@ function AuthPage() {
                     type="password"
                     required
                     minLength={6}
+                    maxLength={MAX_PASSWORD_LENGTH}
                     className={inputClass}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -262,6 +277,7 @@ function AuthPage() {
                     type="password"
                     required
                     minLength={6}
+                    maxLength={MAX_PASSWORD_LENGTH}
                     className={inputClass}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -302,7 +318,7 @@ function AuthPage() {
                             ? "tel"
                             : undefined
                       }
-                      maxLength={field.key === "dni" ? 8 : undefined}
+                      maxLength={field.key === "dni" ? 8 : MAX_FIELD_LENGTH}
                       onChange={(e) => {
                         let value = e.target.value;
                         if (field.key === "dni") value = value.replace(/\D/g, "").slice(0, 8);
@@ -334,6 +350,7 @@ function AuthPage() {
                   <input
                     required
                     className={inputClass}
+                    maxLength={MAX_FIELD_LENGTH}
                     value={profileForm.sucursal_correo}
                     onChange={(e) =>
                       setProfileForm({ ...profileForm, sucursal_correo: e.target.value })
@@ -426,6 +443,7 @@ function AuthPage() {
                   type="email"
                   required
                   className={inputClass}
+                  maxLength={MAX_EMAIL_LENGTH}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
@@ -441,6 +459,7 @@ function AuthPage() {
                     required
                     minLength={6}
                     className={inputClass}
+                    maxLength={MAX_PASSWORD_LENGTH}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -466,7 +485,7 @@ function AuthPage() {
                         inputMode={
                           f.key === "dni" ? "numeric" : f.key === "telefono" ? "tel" : undefined
                         }
-                        maxLength={f.key === "dni" ? 8 : undefined}
+                        maxLength={f.key === "dni" ? 8 : MAX_FIELD_LENGTH}
                         onChange={(e) => {
                           let val = e.target.value;
                           if (f.key === "dni") {
@@ -507,6 +526,7 @@ function AuthPage() {
                     <input
                       required
                       className={inputClass}
+                      maxLength={MAX_FIELD_LENGTH}
                       value={form.sucursal_correo}
                       onChange={(e) => setForm({ ...form, sucursal_correo: e.target.value })}
                     />

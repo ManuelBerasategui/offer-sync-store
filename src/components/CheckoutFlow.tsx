@@ -19,6 +19,8 @@ type CheckoutItem = { nombre: string; qty: number; unitPrice: number };
 
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
+const MAX_FIELD_LENGTH = 40;
+const MAX_EMAIL_LENGTH = 254;
 
 const BASE_FIELDS: { key: keyof ShippingForm; label: string; type?: string }[] = [
   { key: "nombre", label: "Nombre y apellido" },
@@ -116,6 +118,19 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
   const submitShipping = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
+
+    if (
+      Object.entries(form).some(
+        ([key, value]) => key !== "email" && value.length > MAX_FIELD_LENGTH,
+      )
+    ) {
+      setError(`Cada dato de envío puede tener hasta ${MAX_FIELD_LENGTH} caracteres.`);
+      return;
+    }
+    if (form.email.length > MAX_EMAIL_LENGTH) {
+      setError("El email es demasiado largo.");
+      return;
+    }
 
     // Validación de DNI
     const dniClean = form.dni.trim();
@@ -216,7 +231,9 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
               <input
                 type={f.type ?? "text"}
                 inputMode={f.key === "dni" ? "numeric" : f.key === "telefono" ? "tel" : undefined}
-                maxLength={f.key === "dni" ? 8 : undefined}
+                maxLength={
+                  f.key === "dni" ? 8 : f.key === "email" ? MAX_EMAIL_LENGTH : MAX_FIELD_LENGTH
+                }
                 required
                 className={inputClass}
                 value={form[f.key]}
@@ -261,6 +278,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
               type="text"
               required
               className={inputClass}
+              maxLength={MAX_FIELD_LENGTH}
               value={form.sucursal_correo}
               onChange={(e) => setForm({ ...form, sucursal_correo: e.target.value })}
             />
