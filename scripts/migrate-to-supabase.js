@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
+import { createHash } from "crypto";
 
 // Cargar variables de entorno desde .env manualmente
 const envPath = path.resolve(process.cwd(), ".env");
@@ -17,10 +18,13 @@ for (const line of envContent.split("\n")) {
 }
 
 const SUPABASE_URL = envVars["SUPABASE_URL"];
+// Este script se ejecuta solamente desde una máquina de administración.
+// Nunca uses la clave pública para importar datos: obligaría a abrir escrituras
+// anónimas en las tablas.
 const SUPABASE_KEY = envVars["SUPABASE_SERVICE_ROLE_KEY"];
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("Falta SUPABASE_SERVICE_ROLE_KEY en el .env. Es necesario para saltar RLS e insertar los datos.");
+  console.error("Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en el .env.");
   process.exit(1);
 }
 
@@ -38,13 +42,16 @@ async function fetchTab(tab) {
     const rows = await res.json();
     return Array.isArray(rows) ? rows : [];
   } catch (error) {
-    console.error("No se pudo leer la planilla", tab, error);
-    return [];
+    throw new Error(`No se pudo leer la planilla ${tab}: ${error instanceof Error ? error.message : error}`);
   }
 }
 
 const hasValue = (row) => Object.values(row).some((v) => String(v ?? "").trim() !== "");
 const isNote = (v) => /^notas?\s*:/i.test(String(v ?? "").trim());
+const deterministicUuid = (value) => {
+  const hash = createHash('sha256').update(value).digest('hex');
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+};
 
 async function run() {
   console.log("Descargando datos de Google Sheets...");
@@ -54,12 +61,15 @@ async function run() {
     fetchTab(TABS.config),
   ]);
 
+  if (!productsRaw.length || !configRaw.length) {
+    throw new Error("Google Sheets devolvió datos incompletos; la migración se canceló para no sobrescribir Supabase.");
+  }
+
   const products = productsRaw.filter(
     (p) =>
       hasValue(p) &&
       !isNote(p.id) &&
-      String(p.nombre ?? "").trim() !== "" &&
-      String(p.stock ?? "SI").trim().toUpperCase() !== "NO"
+      String(p.nombre ?? "").trim() !== ""
   ).map((p) => {
     // Separar campos estándar y metadata
     const stdFields = ["id", "nombre", "categoria", "precio", "precio_oferta", "imagen_url", "descripcion", "destacado", "oferta", "stock", "descuento"];
@@ -84,9 +94,11 @@ async function run() {
     (b) =>
       hasValue(b) &&
       !isNote(b.titulo) &&
-      String(b.titulo ?? "").trim() !== "" &&
-      String(b.activo ?? "SI").trim().toUpperCase() !== "NO"
-  ).map(b => ({
+      String(b.titulo ?? "").trim() !== ""
+  ).map((b, index) => ({
+    // Un UUID determinístico permite ejecutar la migración más de una vez sin
+    // duplicar banners, aunque la tabla use UUID como clave primaria.
+    id: deterministicUuid(`${index}:${b.titulo}:${b.imagen_url}`),
     titulo: b.titulo,
     subtitulo: b.subtitulo,
     imagen_url: b.imagen_url,
@@ -107,22 +119,30 @@ async function run() {
   console.log(`Procesados: ${products.length} productos, ${banners.length} banners, ${config.length} configs.`);
   console.log("Subiendo a Supabase...");
 
-  // Para poder insertar con la public key, las tablas deben tener RLS temporalmente deshabilitado 
-  // o permitir INSERTS públicos. Suponiendo que aplicaste la migración correctamente.
-  
   const { error: pErr } = await supabase.from('products').upsert(products);
-  if (pErr) console.error("Error insertando productos:", pErr);
-  else console.log("Productos insertados exitosamente.");
+  if (pErr) throw new Error(`Error insertando productos: ${pErr.message}`);
+  console.log("Productos insertados exitosamente.");
 
-  const { error: bErr } = await supabase.from('banners').insert(banners);
-  if (bErr) console.error("Error insertando banners:", bErr);
-  else console.log("Banners insertados exitosamente.");
+  const { error: bErr } = await supabase.from('banners').upsert(banners);
+  if (bErr) throw new Error(`Error insertando banners: ${bErr.message}`);
+  console.log("Banners insertados exitosamente.");
 
   const { error: cErr } = await supabase.from('site_config').upsert(config);
-  if (cErr) console.error("Error insertando config:", cErr);
-  else console.log("Configuraciones insertadas exitosamente.");
-  
-  console.log("Migración completada.");
+  if (cErr) throw new Error(`Error insertando config: ${cErr.message}`);
+  console.log("Configuraciones insertadas exitosamente.");
+
+  const [{ count: productCount, error: productCountError }, { count: bannerCount, error: bannerCountError }, { count: configCount, error: configCountError }] = await Promise.all([
+    supabase.from('products').select('*', { count: 'exact', head: true }),
+    supabase.from('banners').select('*', { count: 'exact', head: true }),
+    supabase.from('site_config').select('*', { count: 'exact', head: true }),
+  ]);
+  if (productCountError || bannerCountError || configCountError) {
+    throw new Error(`No se pudo verificar la migración: ${productCountError?.message ?? bannerCountError?.message ?? configCountError?.message}`);
+  }
+  console.log(`Migración verificada: ${productCount} productos, ${bannerCount} banners, ${configCount} configuraciones en Supabase.`);
 }
 
-run();
+run().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});

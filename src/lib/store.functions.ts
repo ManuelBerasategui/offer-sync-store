@@ -6,7 +6,7 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
   async (): Promise<StoreData> => {
     try {
       const [{ data: productsRaw }, { data: bannersRaw }, { data: configRaw }] = await Promise.all([
-        supabase.from('products').select('*'),
+        supabase.from('products').select('*').neq('stock', 'NO'),
         supabase.from('banners').select('*').eq('activo', 'SI'),
         supabase.from('site_config').select('*'),
       ]);
