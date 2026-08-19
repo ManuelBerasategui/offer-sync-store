@@ -1,13 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Flame } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { HowItWorks, ReviewsCarousel } from "@/components/Social";
 import { storeQueryOptions } from "@/lib/store-query";
-import { FALLBACK_IMAGE, imageUrl,
-  onImageError, isYes, money, toNumber, waLink, type SiteConfig } from "@/lib/store";
+import {
+  FALLBACK_IMAGE, imageUrl,
+  onImageError, isYes, money, toNumber, waLink, type SiteConfig
+} from "@/lib/store";
 
 export const Route = createFileRoute("/")({
   loader: ({ context }) => {
@@ -57,38 +60,50 @@ function Home() {
       {/* OFERTAS DEL DÍA */}
       <section id="ofertas" className="px-4 py-14 sm:px-6">
         <div className="mx-auto max-w-[1180px]">
-          <SectionHead title="Ofertas del día" />
+          <SectionHead
+            title={
+              <>
+                Ofertas <span className="text-primary">del día</span>
+              </>
+            }
+            sub="Precios exclusivos que renovamos todos los días. Válidos solo por hoy."
+          />
 
           {banners.length > 0 && (
-            <div className="no-scrollbar -mx-4 mb-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-              {banners.map((b, i) => (
-                <Link
-                  key={i}
-                  to="/combo/$index"
-                  params={{ index: String(i) }}
-                  className="relative min-w-[280px] snap-start overflow-hidden rounded-xl border border-border bg-card sm:min-w-[420px]"
-                  style={{ aspectRatio: "16 / 10" }}
-                >
-                  <img
-                    src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
-                    alt={b.titulo ?? ""}
-                    referrerPolicy="no-referrer"
-                    className="h-full w-full object-cover"
-                    onError={onImageError(b.imagen_url)}
-                  />
-                  <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/25 to-transparent p-4">
-                    <span className="mb-2 self-start rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase text-primary-foreground">
-                      Combo en oferta
-                    </span>
-                    <h3 className="text-lg text-white">{b.titulo}</h3>
-                    {toNumber(b.precio) > 0 && (
-                      <p className="tabular-nums text-base font-bold text-white">
-                        {money(b.precio)}
-                      </p>
-                    )}
-                  </div>
-                </Link>
-              ))}
+            <div className="relative -mx-4 mb-6 sm:mx-0">
+              <div className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0">
+                {banners.map((b, i) => (
+                  <Link
+                    key={i}
+                    to="/combo/$index"
+                    params={{ index: String(i) }}
+                    className="group relative min-w-[280px] snap-start overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:min-w-[420px]"
+                    style={{ aspectRatio: "16 / 10" }}
+                  >
+                    <img
+                      src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
+                      alt={b.titulo ?? ""}
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      onError={onImageError(b.imagen_url)}
+                    />
+                    <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/25 to-transparent p-4">
+                      <span className="mb-2 inline-flex w-fit items-center gap-1 self-start rounded-full grad-urgente px-2.5 py-1 text-[10px] font-bold uppercase text-primary-foreground">
+                        <Flame className="h-3 w-3" />
+                        Combo en oferta
+                      </span>
+                      <h3 className="text-lg font-bold text-white sm:text-xl">{b.titulo}</h3>
+                      {toNumber(b.precio) > 0 && (
+                        <p className="tabular-nums mt-1.5 w-fit rounded-md bg-white px-2 py-0.5 text-base font-bold text-foreground">
+                          {money(b.precio)}
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              {/* Hint that there's more to scroll on wider screens where cards don't peek off-edge */}
+              <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
             </div>
           )}
 
@@ -193,7 +208,7 @@ function Home() {
   );
 }
 
-function SectionHead({ title, sub }: { title: string; sub?: string }) {
+function SectionHead({ title, sub }: { title: React.ReactNode; sub?: string }) {
   return (
     <div className="mb-7">
       <h2 className="text-[clamp(24px,7vw,40px)]">{title}</h2>
