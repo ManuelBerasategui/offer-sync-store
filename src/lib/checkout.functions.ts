@@ -123,5 +123,6 @@ export const createCheckout = createServerFn({ method: "POST" })
     }
 
     const json = JSON.parse(body) as { init_point?: string; sandbox_init_point?: string };
-    return { url: json.init_point ?? json.sandbox_init_point ?? undefined };
+    const url = json.init_point ?? json.sandbox_init_point;
+    return url ? { url } : { error: "No pudimos obtener el enlace de pago. Probá de nuevo." };
   });

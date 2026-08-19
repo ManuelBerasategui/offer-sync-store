@@ -13,7 +13,9 @@ const graciasSearchSchema = z
     code: z.string().optional(),
     status: z.string().optional(),
     collection_status: z.string().optional(),
-    payment_id: z.string().optional(),
+    // MP puede enviar estos como números — los convertimos a string para no perderlos
+    payment_id: z.coerce.string().optional(),
+    collection_id: z.coerce.string().optional(),
   })
   .passthrough();
 
@@ -41,7 +43,7 @@ export const Route = createFileRoute("/gracias")({
 });
 
 function GraciasPage() {
-  const { code, status, collection_status, payment_id } = Route.useSearch();
+  const { code, status, collection_status, payment_id, collection_id } = Route.useSearch();
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { config } = data;
   const cart = useCart();
@@ -67,7 +69,8 @@ function GraciasPage() {
             code,
             status: rawStatus,
             collectionStatus: collection_status,
-            paymentId: payment_id,
+            // Usamos payment_id o collection_id (MP envía ambos, el que llegue sirve)
+            paymentId: payment_id || collection_id,
           },
         });
         if (!cancelled) {

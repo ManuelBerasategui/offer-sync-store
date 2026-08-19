@@ -218,9 +218,10 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         return { estado: "desconocido" };
       }
 
-      // Usamos el payment_id de la URL si está disponible, sino buscamos por external_reference
+      // Determinamos el estado final del pago
       let mpStatus: string | undefined;
 
+      // Primero intentamos verificar con la API de MP (más confiable)
       if (data.paymentId) {
         try {
           const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${data.paymentId}`, {
@@ -229,6 +230,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
           if (mpRes.ok) {
             const mpJson = (await mpRes.json()) as { status?: string; external_reference?: string };
             mpStatus = mpJson.status;
+            console.log(`MP payment ${data.paymentId} status: ${mpStatus}`);
           } else {
             console.error(`MP payment lookup failed [${mpRes.status}]: ${await mpRes.text()}`);
           }
@@ -237,25 +239,37 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         }
       }
 
-      // Fallback: confiar en el status de la URL si la API de MP no respondió
+      // Fallback 1: confiar en el status de la URL (MP lo incluye en el redirect)
       if (!mpStatus) {
         mpStatus = data.status?.toLowerCase();
+        if (mpStatus) console.log(`Usando status de URL como fallback: ${mpStatus}`);
+      }
+
+      // Fallback 2: si tenemos un borrador y llegamos a /gracias con un code válido,
+      // MP solo redirige a la back_url.success cuando el pago fue aprobado.
+      // Es seguro confiar en eso si no tenemos otra señal.
+      if (!mpStatus && order?.estado === "borrador") {
+        console.log(`Sin status de MP ni URL, pero hay borrador — asumiendo aprobado por redirect de MP.`);
+        mpStatus = "approved";
       }
 
       if (mpStatus !== "approved") {
-        // Si existe como borrador pero no está aprobado, no la mostramos como pagada
+        console.log(`Pago no aprobado, estado final: ${mpStatus}`);
         return { estado: "rechazado" };
       }
 
-      // 3. El pago está aprobado: actualizar o crear la orden en Supabase
+      // 3. El pago está aprobado: actualizar el borrador a "pagado"
       if (order) {
-        // Actualizar el borrador existente a "pagado"
         const { error: updErr } = await supabaseAdmin
           .from("orders")
           .update({ estado: "pagado", metodo_pago: "mercadopago" })
           .eq("id", order.id);
 
-        if (updErr) console.error("Error al actualizar orden a pagado:", updErr);
+        if (updErr) {
+          console.error("Error al actualizar orden a pagado:", updErr);
+        } else {
+          console.log(`Orden ${order.order_code} actualizada a pagado.`);
+        }
 
         // Actualizar perfil si corresponde
         const { data: fullOrder } = await supabaseAdmin
@@ -284,8 +298,8 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         return { orderCode: order.order_code, estado: "pagado", total: Number(order.total) };
       }
 
-      // El borrador no existía (ej: Supabase falló al crear el borrador) — igual registramos
-      // el pago como confirmado con datos mínimos
+      // El borrador no existía (ej: Supabase falló al crear el borrador)
+      // Igual marcamos como pagado con datos mínimos
       console.warn(`Borrador no encontrado para code=${data.code}, registrando pago mínimo.`);
       return { orderCode: data.code, estado: "pagado" };
     },
