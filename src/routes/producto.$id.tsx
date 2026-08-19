@@ -138,7 +138,7 @@ function ProductoPage() {
               src={imageUrl(product.imagen_url) || FALLBACK_IMAGE}
               alt={product.nombre ?? "Producto"}
               referrerPolicy="no-referrer"
-              className="aspect-square w-full object-cover"
+              className="aspect-square w-full bg-surface object-contain p-3"
               onError={onImageError(product.imagen_url)}
             />
           </div>
