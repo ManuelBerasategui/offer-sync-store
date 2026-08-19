@@ -59,7 +59,9 @@ Deno.serve(async (request) => {
     if (!settings.enabled) return json({ skipped: true, reason: "Sincronización desactivada." });
 
     const { rate, offers } = await binanceP2pRate();
-    const { data: products, error: productsError } = await supabase.from("products").select("id, precio, precio_usd");
+    const { data: products, error: productsError } = await supabase
+      .from("products")
+      .select("id, precio, precio_usd, precio_oferta, precio_oferta_usd");
     if (productsError) throw new Error(`No se pudieron leer productos: ${productsError.message}`);
 
     const markup = Number(settings.markup_percentage) / 100;
@@ -69,7 +71,15 @@ Deno.serve(async (request) => {
       const baseUsd = Number(product.precio_usd) || parseArs(product.precio) / rate;
       if (!Number.isFinite(baseUsd) || baseUsd <= 0) return [];
       const price = Math.ceil((baseUsd * rate * (1 + markup)) / increment) * increment;
-      return [{ id: product.id, precio: String(price), precio_usd: Number(baseUsd.toFixed(6)), precio_actualizado_en: now }];
+      const offerArs = parseArs(product.precio_oferta);
+      const offerUsd = Number(product.precio_oferta_usd) || (offerArs > 0 ? offerArs / rate : 0);
+      const offerUpdate = offerUsd > 0
+        ? {
+            precio_oferta: String(Math.ceil((offerUsd * rate * (1 + markup)) / increment) * increment),
+            precio_oferta_usd: Number(offerUsd.toFixed(6)),
+          }
+        : {};
+      return [{ id: product.id, precio: String(price), precio_usd: Number(baseUsd.toFixed(6)), precio_actualizado_en: now, ...offerUpdate }];
     });
     if (updates.length) {
       // No usamos upsert: Postgres valida las columnas NOT NULL antes de resolver
@@ -83,6 +93,8 @@ Deno.serve(async (request) => {
               .update({
                 precio: product.precio,
                 precio_usd: product.precio_usd,
+                ...(product.precio_oferta ? { precio_oferta: product.precio_oferta } : {}),
+                ...(product.precio_oferta_usd ? { precio_oferta_usd: product.precio_oferta_usd } : {}),
                 precio_actualizado_en: product.precio_actualizado_en,
               })
               .eq("id", product.id),

@@ -1,5 +1,6 @@
 ALTER TABLE public.products
   ADD COLUMN IF NOT EXISTS precio_usd numeric(14, 6),
+  ADD COLUMN IF NOT EXISTS precio_oferta_usd numeric(14, 6),
   ADD COLUMN IF NOT EXISTS precio_actualizado_en timestamptz;
 
 CREATE TABLE IF NOT EXISTS public.pricing_settings (
@@ -22,4 +23,5 @@ ALTER TABLE public.pricing_settings ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.pricing_settings TO service_role;
 
 COMMENT ON COLUMN public.products.precio_usd IS 'Precio base en USDT. Si está vacío, el primer sync lo calcula a partir del precio actual en ARS.';
+COMMENT ON COLUMN public.products.precio_oferta_usd IS 'Precio de oferta base en USDT. Si está vacío, el primer sync lo calcula a partir del precio de oferta actual en ARS.';
 COMMENT ON COLUMN public.pricing_settings.rounding_increment IS 'El precio final siempre se redondea hacia arriba a este múltiplo en ARS.';
