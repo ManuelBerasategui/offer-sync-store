@@ -72,78 +72,90 @@ function CarritoPage() {
                 const targetId = String(i.productId || i.id || i.nombre || "");
 
                 return (
-                  <li key={i.id} className="card-soft flex items-center gap-3 p-3">
-                    <Link
-                      to="/producto/$id"
-                      params={{ id: targetId }}
-                      className="shrink-0 transition-opacity hover:opacity-80"
-                    >
-                      <img
-                        src={i.imagen || FALLBACK_IMAGE}
-                        alt={i.nombre}
-                        referrerPolicy="no-referrer"
-                        className="h-16 w-16 rounded-lg object-cover"
-                        onError={(e) => {
-                          e.currentTarget.src = FALLBACK_IMAGE;
-                        }}
-                      />
-                    </Link>
-                    <div className="min-w-0 flex-1">
+                  <li
+                    key={i.id}
+                    className="card-soft flex flex-col gap-3 p-3 sm:flex-row sm:items-center"
+                  >
+                    {/* Image + name/price — full width on mobile, flexible on desktop */}
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
                       <Link
                         to="/producto/$id"
                         params={{ id: targetId }}
-                        className="block truncate text-sm font-semibold hover:text-primary transition-colors"
+                        className="shrink-0 transition-opacity hover:opacity-80"
                       >
-                        {i.nombre}
+                        <img
+                          src={i.imagen || FALLBACK_IMAGE}
+                          alt={i.nombre}
+                          referrerPolicy="no-referrer"
+                          className="h-16 w-16 rounded-lg object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = FALLBACK_IMAGE;
+                          }}
+                        />
                       </Link>
-                      <p className="tabular-nums text-sm text-muted-foreground">
-                        {percent > 0 ? (
-                          <>
-                            <span className="mr-1 text-xs line-through">{money(basePrice)}</span>
-                            <span className="font-semibold text-foreground">{money(i.unitPrice)}</span> c/u{" "}
-                            <span className="text-[11px] font-bold text-primary">(-{percent}%)</span>
-                          </>
-                        ) : (
-                          <>{money(i.unitPrice)} c/u</>
-                        )}
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          to="/producto/$id"
+                          params={{ id: targetId }}
+                          className="block truncate text-sm font-semibold hover:text-primary transition-colors"
+                        >
+                          {i.nombre}
+                        </Link>
+                        <p className="tabular-nums text-sm text-muted-foreground">
+                          {percent > 0 ? (
+                            <>
+                              <span className="mr-1 text-xs line-through">{money(basePrice)}</span>
+                              <span className="font-semibold text-foreground">{money(i.unitPrice)}</span> c/u{" "}
+                              <span className="text-[11px] font-bold text-primary">(-{percent}%)</span>
+                            </>
+                          ) : (
+                            <>{money(i.unitPrice)} c/u</>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Qty stepper + subtotal + remove — own row on mobile so nothing gets squeezed */}
+                    <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+                      <div className="flex shrink-0 items-center rounded-md border border-input bg-background">
+                        <button
+                          type="button"
+                          onClick={() => cart.setQty(i.id, i.qty - 1)}
+                          disabled={i.qty <= 1}
+                          className="flex h-8 w-7 items-center justify-center text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`Quitar una unidad de ${i.nombre}`}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          value={i.qty}
+                          onChange={(e) => cart.setQty(i.id, Number(e.target.value) || 1)}
+                          className="h-8 w-8 border-x border-input bg-background text-center text-xs outline-none focus:border-primary [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+                          aria-label={`Cantidad de ${i.nombre}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => cart.setQty(i.id, i.qty + 1)}
+                          className="flex h-8 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
+                          aria-label={`Agregar una unidad de ${i.nombre}`}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+
+                      <p className="w-20 shrink-0 text-right tabular-nums text-sm font-bold sm:w-24">
+                        {money(i.unitPrice * i.qty)}
                       </p>
-                    </div>
-                    <div className="flex shrink-0 items-center rounded-md border border-input bg-background">
+
                       <button
-                        type="button"
-                        onClick={() => cart.setQty(i.id, i.qty - 1)}
-                        disabled={i.qty <= 1}
-                        className="flex h-7 w-5 items-center justify-center text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label={`Quitar una unidad de ${i.nombre}`}
+                        onClick={() => cart.remove(i.id)}
+                        className="shrink-0 text-xs font-semibold text-muted-foreground hover:text-destructive"
                       >
-                        <Minus className="h-3 w-3" />
-                      </button>
-                      <input
-                        type="number"
-                        min={1}
-                        value={i.qty}
-                        onChange={(e) => cart.setQty(i.id, Number(e.target.value) || 1)}
-                        className="h-7 w-7 border-x border-input bg-background text-center text-xs outline-none focus:border-primary"
-                        aria-label={`Cantidad de ${i.nombre}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => cart.setQty(i.id, i.qty + 1)}
-                        className="flex h-7 w-5 items-center justify-center text-muted-foreground hover:text-foreground"
-                        aria-label={`Agregar una unidad de ${i.nombre}`}
-                      >
-                        <Plus className="h-3 w-3" />
+                        Quitar
                       </button>
                     </div>
-                    <p className="w-24 shrink-0 text-right tabular-nums text-sm font-bold">
-                      {money(i.unitPrice * i.qty)}
-                    </p>
-                    <button
-                      onClick={() => cart.remove(i.id)}
-                      className="text-xs font-semibold text-muted-foreground hover:text-destructive"
-                    >
-                      Quitar
-                    </button>
                   </li>
                 );
               })}
