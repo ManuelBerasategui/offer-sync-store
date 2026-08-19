@@ -82,7 +82,7 @@ function GraciasPage() {
       } catch {
         if (!cancelled) {
           // Si el estado enviado directamente en URL o tarjeta era approved
-          const isApproved = (rawStatus.toLowerCase() === "approved");
+          const isApproved = rawStatus.toLowerCase() === "approved";
           setOrderState({ estado: isApproved ? "pagado" : "pendiente" });
           if (isApproved) cart.clear();
         }
@@ -97,7 +97,8 @@ function GraciasPage() {
 
   const isApproved = orderState.estado === "pagado";
   const isLoading = orderState.estado === "cargando";
-  const isRejected = !isApproved && !isLoading;
+  const isPending = orderState.estado === "pendiente";
+  const isRejected = orderState.estado === "rechazado" || orderState.estado === "desconocido";
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12 text-center">
@@ -109,7 +110,8 @@ function GraciasPage() {
             </span>
             <h1 className="text-4xl font-bold">¡Gracias por tu compra!</h1>
             <p className="mt-4 text-muted-foreground">
-              Recibimos tu pago correctamente. Ya estamos preparando tu pedido y te contactaremos para coordinar el envío.
+              Recibimos tu pago correctamente. Ya estamos preparando tu pedido y te contactaremos
+              para coordinar el envío.
             </p>
           </>
         ) : isLoading ? (
@@ -122,6 +124,17 @@ function GraciasPage() {
               Estamos confirmando el pago con Mercado Pago. Esto tarda solo unos segundos.
             </p>
           </>
+        ) : isPending ? (
+          <>
+            <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+              ⧗ Pago pendiente
+            </span>
+            <h1 className="text-3xl font-bold">Tu pedido fue registrado</h1>
+            <p className="mt-4 text-muted-foreground">
+              Estamos esperando la confirmación de Mercado Pago. Te avisaremos apenas el pago se
+              acredite.
+            </p>
+          </>
         ) : (
           <>
             <span className="inline-block rounded-full bg-destructive/10 px-3 py-1 text-xs font-bold text-destructive uppercase tracking-wider mb-2">
@@ -129,7 +142,8 @@ function GraciasPage() {
             </span>
             <h1 className="text-3xl font-bold text-foreground">El pago no se completó</h1>
             <p className="mt-4 text-muted-foreground">
-              Mercado Pago no pudo procesar la transacción o la operación fue cancelada. Podés volver al carrito para reintentar.
+              Mercado Pago no pudo procesar la transacción o la operación fue cancelada. Podés
+              volver al carrito para reintentar.
             </p>
           </>
         )}
@@ -178,4 +192,3 @@ function GraciasPage() {
     </main>
   );
 }
-

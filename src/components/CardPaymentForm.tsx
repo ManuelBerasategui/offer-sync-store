@@ -11,9 +11,7 @@ export type CardFormData = {
 };
 
 // La Public Key de MercadoPago es pública por diseño (se usa en el navegador).
-const PUBLIC_KEY =
-  (import.meta.env["VITE_MERCADOPAGO_PUBLIC_KEY"] as string | undefined) ||
-  "TEST-9af6f77e-2e08-4ef5-924b-b67d9c0ba75d";
+const PUBLIC_KEY = (import.meta.env["VITE_MERCADOPAGO_PUBLIC_KEY"] as string | undefined) || "";
 
 interface BrickController {
   unmount: () => void;
@@ -21,7 +19,10 @@ interface BrickController {
 
 declare global {
   interface Window {
-    MercadoPago?: new (key: string, opts?: { locale?: string }) => {
+    MercadoPago?: new (
+      key: string,
+      opts?: { locale?: string },
+    ) => {
       bricks: () => {
         create: (type: string, container: string, settings: unknown) => Promise<BrickController>;
       };

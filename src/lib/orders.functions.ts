@@ -14,7 +14,10 @@ export type ShippingInput = {
   sucursal_correo: string;
 };
 
-const text = (v: unknown, max = 120) => String(v ?? "").trim().slice(0, max);
+const text = (v: unknown, max = 120) =>
+  String(v ?? "")
+    .trim()
+    .slice(0, max);
 
 export function makeCode() {
   const d = new Date();
@@ -48,7 +51,8 @@ function cleanItems(items: OrderItem[]): OrderItem[] {
 
 /**
  * Cobro con tarjeta usando el token generado por MercadoPago en el browser.
- * La orden en Supabase se crea ÚNICAMENTE si el cobro es APROBADO.
+ * La orden se crea primero como pendiente para que cada intento de cobro quede
+ * registrado, incluso cuando Mercado Pago lo rechace o lo deje en proceso.
  */
 export const payOrderWithCard = createServerFn({ method: "POST" })
   .validator(
@@ -79,13 +83,51 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
   .handler(
     async ({
       data,
-    }): Promise<{ status: "approved" | "rejected" | "error"; orderCode?: string; message?: string }> => {
+    }): Promise<{
+      status: "approved" | "pending" | "rejected" | "error";
+      orderCode?: string;
+      message?: string;
+    }> => {
       const token = process.env["MERCADOPAGO_ACCESS_TOKEN"];
       if (!token) return { status: "error", message: "Falta configurar MercadoPago." };
       if (!data.items.length) return { status: "error", message: "El carrito está vacío." };
 
       const total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
       const orderCode = makeCode();
+
+      if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+        console.error("Supabase no está configurado para crear la orden pendiente.");
+        return {
+          status: "error",
+          message: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos.",
+        };
+      }
+
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { error } = await supabaseAdmin.from("orders").insert({
+          order_code: orderCode,
+          user_id: data.userId ?? null,
+          ...data.shipping,
+          items: data.items,
+          total,
+          estado: "pendiente",
+          metodo_pago: "tarjeta",
+        });
+        if (error) {
+          console.error("Error al registrar la orden pendiente con tarjeta:", error);
+          return {
+            status: "error",
+            message: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos.",
+          };
+        }
+      } catch (err) {
+        console.error("Error al registrar la orden pendiente con tarjeta:", err);
+        return {
+          status: "error",
+          message: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos.",
+        };
+      }
 
       const res = await fetch("https://api.mercadopago.com/v1/payments", {
         method: "POST",
@@ -114,49 +156,53 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
       const body = await res.text();
       if (!res.ok) {
         console.error(`MercadoPago card error [${res.status}]: ${body}`);
-        return { status: "error", message: "No pudimos procesar la tarjeta. Probá con Mercado Pago." };
+        return {
+          status: "error",
+          message: "No pudimos procesar la tarjeta. Probá con Mercado Pago.",
+        };
       }
 
       const json = JSON.parse(body) as { status?: string };
 
-      if (json.status !== "approved") {
-        return { status: "rejected", message: "La tarjeta fue rechazada. Probá con otra o con Mercado Pago." };
+      if (json.status === "in_process" || json.status === "pending") {
+        return {
+          status: "pending",
+          orderCode,
+          message: "El pago quedó pendiente de confirmación. Te avisaremos cuando se acredite.",
+        };
       }
 
-      // Solo guardamos en Supabase si el cobro fue APROBADO
-      if (process.env["SUPABASE_URL"] && process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      if (json.status !== "approved") {
+        return {
+          status: "rejected",
+          message: "La tarjeta fue rechazada. Probá con otra o con Mercado Pago.",
+        };
+      }
 
-        const { error: insertError } = await supabaseAdmin.from("orders").insert({
-          order_code: orderCode,
-          user_id: data.userId ?? null,
-          ...data.shipping,
-          items: data.items,
-          total,
-          estado: "pagado",
-          metodo_pago: "tarjeta",
-        });
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error: updateError } = await supabaseAdmin
+        .from("orders")
+        .update({ estado: "pagado" })
+        .eq("order_code", orderCode);
+      if (updateError) {
+        console.error("Error al actualizar la orden pagada con tarjeta:", updateError);
+      }
 
-        if (insertError) {
-          console.error("Error al registrar la orden pagada con tarjeta:", insertError);
-        }
-
-        if (data.userId) {
-          await supabaseAdmin.from("profiles").upsert(
-            {
-              id: data.userId,
-              nombre: data.shipping.nombre,
-              dni: data.shipping.dni,
-              telefono: data.shipping.telefono,
-              provincia: data.shipping.provincia,
-              ciudad: data.shipping.ciudad,
-              codigo_postal: data.shipping.codigo_postal,
-              transporte: data.shipping.transporte,
-              sucursal_correo: data.shipping.sucursal_correo,
-            },
-            { onConflict: "id" },
-          );
-        }
+      if (data.userId) {
+        await supabaseAdmin.from("profiles").upsert(
+          {
+            id: data.userId,
+            nombre: data.shipping.nombre,
+            dni: data.shipping.dni,
+            telefono: data.shipping.telefono,
+            provincia: data.shipping.provincia,
+            ciudad: data.shipping.ciudad,
+            codigo_postal: data.shipping.codigo_postal,
+            transporte: data.shipping.transporte,
+            sucursal_correo: data.shipping.sucursal_correo,
+          },
+          { onConflict: "id" },
+        );
       }
 
       return { status: "approved", orderCode };
@@ -165,7 +211,7 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
 
 /**
  * Se ejecuta cuando el usuario vuelve de Mercado Pago.
- * Busca el borrador de la orden por código, consulta el estado real en la API de MP,
+ * Busca la orden pendiente por código, consulta el estado real en la API de MP,
  * y si está aprobado actualiza el estado a "pagado".
  * Nunca necesita reconstruir datos de envío o items desde MP.
  */
@@ -187,7 +233,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       data,
     }): Promise<{
       orderCode?: string;
-      estado: "pagado" | "rechazado" | "desconocido";
+      estado: "pagado" | "pendiente" | "rechazado" | "desconocido";
       total?: number;
     }> => {
       if (!data.code) return { estado: "desconocido" };
@@ -199,7 +245,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
 
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-      // 1. Buscar la orden en Supabase (puede ser "borrador" o ya "pagado")
+      // 1. Buscar la orden en Supabase (puede ser "pendiente" o ya "pagado")
       const { data: order } = await supabaseAdmin
         .from("orders")
         .select("id, order_code, estado, total")
@@ -245,12 +291,13 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         if (mpStatus) console.log(`Usando status de URL como fallback: ${mpStatus}`);
       }
 
-      // Fallback 2: si tenemos un borrador y llegamos a /gracias con un code válido,
-      // MP solo redirige a la back_url.success cuando el pago fue aprobado.
-      // Es seguro confiar en eso si no tenemos otra señal.
-      if (!mpStatus && order?.estado === "borrador") {
-        console.log(`Sin status de MP ni URL, pero hay borrador — asumiendo aprobado por redirect de MP.`);
-        mpStatus = "approved";
+      if (mpStatus === "pending" || mpStatus === "in_process" || mpStatus === "authorized") {
+        console.log(`Pago aún pendiente, estado de Mercado Pago: ${mpStatus}`);
+        return {
+          orderCode: order?.order_code,
+          estado: "pendiente",
+          total: order ? Number(order.total) : undefined,
+        };
       }
 
       if (mpStatus !== "approved") {
@@ -258,7 +305,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         return { estado: "rechazado" };
       }
 
-      // 3. El pago está aprobado: actualizar el borrador a "pagado"
+      // 3. El pago está aprobado: actualizar la orden pendiente a "pagado"
       if (order) {
         const { error: updErr } = await supabaseAdmin
           .from("orders")
@@ -274,7 +321,9 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         // Actualizar perfil si corresponde
         const { data: fullOrder } = await supabaseAdmin
           .from("orders")
-          .select("user_id, nombre, dni, telefono, provincia, ciudad, codigo_postal, transporte, sucursal_correo")
+          .select(
+            "user_id, nombre, dni, telefono, provincia, ciudad, codigo_postal, transporte, sucursal_correo",
+          )
           .eq("id", order.id)
           .maybeSingle();
 
@@ -298,7 +347,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         return { orderCode: order.order_code, estado: "pagado", total: Number(order.total) };
       }
 
-      // El borrador no existía (ej: Supabase falló al crear el borrador)
+      // La orden no existía (ej: un pedido creado por una versión anterior)
       // Igual marcamos como pagado con datos mínimos
       console.warn(`Borrador no encontrado para code=${data.code}, registrando pago mínimo.`);
       return { orderCode: data.code, estado: "pagado" };

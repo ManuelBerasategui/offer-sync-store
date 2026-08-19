@@ -190,6 +190,8 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
       });
       if (res.status === "approved" && res.orderCode) {
         navigate({ to: "/gracias", search: { code: res.orderCode, status: "approved" } });
+      } else if (res.status === "pending" && res.orderCode) {
+        navigate({ to: "/gracias", search: { code: res.orderCode, status: "pending" } });
       } else {
         setCardMsg(res.message ?? "No pudimos procesar el pago con tarjeta.");
       }

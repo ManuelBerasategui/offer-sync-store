@@ -16,8 +16,8 @@ type ShippingInput = {
 
 /**
  * Crea la preferencia de pago en Mercado Pago Y guarda la orden en Supabase
- * con estado "borrador" (invisible en el panel admin).
- * Cuando MP confirma el pago, verifyOrderPayment la actualiza a "pagado".
+ * con estado "pendiente". Cuando MP confirma el pago,
+ * verifyOrderPayment la actualiza a "pagado".
  */
 export const createCheckout = createServerFn({ method: "POST" })
   .validator(
@@ -56,7 +56,9 @@ export const createCheckout = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ url?: string; error?: string }> => {
     const mpToken = process.env["MERCADOPAGO_ACCESS_TOKEN"];
     if (!mpToken) {
-      return { error: "Falta configurar MercadoPago. Escribinos por WhatsApp para completar tu compra." };
+      return {
+        error: "Falta configurar MercadoPago. Escribinos por WhatsApp para completar tu compra.",
+      };
     }
 
     // Generamos el código de orden
@@ -67,24 +69,32 @@ export const createCheckout = createServerFn({ method: "POST" })
 
     const total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
 
-    // Guardamos la orden como "borrador" en Supabase ANTES de ir a MP.
-    // Esto garantiza que los datos de envío e items nunca se pierdan.
-    if (process.env["SUPABASE_URL"] && process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
-      try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        await supabaseAdmin.from("orders").insert({
-          order_code: orderCode,
-          user_id: data.userId ?? null,
-          ...data.shipping,
-          items: data.items,
-          total,
-          estado: "borrador",
-          metodo_pago: "mercadopago",
-        });
-      } catch (err) {
-        console.error("Error al guardar borrador de orden:", err);
-        // Continuamos igual; si falla Supabase el usuario puede pagar igual
+    // La orden debe existir antes de abrir Mercado Pago. No continuamos si no se
+    // pudo registrar: de ese modo no quedan cobros sin pedido asociado.
+    if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+      console.error("Supabase no está configurado para crear la orden pendiente.");
+      return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
+    }
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin.from("orders").insert({
+        order_code: orderCode,
+        user_id: data.userId ?? null,
+        ...data.shipping,
+        items: data.items,
+        total,
+        estado: "pendiente",
+        metodo_pago: "mercadopago",
+      });
+
+      if (error) {
+        console.error("Error al guardar orden pendiente:", error);
+        return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
       }
+    } catch (err) {
+      console.error("Error al guardar orden pendiente:", err);
+      return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
     }
 
     const successUrl = `${data.origin}/gracias?code=${encodeURIComponent(orderCode)}`;
