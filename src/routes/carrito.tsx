@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { Minus, Plus } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
@@ -107,13 +108,33 @@ function CarritoPage() {
                         )}
                       </p>
                     </div>
-                    <input
-                      type="number"
-                      min={1}
-                      value={i.qty}
-                      onChange={(e) => cart.setQty(i.id, Number(e.target.value) || 1)}
-                      className="w-16 rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
-                    />
+                    <div className="flex shrink-0 items-center rounded-lg border border-input bg-background">
+                      <button
+                        type="button"
+                        onClick={() => cart.setQty(i.id, i.qty - 1)}
+                        disabled={i.qty <= 1}
+                        className="flex h-9 w-8 items-center justify-center text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={`Quitar una unidad de ${i.nombre}`}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        value={i.qty}
+                        onChange={(e) => cart.setQty(i.id, Number(e.target.value) || 1)}
+                        className="h-9 w-10 border-x border-input bg-background text-center text-sm outline-none focus:border-primary"
+                        aria-label={`Cantidad de ${i.nombre}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => cart.setQty(i.id, i.qty + 1)}
+                        className="flex h-9 w-8 items-center justify-center text-muted-foreground hover:text-foreground"
+                        aria-label={`Agregar una unidad de ${i.nombre}`}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
                     <p className="w-24 shrink-0 text-right tabular-nums text-sm font-bold">
                       {money(i.unitPrice * i.qty)}
                     </p>
