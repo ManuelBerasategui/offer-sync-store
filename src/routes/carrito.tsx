@@ -108,31 +108,31 @@ function CarritoPage() {
                         )}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center rounded-lg border border-input bg-background">
+                    <div className="flex shrink-0 items-center rounded-md border border-input bg-background">
                       <button
                         type="button"
                         onClick={() => cart.setQty(i.id, i.qty - 1)}
                         disabled={i.qty <= 1}
-                        className="flex h-9 w-8 items-center justify-center text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex h-7 w-5 items-center justify-center text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                         aria-label={`Quitar una unidad de ${i.nombre}`}
                       >
-                        <Minus className="h-4 w-4" />
+                        <Minus className="h-3 w-3" />
                       </button>
                       <input
                         type="number"
                         min={1}
                         value={i.qty}
                         onChange={(e) => cart.setQty(i.id, Number(e.target.value) || 1)}
-                        className="h-9 w-10 border-x border-input bg-background text-center text-sm outline-none focus:border-primary"
+                        className="h-7 w-7 border-x border-input bg-background text-center text-xs outline-none focus:border-primary"
                         aria-label={`Cantidad de ${i.nombre}`}
                       />
                       <button
                         type="button"
                         onClick={() => cart.setQty(i.id, i.qty + 1)}
-                        className="flex h-9 w-8 items-center justify-center text-muted-foreground hover:text-foreground"
+                        className="flex h-7 w-5 items-center justify-center text-muted-foreground hover:text-foreground"
                         aria-label={`Agregar una unidad de ${i.nombre}`}
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-3 w-3" />
                       </button>
                     </div>
                     <p className="w-24 shrink-0 text-right tabular-nums text-sm font-bold">
