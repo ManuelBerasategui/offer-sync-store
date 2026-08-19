@@ -8,12 +8,14 @@ import { useCart } from "@/lib/cart";
 import { money, waLink } from "@/lib/store";
 import { verifyOrderPayment } from "@/lib/orders.functions";
 
-const graciasSearchSchema = z.object({
-  code: z.string().optional(),
-  status: z.string().optional(),
-  collection_status: z.string().optional(),
-  payment_id: z.string().optional(),
-});
+const graciasSearchSchema = z
+  .object({
+    code: z.string().optional(),
+    status: z.string().optional(),
+    collection_status: z.string().optional(),
+    payment_id: z.string().optional(),
+  })
+  .passthrough();
 
 export const Route = createFileRoute("/gracias")({
   validateSearch: graciasSearchSchema,
@@ -91,8 +93,8 @@ function GraciasPage() {
   }, [code, status, collection_status]);
 
   const isApproved = orderState.estado === "pagado";
-  const isPending = orderState.estado === "pendiente" || orderState.estado === "cargando";
-  const isRejected = orderState.estado === "rechazado";
+  const isLoading = orderState.estado === "cargando";
+  const isRejected = !isApproved && !isLoading;
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12 text-center">
@@ -107,24 +109,24 @@ function GraciasPage() {
               Recibimos tu pago correctamente. Ya estamos preparando tu pedido y te contactaremos para coordinar el envío.
             </p>
           </>
-        ) : isRejected ? (
+        ) : isLoading ? (
           <>
-            <span className="inline-block rounded-full bg-destructive/10 px-3 py-1 text-xs font-bold text-destructive uppercase tracking-wider mb-2">
-              ✕ Pago Rechazado
+            <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+              ⧗ Verificando pago…
             </span>
-            <h1 className="text-3xl font-bold text-foreground">El pago no se pudo completar</h1>
+            <h1 className="text-3xl font-bold">Procesando tu pedido</h1>
             <p className="mt-4 text-muted-foreground">
-              Mercado Pago no pudo procesar la transacción o la operación fue cancelada. Podés volver al carrito para reintentar.
+              Estamos confirmando el pago con Mercado Pago. Esto tarda solo unos segundos.
             </p>
           </>
         ) : (
           <>
-            <span className="inline-block rounded-full bg-amber/10 px-3 py-1 text-xs font-bold text-amber uppercase tracking-wider mb-2">
-              ⌛ Pago Pendiente
+            <span className="inline-block rounded-full bg-destructive/10 px-3 py-1 text-xs font-bold text-destructive uppercase tracking-wider mb-2">
+              ✕ Pago No Completado
             </span>
-            <h1 className="text-3xl font-bold">Pedido registrado</h1>
+            <h1 className="text-3xl font-bold text-foreground">El pago no se completó</h1>
             <p className="mt-4 text-muted-foreground">
-              Tu pedido fue creado correctamente. Una vez acreditado el pago en Mercado Pago, procesaremos tu envío.
+              Mercado Pago no pudo procesar la transacción o la operación fue cancelada. Podés volver al carrito para reintentar.
             </p>
           </>
         )}
@@ -147,12 +149,12 @@ function GraciasPage() {
         )}
 
         <div className="mt-8 flex flex-col gap-3">
-          {isRejected ? (
-            <Link to="/carrito" className="btn-base grad-urgente text-primary-foreground">
+          {isRejected && !isLoading ? (
+            <Link to="/carrito" className="btn-base w-full grad-urgente text-primary-foreground">
               Volver al carrito y reintentar
             </Link>
           ) : (
-            <Link to="/catalogo" className="btn-base grad-urgente text-primary-foreground">
+            <Link to="/catalogo" className="btn-base w-full grad-urgente text-primary-foreground">
               Seguir comprando
             </Link>
           )}

@@ -109,7 +109,7 @@
 }
 
 @utility btn-base {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
@@ -119,6 +119,9 @@
   letter-spacing: 0.3px;
   text-transform: uppercase;
   padding: 0.85rem 1.5rem;
+  min-height: 48px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease,

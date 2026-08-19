@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CardPaymentForm, type CardFormData } from "@/components/CardPaymentForm";
-import { createOrder, payOrderWithCard } from "@/lib/orders.functions";
+import { payOrderWithCard } from "@/lib/orders.functions";
 import { createCheckout } from "@/lib/checkout.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { money } from "@/lib/store";
@@ -66,11 +66,9 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
   const [form, setForm] = useState<ShippingForm>(EMPTY);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [promptShown, setPromptShown] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState("");
-  const [order, setOrder] = useState<{ orderId: string; orderCode: string } | null>(null);
   const [mpLoading, setMpLoading] = useState(false);
   const [cardMsg, setCardMsg] = useState("");
+  const [error, setError] = useState("");
 
   // Autocompletar con los datos guardados si el usuario inició sesión.
   useEffect(() => {
@@ -143,30 +141,16 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
     setStep("payment");
   };
 
-  const ensureOrder = async () => {
-    if (order) return order;
-    const res = await createOrder({
-      data: {
-        shipping: form,
-        items,
-        userId: user?.id,
-      },
-    });
-    const created = { orderId: res.orderId, orderCode: res.orderCode };
-    setOrder(created);
-    return created;
-  };
-
   const goMercadoPago = async () => {
     setError("");
     setMpLoading(true);
     try {
-      const activeOrder = await ensureOrder();
       const res = await createCheckout({
         data: {
           items,
+          shipping: form,
           origin: window.location.origin,
-          orderCode: activeOrder.orderCode,
+          userId: user?.id,
         },
       });
       if (res.url) window.location.href = res.url;
@@ -181,10 +165,16 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
   const payWithCard = async (cardData: CardFormData) => {
     setCardMsg("");
     try {
-      const activeOrder = await ensureOrder();
-      const res = await payOrderWithCard({ data: { ...cardData, orderId: activeOrder.orderId } });
-      if (res.status === "approved" || res.status === "pending") {
-        navigate({ to: "/gracias", search: { code: activeOrder.orderCode } });
+      const res = await payOrderWithCard({
+        data: {
+          ...cardData,
+          shipping: form,
+          items,
+          userId: user?.id,
+        },
+      });
+      if (res.status === "approved" && res.orderCode) {
+        navigate({ to: "/gracias", search: { code: res.orderCode, status: "approved" } });
       } else {
         setCardMsg(res.message ?? "No pudimos procesar el pago con tarjeta.");
       }

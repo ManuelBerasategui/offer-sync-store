@@ -227,7 +227,7 @@ function ProductoPage() {
             <div className="mt-6 flex flex-col gap-3">
               {consultar ? (
                 <a
-                  className="btn-base bg-whatsapp text-whatsapp-foreground"
+                  className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
                   href={waLink(config, product.nombre)}
                   target="_blank"
                   rel="noreferrer"
@@ -242,20 +242,22 @@ function ProductoPage() {
               ) : (
                 <>
                   <button
+                    type="button"
                     onClick={() => {
                       if (bloqueaCompra) setShowMin(true);
                       else setShowCheckout(true);
                     }}
-                    className="btn-base grad-urgente text-primary-foreground"
+                    className="btn-base w-full grad-urgente text-primary-foreground"
                   >
                     Comprar ya
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       cart.add(cartItem);
                       navigate({ to: "/carrito" });
                     }}
-                    className="btn-base border border-border text-foreground hover:border-primary hover:text-primary"
+                    className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary"
                   >
                     Agregar al carrito
                   </button>
