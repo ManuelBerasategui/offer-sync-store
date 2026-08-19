@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -56,13 +56,47 @@ function AuthPage() {
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
 
-  const [mode, setMode] = useState<Mode>(search.mode ?? "login");
+  // The URL is now the single source of truth for `mode` instead of a
+  // useState that only read `search.mode` on first mount. That's what made
+  // /auth?mode=forgot show the login screen: a client-side search-param
+  // change doesn't remount this component, so a plain useState never
+  // noticed the URL had changed.
+  const mode: Mode = search.mode ?? "login";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [form, setForm] = useState<ShippingData>(EMPTY_SHIPPING);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // --- Password recovery ---------------------------------------------
+  // When someone clicks the "reset password" link from their email,
+  // Supabase redirects them back here with a valid session already
+  // attached and fires a PASSWORD_RECOVERY event. Previously that meant
+  // `user` became truthy and they'd land straight on the "Mi cuenta"
+  // panel below, without ever being asked to set a new password — so the
+  // reset flow never actually completed. This listener catches that case
+  // and shows a dedicated "set new password" screen instead.
+  const [recovering, setRecovering] = useState(false);
+  const [recoveryDone, setRecoveryDone] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setRecovering(true);
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const goToMode = (next: Mode) => {
+    setError("");
+    setMsg("");
+    navigate({ to: "/auth", search: { mode: next }, replace: true });
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,7 +133,7 @@ function AuthPage() {
         });
         if (err) throw err;
         setMsg("¡Cuenta creada! Ya podés iniciar sesión.");
-        setMode("login");
+        goToMode("login");
         return;
       }
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
@@ -114,12 +148,96 @@ function AuthPage() {
     }
   };
 
+  const submitNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (newPassword.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.updateUser({ password: newPassword });
+      if (err) throw err;
+      setRecoveryDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos actualizar la contraseña.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <SiteHeader config={config} />
 
       <main className="mx-auto max-w-[460px] px-4 py-12 sm:px-6">
-        {user ? (
+        {recovering ? (
+          <div className="card-soft p-6">
+            <h1 className="font-sans text-xl font-bold normal-case tracking-tight">
+              Elegí tu nueva contraseña
+            </h1>
+
+            {recoveryDone ? (
+              <>
+                <p className="mt-4 text-sm text-whatsapp">¡Contraseña actualizada!</p>
+                <button
+                  onClick={() => {
+                    setRecovering(false);
+                    navigate({ to: "/" });
+                  }}
+                  className="btn-base grad-urgente text-primary-foreground mt-4"
+                >
+                  Continuar
+                </button>
+              </>
+            ) : (
+              <form className="mt-5 flex flex-col gap-4" onSubmit={submitNewPassword}>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                    Nueva contraseña
+                  </span>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    className={inputClass}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                    Repetir contraseña
+                  </span>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    className={inputClass}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn-base grad-urgente text-primary-foreground disabled:opacity-60"
+                >
+                  {loading ? "Guardando..." : "Guardar nueva contraseña"}
+                </button>
+
+                {error && <p className="text-sm text-destructive">{error}</p>}
+              </form>
+            )}
+          </div>
+        ) : user ? (
           <div className="card-soft p-6">
             <h1 className="font-sans text-xl font-bold normal-case tracking-tight">Mi cuenta</h1>
             <p className="mt-2 text-sm text-muted-foreground">{user.email}</p>
@@ -277,24 +395,26 @@ function AuthPage() {
             </form>
 
             <div className="mt-5 flex flex-col items-start gap-2 text-xs">
-              {mode !== "register" && (
-                <button
-                  onClick={() => {
-                    setMode("register");
-                    setError("");
-                  }}
-                  className="underline text-muted-foreground hover:text-primary"
-                >
-                  ¿No tenés cuenta? Registrarse
-                </button>
+              {mode === "login" && (
+                <>
+                  <button
+                    onClick={() => goToMode("register")}
+                    className="underline text-muted-foreground hover:text-primary"
+                  >
+                    ¿No tenés cuenta? Registrarse
+                  </button>
+                  <button
+                    onClick={() => goToMode("forgot")}
+                    className="underline text-muted-foreground hover:text-primary"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </>
               )}
 
               {mode !== "login" && (
                 <button
-                  onClick={() => {
-                    setMode("login");
-                    setError("");
-                  }}
+                  onClick={() => goToMode("login")}
                   className="underline text-muted-foreground hover:text-primary"
                 >
                   Ya tengo cuenta: iniciar sesión
