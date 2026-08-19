@@ -49,12 +49,25 @@ const BASE_FIELDS: { key: keyof ShippingData; label: string }[] = [
   { key: "codigo_postal", label: "Código postal" },
 ];
 
+function validateShippingData(form: ShippingData) {
+  if (BASE_FIELDS.some((field) => !form[field.key].trim()) || !form.sucursal_correo.trim()) {
+    return "Completá todos los datos de envío.";
+  }
+  if (!/^\d{7,8}$/.test(form.dni.trim())) {
+    return "El DNI debe contener entre 7 y 8 números (sin puntos ni letras).";
+  }
+  if (form.telefono.replace(/\D/g, "").length < 8) {
+    return "Ingresá un número de teléfono válido con característica.";
+  }
+  return null;
+}
+
 function AuthPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { config } = data;
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, refreshProfile } = useAuth();
 
   // The URL is now the single source of truth for `mode` instead of a
   // useState that only read `search.mode` on first mount. That's what made
@@ -69,6 +82,11 @@ function AuthPage() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState<ShippingData>(EMPTY_SHIPPING);
+  const [profileError, setProfileError] = useState("");
+  const [profileMsg, setProfileMsg] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
 
   // --- Password recovery ---------------------------------------------
   // When someone clicks the "reset password" link from their email,
@@ -92,6 +110,10 @@ function AuthPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!editingProfile) setProfileForm({ ...EMPTY_SHIPPING, ...profile });
+  }, [profile, editingProfile]);
+
   const goToMode = (next: Mode) => {
     setError("");
     setMsg("");
@@ -112,19 +134,11 @@ function AuthPage() {
       }
       if (mode === "register") {
         if (password.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");
-        // Validación de DNI
-        const dniClean = form.dni.trim();
-        if (!/^\d{7,8}$/.test(dniClean)) {
-          throw new Error("El DNI debe contener entre 7 y 8 números (sin puntos ni letras).");
-        }
+        const shippingError = validateShippingData(form);
+        if (shippingError) throw new Error(shippingError);
         // Validación de Email
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
           throw new Error("Ingresá un correo electrónico válido (ej: nombre@gmail.com).");
-        }
-        // Validación de Teléfono
-        const telDigits = form.telefono.replace(/\D/g, "");
-        if (telDigits.length < 8) {
-          throw new Error("Ingresá un número de teléfono válido con característica.");
         }
         const { error: err } = await supabase.auth.signUp({
           email,
@@ -145,6 +159,35 @@ function AuthPage() {
       setError(err instanceof Error ? err.message : "No pudimos completar la operación.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError("");
+    setProfileMsg("");
+    const validationError = validateShippingData(profileForm);
+    if (validationError) {
+      setProfileError(validationError);
+      return;
+    }
+    if (!user) return;
+
+    setSavingProfile(true);
+    try {
+      const { error: err } = await supabase
+        .from("profiles")
+        .upsert({ id: user.id, ...profileForm });
+      if (err) throw err;
+      await refreshProfile();
+      setProfileMsg("Tus datos se guardaron correctamente.");
+      setEditingProfile(false);
+    } catch (err) {
+      setProfileError(
+        err instanceof Error ? err.message : "No pudimos guardar tus datos. Probá de nuevo.",
+      );
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -241,23 +284,116 @@ function AuthPage() {
           <div className="card-soft p-6">
             <h1 className="font-sans text-xl font-bold normal-case tracking-tight">Mi cuenta</h1>
             <p className="mt-2 text-sm text-muted-foreground">{user.email}</p>
-            {profile && (
-              <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
-                {BASE_FIELDS.map((f) => (
-                  <li key={f.key}>
-                    <span className="font-semibold text-foreground">{f.label}:</span>{" "}
-                    {profile[f.key] || "—"}
-                  </li>
+            {editingProfile ? (
+              <form className="mt-5 flex flex-col gap-4" onSubmit={saveProfile}>
+                {BASE_FIELDS.map((field) => (
+                  <label key={field.key} className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                      {field.label}
+                    </span>
+                    <input
+                      required
+                      className={inputClass}
+                      value={profileForm[field.key]}
+                      inputMode={
+                        field.key === "dni"
+                          ? "numeric"
+                          : field.key === "telefono"
+                            ? "tel"
+                            : undefined
+                      }
+                      maxLength={field.key === "dni" ? 8 : undefined}
+                      onChange={(e) => {
+                        let value = e.target.value;
+                        if (field.key === "dni") value = value.replace(/\D/g, "").slice(0, 8);
+                        setProfileForm({ ...profileForm, [field.key]: value });
+                      }}
+                    />
+                  </label>
                 ))}
-                <li>
-                  <span className="font-semibold text-foreground">Transporte:</span>{" "}
-                  {profile.transporte || "—"}
-                </li>
-                <li>
-                  <span className="font-semibold text-foreground">Sucursal:</span>{" "}
-                  {profile.sucursal_correo || "—"}
-                </li>
-              </ul>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                    Transporte
+                  </span>
+                  <select
+                    required
+                    className={inputClass}
+                    value={profileForm.transporte}
+                    onChange={(e) => setProfileForm({ ...profileForm, transporte: e.target.value })}
+                  >
+                    <option value="Correo Argentino">Correo Argentino</option>
+                    <option value="Vía Cargo">Vía Cargo</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                    {profileForm.transporte === "Vía Cargo"
+                      ? "Suc. Vía Cargo más cercana"
+                      : "Suc. Correo Argentino más cercana"}
+                  </span>
+                  <input
+                    required
+                    className={inputClass}
+                    value={profileForm.sucursal_correo}
+                    onChange={(e) =>
+                      setProfileForm({ ...profileForm, sucursal_correo: e.target.value })
+                    }
+                  />
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={savingProfile}
+                    className="btn-base grad-urgente flex-1 text-primary-foreground disabled:opacity-60"
+                  >
+                    {savingProfile ? "Guardando..." : "Guardar cambios"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProfile(false);
+                      setProfileError("");
+                    }}
+                    className="btn-base border border-border text-foreground"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+                {profileError && <p className="text-sm text-destructive">{profileError}</p>}
+              </form>
+            ) : (
+              <>
+                {profile && (
+                  <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
+                    {BASE_FIELDS.map((field) => (
+                      <li key={field.key}>
+                        <span className="font-semibold text-foreground">{field.label}:</span>{" "}
+                        {profile[field.key] || "—"}
+                      </li>
+                    ))}
+                    <li>
+                      <span className="font-semibold text-foreground">Transporte:</span>{" "}
+                      {profile.transporte || "—"}
+                    </li>
+                    <li>
+                      <span className="font-semibold text-foreground">Sucursal:</span>{" "}
+                      {profile.sucursal_correo || "—"}
+                    </li>
+                  </ul>
+                )}
+                {profileMsg && <p className="mt-4 text-sm text-whatsapp">{profileMsg}</p>}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileForm({ ...EMPTY_SHIPPING, ...profile });
+                    setProfileMsg("");
+                    setEditingProfile(true);
+                  }}
+                  className="btn-base mt-5 w-full border border-border text-foreground"
+                >
+                  Editar perfil
+                </button>
+              </>
             )}
             <div className="mt-6 flex flex-col gap-3">
               <Link to="/catalogo" className="btn-base grad-urgente text-primary-foreground">
@@ -327,7 +463,9 @@ function AuthPage() {
                         required
                         className={inputClass}
                         value={form[f.key]}
-                        inputMode={f.key === "dni" ? "numeric" : f.key === "telefono" ? "tel" : undefined}
+                        inputMode={
+                          f.key === "dni" ? "numeric" : f.key === "telefono" ? "tel" : undefined
+                        }
                         maxLength={f.key === "dni" ? 8 : undefined}
                         onChange={(e) => {
                           let val = e.target.value;

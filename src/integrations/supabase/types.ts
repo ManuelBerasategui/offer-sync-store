@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      cart_items: {
+        Row: {
+          categoria: string | null
+          created_at: string
+          imagen: string | null
+          item_id: string
+          nombre: string
+          product_id: string | null
+          qty: number
+          unit_price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string
+          imagen?: string | null
+          item_id: string
+          nombre: string
+          product_id?: string | null
+          qty: number
+          unit_price: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string
+          imagen?: string | null
+          item_id?: string
+          nombre?: string
+          product_id?: string | null
+          qty?: number
+          unit_price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           ciudad: string
