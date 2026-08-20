@@ -49,7 +49,7 @@ async function fetchTab(tab) {
 const hasValue = (row) => Object.values(row).some((v) => String(v ?? "").trim() !== "");
 const isNote = (v) => /^notas?\s*:/i.test(String(v ?? "").trim());
 // En la planilla: Variantes = "Negro: 55000 | Blanco: 58000".
-// También acepta JSON: [{"color":"Negro","precio":55000}].
+// También acepta JSON: [{"color":"Negro","precio":55000,"imagen_url":"https://..."}].
 function parseVariants(value, productId) {
   const raw = String(value ?? "").trim();
   if (!raw) return [];
@@ -57,7 +57,12 @@ function parseVariants(value, productId) {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       return parsed
-        .map((v) => ({ product_id: productId, color: String(v.color ?? "").trim(), precio: Number(v.precio) }))
+        .map((v) => ({
+          product_id: productId,
+          color: String(v.color ?? "").trim(),
+          precio: Number(v.precio),
+          imagen_url: String(v.imagen_url ?? "").trim() || null,
+        }))
         .filter((v) => v.color && Number.isFinite(v.precio) && v.precio >= 0);
     }
   } catch {

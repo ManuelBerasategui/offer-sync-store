@@ -6,6 +6,7 @@ export type ProductVariant = {
   color: string;
   precio: number | string;
   stock?: string | null;
+  imagen_url?: string | null;
 };
 
 export type Product = {

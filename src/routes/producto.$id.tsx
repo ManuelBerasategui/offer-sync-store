@@ -107,6 +107,7 @@ function ProductoPage() {
   const consultar = isWhatsappOnly(product);
   const selectedVariant = variants.find((variant) => variant.id === selectedVariantId);
   const basePrice = selectedVariant ? Number(selectedVariant.precio) : priceOf(product);
+  const selectedImage = selectedVariant?.imagen_url || product.imagen_url;
   const percent = discountFor(product, qty);
   const unit = unitPriceFor(product, qty, basePrice);
   const total = unit * qty;
@@ -122,7 +123,7 @@ function ProductoPage() {
     basePrice,
     variantId: selectedVariant?.id,
     variantColor: selectedVariant?.color,
-    imagen: imageUrl(product.imagen_url),
+    imagen: imageUrl(selectedImage),
     categoria: product.categoria ?? "",
   };
 
@@ -144,11 +145,11 @@ function ProductoPage() {
         <div className="mt-6 grid gap-8 lg:grid-cols-2">
           <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-xl border border-border bg-surface">
             <img
-              src={imageUrl(product.imagen_url) || FALLBACK_IMAGE}
+              src={imageUrl(selectedImage) || FALLBACK_IMAGE}
               alt={product.nombre ?? "Producto"}
               referrerPolicy="no-referrer"
               className="aspect-square w-full bg-surface object-contain p-3"
-              onError={onImageError(product.imagen_url)}
+              onError={onImageError(selectedImage)}
             />
           </div>
 
