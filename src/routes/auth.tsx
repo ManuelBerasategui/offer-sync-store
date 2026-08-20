@@ -113,6 +113,15 @@ function AuthPage() {
         setRecovering(true);
       }
     });
+
+    // En el flujo implícito, Supabase agrega `type=recovery` al fragmento
+    // de la URL. Lo detectamos también por si el evento ocurre antes de que
+    // el listener termine de inicializarse.
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    if (hashParams.get("type") === "recovery") {
+      setRecovering(true);
+    }
+
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -161,7 +170,7 @@ function AuthPage() {
         return;
       }
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`,
+        redirectTo: `${window.location.origin}/auth?mode=forgot`,
       });
       if (err) throw err;
       setMsg("Te enviamos un mail para restablecer tu contraseña.");

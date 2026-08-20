@@ -11,9 +11,16 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
       <div className="mx-auto grid max-w-[1180px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:px-6">
-        <Link to="/" className="min-w-0 font-display text-[21px] normal-case tracking-normal">
-          <span className="text-foreground">Te</span>
-          <span className="text-primary">importamos</span>
+        <Link
+          to="/"
+          aria-label="Ir al inicio"
+          className="block h-10 w-[180px] shrink-0 sm:w-[240px]"
+        >
+          <img
+            src="/businessicon-header.jpg"
+            alt="Te Importamos"
+            className="h-full w-auto object-contain object-left"
+          />
         </Link>
 
         <div className="flex shrink-0 items-center gap-3">
