@@ -86,6 +86,8 @@ function ProductoPage() {
   const [showMin, setShowMin] = useState(false);
 
   const tiers = useMemo(() => (product ? tiersOf(product) : []), [product]);
+  const variants = product?.variants ?? [];
+  const [selectedVariantId, setSelectedVariantId] = useState("");
 
   if (!product) {
     return (
@@ -103,16 +105,23 @@ function ProductoPage() {
   }
 
   const consultar = isWhatsappOnly(product);
+  const selectedVariant = variants.find((variant) => variant.id === selectedVariantId);
+  const basePrice = selectedVariant ? Number(selectedVariant.precio) : priceOf(product);
   const percent = discountFor(product, qty);
-  const unit = unitPriceFor(product, qty);
+  const unit = unitPriceFor(product, qty, basePrice);
   const total = unit * qty;
 
   const cartItem = {
-    id: String(product.id ?? product.nombre ?? ""),
+    id: selectedVariant
+      ? `${String(product.id ?? product.nombre ?? "")}:${selectedVariant.id}`
+      : String(product.id ?? product.nombre ?? ""),
     productId: product.id ? String(product.id) : undefined,
-    nombre: product.nombre ?? "Producto",
+    nombre: selectedVariant ? `${product.nombre ?? "Producto"} — ${selectedVariant.color}` : product.nombre ?? "Producto",
     qty,
     unitPrice: Math.round(unit),
+    basePrice,
+    variantId: selectedVariant?.id,
+    variantColor: selectedVariant?.color,
     imagen: imageUrl(product.imagen_url),
     categoria: product.categoria ?? "",
   };
@@ -171,6 +180,30 @@ function ProductoPage() {
                   )}
                 </div>
               </>
+            )}
+
+            {!consultar && variants.length > 0 && (
+              <div className="mt-6">
+                <label
+                  htmlFor="color"
+                  className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground"
+                >
+                  Color
+                </label>
+                <select
+                  id="color"
+                  value={selectedVariantId}
+                  onChange={(e) => setSelectedVariantId(e.target.value)}
+                  className="mt-2 w-full max-w-[320px] rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                >
+                  <option value="">Elegí un color</option>
+                  {variants.map((variant) => (
+                    <option key={variant.id} value={variant.id}>
+                      {variant.color} — {money(variant.precio)}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
 
             {/* Cantidad */}
@@ -244,20 +277,24 @@ function ProductoPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      if (variants.length > 0 && !selectedVariant) return;
                       if (bloqueaCompra) setShowMin(true);
                       else setShowCheckout(true);
                     }}
-                    className="btn-base w-full grad-urgente text-primary-foreground"
+                    disabled={variants.length > 0 && !selectedVariant}
+                    className="btn-base w-full grad-urgente text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Comprar ya
+                    {variants.length > 0 && !selectedVariant ? "Elegí un color para comprar" : "Comprar ya"}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
+                      if (variants.length > 0 && !selectedVariant) return;
                       cart.add(cartItem);
                       navigate({ to: "/carrito" });
                     }}
-                    className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary"
+                    disabled={variants.length > 0 && !selectedVariant}
+                    className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Agregar al carrito
                   </button>

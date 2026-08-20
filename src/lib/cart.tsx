@@ -13,6 +13,10 @@ export type CartItem = {
   nombre: string;
   qty: number;
   unitPrice: number;
+  /** Precio de lista de la variante; permite recalcular descuentos por cantidad. */
+  basePrice?: number | undefined;
+  variantId?: string | undefined;
+  variantColor?: string | undefined;
   imagen?: string | undefined;
   categoria?: string | undefined;
 };
@@ -35,6 +39,9 @@ type CartRow = {
   unit_price: number;
   imagen: string | null;
   categoria: string | null;
+  base_price: number | null;
+  variant_id: string | null;
+  variant_color: string | null;
 };
 
 const STORAGE_KEY = "ti_cart_v1";
@@ -58,6 +65,9 @@ function toCartItem(row: CartRow): CartItem {
     unitPrice: Number(row.unit_price),
     imagen: row.imagen ?? undefined,
     categoria: row.categoria ?? undefined,
+    basePrice: row.base_price === null ? undefined : Number(row.base_price),
+    variantId: row.variant_id ?? undefined,
+    variantColor: row.variant_color ?? undefined,
   };
 }
 
@@ -71,6 +81,9 @@ function toCartRow(userId: string, item: CartItem) {
     unit_price: item.unitPrice,
     imagen: item.imagen ?? null,
     categoria: item.categoria ?? null,
+    base_price: item.basePrice ?? null,
+    variant_id: item.variantId ?? null,
+    variant_color: item.variantColor ?? null,
   };
 }
 
@@ -103,7 +116,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const { data: rows, error } = await supabase
         .from("cart_items")
-        .select("item_id, product_id, nombre, qty, unit_price, imagen, categoria")
+        .select("item_id, product_id, nombre, qty, unit_price, imagen, categoria, base_price, variant_id, variant_color")
         .eq("user_id", user.id);
 
       if (cancelled || error) return;
@@ -130,7 +143,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return items.map((item) => {
       const product = findProduct(products, item.productId || item.id || item.nombre);
       if (!product) return item;
-      const unitPrice = Math.round(unitPriceFor(product, item.qty));
+      const unitPrice = Math.round(unitPriceFor(product, item.qty, item.basePrice));
       return unitPrice === item.unitPrice ? item : { ...item, unitPrice };
     });
   }, [items, data?.products]);

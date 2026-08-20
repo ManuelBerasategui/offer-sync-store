@@ -6,7 +6,7 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
   async (): Promise<StoreData> => {
     try {
       const [{ data: productsRaw }, { data: bannersRaw }, { data: configRaw }] = await Promise.all([
-        supabase.from('products').select('*').neq('stock', 'NO'),
+        supabase.from('products').select('*, product_variants(*)').neq('stock', 'NO'),
         supabase.from('banners').select('*').eq('activo', 'SI'),
         supabase.from('site_config').select('*'),
       ]);
@@ -14,8 +14,11 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
       const products: Product[] = (productsRaw ?? []).map(p => {
         // Expand metadata back onto the product object
         const meta = typeof p.metadata === 'object' && p.metadata !== null ? p.metadata : {};
-        const { metadata, ...rest } = p;
-        return { ...rest, ...meta } as Product;
+        const { metadata, product_variants, ...rest } = p;
+        const variants = Array.isArray(product_variants)
+          ? product_variants.filter((v) => String(v.stock ?? '').trim().toUpperCase() !== 'NO')
+          : [];
+        return { ...rest, ...meta, variants } as Product;
       });
 
       const banners: Banner[] = (bannersRaw ?? []) as Banner[];

@@ -67,7 +67,7 @@ function CarritoPage() {
               {cart.items.map((i) => {
                 const product = findProduct(products, i.productId || i.id || i.nombre);
                 const percent = product ? discountFor(product, i.qty) : 0;
-                const basePrice = product ? priceOf(product) : i.unitPrice;
+                const basePrice = i.basePrice ?? (product ? priceOf(product) : i.unitPrice);
 
                 const targetId = String(i.productId || i.id || i.nombre || "");
 

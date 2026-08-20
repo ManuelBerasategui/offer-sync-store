@@ -1,5 +1,13 @@
 import type React from "react";
 
+export type ProductVariant = {
+  id: string;
+  product_id: string;
+  color: string;
+  precio: number | string;
+  stock?: string | null;
+};
+
 export type Product = {
   id?: string;
   nombre?: string;
@@ -12,7 +20,8 @@ export type Product = {
   oferta?: string;
   stock?: string;
   descuento?: string;
-  [key: string]: string | undefined;
+  variants?: ProductVariant[];
+  [key: string]: string | ProductVariant[] | undefined;
 };
 
 export type Banner = {
@@ -160,8 +169,8 @@ export function discountFor(p: Product, qty: number) {
   return percent;
 }
 
-export function unitPriceFor(p: Product, qty: number) {
-  const base = priceOf(p);
+export function unitPriceFor(p: Product, qty: number, basePrice = priceOf(p)) {
+  const base = basePrice;
   return base * (1 - discountFor(p, qty) / 100);
 }
 

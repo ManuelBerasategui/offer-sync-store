@@ -85,3 +85,21 @@ La aplicación estará disponible en `http://localhost:3000`.
 - `npm run preview`: Previsualiza la versión construida localmente.
 - `npm run lint`: Ejecuta ESLint para validar el código.
 
+## 🎨 Colores y precios por variante
+
+Los colores son opcionales y se administran directamente en Supabase, en la
+tabla `product_variants`. Para un producto simple no hay que crear registros.
+Cada variante necesita el `product_id` del producto, su `color` y su `precio`;
+por ejemplo, para un parlante se pueden cargar `Negro` con precio `55000` y
+`Blanco` con precio `58000`. La web exige elegir un color antes de comprar y lo
+conserva en el carrito, pedido y pago.
+
+El script de Google Sheets es una importación administrativa heredada y
+opcional. Si se lo usa, admite una columna `Variantes` con este formato:
+`Negro: 55000 | Blanco: 58000`.
+
+También se acepta el formato JSON:
+
+```json
+[{"color":"Negro","precio":55000},{"color":"Blanco","precio":58000}]
+```

@@ -17,6 +17,7 @@ export type Database = {
       cart_items: {
         Row: {
           categoria: string | null
+          base_price: number | null
           created_at: string
           imagen: string | null
           item_id: string
@@ -24,11 +25,14 @@ export type Database = {
           product_id: string | null
           qty: number
           unit_price: number
+          variant_color: string | null
+          variant_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           categoria?: string | null
+          base_price?: number | null
           created_at?: string
           imagen?: string | null
           item_id: string
@@ -36,11 +40,14 @@ export type Database = {
           product_id?: string | null
           qty: number
           unit_price: number
+          variant_color?: string | null
+          variant_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           categoria?: string | null
+          base_price?: number | null
           created_at?: string
           imagen?: string | null
           item_id?: string
@@ -48,6 +55,8 @@ export type Database = {
           product_id?: string | null
           qty?: number
           unit_price?: number
+          variant_color?: string | null
+          variant_id?: string | null
           updated_at?: string
           user_id?: string
         }
