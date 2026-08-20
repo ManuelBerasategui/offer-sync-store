@@ -105,14 +105,7 @@ function ProductoPage() {
   }
 
   const consultar = isWhatsappOnly(product);
-  // Si todavía no se eligió manualmente, usamos el color marcado como
-  // predeterminado. Como respaldo, usamos el primero disponible.
-  const defaultVariant =
-    variants.find((variant) => variant.es_predeterminada) ??
-    variants.find((variant) => variant.color.trim().toLowerCase() === "negro") ??
-    variants[0];
-  const selectedVariant =
-    variants.find((variant) => variant.id === selectedVariantId) ?? defaultVariant;
+  const selectedVariant = variants.find((variant) => String(variant.id) === selectedVariantId);
   const basePrice = selectedVariant ? Number(selectedVariant.precio) : priceOf(product);
   const selectedImage = selectedVariant?.imagen_url || product.imagen_url;
   const percent = discountFor(product, qty);
@@ -200,13 +193,13 @@ function ProductoPage() {
                 </label>
                 <select
                   id="color"
-                  value={selectedVariant?.id ?? ""}
+                  value={selectedVariantId}
                   onChange={(e) => setSelectedVariantId(e.target.value)}
                   className="mt-2 w-full max-w-[320px] rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
                 >
                   <option value="">Elegí un color</option>
                   {variants.map((variant) => (
-                    <option key={variant.id} value={variant.id}>
+                    <option key={variant.id ?? variant.color} value={String(variant.id)}>
                       {variant.color} — {money(variant.precio)}
                     </option>
                   ))}
