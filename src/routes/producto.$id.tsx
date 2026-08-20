@@ -105,7 +105,14 @@ function ProductoPage() {
   }
 
   const consultar = isWhatsappOnly(product);
-  const selectedVariant = variants.find((variant) => variant.id === selectedVariantId);
+  // Si todavía no se eligió manualmente, usamos el color marcado como
+  // predeterminado. Como respaldo, usamos el primero disponible.
+  const defaultVariant =
+    variants.find((variant) => variant.es_predeterminada) ??
+    variants.find((variant) => variant.color.trim().toLowerCase() === "negro") ??
+    variants[0];
+  const selectedVariant =
+    variants.find((variant) => variant.id === selectedVariantId) ?? defaultVariant;
   const basePrice = selectedVariant ? Number(selectedVariant.precio) : priceOf(product);
   const selectedImage = selectedVariant?.imagen_url || product.imagen_url;
   const percent = discountFor(product, qty);
@@ -193,7 +200,7 @@ function ProductoPage() {
                 </label>
                 <select
                   id="color"
-                  value={selectedVariantId}
+                  value={selectedVariant?.id ?? ""}
                   onChange={(e) => setSelectedVariantId(e.target.value)}
                   className="mt-2 w-full max-w-[320px] rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
                 >
