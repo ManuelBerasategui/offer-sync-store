@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Flame } from "lucide-react";
+import { Flame, Truck, ShieldCheck, Percent, ArrowRight, MessageCircle, Mail, Instagram } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -49,17 +49,43 @@ function Home() {
       <SiteHeader config={config} />
 
       {/* HERO */}
-      <section className="border-b border-border bg-surface px-4 py-16 text-center sm:px-6 sm:py-24">
-        <h1 className="mx-auto max-w-4xl text-[clamp(40px,12vw,84px)] leading-[0.95]">
+      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 py-16 text-center sm:px-6 sm:py-24">
+        {/* decorative color wash — reemplaza el fondo plano */}
+        <div aria-hidden className="pointer-events-none absolute -top-28 -left-20 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-10 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
+
+        <span className="relative mb-5 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary ring-1 ring-primary/20">
+          <Flame className="h-3.5 w-3.5" />
+          Precio de importador, todos los días
+        </span>
+
+        <h1 className="relative mx-auto max-w-4xl text-[clamp(40px,12vw,84px)] leading-[0.95]">
           Importamos de todo
           <br />
           <span className="text-primary">para que revendas</span>
         </h1>
+
+        <div className="relative mx-auto mt-9 flex max-w-2xl flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm font-medium text-muted-foreground">
+          <span className="inline-flex items-center gap-2">
+            <Truck className="h-4 w-4 text-primary" />
+            Envíos a todo el país
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            Productos originales
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <Percent className="h-4 w-4 text-primary" />
+            Precio de importador
+          </span>
+        </div>
       </section>
 
       {/* OFERTAS DEL DÍA */}
-      <section id="ofertas" className="px-4 py-14 sm:px-6">
-        <div className="mx-auto max-w-[1180px]">
+      <section id="ofertas" className="relative overflow-hidden px-4 py-14 sm:px-6">
+        <div aria-hidden className="pointer-events-none absolute -top-16 right-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+
+        <div className="relative mx-auto max-w-[1180px]">
           <SectionHead
             title={
               <>
@@ -77,7 +103,7 @@ function Home() {
                     key={i}
                     to="/combo/$index"
                     params={{ index: String(i) }}
-                    className="group relative min-w-[280px] snap-start overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:min-w-[420px]"
+                    className="group relative min-w-[280px] snap-start overflow-hidden rounded-xl border border-primary/15 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 sm:min-w-[420px]"
                     style={{ aspectRatio: "16 / 10" }}
                   >
                     <img
@@ -118,8 +144,10 @@ function Home() {
       </section>
 
       {/* MÁS VENDIDOS */}
-      <section id="mas-vendidos" className="bg-surface px-4 py-14 sm:px-6">
-        <div className="mx-auto max-w-[1180px]">
+      <section id="mas-vendidos" className="relative overflow-hidden bg-gradient-to-b from-surface via-surface to-primary/5 px-4 py-14 sm:px-6">
+        <div aria-hidden className="pointer-events-none absolute -bottom-20 -left-16 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+
+        <div className="relative mx-auto max-w-[1180px]">
           <SectionHead title="Más vendidos" sub="Los tres productos que más salen esta semana." />
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
             {masVendidos.map((p, i) => (
@@ -131,17 +159,21 @@ function Home() {
           <div className="mt-8 flex justify-center">
             <Link
               to="/catalogo"
-              className="btn-base grad-urgente w-full text-primary-foreground sm:w-auto sm:px-12"
+              className="btn-base grad-urgente group inline-flex w-full items-center justify-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:w-auto sm:px-12"
             >
               Ver más
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
           </div>
         </div>
       </section>
 
       {/* NOSOTROS */}
-      <section id="nosotros" className="border-y border-border px-4 py-16 text-center sm:px-6">
-        <div className="mx-auto max-w-2xl">
+      <section id="nosotros" className="relative overflow-hidden border-y border-border px-4 py-16 text-center sm:px-6">
+        <div aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/40 via-primary to-primary/40" />
+        <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+
+        <div className="relative mx-auto max-w-2xl">
           <h2 className="font-sans text-[clamp(24px,6vw,38px)] font-semibold uppercase tracking-tight text-foreground/90">
             Importamos para que vos revendas
           </h2>
@@ -149,26 +181,31 @@ function Home() {
             Somos un equipo dedicado a traer productos importados de tecnología, bazar,
             indumentaria y mucho más
           </p>
-          <a href="#contacto" className="btn-base grad-urgente mt-8 text-primary-foreground">
+          <a href="#contacto" className="btn-base grad-urgente group mt-8 inline-flex items-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg">
             Emprendé hoy
+            <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
           </a>
 
           <ReviewsCarousel />
         </div>
       </section>
 
-      <HowItWorks />
+      <div className="bg-gradient-to-b from-transparent via-primary/[0.04] to-transparent">
+        <HowItWorks />
+      </div>
 
       {/* CONTACTO */}
-      <section id="contacto" className="bg-surface px-4 py-14 sm:px-6">
-        <div className="mx-auto max-w-[1180px]">
+      <section id="contacto" className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-surface to-surface px-4 py-14 sm:px-6">
+        <div aria-hidden className="pointer-events-none absolute -top-16 right-10 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+
+        <div className="relative mx-auto max-w-[1180px]">
           <SectionHead
             title="Contactanos"
             sub="Escribinos por el formulario o directo por WhatsApp. Respondemos rápido."
           />
           <div className="grid gap-8 lg:grid-cols-2">
             <ContactForm config={config} />
-            <div className="card-soft flex flex-col gap-4 p-6">
+            <div className="card-soft flex flex-col gap-4 border-l-4 border-primary p-6 shadow-sm">
               <h3 className="font-sans text-lg font-bold normal-case tracking-normal">
                 Grupo mayorista de WhatsApp
               </h3>
@@ -177,7 +214,7 @@ function Home() {
               </p>
               {config['whatsapp_grupo'] && (
                 <a
-                  className="btn-base bg-whatsapp text-whatsapp-foreground"
+                  className="btn-base bg-whatsapp text-whatsapp-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
                   href={config['whatsapp_grupo']}
                   target="_blank"
                   rel="noreferrer"
@@ -186,17 +223,32 @@ function Home() {
                 </a>
               )}
               <a
-                className="btn-base border border-border text-foreground"
+                className="btn-base border border-primary/30 text-foreground transition-colors duration-200 hover:bg-primary/5"
                 href={waLink(config)}
                 target="_blank"
                 rel="noreferrer"
               >
                 Escribirnos directo
               </a>
-              <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                {config['whatsapp_individual'] && <p>WhatsApp: +{config['whatsapp_individual']}</p>}
-                {config['email'] && <p>Email: {config['email']}</p>}
-                {config['instagram'] && <p>Instagram: {config['instagram']}</p>}
+              <div className="mt-2 space-y-2 text-sm text-muted-foreground">
+                {config['whatsapp_individual'] && (
+                  <p className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-primary" />
+                    +{config['whatsapp_individual']}
+                  </p>
+                )}
+                {config['email'] && (
+                  <p className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-primary" />
+                    {config['email']}
+                  </p>
+                )}
+                {config['instagram'] && (
+                  <p className="flex items-center gap-2">
+                    <Instagram className="h-4 w-4 text-primary" />
+                    {config['instagram']}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -211,6 +263,7 @@ function Home() {
 function SectionHead({ title, sub }: { title: React.ReactNode; sub?: string }) {
   return (
     <div className="mb-7">
+      <div className="mb-3 h-1 w-10 rounded-full bg-primary" />
       <h2 className="text-[clamp(24px,7vw,40px)]">{title}</h2>
       {sub && <p className="mt-2 max-w-md text-sm text-muted-foreground">{sub}</p>}
     </div>
@@ -233,10 +286,10 @@ function ContactForm({ config }: { config: SiteConfig }) {
   };
 
   const inputClass =
-    "rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
+    "rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15";
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+    <form className="card-soft flex flex-col gap-4 p-6 shadow-sm" onSubmit={onSubmit}>
       <label className="flex flex-col gap-1.5">
         <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
           Nombre
@@ -271,7 +324,7 @@ function ContactForm({ config }: { config: SiteConfig }) {
           onChange={(e) => setMensaje(e.target.value)}
         />
       </label>
-      <button type="submit" className="btn-base grad-urgente text-primary-foreground">
+      <button type="submit" className="btn-base grad-urgente text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg">
         Enviar mensaje
       </button>
     </form>
