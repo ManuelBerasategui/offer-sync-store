@@ -565,15 +565,23 @@ function AdminProductosPage() {
                 <tbody className="divide-y divide-border">
                   {filtered.map((p) => (
                     <tr key={String(p.id)} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3">
+                      <td
+                        className="px-4 py-3 cursor-pointer"
+                        onClick={() => setModal(productToInput(p))}
+                      >
                         <img
                           src={p.imagen_url || FALLBACK_IMAGE}
                           alt={p.nombre}
-                          className="h-10 w-10 rounded-lg object-cover"
+                          className="h-10 w-10 rounded-lg object-cover hover:opacity-80 transition-opacity"
                           onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
                         />
                       </td>
-                      <td className="px-4 py-3 font-medium">{p.nombre}</td>
+                      <td
+                        className="px-4 py-3 font-medium cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => setModal(productToInput(p))}
+                      >
+                        {p.nombre}
+                      </td>
                       <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
                       <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
                         {money(p.precio)}
