@@ -19,7 +19,7 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
           <img
             src="/businessicon-header.jpg"
             alt="Te Importamos"
-            className="h-7 w-auto max-w-[130px] object-contain object-left xs:max-w-[160px] sm:h-10 sm:max-w-none"
+            className="h-8 w-auto max-w-[150px] object-contain object-left xs:max-w-[170px] sm:h-10 sm:max-w-none"
           />
         </Link>
 

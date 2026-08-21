@@ -160,9 +160,10 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         productId = p.id;
       } else {
         // Crear
+        const newId = crypto.randomUUID();
         const { data: inserted, error } = await supabaseAdmin
           .from("products")
-          .insert(row)
+          .insert({ id: newId, ...row })
           .select("id")
           .single();
         if (error) throw error;
@@ -177,6 +178,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         // Insertar las nuevas
         if (p.variants.length > 0) {
           const variantRows = p.variants.map((v) => ({
+            id: crypto.randomUUID(),
             product_id: productId,
             color: v.color,
             precio: parsePrice(v.precio),
