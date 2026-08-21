@@ -5,19 +5,41 @@ import { supabase } from "@/integrations/supabase/client";
 export const getStoreData = createServerFn({ method: "GET" }).handler(
   async (): Promise<StoreData> => {
     try {
-      const [{ data: productsRaw }, { data: bannersRaw }, { data: configRaw }] = await Promise.all([
-        supabase.from('products').select('*, product_variants(*)').neq('stock', 'NO'),
+      const [productsResult, variantsResult, bannersResult, configResult] = await Promise.all([
+        // La consulta principal no depende de la tabla opcional de variantes.
+        // Así, un error de relación/caché de Supabase nunca deja el catálogo vacío.
+        supabase.from('products').select('*').neq('stock', 'NO'),
+        supabase.from('product_variants').select('*'),
         supabase.from('banners').select('*').eq('activo', 'SI'),
         supabase.from('site_config').select('*'),
       ]);
 
+      if (productsResult.error) throw productsResult.error;
+      if (variantsResult.error) {
+        console.warn("No se pudieron cargar las variantes de color:", variantsResult.error.message);
+      }
+      const productsRaw = productsResult.data;
+      const bannersRaw = bannersResult.data;
+      const configRaw = configResult.data;
+      const variantsByProduct = new Map<string, unknown[]>();
+      for (const variant of variantsResult.data ?? []) {
+        const productId = String(variant.product_id ?? "");
+        if (!productId) continue;
+        const current = variantsByProduct.get(productId) ?? [];
+        current.push(variant);
+        variantsByProduct.set(productId, current);
+      }
+
       const products: Product[] = (productsRaw ?? []).map(p => {
         // Expand metadata back onto the product object
         const meta = typeof p.metadata === 'object' && p.metadata !== null ? p.metadata : {};
-        const { metadata, product_variants, ...rest } = p;
-        const variants = Array.isArray(product_variants)
-          ? product_variants.filter((v) => String(v.stock ?? '').trim().toUpperCase() !== 'NO')
-          : [];
+        const { metadata, ...rest } = p;
+        const linkedVariants = variantsByProduct.get(String(p.id ?? "")) ?? [];
+        const variants = linkedVariants
+          .filter((v) => {
+            const stock = typeof v === "object" && v !== null ? (v as { stock?: unknown }).stock : undefined;
+            return String(stock ?? '').trim().toUpperCase() !== 'NO';
+          });
         return { ...rest, ...meta, variants } as Product;
       });
 

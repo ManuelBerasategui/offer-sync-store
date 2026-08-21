@@ -17,6 +17,10 @@ function parseArs(value: unknown) {
   return Number(digits) || 0;
 }
 
+function arsFromUsd(usd: number, rate: number, markup: number, increment: number) {
+  return Math.ceil((usd * rate * (1 + markup)) / increment) * increment;
+}
+
 function median(values: number[]) {
   const ordered = [...values].sort((a, b) => a - b);
   const middle = Math.floor(ordered.length / 2);
@@ -63,6 +67,10 @@ Deno.serve(async (request) => {
       .from("products")
       .select("id, precio, precio_usd, precio_oferta, precio_oferta_usd");
     if (productsError) throw new Error(`No se pudieron leer productos: ${productsError.message}`);
+    const { data: variants, error: variantsError } = await supabase
+      .from("product_variants")
+      .select("id, precio, precio_usd");
+    if (variantsError) throw new Error(`No se pudieron leer las variantes: ${variantsError.message}`);
 
     const markup = Number(settings.markup_percentage) / 100;
     const increment = Number(settings.rounding_increment);
@@ -70,12 +78,12 @@ Deno.serve(async (request) => {
     const updates = (products ?? []).flatMap((product) => {
       const baseUsd = Number(product.precio_usd) || parseArs(product.precio) / rate;
       if (!Number.isFinite(baseUsd) || baseUsd <= 0) return [];
-      const price = Math.ceil((baseUsd * rate * (1 + markup)) / increment) * increment;
+      const price = arsFromUsd(baseUsd, rate, markup, increment);
       const offerArs = parseArs(product.precio_oferta);
       const offerUsd = Number(product.precio_oferta_usd) || (offerArs > 0 ? offerArs / rate : 0);
       const offerUpdate = offerUsd > 0
         ? {
-            precio_oferta: String(Math.ceil((offerUsd * rate * (1 + markup)) / increment) * increment),
+            precio_oferta: String(arsFromUsd(offerUsd, rate, markup, increment)),
             precio_oferta_usd: Number(offerUsd.toFixed(6)),
           }
         : {};
@@ -105,6 +113,38 @@ Deno.serve(async (request) => {
       }
     }
 
+    const variantUpdates = (variants ?? []).flatMap((variant) => {
+      // Si aún no tiene valor USD, se toma el precio ARS actual como base una única vez,
+      // igual que con products. Para precios controlados, cargá precio_usd manualmente.
+      const baseUsd = Number(variant.precio_usd) || parseArs(variant.precio) / rate;
+      if (!Number.isFinite(baseUsd) || baseUsd <= 0) return [];
+      return [
+        {
+          id: variant.id,
+          precio: arsFromUsd(baseUsd, rate, markup, increment),
+          precio_usd: Number(baseUsd.toFixed(6)),
+          precio_actualizado_en: now,
+        },
+      ];
+    });
+    for (let offset = 0; offset < variantUpdates.length; offset += 20) {
+      const batch = variantUpdates.slice(offset, offset + 20);
+      const results = await Promise.all(
+        batch.map((variant) =>
+          supabase
+            .from("product_variants")
+            .update({
+              precio: variant.precio,
+              precio_usd: variant.precio_usd,
+              precio_actualizado_en: variant.precio_actualizado_en,
+            })
+            .eq("id", variant.id),
+        ),
+      );
+      const updateError = results.find((result) => result.error)?.error;
+      if (updateError) throw new Error(`No se pudieron actualizar los precios por color: ${updateError.message}`);
+    }
+
     const { error: saveError } = await supabase.from("pricing_settings").update({
       last_rate: rate,
       last_rate_at: now,
@@ -112,7 +152,14 @@ Deno.serve(async (request) => {
       updated_at: now,
     }).eq("id", true);
     if (saveError) throw new Error(`No se pudo guardar la cotización: ${saveError.message}`);
-    return json({ updated: updates.length, rate, roundingIncrement: increment, markupPercentage: Number(settings.markup_percentage) });
+    return json({
+      updated: updates.length + variantUpdates.length,
+      updatedProducts: updates.length,
+      updatedVariants: variantUpdates.length,
+      rate,
+      roundingIncrement: increment,
+      markupPercentage: Number(settings.markup_percentage),
+    });
   } catch (error) {
     console.error(error);
     return json({ error: error instanceof Error ? error.message : "Error inesperado." }, 500);
