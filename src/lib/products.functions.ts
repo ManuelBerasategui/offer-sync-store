@@ -126,13 +126,21 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         }
       }
 
+      const parsePrice = (val: string | number | undefined | null) => {
+        if (val === undefined || val === null) return null;
+        const cleaned = String(val).replace(/[^\d.-]/g, "").trim();
+        if (cleaned === "") return null;
+        const num = Number(cleaned);
+        return isNaN(num) ? null : num;
+      };
+
       const row = {
         nombre: p.nombre,
         categoria: p.categoria,
-        precio: p.precio,
-        precio_usd: p.precio_usd ?? null,
-        precio_oferta: p.precio_oferta ?? "",
-        precio_oferta_usd: p.precio_oferta_usd ?? null,
+        precio: parsePrice(p.precio),
+        precio_usd: parsePrice(p.precio_usd),
+        precio_oferta: parsePrice(p.precio_oferta),
+        precio_oferta_usd: parsePrice(p.precio_oferta_usd),
         descripcion: p.descripcion ?? "",
         destacado: p.destacado ?? "NO",
         oferta: p.oferta ?? "NO",
@@ -171,7 +179,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
           const variantRows = p.variants.map((v) => ({
             product_id: productId,
             color: v.color,
-            precio: v.precio,
+            precio: parsePrice(v.precio),
             stock: v.stock ?? "SI",
             imagen_url: v.imagen_url ?? null,
           }));
