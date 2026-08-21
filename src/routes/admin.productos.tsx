@@ -52,6 +52,8 @@ function emptyProduct(): ProductInput {
     descuento: "NO",
     color_predeterminado: "",
     imagen_url: "",
+    tipo_talles: "NINGUNO",
+    talles_disponibles: [],
     tiers: [],
     variants: [],
   };
@@ -67,6 +69,18 @@ function productToInput(p: Product): ProductInput {
       if (units > 0 && percent > 0) tiers.push({ units, percent });
     }
   }
+
+  const rawTipo = String((p as Record<string, unknown>).tipo_talles ?? "NINGUNO").toUpperCase();
+  const tipo_talles: "ZAPATILLAS" | "ROPA" | "NINGUNO" =
+    rawTipo === "ZAPATILLAS" ? "ZAPATILLAS" : rawTipo === "ROPA" ? "ROPA" : "NINGUNO";
+
+  const rawTalles = (p as Record<string, unknown>).talles_disponibles;
+  const talles_disponibles: string[] = Array.isArray(rawTalles)
+    ? (rawTalles as string[])
+    : typeof rawTalles === "string"
+      ? rawTalles.split(",").map((t) => t.trim()).filter(Boolean)
+      : [];
+
   return {
     id: String(p.id ?? ""),
     nombre: String(p.nombre ?? ""),
@@ -82,6 +96,8 @@ function productToInput(p: Product): ProductInput {
     descuento: String(p.descuento ?? "NO"),
     color_predeterminado: p.color_predeterminado ?? "",
     imagen_url: p.imagen_url ?? "",
+    tipo_talles,
+    talles_disponibles,
     tiers: tiers.sort((a, b) => a.units - b.units),
     variants: (p.variants ?? []).map((v) => ({
       id: String(v.id ?? ""),
@@ -414,6 +430,102 @@ function ProductModal({
                 {field}
               </label>
             ))}
+          </div>
+
+          {/* Configuración de Talles (Zapatillas / Ropa) */}
+          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+              Configuración de Talles (Stock por talle)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  set("tipo_talles", "NINGUNO");
+                  set("talles_disponibles", []);
+                }}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+                  (form.tipo_talles ?? "NINGUNO") === "NINGUNO"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:bg-muted"
+                }`}
+              >
+                Sin talles
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const defaultShoes = ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"];
+                  set("tipo_talles", "ZAPATILLAS");
+                  if (!form.talles_disponibles || form.talles_disponibles.length === 0) {
+                    set("talles_disponibles", defaultShoes);
+                  }
+                }}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+                  form.tipo_talles === "ZAPATILLAS"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:bg-muted"
+                }`}
+              >
+                👟 Es Zapatilla
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const defaultClothes = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+                  set("tipo_talles", "ROPA");
+                  if (!form.talles_disponibles || form.talles_disponibles.length === 0) {
+                    set("talles_disponibles", defaultClothes);
+                  }
+                }}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+                  form.tipo_talles === "ROPA"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:bg-muted"
+                }`}
+              >
+                👕 Es Ropa
+              </button>
+            </div>
+
+            {form.tipo_talles && form.tipo_talles !== "NINGUNO" && (
+              <div className="mt-3 space-y-2 pt-2 border-t border-border/60">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    Hacé clic en los talles para marcar si están <strong className="text-emerald-600">EN STOCK (verde)</strong> o <strong className="text-muted-foreground">SIN STOCK (gris)</strong>:
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {(form.tipo_talles === "ZAPATILLAS"
+                    ? ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"]
+                    : ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
+                  ).map((talle) => {
+                    const active = (form.talles_disponibles ?? []).includes(talle);
+                    return (
+                      <button
+                        key={talle}
+                        type="button"
+                        onClick={() => {
+                          const current = form.talles_disponibles ?? [];
+                          const next = active
+                            ? current.filter((t) => t !== talle)
+                            : [...current, talle];
+                          set("talles_disponibles", next);
+                        }}
+                        className={`h-9 min-w-10 rounded-lg px-2.5 text-xs font-bold transition-all border ${
+                          active
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
+                            : "bg-muted/40 text-muted-foreground/60 border-border opacity-60 hover:opacity-100"
+                        }`}
+                      >
+                        {talle} {active ? "✓" : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Variantes de color */}

@@ -103,10 +103,11 @@ function ProductoPage() {
   const [custom, setCustom] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showMin, setShowMin] = useState(false);
-
   const tiers = useMemo(() => (product ? tiersOf(product) : []), [product]);
   const variants = product?.variants ?? [];
   const [selectedVariantId, setSelectedVariantId] = useState("");
+  const [selectedTalle, setSelectedTalle] = useState("");
+  const [talleError, setTalleError] = useState(false);
 
   if (!product) {
     return (
@@ -122,6 +123,15 @@ function ProductoPage() {
       </div>
     );
   }
+
+  const rawTipo = String((product as Record<string, unknown>).tipo_talles ?? "NINGUNO").toUpperCase();
+  const hasTalles = rawTipo === "ZAPATILLAS" || rawTipo === "ROPA";
+  const rawTalles = (product as Record<string, unknown>).talles_disponibles;
+  const availableTalles: string[] = Array.isArray(rawTalles)
+    ? (rawTalles as string[])
+    : typeof rawTalles === "string"
+      ? rawTalles.split(",").map((t) => t.trim()).filter(Boolean)
+      : [];
 
   const consultar = isWhatsappOnly(product);
   const rawDefaultColor = product.color_predeterminado;
@@ -142,6 +152,8 @@ function ProductoPage() {
         .trim()
     : product.nombre ?? "Producto";
   const displayName = selectedVariant ? `${baseName} ${selectedVariant.color}`.trim() : product.nombre ?? "Producto";
+
+  const displayNameWithTalle = selectedTalle ? `${displayName} (Talle: ${selectedTalle})` : displayName;
   const basePrice = selectedVariant ? Number(selectedVariant.precio) : priceOf(product);
   const selectedImage = selectedVariant?.imagen_url || product.imagen_url;
   const percent = discountFor(product, qty);
@@ -149,11 +161,9 @@ function ProductoPage() {
   const total = unit * qty;
 
   const cartItem = {
-    id: selectedVariant
-      ? `${String(product.id ?? product.nombre ?? "")}:${selectedVariant.id}`
-      : String(product.id ?? product.nombre ?? ""),
+    id: `${String(product.id ?? product.nombre ?? "")}:${selectedVariant?.id ?? ""}:${selectedTalle ?? ""}`,
     productId: product.id ? String(product.id) : undefined,
-    nombre: displayName,
+    nombre: displayNameWithTalle,
     qty,
     unitPrice: Math.round(unit),
     basePrice,
@@ -243,6 +253,51 @@ function ProductoPage() {
               </div>
             )}
 
+            {/* Selector de Talle */}
+            {!consultar && hasTalles && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                    Elegí tu talle {rawTipo === "ZAPATILLAS" ? "(Zapatillas)" : "(Ropa)"} *
+                  </label>
+                  {selectedTalle && (
+                    <span className="text-xs font-bold text-emerald-600">Talle: {selectedTalle}</span>
+                  )}
+                </div>
+                {availableTalles.length === 0 ? (
+                  <p className="text-xs font-semibold text-destructive">Sin talles con stock disponible en este momento.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {availableTalles.map((talle) => {
+                      const isSelected = selectedTalle === talle;
+                      return (
+                        <button
+                          key={talle}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTalle(talle);
+                            setTalleError(false);
+                          }}
+                          className={`h-10 min-w-11 rounded-lg px-3 text-xs font-bold transition-all border ${
+                            isSelected
+                              ? "bg-primary text-primary-foreground border-primary shadow-sm scale-105"
+                              : "bg-background text-foreground border-border hover:border-primary/50"
+                          }`}
+                        >
+                          {talle}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {talleError && (
+                  <p className="mt-2 text-xs font-semibold text-destructive">
+                    ⚠️ Por favor elegí tu talle antes de continuar.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Cantidad */}
             {!consultar && (
               <div className="mt-6">
@@ -315,18 +370,30 @@ function ProductoPage() {
                     type="button"
                     onClick={() => {
                       if (usesColors && !selectedVariant) return;
+                      if (hasTalles && !selectedTalle) {
+                        setTalleError(true);
+                        return;
+                      }
                       if (bloqueaCompra) setShowMin(true);
                       else setShowCheckout(true);
                     }}
                     disabled={usesColors && !selectedVariant}
                     className="btn-base w-full grad-urgente text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {usesColors && !selectedVariant ? "Elegí un color para comprar" : "Comprar ya"}
+                    {usesColors && !selectedVariant
+                      ? "Elegí un color para comprar"
+                      : hasTalles && !selectedTalle
+                        ? "Elegí tu talle para comprar"
+                        : "Comprar ya"}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       if (usesColors && !selectedVariant) return;
+                      if (hasTalles && !selectedTalle) {
+                        setTalleError(true);
+                        return;
+                      }
                       cart.add(cartItem);
                       navigate({ to: "/carrito" });
                     }}
@@ -344,25 +411,6 @@ function ProductoPage() {
           </div>
         </div>
 
-        {/* Descripción */}
-        <section className="mt-12 max-w-3xl">
-          <h2 className="font-sans text-xl font-bold normal-case tracking-tight">Descripción</h2>
-          <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-            {product.descripcion || "Producto importado original. Consultanos por más detalles."}
-          </p>
-        </section>
-
-        {/* Reseñas */}
-        <section className="mt-10 max-w-3xl">
-          <h2 className="font-sans text-xl font-bold normal-case tracking-tight">
-            Reseñas de compradores
-          </h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {REVIEWS.map((r) => (
-              <div key={r.name} className="card-soft p-4">
-                <Stars value={r.stars} />
-                <p className="mt-2 text-sm text-muted-foreground">{r.text}</p>
-                <p className="mt-2 text-xs font-semibold">{r.name}</p>
               </div>
             ))}
           </div>

@@ -29,6 +29,8 @@ export type ProductInput = {
   descuento?: string;
   color_predeterminado?: string | null;
   imagen_url?: string | null;
+  tipo_talles?: "ZAPATILLAS" | "ROPA" | "NINGUNO";
+  talles_disponibles?: string[];
   /** Tiers: [{ units: 5, percent: 2.5 }, ...] */
   tiers?: { units: number; percent: number }[];
   variants?: VariantInput[];
@@ -118,12 +120,18 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       const supabaseAdmin = await assertAdmin(data.email, data.token);
       const p = data.product;
 
-      // Construir metadata de descuentos
+      // Construir metadata de descuentos y talles
       const metadata: Record<string, string> = {};
       for (const tier of p.tiers ?? []) {
         if (tier.units > 0 && tier.percent > 0) {
           metadata[`${tier.units} unidades`] = `${tier.percent}%`;
         }
+      }
+      if (p.tipo_talles && p.tipo_talles !== "NINGUNO") {
+        metadata["tipo_talles"] = p.tipo_talles;
+        metadata["talles_disponibles"] = Array.isArray(p.talles_disponibles)
+          ? p.talles_disponibles.join(",")
+          : String(p.talles_disponibles ?? "");
       }
 
       const parsePrice = (val: string | number | undefined | null) => {
