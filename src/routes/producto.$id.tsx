@@ -32,24 +32,41 @@ import {
 } from "@/lib/store";
 
 export const Route = createFileRoute("/producto/$id")({
-  loader: ({ context }) => {
-    context.queryClient.ensureQueryData(storeQueryOptions);
+  loader: async ({ context, params }) => {
+    const data = await context.queryClient.ensureQueryData(storeQueryOptions);
+    const product = findProduct(data.products, params.id);
+    return { product };
   },
-  head: () => ({
-    meta: [
-      { title: "Producto — Te importamos" },
-      {
-        name: "description",
-        content:
-          "Comprá online productos importados originales con descuentos por cantidad y envíos a todo el país.",
-      },
-      { property: "og:title", content: "Producto — Te importamos" },
-      {
-        property: "og:description",
-        content: "Comprá online con MercadoPago. Descuentos por cantidad para revendedores.",
-      },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    const product = loaderData?.product;
+    const title = product?.nombre ? `${product.nombre} — Te importamos` : "Producto — Te importamos";
+    const rawDesc = product?.descripcion?.replace(/[\r\n]+/g, " ").trim() || "";
+    const description = rawDesc
+      ? rawDesc.length > 160
+        ? rawDesc.slice(0, 157) + "..."
+        : rawDesc
+      : "Comprá online productos importados originales con descuentos por cantidad y envíos a todo el país.";
+    const image = product?.imagen_url ? imageUrl(product.imagen_url) : undefined;
+
+    return {
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:type", content: "product" },
+        { name: "twitter:card", content: image ? "summary_large_image" : "summary" },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+        ...(image
+          ? [
+              { property: "og:image", content: image },
+              { name: "twitter:image", content: image },
+            ]
+          : []),
+      ],
+    };
+  },
   component: ProductoPage,
 });
 
