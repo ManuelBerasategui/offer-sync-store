@@ -150,10 +150,10 @@ TOTAL: ${money(order.total)}`;
               Panel de Control
             </span>
             <h1 className="mt-2 font-sans text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Órdenes Pagadas
+              Panel Admin
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Visualizá los detalles de pago y datos de envío de tus clientes.
+              Órdenes pagadas y gestión de la tienda.
             </p>
           </div>
 
