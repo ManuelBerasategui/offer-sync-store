@@ -19,7 +19,9 @@ export type ProductInput = {
   nombre: string;
   categoria: string;
   precio: string;
+  precio_usd?: string;
   precio_oferta?: string;
+  precio_oferta_usd?: string;
   descripcion?: string;
   destacado?: string;
   oferta?: string;
@@ -128,7 +130,9 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         nombre: p.nombre,
         categoria: p.categoria,
         precio: p.precio,
+        precio_usd: p.precio_usd ?? null,
         precio_oferta: p.precio_oferta ?? "",
+        precio_oferta_usd: p.precio_oferta_usd ?? null,
         descripcion: p.descripcion ?? "",
         destacado: p.destacado ?? "NO",
         oferta: p.oferta ?? "NO",

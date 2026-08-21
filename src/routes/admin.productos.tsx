@@ -41,7 +41,9 @@ function emptyProduct(): ProductInput {
     nombre: "",
     categoria: "",
     precio: "",
+    precio_usd: "",
     precio_oferta: "",
+    precio_oferta_usd: "",
     descripcion: "",
     destacado: "NO",
     oferta: "NO",
@@ -69,7 +71,9 @@ function productToInput(p: Product): ProductInput {
     nombre: String(p.nombre ?? ""),
     categoria: String(p.categoria ?? ""),
     precio: String(p.precio ?? ""),
+    precio_usd: String((p as Record<string, unknown>).precio_usd ?? ""),
     precio_oferta: String(p.precio_oferta ?? ""),
+    precio_oferta_usd: String((p as Record<string, unknown>).precio_oferta_usd ?? ""),
     descripcion: String(p.descripcion ?? ""),
     destacado: String(p.destacado ?? "NO"),
     oferta: String(p.oferta ?? "NO"),
@@ -286,12 +290,20 @@ function ProductModal({
               <input className="input-base" value={form.color_predeterminado ?? ""} onChange={(e) => set("color_predeterminado", e.target.value)} placeholder="Ej: Negro" />
             </div>
             <div>
-              <label className="label-sm">Precio *</label>
-              <input className="input-base" value={form.precio} onChange={(e) => set("precio", e.target.value)} placeholder="Ej: 15000" />
+              <label className="label-sm">Precio USD * (u$d)</label>
+              <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => set("precio_usd", e.target.value)} placeholder="Ej: 150" />
             </div>
             <div>
-              <label className="label-sm">Precio oferta</label>
-              <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => set("precio_oferta", e.target.value)} placeholder="Ej: 12000" />
+              <label className="label-sm">Precio oferta USD (u$d)</label>
+              <input className="input-base" value={form.precio_oferta_usd ?? ""} onChange={(e) => set("precio_oferta_usd", e.target.value)} placeholder="Ej: 120" />
+            </div>
+            <div>
+              <label className="label-sm">Precio ARS (opcional)</label>
+              <input className="input-base" value={form.precio} onChange={(e) => set("precio", e.target.value)} placeholder="Ej: 150000" />
+            </div>
+            <div>
+              <label className="label-sm">Precio oferta ARS</label>
+              <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => set("precio_oferta", e.target.value)} placeholder="Ej: 120000" />
             </div>
             <div className="col-span-2">
               <label className="label-sm">Descripción</label>
