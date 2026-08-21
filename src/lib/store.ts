@@ -22,8 +22,9 @@ export type Product = {
   stock?: string;
   descuento?: string;
   color_predeterminado?: string | null;
+  ventas_semana?: number;
   variants?: ProductVariant[];
-  [key: string]: string | ProductVariant[] | undefined | null;
+  [key: string]: string | number | ProductVariant[] | undefined | null;
 };
 
 export type Banner = {

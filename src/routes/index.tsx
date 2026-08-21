@@ -40,8 +40,12 @@ function Home() {
   const { products, banners, config } = data;
 
   const ofertasDelDia = products.filter((p) => isYes(p.oferta)).slice(0, 3);
-  const top = products.filter((p) => isYes(p.destacado));
-  const masVendidos = (top.length ? top : products).slice(0, 3);
+  // Más vendidos: productos con ventas reales esta semana, ordenados de mayor a menor.
+  // Fallback a 'destacado' si todavía no hay ventas registradas.
+  const conVentas = [...products]
+    .filter((p) => (p.ventas_semana ?? 0) > 0)
+    .sort((a, b) => (b.ventas_semana ?? 0) - (a.ventas_semana ?? 0));
+  const masVendidos = (conVentas.length >= 1 ? conVentas : products.filter((p) => isYes(p.destacado))).slice(0, 3);
 
 
   return (

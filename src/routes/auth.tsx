@@ -143,7 +143,15 @@ function AuthPage() {
     try {
       if (mode === "login") {
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-        if (err) throw err;
+        if (err) {
+          if (err.message.includes("Email not confirmed")) {
+            throw new Error("Debés confirmar tu casilla de correo electrónico antes de iniciar sesión. Revisá tu email (y la carpeta de Spam).");
+          }
+          if (err.message.includes("Invalid login credentials")) {
+            throw new Error("Email o contraseña incorrectos.");
+          }
+          throw err;
+        }
         navigate({ to: "/" });
         return;
       }
@@ -159,14 +167,19 @@ function AuthPage() {
           throw new Error("Ingresá un correo electrónico válido (ej: nombre@gmail.com).");
         }
         if (email.length > MAX_EMAIL_LENGTH) throw new Error("El email es demasiado largo.");
-        const { error: err } = await supabase.auth.signUp({
+        const { data: signupData, error: err } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin, data: { ...form } },
+          options: { emailRedirectTo: `${window.location.origin}/auth`, data: { ...form } },
         });
         if (err) throw err;
-        setMsg("¡Cuenta creada! Ya podés iniciar sesión.");
-        goToMode("login");
+
+        navigate({ to: "/auth", search: { mode: "login" }, replace: true });
+        if (!signupData.session) {
+          setMsg("¡Cuenta creada! Te enviamos un email de confirmación. Por favor revisá tu casilla (y Spam) para activarla.");
+        } else {
+          setMsg("¡Cuenta creada con éxito! Ya podés iniciar sesión.");
+        }
         return;
       }
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {

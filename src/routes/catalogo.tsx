@@ -49,7 +49,7 @@ function Catalogo() {
     const filtered = products.filter((p) => {
       if (cat !== "todas" && (p.categoria ?? "").trim() !== cat) return false;
       if (q && !(p.nombre ?? "").toLowerCase().includes(q)) return false;
-      if (onlyTop && !isYes(p.destacado)) return false;
+      if (onlyTop && (p.ventas_semana ?? 0) <= 0 && !isYes(p.destacado)) return false;
       if (onlyOffers && !isYes(p.oferta)) return false;
       return true;
     });
@@ -58,6 +58,9 @@ function Catalogo() {
       if (sort === "precio_asc") return priceOf(a) - priceOf(b);
       if (sort === "precio_desc") return priceOf(b) - priceOf(a);
       if (sort === "nombre") return (a.nombre ?? "").localeCompare(b.nombre ?? "");
+      // "destacado": ordena por ventas semanales reales, luego por flag destacado como desempate
+      const ventasB = (b.ventas_semana ?? 0) - (a.ventas_semana ?? 0);
+      if (ventasB !== 0) return ventasB;
       return (isYes(b.destacado) ? 1 : 0) - (isYes(a.destacado) ? 1 : 0);
     });
   }, [products, search, cat, sort, onlyTop, onlyOffers]);
