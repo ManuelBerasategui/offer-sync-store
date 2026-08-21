@@ -144,3 +144,34 @@
     display: none;
   }
 }
+
+@utility input-base {
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-color: var(--background);
+  color: var(--foreground);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  outline: none;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    border-color: var(--primary);
+  }
+
+  &::placeholder {
+    color: var(--muted-foreground);
+  }
+}
+
+@utility label-sm {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+  margin-bottom: 0.25rem;
+}

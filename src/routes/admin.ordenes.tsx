@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Copy, Check, Search, RefreshCw, MessageCircle, PackageCheck, DollarSign, ShoppingBag } from "lucide-react";
@@ -157,14 +157,22 @@ TOTAL: ${money(order.total)}`;
             </p>
           </div>
 
-          <button
-            onClick={() => void loadOrders()}
-            disabled={loading}
-            className="btn-base border border-border bg-surface hover:border-primary flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-foreground disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Actualizar
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/admin/productos"
+              className="btn-base border border-border bg-surface hover:border-primary flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-foreground"
+            >
+              Productos
+            </Link>
+            <button
+              onClick={() => void loadOrders()}
+              disabled={loading}
+              className="btn-base border border-border bg-surface hover:border-primary flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-foreground disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              Actualizar
+            </button>
+          </div>
         </div>
 
         {/* Tarjetas de Métricas (KPIs) */}
