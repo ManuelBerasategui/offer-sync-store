@@ -182,7 +182,9 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
 
       return { id: productId };
     } catch (err) {
-      return { error: err instanceof Error ? err.message : "Error al guardar el producto." };
+      console.error("Error in upsertAdminProduct:", err);
+      const msg = (err as any)?.message || (err as any)?.details || String(err);
+      return { error: `Error al guardar: ${msg}` };
     }
   });
 
