@@ -220,3 +220,49 @@ export const deleteAdminProduct = createServerFn({ method: "POST" })
       return { error: err instanceof Error ? err.message : "Error al eliminar el producto." };
     }
   });
+
+/* ─── Subir imagen de producto (Admin, bypass RLS) ─────── */
+
+export const uploadAdminProductImage = createServerFn({ method: "POST" })
+  .validator(
+    (data: { email?: string; token?: string; filename: string; base64: string; bucket?: string }) => ({
+      email: str(data?.email, 160).toLowerCase(),
+      token: str(data?.token, 2000),
+      filename: str(data?.filename, 200),
+      base64: data?.base64 ?? "",
+      bucket: str(data?.bucket, 60) || "storage-images",
+    }),
+  )
+  .handler(async ({ data }): Promise<{ publicUrl?: string; error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+
+      // Convertir base64 a buffer
+      const base64Data = data.base64.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      const bucketName = data.bucket || "storage-images";
+
+      // Crear bucket si no existe
+      try {
+        const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+        if (!buckets?.some((b) => b.name === bucketName)) {
+          await supabaseAdmin.storage.createBucket(bucketName, { public: true });
+        }
+      } catch {}
+
+      const { error: uploadErr } = await supabaseAdmin.storage
+        .from(bucketName)
+        .upload(data.filename, buffer, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: pubData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(data.filename);
+      return { publicUrl: pubData.publicUrl };
+    } catch (err) {
+      console.error("Error al subir imagen:", err);
+      return { error: err instanceof Error ? err.message : "Error al subir la imagen." };
+    }
+  });

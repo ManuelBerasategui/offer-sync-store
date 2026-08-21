@@ -13,6 +13,7 @@ import {
   getAdminProducts,
   upsertAdminProduct,
   deleteAdminProduct,
+  uploadAdminProductImage,
   type ProductInput,
   type VariantInput,
 } from "@/lib/products.functions";
@@ -101,7 +102,7 @@ function ImageDropzone({
   onChange,
   bucket,
   folder,
-  label = "Arrastrá o hacé clic para subir imagen",
+  label = "Arrastrá una imagen, un enlace web o haz clic para subir",
 }: {
   value: string;
   onChange: (url: string) => void;
@@ -109,66 +110,151 @@ function ImageDropzone({
   folder: string;
   label?: string;
 }) {
+  const { user, session } = useAuth();
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function uploadFile(file: File) {
-    if (!file.type.startsWith("image/")) return;
+    if (!file.type.startsWith("image/")) {
+      setErrorMsg("El archivo seleccionado debe ser una imagen (JPG, PNG, WebP).");
+      return;
+    }
     setUploading(true);
+    setErrorMsg("");
     try {
       const ext = file.name.split(".").pop() ?? "jpg";
       const filename = `${folder}/${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from(bucket).upload(filename, file, { upsert: true });
-      if (error) throw error;
-      const { data } = supabase.storage.from(bucket).getPublicUrl(filename);
-      onChange(data.publicUrl);
+
+      // Intentar primero subida por cliente
+      const { error: clientErr } = await supabase.storage.from(bucket).upload(filename, file, { upsert: true });
+      if (!clientErr) {
+        const { data } = supabase.storage.from(bucket).getPublicUrl(filename);
+        onChange(data.publicUrl);
+        setUploading(false);
+        return;
+      }
+
+      // Si falla por políticas de Supabase RLS, usar la función admin del servidor (base64)
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const res = await uploadAdminProductImage({
+          data: {
+            email: user?.email ?? "",
+            token: session?.access_token ?? "",
+            filename,
+            base64,
+            bucket,
+          },
+        });
+        if (res.publicUrl) {
+          onChange(res.publicUrl);
+        } else {
+          setErrorMsg(res.error ?? "No se pudo guardar la imagen.");
+        }
+        setUploading(false);
+      };
+      reader.onerror = () => {
+        setErrorMsg("Error al leer el archivo.");
+        setUploading(false);
+      };
+      reader.readAsDataURL(file);
     } catch (err) {
       console.error("Error al subir imagen:", err);
-    } finally {
+      setErrorMsg("No se pudo subir la imagen.");
       setUploading(false);
     }
   }
 
   return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragging(false);
-        const file = e.dataTransfer.files[0];
-        if (file) void uploadFile(file);
-      }}
-      onClick={() => inputRef.current?.click()}
-      className={`relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 transition-colors ${
-        dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/30"
-      }`}
-      style={{ minHeight: 120 }}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadFile(f); }}
-      />
-      {uploading ? (
-        <div className="flex flex-col items-center gap-2 text-primary">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <span className="text-xs">Subiendo...</span>
-        </div>
-      ) : value ? (
-        <div className="flex flex-col items-center gap-2">
-          <img src={value} alt="preview" className="h-20 w-20 rounded-lg object-cover" onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }} />
-          <span className="text-xs text-muted-foreground">Clic o arrastrá para cambiar</span>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <Upload className="h-6 w-6" />
-          <span className="text-xs text-center">{label}</span>
-        </div>
-      )}
+    <div className="space-y-2">
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          setErrorMsg("");
+
+          const file = e.dataTransfer.files[0];
+          if (file) {
+            void uploadFile(file);
+            return;
+          }
+
+          // Si el usuario arrastró una imagen desde otra web/pestaña
+          const textUrl =
+            e.dataTransfer.getData("text/uri-list") ||
+            e.dataTransfer.getData("text/plain") ||
+            e.dataTransfer.getData("URL");
+
+          if (textUrl && (textUrl.startsWith("http://") || textUrl.startsWith("https://") || textUrl.startsWith("data:image"))) {
+            onChange(textUrl.trim());
+          } else {
+            setErrorMsg("No se detectó una imagen válida al arrastrar.");
+          }
+        }}
+        onClick={() => inputRef.current?.click()}
+        className={`relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 transition-colors ${
+          dragging
+            ? "border-primary bg-primary/5"
+            : "border-border hover:border-primary/50 hover:bg-muted/30"
+        }`}
+        style={{ minHeight: 120 }}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void uploadFile(f);
+          }}
+        />
+
+        {uploading ? (
+          <div className="flex flex-col items-center gap-2 text-primary">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span className="text-xs">Subiendo e integrando imagen...</span>
+          </div>
+        ) : value ? (
+          <div className="flex flex-col items-center gap-2">
+            <img
+              src={value}
+              alt="Vista previa"
+              className="h-24 w-24 rounded-xl object-cover shadow-sm border border-border"
+              onError={(e) => {
+                e.currentTarget.src = FALLBACK_IMAGE;
+              }}
+            />
+            <span className="text-xs text-muted-foreground">Clic o arrastrá para cambiar</span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Upload className="h-6 w-6 text-primary/70" />
+            <span className="text-xs text-center">{label}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Input secundario para pegar enlace directo */}
+      <div className="flex items-center gap-2">
+        <input
+          type="url"
+          className="input-base text-xs py-1.5"
+          placeholder="O pegá un enlace directo de imagen (https://...)"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+
+      {errorMsg && <p className="text-xs text-destructive font-semibold">{errorMsg}</p>}
     </div>
   );
 }
