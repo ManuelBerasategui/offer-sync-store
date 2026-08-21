@@ -174,4 +174,13 @@
   letter-spacing: 0.05em;
   color: var(--muted-foreground);
   margin-bottom: 0.25rem;
+}
+
+/* Enmascaramiento de código de seguridad de tarjeta con asteriscos/puntos */
+input[name*="securityCode"],
+input[id*="securityCode"],
+input[autocomplete="cc-csc"],
+input[id*="cvv"],
+input[name*="cvv"] {
+  -webkit-text-security: disc !important;
 }

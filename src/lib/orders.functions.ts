@@ -49,6 +49,36 @@ function cleanItems(items: OrderItem[]): OrderItem[] {
   }));
 }
 
+function getStatusDetailMessage(statusDetail?: string): string | null {
+  if (!statusDetail) return null;
+  switch (statusDetail) {
+    case "cc_rejected_bad_filled_card_number":
+      return "Número de tarjeta incorrecto. Verificá los números tipeados.";
+    case "cc_rejected_bad_filled_date":
+      return "Fecha de vencimiento incorrecta.";
+    case "cc_rejected_bad_filled_security_code":
+      return "Código de seguridad (CVV) incorrecto.";
+    case "cc_rejected_bad_filled_other":
+      return "Revisá los datos de la tarjeta. Si estás usando una tarjeta de prueba, asegurate de no usar credenciales de producción.";
+    case "cc_rejected_insufficient_amount":
+      return "Tarjeta rechazada por fondos insuficientes.";
+    case "cc_rejected_high_risk":
+      return "Rechazado por prevención de fraude de Mercado Pago. Si estás probando con tu propia cuenta de MP o tarjeta propia, usá el botón azul de Mercado Pago.";
+    case "cc_rejected_call_for_authorize":
+      return "Debés llamar al emisor de tu tarjeta para autorizar el pago.";
+    case "cc_rejected_max_attempts":
+      return "Superaste el límite de intentos permitidos con esta tarjeta.";
+    case "cc_rejected_duplicated_payment":
+      return "Ya procesaste un pago por el mismo monto recientemente.";
+    case "cc_rejected_card_disabled":
+      return "Tarjeta deshabilitada. Contactate con tu banco.";
+    case "cc_rejected_other":
+      return "Tarjeta rechazada por el banco emisor. Probá con otra tarjeta o con el botón de Mercado Pago.";
+    default:
+      return null;
+  }
+}
+
 function paymentErrorMessage(body: string): string {
   try {
     const response = JSON.parse(body) as {
@@ -179,7 +209,7 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
         };
       }
 
-      const json = JSON.parse(body) as { status?: string };
+      const json = JSON.parse(body) as { status?: string; status_detail?: string };
 
       if (json.status === "in_process" || json.status === "pending") {
         return {
@@ -190,9 +220,12 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
       }
 
       if (json.status !== "approved") {
+        const detailMessage = getStatusDetailMessage(json.status_detail);
         return {
           status: "rejected",
-          message: "La tarjeta fue rechazada. Probá con otra o con Mercado Pago.",
+          message:
+            detailMessage ||
+            `La tarjeta fue rechazada (${json.status_detail ?? "motivo no especificado"}). Probá con otra tarjeta o usá el botón azul de Mercado Pago.`,
         };
       }
 
