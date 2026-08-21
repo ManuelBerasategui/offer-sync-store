@@ -71,6 +71,8 @@ const REVIEWS = [
   },
 ];
 
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 function ProductoPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
@@ -105,7 +107,23 @@ function ProductoPage() {
   }
 
   const consultar = isWhatsappOnly(product);
-  const selectedVariant = variants.find((variant) => String(variant.id) === selectedVariantId);
+  const defaultColor = String(product.color_predeterminado ?? "").trim();
+  // NULL significa producto sin colores, incluso si quedaron variantes antiguas vinculadas.
+  const usesColors = Boolean(defaultColor) && variants.length > 0;
+  const defaultVariant = usesColors
+    ? variants.find(
+        (variant) => variant.color.trim().toLocaleLowerCase() === defaultColor.toLocaleLowerCase(),
+      )
+    : undefined;
+  const selectedVariant =
+    (usesColors ? variants.find((variant) => String(variant.id) === selectedVariantId) : undefined) ??
+    defaultVariant;
+  const baseName = defaultColor
+    ? (product.nombre ?? "Producto")
+        .replace(new RegExp(`(?:\\s*[-—]?\\s*)${escapeRegExp(defaultColor)}\\s*$`, "i"), "")
+        .trim()
+    : product.nombre ?? "Producto";
+  const displayName = selectedVariant ? `${baseName} ${selectedVariant.color}`.trim() : product.nombre ?? "Producto";
   const basePrice = selectedVariant ? Number(selectedVariant.precio) : priceOf(product);
   const selectedImage = selectedVariant?.imagen_url || product.imagen_url;
   const percent = discountFor(product, qty);
@@ -117,7 +135,7 @@ function ProductoPage() {
       ? `${String(product.id ?? product.nombre ?? "")}:${selectedVariant.id}`
       : String(product.id ?? product.nombre ?? ""),
     productId: product.id ? String(product.id) : undefined,
-    nombre: selectedVariant ? `${product.nombre ?? "Producto"} — ${selectedVariant.color}` : product.nombre ?? "Producto",
+    nombre: displayName,
     qty,
     unitPrice: Math.round(unit),
     basePrice,
@@ -158,7 +176,7 @@ function ProductoPage() {
               {product.categoria || "General"}
             </p>
             <h1 className="mt-2 font-sans text-[clamp(24px,6vw,36px)] font-bold normal-case tracking-tight">
-              {product.nombre}
+              {displayName}
             </h1>
 
             {consultar ? (
@@ -183,17 +201,17 @@ function ProductoPage() {
               </>
             )}
 
-            {!consultar && variants.length > 0 && (
+            {!consultar && usesColors && (
               <div className="mt-6">
                 <label
                   htmlFor="color"
                   className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground"
                 >
-                  Color
+                  Elegir color
                 </label>
                 <select
                   id="color"
-                  value={selectedVariantId}
+                  value={selectedVariant?.id ?? ""}
                   onChange={(e) => setSelectedVariantId(e.target.value)}
                   className="mt-2 w-full max-w-[320px] rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
                 >
@@ -278,23 +296,23 @@ function ProductoPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (variants.length > 0 && !selectedVariant) return;
+                      if (usesColors && !selectedVariant) return;
                       if (bloqueaCompra) setShowMin(true);
                       else setShowCheckout(true);
                     }}
-                    disabled={variants.length > 0 && !selectedVariant}
+                    disabled={usesColors && !selectedVariant}
                     className="btn-base w-full grad-urgente text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {variants.length > 0 && !selectedVariant ? "Elegí un color para comprar" : "Comprar ya"}
+                    {usesColors && !selectedVariant ? "Elegí un color para comprar" : "Comprar ya"}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      if (variants.length > 0 && !selectedVariant) return;
+                      if (usesColors && !selectedVariant) return;
                       cart.add(cartItem);
                       navigate({ to: "/carrito" });
                     }}
-                    disabled={variants.length > 0 && !selectedVariant}
+                    disabled={usesColors && !selectedVariant}
                     className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Agregar al carrito

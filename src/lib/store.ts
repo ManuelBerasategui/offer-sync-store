@@ -7,7 +7,6 @@ export type ProductVariant = {
   precio: number | string;
   stock?: string | null;
   imagen_url?: string | null;
-  es_predeterminada?: boolean;
 };
 
 export type Product = {
@@ -22,6 +21,7 @@ export type Product = {
   oferta?: string;
   stock?: string;
   descuento?: string;
+  color_predeterminado?: string;
   variants?: ProductVariant[];
   [key: string]: string | ProductVariant[] | undefined;
 };
