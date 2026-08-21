@@ -400,16 +400,6 @@ export const getAdminPaidOrders = createServerFn({ method: "POST" })
       return { orders: [], error: "Variables de Supabase no configuradas en el servidor." };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    let requestingEmail = data.email;
-    if (data.token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-      if (userData?.user?.email) {
-        requestingEmail = userData.user.email.toLowerCase();
-      }
-    }
-
     const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
     const adminEmails = adminEmailsRaw
       .toLowerCase()
@@ -417,8 +407,27 @@ export const getAdminPaidOrders = createServerFn({ method: "POST" })
       .map((e) => e.trim())
       .filter(Boolean);
 
-    if (adminEmails.length > 0 && requestingEmail && !adminEmails.includes(requestingEmail)) {
-      return { orders: [], error: "Acceso denegado: Tu email no tiene permisos de administrador." };
+    let requestingEmail = data.email ? data.email.toLowerCase().trim() : "";
+    if (data.token) {
+      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
+      if (userData?.user?.email) {
+        requestingEmail = userData.user.email.toLowerCase().trim();
+      }
+    }
+
+    if (!requestingEmail) {
+      return { orders: [], error: "Acceso denegado: Debés iniciar sesión como administrador." };
+    }
+
+    if (adminEmails.length > 0) {
+      if (!adminEmails.includes(requestingEmail)) {
+        return { orders: [], error: "Acceso denegado: El email no tiene permisos de administrador." };
+      }
+    } else {
+      const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
+      if (!defaultAdmins.includes(requestingEmail)) {
+        return { orders: [], error: "Acceso denegado: Configurá ADMIN_EMAILS en el archivo .env." };
+      }
     }
 
     const { data: rows, error } = await supabaseAdmin

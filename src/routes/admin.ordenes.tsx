@@ -128,6 +128,26 @@ TOTAL: ${money(order.total)}`;
     return `https://wa.me/${cleanPhone}?text=${text}`;
   };
 
+  if (!user && !authLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SiteHeader config={config} />
+        <main className="mx-auto max-w-[460px] px-4 py-20 text-center">
+          <div className="card-soft p-8">
+            <h1 className="text-2xl font-bold text-foreground">Acceso Denegado</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Debés iniciar sesión con una cuenta de administrador para ver las órdenes pagadas.
+            </p>
+            <Link to="/auth" className="btn-base grad-urgente mt-6 text-primary-foreground">
+              Iniciar sesión
+            </Link>
+          </div>
+        </main>
+        <SiteFooter config={config} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader config={config} />
