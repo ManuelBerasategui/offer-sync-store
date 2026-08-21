@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -44,17 +44,7 @@ type CartRow = {
   variant_color: string | null;
 };
 
-const STORAGE_KEY = "ti_cart_v1";
 const Ctx = createContext<CartCtx | null>(null);
-
-function readGuestCart(): CartItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as CartItem[]) : [];
-  } catch {
-    return [];
-  }
-}
 
 function toCartItem(row: CartRow): CartItem {
   return {
@@ -87,38 +77,21 @@ function toCartRow(userId: string, item: CartItem) {
   };
 }
 
-function mergeItems(serverItems: CartItem[], guestItems: CartItem[]) {
-  const merged = new Map(serverItems.map((item) => [item.id, item]));
-  for (const item of guestItems) {
-    const current = merged.get(item.id);
-    merged.set(item.id, current ? { ...item, qty: current.qty + item.qty } : item);
-  }
-  return [...merged.values()];
-}
-
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const { data } = useQuery(storeQueryOptions);
   const { user, loading: authLoading } = useAuth();
-  // Tracks whether the initial cart load (localStorage or server) has already run.
-  // Prevents localStorage from overwriting in-memory changes on subsequent renders.
-  const initialLoadDone = useRef(false);
 
-  // Con sesión, la base es la fuente de verdad. Al ingresar se migran los ítems del invitado.
+  // Cuando el usuario inicia sesión, carga el carrito desde la DB.
+  // Cuando cierra sesión, limpia el carrito en memoria.
   useEffect(() => {
     if (authLoading) return;
-    // Si ya cargamos el carrito inicial y el user no cambió, no volver a leer localStorage.
-    if (initialLoadDone.current && !user) return;
-    let cancelled = false;
-
     if (!user) {
-      setItems(readGuestCart());
-      initialLoadDone.current = true;
-      return () => {
-        cancelled = true;
-      };
+      setItems([]);
+      return;
     }
 
+    let cancelled = false;
     void (async () => {
       const { data: rows, error } = await supabase
         .from("cart_items")
@@ -126,17 +99,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         .eq("user_id", user.id);
 
       if (cancelled || error) return;
-      const guestItems = initialLoadDone.current ? [] : readGuestCart();
-      const merged = mergeItems((rows ?? []).map(toCartItem), guestItems);
-      setItems(merged);
-      initialLoadDone.current = true;
-
-      if (merged.length > 0) {
-        await supabase.from("cart_items").upsert(merged.map((item) => toCartRow(user.id, item)), {
-          onConflict: "user_id,item_id",
-        });
-      }
-      localStorage.removeItem(STORAGE_KEY);
+      setItems((rows ?? []).map(toCartItem));
     })();
 
     return () => {
@@ -156,14 +119,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }, [items, data?.products]);
 
-  const saveGuestCart = useCallback((next: CartItem[]) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // El carrito en memoria continúa disponible aunque localStorage esté bloqueado.
-    }
-  }, []);
-
   const add = useCallback(
     (item: CartItem) => {
       setItems((prev) => {
@@ -174,13 +129,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const savedItem = next.find((entry) => entry.id === item.id)!;
         if (user) {
           void supabase.from("cart_items").upsert(toCartRow(user.id, savedItem), { onConflict: "user_id,item_id" });
-        } else {
-          saveGuestCart(next);
         }
         return next;
       });
     },
-    [user, saveGuestCart],
+    [user],
   );
 
   const remove = useCallback(
@@ -188,10 +141,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setItems((prev) => {
         const next = prev.filter((item) => item.id !== id);
         if (user) void supabase.from("cart_items").delete().eq("user_id", user.id).eq("item_id", id);
-        else saveGuestCart(next);
         return next;
       }),
-    [user, saveGuestCart],
+    [user],
   );
 
   const setQty = useCallback(
@@ -201,19 +153,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const updated = next.find((item) => item.id === id);
         if (user && updated) {
           void supabase.from("cart_items").upsert(toCartRow(user.id, updated), { onConflict: "user_id,item_id" });
-        } else {
-          saveGuestCart(next);
         }
         return next;
       }),
-    [user, saveGuestCart],
+    [user],
   );
 
   const clear = useCallback(() => {
     setItems([]);
     if (user) void supabase.from("cart_items").delete().eq("user_id", user.id);
-    else saveGuestCart([]);
-  }, [user, saveGuestCart]);
+  }, [user]);
 
   const value = useMemo<CartCtx>(
     () => ({
