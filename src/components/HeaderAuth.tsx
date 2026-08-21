@@ -11,7 +11,7 @@ const inputClass =
 
 /** Botón de "Iniciar sesión" en el header con mini formulario desplegable. */
 export function HeaderAuth() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -53,13 +53,15 @@ export function HeaderAuth() {
           <p className="truncate text-sm font-semibold">{profile?.nombre || user.email}</p>
           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
           <div className="mt-3 flex flex-col gap-2">
-            <Link
-              to="/admin/ordenes"
-              onClick={() => setOpen(false)}
-              className="rounded-md bg-emerald-500/10 px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 text-center"
-            >
-              ⚙️ Panel Admin
-            </Link>
+            {isAdmin && (
+              <Link
+                to="/admin/ordenes"
+                onClick={() => setOpen(false)}
+                className="rounded-md bg-emerald-500/10 px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 text-center"
+              >
+                ⚙️ Panel Admin
+              </Link>
+            )}
             <Link
               to="/auth"
               onClick={() => setOpen(false)}

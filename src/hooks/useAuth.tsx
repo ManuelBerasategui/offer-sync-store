@@ -31,6 +31,7 @@ type AuthCtx = {
   session: Session | null;
   profile: ShippingData | null;
   loading: boolean;
+  isAdmin: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -71,17 +72,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, [loadProfile]);
 
+  const adminEmails = (import.meta.env["VITE_ADMIN_EMAILS"] as string | undefined ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
   const value = useMemo<AuthCtx>(
     () => ({
       user: session?.user ?? null,
       session,
       profile,
       loading,
+      isAdmin: !!session?.user?.email && adminEmails.includes(session.user.email.toLowerCase()),
       signOut: async () => {
         await supabase.auth.signOut();
       },
       refreshProfile: async () => loadProfile(session?.user?.id),
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [session, profile, loading, loadProfile],
   );
 

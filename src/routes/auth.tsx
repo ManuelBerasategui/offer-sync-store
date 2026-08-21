@@ -73,7 +73,7 @@ function AuthPage() {
   const { config } = data;
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { user, profile, signOut, refreshProfile } = useAuth();
+  const { user, profile, signOut, refreshProfile, isAdmin } = useAuth();
 
   // The URL is now the single source of truth for `mode` instead of a
   // useState that only read `search.mode` on first mount. That's what made
@@ -437,12 +437,14 @@ function AuthPage() {
               </>
             )}
             <div className="mt-6 flex flex-col gap-3">
-              <Link
-                to="/admin/ordenes"
-                className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-center"
-              >
-                📦 Panel de Órdenes Pagadas
-              </Link>
+              {isAdmin && (
+                <Link
+                  to="/admin/ordenes"
+                  className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-center"
+                >
+                  📦 Panel de Órdenes Pagadas
+                </Link>
+              )}
               <Link to="/catalogo" className="btn-base grad-urgente text-primary-foreground">
                 Seguir comprando
               </Link>
