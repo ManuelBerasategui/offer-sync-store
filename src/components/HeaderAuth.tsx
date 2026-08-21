@@ -40,7 +40,7 @@ export function HeaderAuth() {
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
-            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-bold text-foreground hover:border-primary hover:text-primary"
+            className="flex items-center gap-1.5 rounded-full border border-border p-2 sm:px-3 sm:py-2 text-xs font-bold text-foreground hover:border-primary hover:text-primary"
             aria-label="Mi cuenta"
           >
             <User className="h-4 w-4" />
@@ -88,7 +88,7 @@ export function HeaderAuth() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="flex items-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-bold text-foreground hover:border-primary hover:text-primary"
+          className="flex items-center gap-1.5 rounded-full border border-border p-2 sm:px-3 sm:py-2 text-xs font-bold text-foreground hover:border-primary hover:text-primary"
           aria-label="Iniciar sesión"
         >
           <User className="h-4 w-4" />

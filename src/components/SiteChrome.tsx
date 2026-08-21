@@ -10,20 +10,20 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
-      <div className="mx-auto grid max-w-[1180px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3">
         <Link
           to="/"
           aria-label="Ir al inicio"
-          className="block h-10 w-[180px] shrink-0 sm:w-[240px]"
+          className="flex shrink-0 items-center min-w-0"
         >
           <img
             src="/businessicon-header.jpg"
             alt="Te Importamos"
-            className="h-full w-auto object-contain object-left"
+            className="h-7 w-auto max-w-[130px] object-contain object-left xs:max-w-[160px] sm:h-10 sm:max-w-none"
           />
         </Link>
 
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <nav className="mr-1 hidden items-center gap-6 text-sm font-semibold md:flex">
             <Link to="/" hash="ofertas" className="text-muted-foreground hover:text-primary">
               Ofertas
@@ -41,16 +41,16 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
           <Link
             to="/catalogo"
             aria-label="Ver catálogo"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
+            className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
           >
-            <LayoutGrid className="h-4 w-4" />
+            <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
             <span>Catálogo</span>
           </Link>
           <HeaderAuth />
           <Link
             to="/carrito"
             aria-label="Carrito"
-            className="relative rounded-full border border-border p-2.5 text-foreground hover:border-primary hover:text-primary"
+            className="relative rounded-full border border-border p-2 text-foreground hover:border-primary hover:text-primary sm:p-2.5"
           >
             <ShoppingCart className="h-4 w-4" />
             {cart.count > 0 && (
