@@ -435,6 +435,7 @@ function AdminProductosPage() {
   const { user, session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -442,13 +443,7 @@ function AdminProductosPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    if (!authLoading && !user) void navigate({ to: "/", replace: true });
-  }, [authLoading, user, navigate]);
-
-  if (authLoading || !user) return null;
-
-  const userEmail = user.email ?? "";
+  const userEmail = user?.email ?? "";
   const userToken = session?.access_token ?? "";
 
   async function loadProducts() {
@@ -456,8 +451,16 @@ function AdminProductosPage() {
     setError("");
     try {
       const res = await getAdminProducts({ data: { email: userEmail, token: userToken } });
-      if (res.error) setError(res.error);
-      else setProducts(res.products);
+      if (res.error) {
+        setError(res.error);
+        if (res.error.toLowerCase().includes("acceso denegado")) {
+          setIsAuthorized(false);
+          void navigate({ to: "/", replace: true });
+        }
+      } else {
+        setIsAuthorized(true);
+        setProducts(res.products);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar.");
     } finally {
@@ -465,8 +468,15 @@ function AdminProductosPage() {
     }
   }
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  useEffect(() => { void loadProducts(); }, [userEmail, userToken]);
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        void navigate({ to: "/", replace: true });
+      } else {
+        void loadProducts();
+      }
+    }
+  }, [authLoading, user, session]);
 
   async function handleDelete(id: string) {
     if (!confirm("¿Seguro que querés eliminar este producto? Se borrarán también sus variantes.")) return;
@@ -489,9 +499,20 @@ function AdminProductosPage() {
     );
   });
 
+  if (authLoading || !user || isAuthorized === false) return null;
+
+  if (isAuthorized === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader config={config} />
+
 
       <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
         {/* Header */}

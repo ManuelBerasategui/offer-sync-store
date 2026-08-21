@@ -27,6 +27,7 @@ function AdminOrdenesPage() {
   const { config } = data;
   const { user, session, loading: authLoading } = useAuth();
 
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -46,7 +47,12 @@ function AdminOrdenesPage() {
       if (res.error) {
         setError(res.error);
         setOrders([]);
+        if (res.error.toLowerCase().includes("acceso denegado")) {
+          setIsAuthorized(false);
+          void navigate({ to: "/", replace: true });
+        }
       } else {
+        setIsAuthorized(true);
         setOrders(res.orders ?? []);
       }
     } catch (err) {
@@ -58,7 +64,11 @@ function AdminOrdenesPage() {
 
   useEffect(() => {
     if (!authLoading) {
-      void loadOrders();
+      if (!user) {
+        void navigate({ to: "/", replace: true });
+      } else {
+        void loadOrders();
+      }
     }
   }, [authLoading, user, session]);
 
@@ -136,7 +146,16 @@ TOTAL: ${money(order.total)}`;
     }
   }, [authLoading, user, navigate]);
 
-  if (authLoading || !user) return null;
+  if (authLoading || !user || isAuthorized === false) return null;
+
+  // Mostramos una pantalla en blanco o spinner mientras validamos si es admin en el servidor
+  if (isAuthorized === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
