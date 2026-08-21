@@ -76,7 +76,7 @@ export function CardPaymentForm({
     if (!PUBLIC_KEY || amount <= 0) return;
     let isCancelled = false;
 
-    const renderBrick = async () => {
+    const timer = setTimeout(async () => {
       try {
         setFailed(false);
         setReady(false);
@@ -95,13 +95,17 @@ export function CardPaymentForm({
         }
         containerElem.innerHTML = "";
 
+        const cleanDni = String(documentNumber ?? "").replace(/\D/g, "") || "11111111";
+        const cleanEmail = String(email ?? "").trim() || "comprador@teimportamos.com";
+        const cleanAmount = Number(amount) > 0 ? Number(amount.toFixed(2)) : 100;
+
         const mp = new window.MercadoPago(PUBLIC_KEY, { locale: "es-AR" });
         const controller = await mp.bricks().create("cardPayment", containerId, {
           initialization: {
-            amount,
+            amount: cleanAmount,
             payer: {
-              email,
-              identification: { type: "DNI", number: documentNumber },
+              email: cleanEmail,
+              identification: { type: "DNI", number: cleanDni },
             },
           },
           customization: { visual: { style: { theme: "default" } } },
@@ -125,9 +129,9 @@ export function CardPaymentForm({
                 paymentMethodId: formData.payment_method_id,
                 installments: formData.installments,
                 issuerId: formData.issuer_id,
-                email: formData.payer?.email ?? email,
-                docType: formData.payer?.identification?.type,
-                docNumber: formData.payer?.identification?.number,
+                email: formData.payer?.email ?? cleanEmail,
+                docType: formData.payer?.identification?.type ?? "DNI",
+                docNumber: formData.payer?.identification?.number ?? cleanDni,
               });
             },
           },
@@ -144,12 +148,11 @@ export function CardPaymentForm({
         console.error("Error al cargar formulario de tarjeta MP:", err);
         if (!isCancelled) setFailed(true);
       }
-    };
-
-    renderBrick();
+    }, 150);
 
     return () => {
       isCancelled = true;
+      clearTimeout(timer);
       if (brickControllerRef.current) {
         try {
           brickControllerRef.current.unmount();
