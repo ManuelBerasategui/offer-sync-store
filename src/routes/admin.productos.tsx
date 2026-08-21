@@ -246,11 +246,11 @@ function ProductModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm">
-      <div className="relative my-8 w-full max-w-2xl rounded-2xl bg-card shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 p-2 sm:p-4 backdrop-blur-sm">
+      <div className="relative my-4 sm:my-8 w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-card shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="text-lg font-bold">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6 sm:py-4 shrink-0">
+          <h2 className="text-base sm:text-lg font-bold">
             {form.id ? "Editar producto" : "Nuevo producto"}
           </h2>
           <button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
@@ -259,7 +259,7 @@ function ProductModal({
         </div>
 
         {/* Body */}
-        <div className="space-y-6 px-6 py-5">
+        <div className="space-y-6 px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto flex-1">
           {error && (
             <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</div>
           )}
@@ -276,8 +276,8 @@ function ProductModal({
           </div>
 
           {/* Campos básicos */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="col-span-1 sm:col-span-2">
               <label className="label-sm">Nombre *</label>
               <input className="input-base" value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder="Nombre del producto" />
             </div>
@@ -305,7 +305,7 @@ function ProductModal({
               <label className="label-sm">Precio oferta ARS</label>
               <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => set("precio_oferta", e.target.value)} placeholder="Ej: 120000" />
             </div>
-            <div className="col-span-2">
+            <div className="col-span-1 sm:col-span-2">
               <label className="label-sm">Descripción</label>
               <textarea className="input-base min-h-[80px] resize-y" value={form.descripcion ?? ""} onChange={(e) => set("descripcion", e.target.value)} placeholder="Descripción del producto..." />
             </div>
@@ -343,7 +343,7 @@ function ProductModal({
                       <X className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                     <div>
                       <label className="label-sm">Color</label>
                       <input className="input-base" value={v.color} onChange={(e) => updateVariant(i, "color", e.target.value)} placeholder="Ej: Rojo" />
@@ -352,7 +352,7 @@ function ProductModal({
                       <label className="label-sm">Precio</label>
                       <input className="input-base" value={String(v.precio)} onChange={(e) => updateVariant(i, "precio", e.target.value)} placeholder="Ej: 15000" />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-1 sm:col-span-2">
                       <label className="label-sm">Stock (SI / NO)</label>
                       <input className="input-base" value={String(v.stock ?? "SI")} onChange={(e) => updateVariant(i, "stock", e.target.value)} />
                     </div>
@@ -380,24 +380,24 @@ function ProductModal({
             </div>
             <div className="space-y-2">
               {(form.tiers ?? []).map((t, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={i} className="flex flex-wrap items-center gap-2">
                   <input
                     type="number" min={1}
-                    className="input-base w-24"
+                    className="input-base w-20 sm:w-24"
                     value={t.units || ""}
                     onChange={(e) => updateTier(i, "units", Number(e.target.value))}
                     placeholder="Unidades"
                   />
-                  <span className="text-sm text-muted-foreground">unidades →</span>
+                  <span className="text-xs sm:text-sm text-muted-foreground">unid. →</span>
                   <input
                     type="number" min={0} max={100} step={0.5}
-                    className="input-base w-24"
+                    className="input-base w-20 sm:w-24"
                     value={t.percent || ""}
                     onChange={(e) => updateTier(i, "percent", Number(e.target.value))}
                     placeholder="% desc."
                   />
-                  <span className="text-sm text-muted-foreground">%</span>
-                  <button type="button" onClick={() => removeTier(i)} className="text-destructive hover:opacity-70">
+                  <span className="text-xs sm:text-sm text-muted-foreground">%</span>
+                  <button type="button" onClick={() => removeTier(i)} className="text-destructive hover:opacity-70 p-1">
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -410,7 +410,7 @@ function ProductModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
+        <div className="flex items-center justify-end gap-3 border-t border-border px-4 py-3 sm:px-6 sm:py-4 shrink-0">
           <button onClick={onClose} className="btn-base bg-muted text-foreground hover:bg-muted/70">Cancelar</button>
           <button
             onClick={() => void handleSave()}
@@ -523,7 +523,7 @@ function AdminProductosPage() {
             </span>
             <h1 className="mt-2 text-2xl font-bold">Gestión de Productos</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Link
               to="/admin/ordenes"
               className="btn-base bg-muted text-foreground hover:bg-muted/70 text-sm"
@@ -542,7 +542,7 @@ function AdminProductosPage() {
         {/* Buscador */}
         <div className="mt-6">
           <input
-            className="input-base max-w-sm"
+            className="input-base w-full max-w-sm"
             placeholder="Buscar por nombre o categoría..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -555,7 +555,7 @@ function AdminProductosPage() {
 
         {/* Tabla de productos */}
         {!loading && !error && (
-          <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-card">
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-16 text-center">
                 <PackagePlus className="h-10 w-10 text-muted-foreground/40" />
@@ -572,22 +572,22 @@ function AdminProductosPage() {
                 )}
               </div>
             ) : (
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[480px] text-sm">
                 <thead className="border-b border-border bg-muted/50">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Imagen</th>
-                    <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Nombre</th>
+                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Imagen</th>
+                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Nombre</th>
                     <th className="hidden px-4 py-3 text-left font-semibold text-muted-foreground sm:table-cell">Categoría</th>
                     <th className="hidden px-4 py-3 text-right font-semibold text-muted-foreground sm:table-cell">Precio</th>
-                    <th className="px-4 py-3 text-center font-semibold text-muted-foreground">Stock</th>
-                    <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Acciones</th>
+                    <th className="px-3 py-3 text-center font-semibold text-muted-foreground sm:px-4">Stock</th>
+                    <th className="px-3 py-3 text-right font-semibold text-muted-foreground sm:px-4">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filtered.map((p) => (
                     <tr key={String(p.id)} className="hover:bg-muted/20 transition-colors">
                       <td
-                        className="px-4 py-3 cursor-pointer"
+                        className="px-3 py-3 sm:px-4 cursor-pointer"
                         onClick={() => setModal(productToInput(p))}
                       >
                         <img
@@ -598,7 +598,7 @@ function AdminProductosPage() {
                         />
                       </td>
                       <td
-                        className="px-4 py-3 font-medium cursor-pointer hover:text-primary transition-colors"
+                        className="px-3 py-3 sm:px-4 font-medium cursor-pointer hover:text-primary transition-colors max-w-[150px] sm:max-w-none truncate sm:whitespace-normal"
                         onClick={() => setModal(productToInput(p))}
                       >
                         {p.nombre}
@@ -607,13 +607,13 @@ function AdminProductosPage() {
                       <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
                         {money(p.precio)}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-3 sm:px-4 text-center">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${String(p.stock ?? "").toUpperCase() === "NO" ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>
                           {String(p.stock ?? "SI").toUpperCase() === "NO" ? "Sin stock" : "Con stock"}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-3 py-3 sm:px-4">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
                           <button
                             onClick={() => setModal(productToInput(p))}
                             className="rounded-lg p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
