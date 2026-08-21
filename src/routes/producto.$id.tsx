@@ -411,27 +411,6 @@ function ProductoPage() {
           </div>
         </div>
 
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <a
-          className="btn-base mt-10 w-full bg-whatsapp text-whatsapp-foreground sm:w-auto sm:px-10"
-          href={waLink(config, product.nombre)}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Contactar por WhatsApp
-        </a>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Consultanos por stock, envíos o descuentos por cantidad.
-        </p>
-      </main>
-
-      <Dialog open={showMin} onOpenChange={setShowMin}>
-        <DialogContent>
-          <DialogHeader>
             <DialogTitle>Compra mínima de suplementos</DialogTitle>
             <DialogDescription>{SUPLEMENTOS_MSG}</DialogDescription>
           </DialogHeader>
