@@ -107,7 +107,8 @@ function ProductoPage() {
   }
 
   const consultar = isWhatsappOnly(product);
-  const defaultColor = String(product.color_predeterminado ?? "").trim();
+  const rawDefaultColor = product.color_predeterminado;
+  const defaultColor = (rawDefaultColor == null || rawDefaultColor === "null") ? "" : String(rawDefaultColor).trim();
   // NULL significa producto sin colores, incluso si quedaron variantes antiguas vinculadas.
   const usesColors = Boolean(defaultColor) && variants.length > 0;
   const defaultVariant = usesColors

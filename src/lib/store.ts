@@ -21,9 +21,9 @@ export type Product = {
   oferta?: string;
   stock?: string;
   descuento?: string;
-  color_predeterminado?: string;
+  color_predeterminado?: string | null;
   variants?: ProductVariant[];
-  [key: string]: string | ProductVariant[] | undefined;
+  [key: string]: string | ProductVariant[] | undefined | null;
 };
 
 export type Banner = {
@@ -120,7 +120,7 @@ export function categoriesOf(products: Product[]) {
 /** Lee la columna "Whatsapp" de la planilla, sin importar mayúsculas ni espacios. */
 export function isWhatsappOnly(p: Product) {
   for (const [key, value] of Object.entries(p)) {
-    if (key.trim().toLowerCase().replace(/\s+/g, "") === "whatsapp") return isYes(value);
+    if (key.trim().toLowerCase().replace(/\s+/g, "") === "whatsapp") return isYes(typeof value === "string" ? value : undefined);
   }
   return false;
 }
