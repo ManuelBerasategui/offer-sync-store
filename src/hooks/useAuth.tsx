@@ -72,10 +72,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, [loadProfile]);
 
-  const adminEmails = (import.meta.env["VITE_ADMIN_EMAILS"] as string | undefined ?? "")
+  const rawAdminEmails =
+    (import.meta.env["VITE_ADMIN_EMAILS"] as string | undefined) ||
+    (import.meta.env["ADMIN_EMAILS"] as string | undefined) ||
+    "";
+  const adminEmails = rawAdminEmails
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
+
+  const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
+
+  const userEmail = session?.user?.email?.toLowerCase().trim();
+  const isAdmin = Boolean(
+    userEmail &&
+      (adminEmails.length > 0
+        ? adminEmails.includes(userEmail)
+        : defaultAdmins.includes(userEmail)),
+  );
 
   const value = useMemo<AuthCtx>(
     () => ({
@@ -83,14 +97,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       profile,
       loading,
-      isAdmin: !!session?.user?.email && adminEmails.includes(session.user.email.toLowerCase()),
+      isAdmin,
       signOut: async () => {
         await supabase.auth.signOut();
       },
       refreshProfile: async () => loadProfile(session?.user?.id),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [session, profile, loading, loadProfile],
+    [session, profile, loading, loadProfile, isAdmin],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
