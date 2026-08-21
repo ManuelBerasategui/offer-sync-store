@@ -30,7 +30,7 @@ BEGIN
     FROM public.orders o,
          jsonb_array_elements(o.items) AS item
     WHERE o.created_at >= now() - interval '7 days'
-      AND o.estado <> 'cancelado'
+      AND o.estado = 'pagado'
       AND (item ->> 'qty') IS NOT NULL
       AND (item ->> 'nombre') IS NOT NULL
     GROUP BY item ->> 'nombre'
