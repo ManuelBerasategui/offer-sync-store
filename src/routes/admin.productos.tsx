@@ -311,8 +311,12 @@ function ProductModal({
     }));
 
   async function handleSave() {
-    if (!form.nombre.trim() || !form.precio.trim()) {
-      setError("Nombre y precio son obligatorios.");
+    const hasName = Boolean(form.nombre.trim());
+    const hasPriceUsd = Boolean(form.precio_usd?.trim());
+    const hasPriceArs = Boolean(form.precio?.trim());
+
+    if (!hasName || (!hasPriceUsd && !hasPriceArs)) {
+      setError("El nombre y al menos un precio (USD o ARS) son obligatorios.");
       return;
     }
     setSaving(true);

@@ -134,13 +134,18 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         return isNaN(num) ? null : num;
       };
 
+      const priceUsd = parsePrice(p.precio_usd);
+      const priceArs = parsePrice(p.precio) ?? priceUsd;
+      const priceOfertaUsd = parsePrice(p.precio_oferta_usd);
+      const priceOfertaArs = parsePrice(p.precio_oferta) ?? priceOfertaUsd;
+
       const row = {
         nombre: p.nombre,
         categoria: p.categoria,
-        precio: parsePrice(p.precio),
-        precio_usd: parsePrice(p.precio_usd),
-        precio_oferta: parsePrice(p.precio_oferta),
-        precio_oferta_usd: parsePrice(p.precio_oferta_usd),
+        precio: priceArs,
+        precio_usd: priceUsd,
+        precio_oferta: priceOfertaArs,
+        precio_oferta_usd: priceOfertaUsd,
         descripcion: p.descripcion ?? "",
         destacado: p.destacado ?? "NO",
         oferta: p.oferta ?? "NO",
