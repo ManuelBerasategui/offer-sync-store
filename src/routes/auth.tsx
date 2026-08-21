@@ -333,6 +333,7 @@ function AuthPage() {
                       required
                       className={inputClass}
                       value={profileForm[field.key]}
+                      type={field.key === "telefono" ? "tel" : "text"}
                       inputMode={
                         field.key === "dni"
                           ? "numeric"
@@ -344,6 +345,7 @@ function AuthPage() {
                       onChange={(e) => {
                         let value = e.target.value;
                         if (field.key === "dni") value = value.replace(/\D/g, "").slice(0, 8);
+                        if (field.key === "telefono") value = value.replace(/[^\d+()\-\s]/g, "");
                         setProfileForm({ ...profileForm, [field.key]: value });
                       }}
                     />
@@ -504,6 +506,7 @@ function AuthPage() {
                         required
                         className={inputClass}
                         value={form[f.key]}
+                        type={f.key === "telefono" ? "tel" : "text"}
                         inputMode={
                           f.key === "dni" ? "numeric" : f.key === "telefono" ? "tel" : undefined
                         }
@@ -512,6 +515,9 @@ function AuthPage() {
                           let val = e.target.value;
                           if (f.key === "dni") {
                             val = val.replace(/\D/g, "").slice(0, 8);
+                          }
+                          if (f.key === "telefono") {
+                            val = val.replace(/[^\d+()\-\s]/g, "");
                           }
                           setForm({ ...form, [f.key]: val });
                         }}

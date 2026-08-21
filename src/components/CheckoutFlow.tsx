@@ -244,6 +244,9 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
                   if (f.key === "dni") {
                     val = val.replace(/\D/g, "").slice(0, 8);
                   }
+                  if (f.key === "telefono") {
+                    val = val.replace(/[^\d+()\-\s]/g, "");
+                  }
                   setForm({ ...form, [f.key]: val });
                 }}
               />
