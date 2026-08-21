@@ -161,10 +161,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
           .eq("user_id", uid)
           .eq("item_id", id)
           .then(({ error }) => {
-            console.log("[cart] delete result — item_id:", id, "| error:", error);
+            if (error) console.error("[cart] delete error:", error);
           });
-      } else {
-        console.warn("[cart] remove called but user is null — DELETE skipped");
       }
       return next;
     });
