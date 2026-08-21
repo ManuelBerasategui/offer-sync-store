@@ -370,3 +370,87 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       return { orderCode: data.code, estado: "pagado" };
     },
   );
+
+export type AdminOrder = {
+  id: string;
+  order_code: string;
+  created_at: string;
+  estado: string;
+  metodo_pago: string | null;
+  total: number;
+  nombre: string;
+  dni: string;
+  telefono: string;
+  email: string;
+  provincia: string;
+  ciudad: string;
+  codigo_postal: string;
+  transporte: string;
+  sucursal_correo: string;
+  items: OrderItem[];
+};
+
+export const getAdminPaidOrders = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string }) => ({
+    email: text(data?.email, 160).toLowerCase(),
+    token: text(data?.token, 2000),
+  }))
+  .handler(async ({ data }): Promise<{ orders: AdminOrder[]; error?: string }> => {
+    if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+      return { orders: [], error: "Variables de Supabase no configuradas en el servidor." };
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let requestingEmail = data.email;
+    if (data.token) {
+      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
+      if (userData?.user?.email) {
+        requestingEmail = userData.user.email.toLowerCase();
+      }
+    }
+
+    const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
+    const adminEmails = adminEmailsRaw
+      .toLowerCase()
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    if (adminEmails.length > 0 && requestingEmail && !adminEmails.includes(requestingEmail)) {
+      return { orders: [], error: "Acceso denegado: Tu email no tiene permisos de administrador." };
+    }
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("estado", "pagado")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error al consultar órdenes pagadas:", error);
+      return { orders: [], error: "No se pudieron obtener las órdenes de la base de datos." };
+    }
+
+    const orders: AdminOrder[] = (rows ?? []).map((row) => ({
+      id: String(row.id),
+      order_code: String(row.order_code ?? ""),
+      created_at: String(row.created_at ?? ""),
+      estado: String(row.estado ?? "pagado"),
+      metodo_pago: row.metodo_pago ? String(row.metodo_pago) : null,
+      total: Number(row.total) || 0,
+      nombre: String(row.nombre ?? ""),
+      dni: String(row.dni ?? ""),
+      telefono: String(row.telefono ?? ""),
+      email: String(row.email ?? ""),
+      provincia: String(row.provincia ?? ""),
+      ciudad: String(row.ciudad ?? ""),
+      codigo_postal: String(row.codigo_postal ?? ""),
+      transporte: String(row.transporte ?? "Correo Argentino"),
+      sucursal_correo: String(row.sucursal_correo ?? ""),
+      items: Array.isArray(row.items) ? (row.items as OrderItem[]) : [],
+    }));
+
+    return { orders };
+  });
+

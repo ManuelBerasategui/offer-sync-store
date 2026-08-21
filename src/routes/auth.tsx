@@ -437,6 +437,12 @@ function AuthPage() {
               </>
             )}
             <div className="mt-6 flex flex-col gap-3">
+              <Link
+                to="/admin/ordenes"
+                className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-center"
+              >
+                📦 Panel de Órdenes Pagadas
+              </Link>
               <Link to="/catalogo" className="btn-base grad-urgente text-primary-foreground">
                 Seguir comprando
               </Link>

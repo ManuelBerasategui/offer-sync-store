@@ -54,6 +54,13 @@ export function HeaderAuth() {
           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
           <div className="mt-3 flex flex-col gap-2">
             <Link
+              to="/admin/ordenes"
+              onClick={() => setOpen(false)}
+              className="rounded-md bg-emerald-500/10 px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 text-center"
+            >
+              📦 Panel Órdenes Pagadas
+            </Link>
+            <Link
               to="/auth"
               onClick={() => setOpen(false)}
               className="text-xs font-semibold text-primary hover:underline"
