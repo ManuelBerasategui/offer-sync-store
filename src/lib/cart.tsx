@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -82,6 +82,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const { data } = useQuery(storeQueryOptions);
   const { user, loading: authLoading } = useAuth();
 
+  // Ref siempre actualizado al usuario más reciente.
+  // Evita que closures capturan user=null durante refreshes de token.
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   // Cuando el usuario inicia sesión, carga el carrito desde la DB.
   // Cuando cierra sesión, limpia el carrito en memoria.
   useEffect(() => {
@@ -98,7 +105,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         .select("item_id, product_id, nombre, qty, unit_price, imagen, categoria, base_price, variant_id, variant_color")
         .eq("user_id", user.id);
 
-      if (cancelled || error) return;
+      if (cancelled) return;
+      if (error) {
+        console.error("[cart] error loading cart from DB:", error);
+        return;
+      }
       setItems((rows ?? []).map(toCartItem));
     })();
 
@@ -119,50 +130,76 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }, [items, data?.products]);
 
-  const add = useCallback(
-    (item: CartItem) => {
-      setItems((prev) => {
-        const current = prev.find((entry) => entry.id === item.id);
-        const next = current
-          ? prev.map((entry) => (entry.id === item.id ? { ...item, qty: entry.qty + item.qty } : entry))
-          : [...prev, item];
-        const savedItem = next.find((entry) => entry.id === item.id)!;
-        if (user) {
-          void supabase.from("cart_items").upsert(toCartRow(user.id, savedItem), { onConflict: "user_id,item_id" });
-        }
-        return next;
-      });
-    },
-    [user],
-  );
+  const add = useCallback((item: CartItem) => {
+    setItems((prev) => {
+      const current = prev.find((entry) => entry.id === item.id);
+      const next = current
+        ? prev.map((entry) => (entry.id === item.id ? { ...item, qty: entry.qty + item.qty } : entry))
+        : [...prev, item];
+      const savedItem = next.find((entry) => entry.id === item.id)!;
+      const uid = userRef.current?.id;
+      if (uid) {
+        void supabase
+          .from("cart_items")
+          .upsert(toCartRow(uid, savedItem), { onConflict: "user_id,item_id" })
+          .then(({ error }) => {
+            if (error) console.error("[cart] upsert error:", error);
+          });
+      }
+      return next;
+    });
+  }, []);
 
-  const remove = useCallback(
-    (id: string) =>
-      setItems((prev) => {
-        const next = prev.filter((item) => item.id !== id);
-        if (user) void supabase.from("cart_items").delete().eq("user_id", user.id).eq("item_id", id);
-        return next;
-      }),
-    [user],
-  );
+  const remove = useCallback((id: string) => {
+    setItems((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      const uid = userRef.current?.id;
+      if (uid) {
+        void supabase
+          .from("cart_items")
+          .delete()
+          .eq("user_id", uid)
+          .eq("item_id", id)
+          .then(({ error }) => {
+            console.log("[cart] delete result — item_id:", id, "| error:", error);
+          });
+      } else {
+        console.warn("[cart] remove called but user is null — DELETE skipped");
+      }
+      return next;
+    });
+  }, []);
 
-  const setQty = useCallback(
-    (id: string, qty: number) =>
-      setItems((prev) => {
-        const next = prev.map((item) => (item.id === id ? { ...item, qty: Math.max(1, qty) } : item));
-        const updated = next.find((item) => item.id === id);
-        if (user && updated) {
-          void supabase.from("cart_items").upsert(toCartRow(user.id, updated), { onConflict: "user_id,item_id" });
-        }
-        return next;
-      }),
-    [user],
-  );
+  const setQty = useCallback((id: string, qty: number) => {
+    setItems((prev) => {
+      const next = prev.map((item) => (item.id === id ? { ...item, qty: Math.max(1, qty) } : item));
+      const updated = next.find((item) => item.id === id);
+      const uid = userRef.current?.id;
+      if (uid && updated) {
+        void supabase
+          .from("cart_items")
+          .upsert(toCartRow(uid, updated), { onConflict: "user_id,item_id" })
+          .then(({ error }) => {
+            if (error) console.error("[cart] setQty upsert error:", error);
+          });
+      }
+      return next;
+    });
+  }, []);
 
   const clear = useCallback(() => {
     setItems([]);
-    if (user) void supabase.from("cart_items").delete().eq("user_id", user.id);
-  }, [user]);
+    const uid = userRef.current?.id;
+    if (uid) {
+      void supabase
+        .from("cart_items")
+        .delete()
+        .eq("user_id", uid)
+        .then(({ error }) => {
+          if (error) console.error("[cart] clear error:", error);
+        });
+    }
+  }, []);
 
   const value = useMemo<CartCtx>(
     () => ({
