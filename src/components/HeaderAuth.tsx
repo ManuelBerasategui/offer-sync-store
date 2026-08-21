@@ -58,7 +58,7 @@ export function HeaderAuth() {
               onClick={() => setOpen(false)}
               className="rounded-md bg-emerald-500/10 px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 text-center"
             >
-              📦 Panel Órdenes Pagadas
+              ⚙️ Panel Admin
             </Link>
             <Link
               to="/auth"
