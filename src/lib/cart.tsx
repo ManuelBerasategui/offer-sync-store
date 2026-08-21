@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -100,14 +100,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const { data } = useQuery(storeQueryOptions);
   const { user, loading: authLoading } = useAuth();
+  // Tracks whether the initial cart load (localStorage or server) has already run.
+  // Prevents localStorage from overwriting in-memory changes on subsequent renders.
+  const initialLoadDone = useRef(false);
 
   // Con sesión, la base es la fuente de verdad. Al ingresar se migran los ítems del invitado.
   useEffect(() => {
     if (authLoading) return;
+    // Si ya cargamos el carrito inicial y el user no cambió, no volver a leer localStorage.
+    if (initialLoadDone.current && !user) return;
     let cancelled = false;
 
     if (!user) {
       setItems(readGuestCart());
+      initialLoadDone.current = true;
       return () => {
         cancelled = true;
       };
@@ -120,8 +126,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         .eq("user_id", user.id);
 
       if (cancelled || error) return;
-      const merged = mergeItems((rows ?? []).map(toCartItem), readGuestCart());
+      const guestItems = initialLoadDone.current ? [] : readGuestCart();
+      const merged = mergeItems((rows ?? []).map(toCartItem), guestItems);
       setItems(merged);
+      initialLoadDone.current = true;
 
       if (merged.length > 0) {
         await supabase.from("cart_items").upsert(merged.map((item) => toCartRow(user.id, item)), {
