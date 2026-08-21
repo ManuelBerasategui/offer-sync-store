@@ -40,8 +40,8 @@ function AdminOrdenesPage() {
     try {
       const res = await getAdminPaidOrders({
         data: {
-          email: user?.email ?? undefined,
-          token: session?.access_token ?? undefined,
+          email: user?.email,
+          token: session?.access_token,
         },
       });
       if (res.error) {

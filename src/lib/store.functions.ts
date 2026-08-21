@@ -46,8 +46,9 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
       const banners: Banner[] = (bannersRaw ?? []) as Banner[];
 
       const config: SiteConfig = {};
-      for (const row of (configRaw ?? [])) {
-        if (row.clave) config[row.clave] = row.valor ?? "";
+      for (const row of configRaw ?? []) {
+        const r = row as { clave?: string; valor?: string };
+        if (r.clave) config[r.clave] = r.valor ?? "";
       }
 
       return { products, banners, config };

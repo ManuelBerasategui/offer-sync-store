@@ -70,11 +70,12 @@ function productToInput(p: Product): ProductInput {
     }
   }
 
-  const rawTipo = String((p as Record<string, unknown>).tipo_talles ?? "NINGUNO").toUpperCase();
+  const pRec = p as Record<string, unknown>;
+  const rawTipo = String(pRec["tipo_talles"] ?? "NINGUNO").toUpperCase();
   const tipo_talles: "ZAPATILLAS" | "ROPA" | "NINGUNO" =
     rawTipo === "ZAPATILLAS" ? "ZAPATILLAS" : rawTipo === "ROPA" ? "ROPA" : "NINGUNO";
 
-  const rawTalles = (p as Record<string, unknown>).talles_disponibles;
+  const rawTalles = pRec["talles_disponibles"];
   const talles_disponibles: string[] = Array.isArray(rawTalles)
     ? (rawTalles as string[])
     : typeof rawTalles === "string"
@@ -86,9 +87,9 @@ function productToInput(p: Product): ProductInput {
     nombre: String(p.nombre ?? ""),
     categoria: String(p.categoria ?? ""),
     precio: String(p.precio ?? ""),
-    precio_usd: String((p as Record<string, unknown>).precio_usd ?? ""),
+    precio_usd: String(pRec["precio_usd"] ?? ""),
     precio_oferta: String(p.precio_oferta ?? ""),
-    precio_oferta_usd: String((p as Record<string, unknown>).precio_oferta_usd ?? ""),
+    precio_oferta_usd: String(pRec["precio_oferta_usd"] ?? ""),
     descripcion: String(p.descripcion ?? ""),
     destacado: String(p.destacado ?? "NO"),
     oferta: String(p.oferta ?? "NO"),
@@ -306,24 +307,24 @@ function ProductModal({
     }));
 
   const removeVariant = (i: number) =>
-    setForm((prev) => ({ ...prev, variants: prev.variants?.filter((_, idx) => idx !== i) }));
+    setForm((prev) => ({ ...prev, variants: (prev.variants ?? []).filter((_, idx) => idx !== i) }));
 
   const updateVariant = (i: number, field: keyof VariantInput, value: string) =>
     setForm((prev) => ({
       ...prev,
-      variants: prev.variants?.map((v, idx) => (idx === i ? { ...v, [field]: value } : v)),
+      variants: (prev.variants ?? []).map((v, idx) => (idx === i ? { ...v, [field]: value } : v)),
     }));
 
   const addTier = () =>
     setForm((prev) => ({ ...prev, tiers: [...(prev.tiers ?? []), { units: 0, percent: 0 }] }));
 
   const removeTier = (i: number) =>
-    setForm((prev) => ({ ...prev, tiers: prev.tiers?.filter((_, idx) => idx !== i) }));
+    setForm((prev) => ({ ...prev, tiers: (prev.tiers ?? []).filter((_, idx) => idx !== i) }));
 
   const updateTier = (i: number, field: "units" | "percent", value: number) =>
     setForm((prev) => ({
       ...prev,
-      tiers: prev.tiers?.map((t, idx) => (idx === i ? { ...t, [field]: value } : t)),
+      tiers: (prev.tiers ?? []).map((t, idx) => (idx === i ? { ...t, [field]: value } : t)),
     }));
 
   async function handleSave() {

@@ -124,9 +124,10 @@ function ProductoPage() {
     );
   }
 
-  const rawTipo = String((product as Record<string, unknown>).tipo_talles ?? "NINGUNO").toUpperCase();
+  const productRec = product as Record<string, unknown>;
+  const rawTipo = String(productRec["tipo_talles"] ?? "NINGUNO").toUpperCase();
   const hasTalles = rawTipo === "ZAPATILLAS" || rawTipo === "ROPA";
-  const rawTalles = (product as Record<string, unknown>).talles_disponibles;
+  const rawTalles = productRec["talles_disponibles"];
   const availableTalles: string[] = Array.isArray(rawTalles)
     ? (rawTalles as string[])
     : typeof rawTalles === "string"
@@ -411,6 +412,46 @@ function ProductoPage() {
           </div>
         </div>
 
+        {/* Descripción */}
+        <section className="mt-12 max-w-3xl">
+          <h2 className="font-sans text-xl font-bold normal-case tracking-tight">Descripción</h2>
+          <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
+            {product.descripcion || "Producto importado original. Consultanos por más detalles."}
+          </p>
+        </section>
+
+        {/* Reseñas */}
+        <section className="mt-10 max-w-3xl">
+          <h2 className="font-sans text-xl font-bold normal-case tracking-tight">
+            Reseñas de compradores
+          </h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {REVIEWS.map((r) => (
+              <div key={r.name} className="card-soft p-4">
+                <Stars value={r.stars} />
+                <p className="mt-2 text-sm text-muted-foreground">{r.text}</p>
+                <p className="mt-2 text-xs font-semibold">{r.name}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <a
+          className="btn-base mt-10 w-full bg-whatsapp text-whatsapp-foreground sm:w-auto sm:px-10"
+          href={waLink(config, product.nombre)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Contactar por WhatsApp
+        </a>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Consultanos por stock, envíos o descuentos por cantidad.
+        </p>
+      </main>
+
+      <Dialog open={showMin} onOpenChange={setShowMin}>
+        <DialogContent>
+          <DialogHeader>
             <DialogTitle>Compra mínima de suplementos</DialogTitle>
             <DialogDescription>{SUPLEMENTOS_MSG}</DialogDescription>
           </DialogHeader>
