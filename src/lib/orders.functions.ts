@@ -400,6 +400,8 @@ export const getAdminPaidOrders = createServerFn({ method: "POST" })
       return { orders: [], error: "Variables de Supabase no configuradas en el servidor." };
     }
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
     const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
     const adminEmails = adminEmailsRaw
       .toLowerCase()
