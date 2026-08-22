@@ -24,7 +24,7 @@ import {
   type BannerInput,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/productos")({
   loader: ({ context }) => {
