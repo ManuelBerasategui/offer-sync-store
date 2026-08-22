@@ -54,6 +54,16 @@ function AdminConfiguracionPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [rules, setRules] = useState<Record<string, CatRuleForm>>({});
   const [dolarRate, setDolarRate] = useState<string>(config["dolar_cotizacion"] ?? "1500");
+  const [liveUsdt, setLiveUsdt] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("https://dolarapi.com/v1/dolares/cripto")
+      .then((res) => res.json())
+      .then((data: { venta?: number }) => {
+        if (data?.venta) setLiveUsdt(Math.round(data.venta));
+      })
+      .catch(() => {});
+  }, []);
 
   const userEmail = user?.email ?? "";
   const userToken = session?.access_token ?? "";
@@ -216,11 +226,18 @@ function AdminConfiguracionPage() {
 
         {/* Cotización Dólar para valor inicial */}
         <div className="mb-6 rounded-2xl border border-border bg-card p-5">
-          <h2 className="text-base font-bold mb-1 flex items-center gap-2">
-            💵 Cotización del Dólar (Cálculo inicial)
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <h2 className="text-base font-bold flex items-center gap-2">
+              💵 Cotización del Dólar (Cálculo inicial)
+            </h2>
+            {liveUsdt !== null && (
+              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600 border border-emerald-500/20">
+                ⚡ Dólar Cripto / USDT Binance en vivo: {money(liveUsdt)}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground mb-3">
-            Cuando creás o editás un producto en dólares y dejás el precio en ARS vacío, se calculará al instante como <code className="bg-muted px-1 py-0.5 rounded text-[11px]">USD × Cotización</code> para que nunca se publique a $20 ARS.
+            Al guardar un producto en dólares con precio ARS vacío, se consulta automáticamente la cotización USDT de Binance en tiempo real ({liveUsdt ? money(liveUsdt) : "en vivo"}) para la carga inicial. Si la API estuviese fuera de línea, se usará el valor de resguardo ingresado debajo.
           </p>
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-muted-foreground">$</span>
@@ -232,7 +249,7 @@ function AdminConfiguracionPage() {
               onChange={(e) => setDolarRate(e.target.value)}
               placeholder="1500"
             />
-            <span className="text-xs font-semibold text-muted-foreground">ARS por USD</span>
+            <span className="text-xs font-semibold text-muted-foreground">ARS por USD (Resguardo manual)</span>
           </div>
         </div>
 

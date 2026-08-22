@@ -172,14 +172,28 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         return isNaN(num) ? null : num;
       };
 
-      // Cotización dólar para cálculo inicial si no se ingresó precio ARS manual
-      const { data: cfgRow } = await (supabaseAdmin as any)
-        .from("site_config")
-        .select("valor")
-        .eq("clave", "dolar_cotizacion")
-        .maybeSingle();
+      // Cotización dólar USDT Cripto en vivo para cálculo inicial si no se ingresó precio ARS manual
+      let rate = 0;
+      try {
+        const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", { signal: AbortSignal.timeout(3000) });
+        if (apiRes.ok) {
+          const apiData = (await apiRes.json()) as { venta?: number };
+          if (apiData?.venta && apiData.venta > 0) {
+            rate = Math.round(apiData.venta);
+          }
+        }
+      } catch {
+        // Fallback a site_config si falla la API
+      }
 
-      const rate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
+      if (!rate) {
+        const { data: cfgRow } = await (supabaseAdmin as any)
+          .from("site_config")
+          .select("valor")
+          .eq("clave", "dolar_cotizacion")
+          .maybeSingle();
+        rate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
+      }
 
       const priceUsd = parsePrice(p.precio_usd);
       const priceArs = parsePrice(p.precio) ?? (priceUsd !== null ? Math.round(priceUsd * rate) : null);
