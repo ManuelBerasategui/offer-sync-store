@@ -127,12 +127,6 @@ function ProductoPage() {
   const productRec = product as Record<string, unknown>;
   const rawTipo = String(productRec["tipo_talles"] ?? "NINGUNO").toUpperCase();
   const hasTalles = rawTipo === "ZAPATILLAS" || rawTipo === "ROPA";
-  const rawTalles = productRec["talles_disponibles"];
-  const availableTalles: string[] = Array.isArray(rawTalles)
-    ? (rawTalles as string[])
-    : typeof rawTalles === "string"
-      ? rawTalles.split(",").map((t) => t.trim()).filter(Boolean)
-      : [];
 
   const consultar = isWhatsappOnly(product);
   const rawDefaultColor = product.color_predeterminado;
@@ -147,6 +141,18 @@ function ProductoPage() {
   const selectedVariant =
     (usesColors ? variants.find((variant) => String(variant.id) === selectedVariantId) : undefined) ??
     defaultVariant;
+
+  const rawTalles = productRec["talles_disponibles"];
+  const productTalles: string[] = Array.isArray(rawTalles)
+    ? (rawTalles as string[])
+    : typeof rawTalles === "string"
+      ? rawTalles.split(",").map((t) => t.trim()).filter(Boolean)
+      : [];
+
+  const availableTalles = (selectedVariant && selectedVariant.talles_disponibles && selectedVariant.talles_disponibles.length > 0)
+    ? selectedVariant.talles_disponibles
+    : productTalles;
+
   const baseName = defaultColor
     ? (product.nombre ?? "Producto")
         .replace(new RegExp(`(?:\\s*[-—]?\\s*)${escapeRegExp(defaultColor)}\\s*$`, "i"), "")
@@ -241,7 +247,11 @@ function ProductoPage() {
                 <select
                   id="color"
                   value={selectedVariant?.id ?? ""}
-                  onChange={(e) => setSelectedVariantId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedVariantId(e.target.value);
+                    setSelectedTalle("");
+                    setTalleError(false);
+                  }}
                   className="mt-2 w-full max-w-[320px] rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
                 >
                   <option value="">Elegí un color</option>

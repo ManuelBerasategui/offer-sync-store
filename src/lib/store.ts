@@ -7,6 +7,7 @@ export type ProductVariant = {
   precio: number | string;
   stock?: string | null;
   imagen_url?: string | null;
+  talles_disponibles?: string[];
 };
 
 export type Product = {

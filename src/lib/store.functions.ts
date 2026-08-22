@@ -32,13 +32,24 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
 
       const products: Product[] = (productsRaw ?? []).map(p => {
         // Expand metadata back onto the product object
-        const meta = typeof p.metadata === 'object' && p.metadata !== null ? p.metadata : {};
+        const meta = typeof p.metadata === 'object' && p.metadata !== null ? p.metadata as Record<string, unknown> : {};
         const { metadata, ...rest } = p;
         const linkedVariants = variantsByProduct.get(String(p.id ?? "")) ?? [];
         const variants = linkedVariants
           .filter((v) => {
             const stock = typeof v === "object" && v !== null ? (v as { stock?: unknown }).stock : undefined;
             return String(stock ?? '').trim().toUpperCase() !== 'NO';
+          })
+          .map((v) => {
+            const vObj = v as { id?: unknown; product_id?: unknown; color?: unknown; precio?: unknown; stock?: unknown; imagen_url?: unknown };
+            const colorKey = `talles_color_${String(vObj.color ?? '').toLowerCase().replace(/\s+/g, '_')}`;
+            const rawTalles = meta[colorKey];
+            const talles_disponibles: string[] = Array.isArray(rawTalles)
+              ? (rawTalles as string[])
+              : typeof rawTalles === 'string' && rawTalles.length > 0
+                ? rawTalles.split(',').map(t => t.trim()).filter(Boolean)
+                : [];
+            return { ...vObj, talles_disponibles };
           });
         return { ...rest, ...meta, variants } as Product;
       });

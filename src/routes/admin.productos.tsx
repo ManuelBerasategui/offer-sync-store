@@ -106,6 +106,7 @@ function productToInput(p: Product): ProductInput {
       precio: String(v.precio ?? ""),
       stock: String(v.stock ?? "SI"),
       imagen_url: v.imagen_url ?? "",
+      talles_disponibles: v.talles_disponibles ?? [],
     })),
   };
 }
@@ -303,13 +304,13 @@ function ProductModal({
   const addVariant = () =>
     setForm((prev) => ({
       ...prev,
-      variants: [...(prev.variants ?? []), { color: "", precio: "", stock: "SI", imagen_url: "" }],
+      variants: [...(prev.variants ?? []), { color: "", precio: "", stock: "SI", imagen_url: "", talles_disponibles: [] }],
     }));
 
   const removeVariant = (i: number) =>
     setForm((prev) => ({ ...prev, variants: (prev.variants ?? []).filter((_, idx) => idx !== i) }));
 
-  const updateVariant = (i: number, field: keyof VariantInput, value: string) =>
+  const updateVariant = (i: number, field: keyof VariantInput, value: any) =>
     setForm((prev) => ({
       ...prev,
       variants: (prev.variants ?? []).map((v, idx) => (idx === i ? { ...v, [field]: value } : v)),
@@ -560,6 +561,39 @@ function ProductModal({
                       <input className="input-base" value={String(v.stock ?? "SI")} onChange={(e) => updateVariant(i, "stock", e.target.value)} />
                     </div>
                   </div>
+                  {form.tipo_talles && form.tipo_talles !== "NINGUNO" && (
+                    <div className="mt-2 mb-3 space-y-1">
+                      <label className="label-sm">Talles en stock para variante {v.color || `Nro ${i + 1}`}</label>
+                      <div className="flex flex-wrap gap-1">
+                        {(form.tipo_talles === "ZAPATILLAS"
+                          ? ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"]
+                          : ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
+                        ).map((talle) => {
+                          const active = (v.talles_disponibles ?? []).includes(talle);
+                          return (
+                            <button
+                              key={talle}
+                              type="button"
+                              onClick={() => {
+                                const current = v.talles_disponibles ?? [];
+                                const next = active
+                                  ? current.filter((t) => t !== talle)
+                                  : [...current, talle];
+                                updateVariant(i, "talles_disponibles", next);
+                              }}
+                              className={`h-7 min-w-8 rounded-md px-1.5 text-[10px] font-bold transition-all border ${
+                                active
+                                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
+                                  : "bg-muted/40 text-muted-foreground/60 border-border opacity-60 hover:opacity-100"
+                              }`}
+                            >
+                               {talle} {active ? "✓" : ""}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <label className="label-sm mb-1 block">Imagen de variante</label>
                   <ImageDropzone
                     value={v.imagen_url ?? ""}

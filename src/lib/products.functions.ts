@@ -12,6 +12,7 @@ export type VariantInput = {
   precio: number | string;
   stock?: string | null;
   imagen_url?: string | null;
+  talles_disponibles?: string[];
 };
 
 export type ProductInput = {
@@ -94,9 +95,20 @@ export const getAdminProducts = createServerFn({ method: "POST" })
       }
 
       const products: Product[] = (productsRes.data ?? []).map((p) => {
-        const meta = typeof p.metadata === "object" && p.metadata !== null ? p.metadata : {};
+        const meta = typeof p.metadata === "object" && p.metadata !== null ? p.metadata as Record<string, unknown> : {};
         const { metadata, ...rest } = p;
-        return { ...rest, ...meta, variants: variantsByProduct.get(String(p.id ?? "")) ?? [] } as Product;
+        const linkedVariants = variantsByProduct.get(String(p.id ?? "")) ?? [];
+        const variants = linkedVariants.map((v) => {
+          const colorKey = `talles_color_${v.color.toLowerCase().replace(/\s+/g, "_")}`;
+          const rawTalles = meta[colorKey];
+          const talles_disponibles: string[] = Array.isArray(rawTalles)
+            ? (rawTalles as string[])
+            : typeof rawTalles === "string" && rawTalles.length > 0
+              ? rawTalles.split(",").map((t) => t.trim()).filter(Boolean)
+              : [];
+          return { ...v, talles_disponibles };
+        });
+        return { ...rest, ...meta, variants } as Product;
       });
 
       return { products };
@@ -132,6 +144,15 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         metadata["talles_disponibles"] = Array.isArray(p.talles_disponibles)
           ? p.talles_disponibles.join(",")
           : String(p.talles_disponibles ?? "");
+      }
+
+      if (p.variants) {
+        for (const v of p.variants) {
+          if (v.talles_disponibles && v.talles_disponibles.length > 0) {
+            const key = `talles_color_${v.color.toLowerCase().replace(/\s+/g, "_")}`;
+            metadata[key] = v.talles_disponibles.join(",");
+          }
+        }
       }
 
       const parsePrice = (val: string | number | undefined | null) => {
