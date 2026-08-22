@@ -29,6 +29,9 @@ import {
   tiersOf,
   unitPriceFor,
   waLink,
+  normCat,
+  parseCategoryRules,
+  findRuleForCat,
   type ProductVariant,
 } from "@/lib/store";
 
@@ -254,6 +257,55 @@ function ProductoPage() {
                     <span className="text-xs font-bold text-primary">-{percent}%</span>
                   )}
                 </div>
+
+                {/* AVISO DE MÍNIMO DE COMPRA POR CATEGORÍA EN LA FICHA DEL PRODUCTO */}
+                {(() => {
+                  const catRules = parseCategoryRules(config);
+                  const catNorm = normCat(product.categoria ?? "");
+                  const ruleMatch = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
+                  const rule = ruleMatch?.rule;
+                  const hasDynMin = rule?.minAmount || rule?.minUnits;
+
+                  if (hasDynMin && ruleMatch) {
+                    const categoryName = ruleMatch.key.charAt(0).toUpperCase() + ruleMatch.key.slice(1);
+                    const minText = rule.minAmount ? money(rule.minAmount) : `${rule.minUnits} unidades`;
+                    return (
+                      <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 sm:p-3.5 text-xs text-foreground">
+                        <div className="flex items-start gap-2.5">
+                          <span className="text-base shrink-0 mt-0.5">ℹ️</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-amber-700 dark:text-amber-400 text-xs sm:text-sm">
+                              Compra mínima para {categoryName}: {minText}
+                            </p>
+                            <p className="mt-0.5 text-muted-foreground leading-relaxed text-[11px] sm:text-xs">
+                              Podés combinar distintos productos de esta categoría en tu carrito hasta alcanzar el mínimo.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isSuplemento(product.categoria, product.nombre)) {
+                    return (
+                      <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 sm:p-3.5 text-xs text-foreground">
+                        <div className="flex items-start gap-2.5">
+                          <span className="text-base shrink-0 mt-0.5">ℹ️</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-amber-700 dark:text-amber-400 text-xs sm:text-sm">
+                              Compra mínima para Suplementos: {money(SUPLEMENTOS_MIN)}
+                            </p>
+                            <p className="mt-0.5 text-muted-foreground leading-relaxed text-[11px] sm:text-xs">
+                              Podés combinar distintos suplementos en tu carrito hasta alcanzar los {money(SUPLEMENTOS_MIN)}.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
               </>
             )}
 

@@ -84,6 +84,17 @@ function Home() {
             Precio de importador
           </span>
         </div>
+
+        <div className="relative mt-6 flex justify-center px-2">
+          <a
+            href="#minimos"
+            className="inline-flex max-w-full items-center justify-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-amber-700 dark:text-amber-300 transition-all hover:bg-amber-500/20 active:scale-95 text-center leading-snug"
+          >
+            <span className="shrink-0 text-xs">ℹ️</span>
+            <span>Mínimos por categoría (ej: Suplementos $250k)</span>
+            <span className="shrink-0 font-extrabold underline">Ver ↓</span>
+          </a>
+        </div>
       </section>
 
       {/* OFERTAS DEL DÍA */}
@@ -208,7 +219,7 @@ function Home() {
         if (items.length === 0) return null;
 
         return (
-          <section className="px-4 py-10 sm:px-6">
+          <section id="minimos" className="px-4 py-10 sm:px-6">
             <div className="mx-auto max-w-[1180px]">
               <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/5 via-amber-500/[0.03] to-transparent p-5 sm:p-7">
                 <div className="flex items-start gap-3 mb-4">
