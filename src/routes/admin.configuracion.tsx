@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, X, Save, Settings2 } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { AdminHeader } from "@/components/AdminHeader";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -201,33 +202,22 @@ function AdminConfiguracionPage() {
     <div className="min-h-screen bg-background">
       <SiteHeader config={storeData.config} />
 
-      <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6">
-
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-          <div>
-            <span className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-primary">
-              Panel Admin
-            </span>
-            <h1 className="mt-2 text-2xl font-bold">Configuración de Categorías</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Descuentos por cantidad y mínimos de compra según categoría.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link to="/admin/productos" className="btn-base bg-muted text-foreground hover:bg-muted/70 text-sm">
-              ← Productos
-            </Link>
+      <main className="mx-auto max-w-[900px] px-3 py-4 sm:px-6 sm:py-8">
+        <AdminHeader
+          title="Configuración de Categorías"
+          subtitle="Descuentos por cantidad y mínimos de compra según categoría."
+          currentRoute="configuracion"
+          actions={
             <button
               onClick={() => void handleSave()}
               disabled={saving}
-              className="btn-base bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 disabled:opacity-50"
+              className="btn-base bg-primary text-primary-foreground hover:opacity-90 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold sm:px-4 sm:py-2 sm:text-sm disabled:opacity-50"
             >
-              <Save className="h-4 w-4" />
-              {saving ? "Guardando..." : "Guardar todo"}
+              <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>{saving ? "Guardando..." : "Guardar todo"}</span>
             </button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Mensajes */}
         {error && (
@@ -240,7 +230,7 @@ function AdminConfiguracionPage() {
         )}
 
         {/* Cotización Dólar para valor inicial */}
-        <div className="mb-6 rounded-2xl border border-border bg-card p-5">
+        <div className="mb-6 rounded-2xl border border-border bg-card p-3.5 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h2 className="text-base font-bold flex items-center gap-2">
               💵 Cotización del Dólar
@@ -283,7 +273,7 @@ function AdminConfiguracionPage() {
             if (!rule) return null;
 
             return (
-              <div key={key} className="rounded-2xl border border-border bg-card p-5 space-y-5">
+              <div key={key} className="rounded-2xl border border-border bg-card p-3.5 sm:p-5 space-y-4 sm:space-y-5">
                 <div className="flex items-center gap-2">
                   <Settings2 className="h-4 w-4 text-primary/70 shrink-0" />
                   <h2 className="text-base font-bold">{cat}</h2>

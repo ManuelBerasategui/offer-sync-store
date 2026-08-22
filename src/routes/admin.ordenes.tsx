@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Copy, Check, Search, RefreshCw, MessageCircle, PackageCheck, DollarSign, ShoppingBag } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { AdminHeader } from "@/components/AdminHeader";
 import { storeQueryOptions } from "@/lib/store-query";
 import { getAdminPaidOrders, type AdminOrder } from "@/lib/orders.functions";
 import { useAuth } from "@/hooks/useAuth";
@@ -40,8 +41,8 @@ function AdminOrdenesPage() {
     try {
       const res = await getAdminPaidOrders({
         data: {
-          email: user?.email,
-          token: session?.access_token,
+          email: user?.email ?? "",
+          token: session?.access_token ?? "",
         },
       });
       if (res.error) {
@@ -161,68 +162,52 @@ TOTAL: ${money(order.total)}`;
     <div className="min-h-screen bg-background">
       <SiteHeader config={config} />
 
-      <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
-        {/* Encabezado del panel */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <span className="rounded-md bg-emerald-500/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              Panel de Control
-            </span>
-            <h1 className="mt-2 font-sans text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Panel Admin
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Órdenes pagadas y gestión de la tienda.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              to="/admin/productos"
-              className="btn-base border border-border bg-surface hover:border-primary flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-foreground"
-            >
-              Productos
-            </Link>
+      <main className="mx-auto max-w-[1180px] px-3 py-4 sm:px-6 sm:py-8">
+        <AdminHeader
+          title="Órdenes Pagadas"
+          subtitle="Gestión de ventas y etiquetas de envío de la tienda."
+          currentRoute="ordenes"
+          actions={
             <button
               onClick={() => void loadOrders()}
               disabled={loading}
-              className="btn-base border border-border bg-surface hover:border-primary flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-foreground disabled:opacity-50"
+              className="btn-base border border-border bg-surface hover:border-primary flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-foreground sm:px-4 sm:py-2 sm:text-sm disabled:opacity-50"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Actualizar
+              <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${loading ? "animate-spin" : ""}`} />
+              <span>Actualizar</span>
             </button>
-          </div>
-        </div>
+          }
+        />
 
-        {/* Tarjetas de Métricas (KPIs) */}
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          <div className="card-soft flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <DollarSign className="h-6 w-6" />
+        {/* Tarjetas de Métricas (KPIs) - Rejilla responsiva compacta */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="card-soft flex flex-col sm:flex-row items-center gap-2 sm:gap-4 p-2.5 sm:p-5 text-center sm:text-left">
+            <div className="flex h-8 w-8 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <DollarSign className="h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Recaudado</p>
-              <p className="text-2xl font-bold tracking-tight text-foreground">{money(stats.totalVentas)}</p>
-            </div>
-          </div>
-
-          <div className="card-soft flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <PackageCheck className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pedidos Pagados</p>
-              <p className="text-2xl font-bold tracking-tight text-foreground">{stats.count}</p>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">Recaudado</p>
+              <p className="text-xs sm:text-2xl font-bold tracking-tight text-foreground truncate">{money(stats.totalVentas)}</p>
             </div>
           </div>
 
-          <div className="card-soft flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber/10 text-amber">
-              <ShoppingBag className="h-6 w-6" />
+          <div className="card-soft flex flex-col sm:flex-row items-center gap-2 sm:gap-4 p-2.5 sm:p-5 text-center sm:text-left">
+            <div className="flex h-8 w-8 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-primary/10 text-primary">
+              <PackageCheck className="h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ticket Promedio</p>
-              <p className="text-2xl font-bold tracking-tight text-foreground">{money(stats.promedio)}</p>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">Pedidos</p>
+              <p className="text-xs sm:text-2xl font-bold tracking-tight text-foreground">{stats.count}</p>
+            </div>
+          </div>
+
+          <div className="card-soft flex flex-col sm:flex-row items-center gap-2 sm:gap-4 p-2.5 sm:p-5 text-center sm:text-left">
+            <div className="flex h-8 w-8 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-amber/10 text-amber">
+              <ShoppingBag className="h-4 w-4 sm:h-6 sm:w-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">Promedio</p>
+              <p className="text-xs sm:text-2xl font-bold tracking-tight text-foreground truncate">{money(stats.promedio)}</p>
             </div>
           </div>
         </div>
@@ -272,7 +257,7 @@ TOTAL: ${money(order.total)}`;
             {filteredOrders.map((order) => {
               const waClient = getWaClientLink(order);
               return (
-                <div key={order.id} className="card-soft overflow-hidden p-6 border border-border shadow-sm transition-all hover:border-primary/50">
+                <div key={order.id} className="card-soft overflow-hidden p-3.5 sm:p-6 border border-border shadow-sm transition-all hover:border-primary/50">
                   {/* Encabezado de la orden */}
                   <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-3">

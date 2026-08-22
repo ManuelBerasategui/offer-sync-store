@@ -8,6 +8,7 @@ import {
 import { toast } from "sonner";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { AdminHeader } from "@/components/AdminHeader";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -1587,65 +1588,50 @@ function AdminProductosPage() {
     <div className="min-h-screen bg-background">
       <SiteHeader config={config} />
 
-      <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <span className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-primary">
-              Panel Admin
-            </span>
-            <h1 className="mt-2 text-2xl font-bold">Gestión de Productos y Ofertas</h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <Link
-              to="/admin/ordenes"
-              className="btn-base bg-muted text-foreground hover:bg-muted/70 text-sm"
-            >
-              Ver órdenes
-            </Link>
-            <Link
-              to="/admin/configuracion"
-              className="btn-base bg-muted text-foreground hover:bg-muted/70 text-sm"
-            >
-              Configuración
-            </Link>
+      <main className="mx-auto max-w-[1180px] px-3 py-4 sm:px-6 sm:py-8">
+        <AdminHeader
+          title="Productos y Ofertas"
+          subtitle="Gestión de catálogo, precios y promociones de la tienda."
+          currentRoute="productos"
+          actions={
             <button
               onClick={() => setModal(emptyProduct())}
-              className="btn-base bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2"
+              className="btn-base bg-primary text-primary-foreground hover:opacity-90 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold sm:px-4 sm:py-2 sm:text-sm"
             >
-              <Plus className="h-4 w-4" /> Nuevo producto
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Nuevo producto</span>
             </button>
-          </div>
-        </div>
+          }
+        />
 
-        {/* Navigation Tabs */}
-        <div className="mt-6 flex border-b border-border">
+        {/* Navigation Tabs Interas (Catálogo vs Ofertas) */}
+        <div className="mt-4 flex border-b border-border">
           <button
             onClick={() => setActiveTab("todos")}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-all ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm ${
               activeTab === "todos"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <PackagePlus className="h-4 w-4" />
-            Catálogo General
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold">
+            <PackagePlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span>Catálogo General</span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] sm:text-xs font-semibold">
               {products.length}
             </span>
           </button>
           <button
             onClick={() => setActiveTab("ofertas")}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-all ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm ${
               activeTab === "ofertas"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Flame className="h-4 w-4 text-primary fill-primary/20" />
-            Ofertas del Día
+            <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary fill-primary/20" />
+            <span>Ofertas del Día</span>
             <span
-              className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+              className={`rounded-full px-2 py-0.5 text-[10px] sm:text-xs font-bold ${
                 activeOffersCount > 0
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground"
