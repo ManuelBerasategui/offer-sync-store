@@ -42,7 +42,17 @@ function Catalogo() {
   const [onlyTop, setOnlyTop] = useState(false);
   const [onlyOffers, setOnlyOffers] = useState(false);
 
-  const cats = useMemo(() => categoriesOf(products), [products]);
+  const cats = useMemo(() => {
+    const all = categoriesOf(products);
+    // Categorías que queremos ver primero (en este orden)
+    const PINNED_FIRST = ["Bazar", "Zapatillas", "Tecnología"];
+    // Categorías que queremos ver al final
+    const PINNED_LAST = ["Vapers"];
+    const pinned = PINNED_FIRST.filter((c) => all.includes(c));
+    const last = PINNED_LAST.filter((c) => all.includes(c));
+    const rest = all.filter((c) => !PINNED_FIRST.includes(c) && !PINNED_LAST.includes(c));
+    return [...pinned, ...rest, ...last];
+  }, [products]);
 
   const list = useMemo(() => {
     const q = search.trim().toLowerCase();
