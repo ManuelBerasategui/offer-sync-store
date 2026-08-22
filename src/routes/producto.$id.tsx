@@ -306,6 +306,42 @@ function ProductoPage() {
 
                   return null;
                 })()}
+
+                {/* AVISO DE DESCUENTOS POR CANTIDAD DE CATEGORÍA */}
+                {(() => {
+                  const catRules = parseCategoryRules(config);
+                  const catNorm = normCat(product.categoria ?? "");
+                  const ruleMatch = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
+                  const rule = ruleMatch?.rule;
+                  if (!rule?.discountTiers?.length || !ruleMatch) return null;
+
+                  const categoryName = ruleMatch.key.charAt(0).toUpperCase() + ruleMatch.key.slice(1);
+                  return (
+                    <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 sm:p-3.5 text-xs text-foreground">
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-base shrink-0 mt-0.5">🎁</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-primary text-xs sm:text-sm">
+                            Descuento por cantidad en {categoryName}:
+                          </p>
+                          <ul className="mt-1 space-y-0.5 text-muted-foreground text-[11px] sm:text-xs">
+                            {rule.discountTiers.map((tier) => (
+                              <li key={tier.units} className="flex items-center gap-1.5">
+                                <span className="font-semibold text-foreground">
+                                  Llevando {tier.units} u. o más:
+                                </span>
+                                <span className="font-bold text-primary">{tier.percent}% OFF</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="mt-1 text-[10px] sm:text-[11px] text-muted-foreground">
+                            Podés combinar distintos productos de {categoryName} en tu carrito.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </>
             )}
 

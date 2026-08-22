@@ -224,18 +224,17 @@ export type CategoryRule = {
   minAmount?: number;
 };
 
-/** Normaliza el nombre de una categoría para usarla como clave */
+/** Normaliza el nombre de una categoría para usarla como clave (remueve acentos y minúsculas) */
 export const normCat = (s: string) =>
-  String(s ?? "").trim().toLowerCase().normalize("NFC");
+  String(s ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
-/** Agrupa subcategorías conocidas en su categoría base (ej: "Perfumes Arabes" -> "Perfumes") */
+/** Devuelve la categoría limpia para administración */
 export function getBaseCategory(rawCat: string): string {
-  const clean = String(rawCat ?? "").trim();
-  const lower = clean.toLowerCase().normalize("NFC");
-  if (lower.startsWith("perfume")) return "Perfumes";
-  if (lower.startsWith("suplement")) return "Suplementos";
-  if (lower.startsWith("zapatilla")) return "Zapatillas";
-  return clean;
+  return String(rawCat ?? "").trim();
 }
 
 /** Lee las reglas por categoría desde site_config */
@@ -260,6 +259,36 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
       const n = Number(val); if (n > 0) rule.minAmount = n;
     }
   }
+
+  // Reglas de descuento por defecto para Perfumes Árabes (5u -> 5%, 10u -> 10%)
+  if (!rules["perfumes arabes"]?.discountTiers?.length && !rules["perfumes arabe"]?.discountTiers?.length) {
+    const arabesDefault: CategoryRule = {
+      ...rules["perfumes arabes"],
+      discountTiers: [
+        { units: 5, percent: 5 },
+        { units: 10, percent: 10 },
+      ],
+    };
+    rules["perfumes arabes"] = arabesDefault;
+    rules["perfumes arabe"] = arabesDefault;
+  }
+
+  // Reglas de descuento por defecto para Perfumes Diseñador (3u -> 5%, 7u -> 7%)
+  if (
+    !rules["perfumes de disenador"]?.discountTiers?.length &&
+    !rules["perfumes disenador"]?.discountTiers?.length
+  ) {
+    const disenadorDefault: CategoryRule = {
+      ...rules["perfumes de disenador"],
+      discountTiers: [
+        { units: 3, percent: 5 },
+        { units: 7, percent: 7 },
+      ],
+    };
+    rules["perfumes de disenador"] = disenadorDefault;
+    rules["perfumes disenador"] = disenadorDefault;
+  }
+
   return rules;
 }
 
@@ -274,18 +303,33 @@ export function categoryDiscountForUnits(tiers: CategoryTier[], totalUnits: numb
 
 /**
  * Busca la regla más aplicable para una categoría.
- * Primero intenta match exacto; si no, busca por prefijo (más específico gana).
- * Ej: "perfumes árabe" encuentra la regla "perfumes".
+ * Soporta match exacto, sin "de", singular/plural y prefijo.
  */
 export function findRuleForCat(
   catNorm: string,
   rules: Record<string, CategoryRule>,
 ): { key: string; rule: CategoryRule } | undefined {
+  if (!catNorm) return undefined;
   if (rules[catNorm]) return { key: catNorm, rule: rules[catNorm] };
-  // Prefix match: el prefijo más largo gana
+
+  // Variante quitando "de"
+  const catWithoutDe = catNorm.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
+  if (rules[catWithoutDe]) return { key: catWithoutDe, rule: rules[catWithoutDe] };
+
+  // Variante singular/plural
+  const catPlural = catNorm.endsWith("s") ? catNorm : catNorm + "s";
+  const catSingular = catNorm.endsWith("s") ? catNorm.slice(0, -1) : catNorm;
+  if (rules[catPlural]) return { key: catPlural, rule: rules[catPlural] };
+  if (rules[catSingular]) return { key: catSingular, rule: rules[catSingular] };
+
+  // Match por prefijo (el prefijo más largo gana)
   let best: { key: string; rule: CategoryRule } | undefined;
   for (const [ruleKey, rule] of Object.entries(rules)) {
-    if (catNorm.startsWith(ruleKey) && (!best || ruleKey.length > best.key.length)) {
+    const cleanRuleKey = ruleKey.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
+    if (
+      (catNorm.startsWith(ruleKey) || (cleanRuleKey && catWithoutDe.startsWith(cleanRuleKey))) &&
+      (!best || ruleKey.length > best.key.length)
+    ) {
       best = { key: ruleKey, rule };
     }
   }

@@ -187,66 +187,115 @@ function Home() {
       {/* MÍNIMOS DE COMPRA */}
       {(() => {
         const catRules = parseCategoryRules(config);
+
+        // Mínimos de compra dinámicos
         const rulesWithMin = Object.entries(catRules)
           .filter(([, r]) => r.minUnits || r.minAmount)
           .map(([key, r]) => ({ key, rule: r }));
 
+        // Descuentos por volumen: solo los que tienen tiers definidos y no son duplicados (arabes/arabe)
+        const seenDiscountKeys = new Set<string>();
+        const rulesWithDiscounts = Object.entries(catRules)
+          .filter(([key, r]) => r.discountTiers?.length > 0)
+          .filter(([key]) => {
+            // Deduplicar: "perfumes arabe" y "perfumes arabes" son la misma regla
+            const canonical = key.replace(/s$/, "");
+            if (seenDiscountKeys.has(canonical)) return false;
+            seenDiscountKeys.add(canonical);
+            return true;
+          })
+          .map(([key, r]) => ({ key, rule: r }));
+
         // Fallback hardcodeado de suplementos si no está en config
         const hasSupRule = catRules[normCat("Suplementos")]?.minAmount;
-        const items: { label: string; desc: string; icon: string }[] = [];
+        const minItems: { label: string; desc: string; icon: string }[] = [];
 
         for (const { key, rule } of rulesWithMin) {
           const displayName = key.charAt(0).toUpperCase() + key.slice(1);
           if (rule.minUnits) {
-            items.push({
-              label: displayName,
-              desc: `Mínimo ${rule.minUnits} unidades`,
-              icon: "📦",
-            });
+            minItems.push({ label: displayName, desc: `Mínimo ${rule.minUnits} unidades`, icon: "📦" });
           } else if (rule.minAmount) {
-            items.push({
-              label: displayName,
-              desc: `Mínimo ${money(rule.minAmount)}`,
-              icon: "💰",
-            });
+            minItems.push({ label: displayName, desc: `Mínimo ${money(rule.minAmount)}`, icon: "💰" });
           }
         }
 
         if (!hasSupRule) {
-          items.push({ label: "Suplementos", desc: "Mínimo $250.000", icon: "💰" });
+          minItems.push({ label: "Suplementos", desc: "Mínimo $250.000", icon: "💰" });
         }
 
-        if (items.length === 0) return null;
+        const hasContent = minItems.length > 0 || rulesWithDiscounts.length > 0;
+        if (!hasContent) return null;
 
         return (
           <section id="minimos" className="px-4 py-10 sm:px-6">
-            <div className="mx-auto max-w-[1180px]">
-              <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/5 via-amber-500/[0.03] to-transparent p-5 sm:p-7">
-                <div className="flex items-start gap-3 mb-4">
-                  <span className="text-2xl">ℹ️</span>
-                  <div>
-                    <h2 className="font-sans text-base font-bold tracking-tight">Mínimos de compra por categoría</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Para ciertas categorías aplicamos un mínimo de compra. Podés combinar productos de la misma categoría para llegar al mínimo.
-                    </p>
+            <div className="mx-auto max-w-[1180px] space-y-4">
+
+              {/* Mínimos de compra */}
+              {minItems.length > 0 && (
+                <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/5 via-amber-500/[0.03] to-transparent p-5 sm:p-7">
+                  <div className="flex items-start gap-3 mb-4">
+                    <span className="text-2xl">ℹ️</span>
+                    <div>
+                      <h2 className="font-sans text-base font-bold tracking-tight">Mínimos de compra por categoría</h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Para ciertas categorías aplicamos un mínimo de compra. Podés combinar productos de la misma categoría para llegar al mínimo.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {minItems.map((it) => (
+                      <div key={it.label} className="flex items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-2.5">
+                        <span className="text-lg shrink-0">{it.icon}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold truncate">{it.label}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{it.desc}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {items.map((it) => (
-                    <div key={it.label} className="flex items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-2.5">
-                      <span className="text-lg shrink-0">{it.icon}</span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold truncate">{it.label}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{it.desc}</p>
-                      </div>
+              )}
+
+              {/* Descuentos por volumen */}
+              {rulesWithDiscounts.length > 0 && (
+                <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 via-primary/[0.03] to-transparent p-5 sm:p-7">
+                  <div className="flex items-start gap-3 mb-4">
+                    <span className="text-2xl">🎁</span>
+                    <div>
+                      <h2 className="font-sans text-base font-bold tracking-tight">Descuentos por cantidad</h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Comprando más unidades de la misma categoría se aplica automáticamente un descuento en el carrito.
+                      </p>
                     </div>
-                  ))}
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {rulesWithDiscounts.map(({ key, rule }) => {
+                      const displayName = key.charAt(0).toUpperCase() + key.slice(1);
+                      return (
+                        <div key={key} className="rounded-xl border border-border bg-card/60 px-4 py-3">
+                          <p className="text-xs font-bold text-foreground mb-1.5">{displayName}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {rule.discountTiers.map((tier) => (
+                              <span
+                                key={tier.units}
+                                className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-1 text-[11px] font-semibold text-primary"
+                              >
+                                {tier.units}+ u → <span className="font-extrabold">{tier.percent}% OFF</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
+
             </div>
           </section>
         );
       })()}
+
 
       {/* NOSOTROS */}
       <section id="nosotros" className="relative overflow-hidden border-y border-border px-4 py-16 text-center sm:px-6">
