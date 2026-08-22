@@ -131,16 +131,6 @@ function ProductoPage() {
   const consultar = isWhatsappOnly(product);
   const rawDefaultColor = product.color_predeterminado;
   const defaultColor = (rawDefaultColor == null || rawDefaultColor === "null") ? "" : String(rawDefaultColor).trim();
-  // NULL significa producto sin colores, incluso si quedaron variantes antiguas vinculadas.
-  const usesColors = Boolean(defaultColor) && variants.length > 0;
-  const defaultVariant = usesColors
-    ? variants.find(
-        (variant) => variant.color.trim().toLocaleLowerCase() === defaultColor.toLocaleLowerCase(),
-      )
-    : undefined;
-  const selectedVariant =
-    (usesColors ? variants.find((variant) => String(variant.id) === selectedVariantId) : undefined) ??
-    defaultVariant;
 
   const rawTalles = productRec["talles_disponibles"];
   const productTalles: string[] = Array.isArray(rawTalles)
@@ -148,6 +138,36 @@ function ProductoPage() {
     : typeof rawTalles === "string"
       ? rawTalles.split(",").map((t) => t.trim()).filter(Boolean)
       : [];
+
+  const hasDefaultInVariants = defaultColor
+    ? variants.some((v) => v.color.trim().toLowerCase() === defaultColor.toLowerCase())
+    : false;
+
+  const allVariants: ProductVariant[] = useMemo(() => {
+    if (!defaultColor) return variants;
+    if (hasDefaultInVariants) return variants;
+    const defaultVar: ProductVariant = {
+      id: "default_base",
+      product_id: String(product.id ?? ""),
+      color: defaultColor,
+      precio: priceOf(product),
+      stock: product.stock,
+      imagen_url: product.imagen_url,
+      talles_disponibles: productTalles,
+    };
+    return [defaultVar, ...variants];
+  }, [defaultColor, variants, hasDefaultInVariants, product, productTalles]);
+
+  const usesColors = allVariants.length > 0;
+  const defaultVariant = defaultColor
+    ? allVariants.find(
+        (variant) => variant.color.trim().toLowerCase() === defaultColor.toLowerCase(),
+      ) ?? allVariants[0]
+    : allVariants[0];
+
+  const selectedVariant =
+    (usesColors ? allVariants.find((variant) => String(variant.id) === selectedVariantId) : undefined) ??
+    defaultVariant;
 
   const availableTalles = (selectedVariant && selectedVariant.talles_disponibles && selectedVariant.talles_disponibles.length > 0)
     ? selectedVariant.talles_disponibles
@@ -168,13 +188,13 @@ function ProductoPage() {
   const total = unit * qty;
 
   const cartItem = {
-    id: `${String(product.id ?? product.nombre ?? "")}:${selectedVariant?.id ?? ""}:${selectedTalle ?? ""}`,
+    id: `${String(product.id ?? product.nombre ?? "")}:${selectedVariant?.id === "default_base" ? "" : (selectedVariant?.id ?? "")}:${selectedTalle ?? ""}`,
     productId: product.id ? String(product.id) : undefined,
     nombre: displayNameWithTalle,
     qty,
     unitPrice: Math.round(unit),
     basePrice,
-    variantId: selectedVariant?.id,
+    variantId: selectedVariant?.id === "default_base" ? undefined : selectedVariant?.id,
     variantColor: selectedVariant?.color,
     imagen: imageUrl(selectedImage),
     categoria: product.categoria ?? "",
@@ -254,8 +274,7 @@ function ProductoPage() {
                   }}
                   className="mt-2 w-full max-w-[320px] rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
                 >
-                  <option value="">Elegí un color</option>
-                  {variants.map((variant) => (
+                  {allVariants.map((variant) => (
                     <option key={variant.id ?? variant.color} value={String(variant.id)}>
                       {variant.color} — {money(variant.precio)}
                     </option>
