@@ -53,6 +53,7 @@ function AdminConfiguracionPage() {
 
   const [categories, setCategories] = useState<string[]>([]);
   const [rules, setRules] = useState<Record<string, CatRuleForm>>({});
+  const [dolarRate, setDolarRate] = useState<string>(config["dolar_cotizacion"] ?? "1500");
 
   const userEmail = user?.email ?? "";
   const userToken = session?.access_token ?? "";
@@ -141,7 +142,12 @@ function AdminConfiguracionPage() {
         minValue: Number(r.minValue) || 0,
       }));
       const res = await upsertCategoryRules({
-        data: { email: userEmail, token: userToken, rules: ruleInputs },
+        data: {
+          email: userEmail,
+          token: userToken,
+          rules: ruleInputs,
+          dolarCotizacion: Number(dolarRate) || 1500,
+        },
       });
       if (res.error) { setError(res.error); return; }
       setSuccessMsg("¡Configuración guardada!");
@@ -208,17 +214,26 @@ function AdminConfiguracionPage() {
           </div>
         )}
 
-        {/* Sugerencia inicial */}
-        <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
-          <p className="font-semibold text-amber-700 dark:text-amber-400 mb-1">
-            💡 Configuración inicial sugerida
+        {/* Cotización Dólar para valor inicial */}
+        <div className="mb-6 rounded-2xl border border-border bg-card p-5">
+          <h2 className="text-base font-bold mb-1 flex items-center gap-2">
+            💵 Cotización del Dólar (Cálculo inicial)
+          </h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            Cuando creás o editás un producto en dólares y dejás el precio en ARS vacío, se calculará al instante como <code className="bg-muted px-1 py-0.5 rounded text-[11px]">USD × Cotización</code> para que nunca se publique a $20 ARS.
           </p>
-          <ul className="list-disc list-inside text-xs space-y-0.5 text-muted-foreground">
-            <li>Suplementos → mínimo de compra: <strong>$250.000 ARS</strong> (monto)</li>
-            <li>Zapatillas → mínimo de compra: <strong>3 unidades</strong></li>
-            <li>Perfumes → mínimo de compra: <strong>5 unidades</strong></li>
-            <li>Tecnología → mínimo de compra: <strong>5 unidades</strong></li>
-          </ul>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">$</span>
+            <input
+              type="number"
+              min={1}
+              className="input-base w-36 font-bold"
+              value={dolarRate}
+              onChange={(e) => setDolarRate(e.target.value)}
+              placeholder="1500"
+            />
+            <span className="text-xs font-semibold text-muted-foreground">ARS por USD</span>
+          </div>
         </div>
 
         {/* Tarjetas por categoría */}

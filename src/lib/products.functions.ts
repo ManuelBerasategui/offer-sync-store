@@ -172,10 +172,19 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         return isNaN(num) ? null : num;
       };
 
+      // Cotización dólar para cálculo inicial si no se ingresó precio ARS manual
+      const { data: cfgRow } = await (supabaseAdmin as any)
+        .from("site_config")
+        .select("valor")
+        .eq("clave", "dolar_cotizacion")
+        .maybeSingle();
+
+      const rate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
+
       const priceUsd = parsePrice(p.precio_usd);
-      const priceArs = parsePrice(p.precio) ?? priceUsd;
+      const priceArs = parsePrice(p.precio) ?? (priceUsd !== null ? Math.round(priceUsd * rate) : null);
       const priceOfertaUsd = parsePrice(p.precio_oferta_usd);
-      const priceOfertaArs = parsePrice(p.precio_oferta) ?? priceOfertaUsd;
+      const priceOfertaArs = parsePrice(p.precio_oferta) ?? (priceOfertaUsd !== null ? Math.round(priceOfertaUsd * rate) : null);
 
       const row = {
         nombre: p.nombre,
@@ -314,10 +323,11 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
 
 export const upsertCategoryRules = createServerFn({ method: "POST" })
   .validator(
-    (data: { email?: string; token?: string; rules: CategoryRuleInput[] }) => ({
+    (data: { email?: string; token?: string; rules: CategoryRuleInput[]; dolarCotizacion?: number }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
       rules: data.rules,
+      dolarCotizacion: data.dolarCotizacion,
     }),
   )
   .handler(async ({ data }): Promise<{ error?: string }> => {
@@ -350,8 +360,15 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         }
       }
 
+      if (data.dolarCotizacion && data.dolarCotizacion > 0) {
+        await (supabaseAdmin as any).from("site_config").upsert(
+          { clave: "dolar_cotizacion", valor: String(data.dolarCotizacion) },
+          { onConflict: "clave" }
+        );
+      }
+
       if (rows.length > 0) {
-        const { error: insErr } = await supabaseAdmin.from("site_config").insert(rows);
+        const { error: insErr } = await (supabaseAdmin as any).from("site_config").insert(rows);
         if (insErr) throw insErr;
       }
 
