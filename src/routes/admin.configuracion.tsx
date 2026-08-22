@@ -84,17 +84,18 @@ function AdminConfiguracionPage() {
       }
       setIsAuthorized(true);
 
-      // Calcular la cotización implícita promedio usada actualmente en los productos de la DB
+      // Calcular la cotización implícita ponderada usada actualmente en los productos de la DB
       const prodsWithBoth = res.products.filter((p) => {
         const ars = Number(p.precio) || 0;
         const usd = Number((p as any).precio_usd) || 0;
-        return ars > 0 && usd > 0;
+        return ars > 0 && usd >= 1;
       });
 
       if (prodsWithBoth.length > 0) {
-        const rates = prodsWithBoth.map((p) => Number(p.precio) / Number((p as any).precio_usd));
-        const avg = Math.round(rates.reduce((a, b) => a + b, 0) / rates.length);
-        setDbDolarRate(avg);
+        const totalArs = prodsWithBoth.reduce((acc, p) => acc + Number(p.precio), 0);
+        const totalUsd = prodsWithBoth.reduce((acc, p) => acc + Number((p as any).precio_usd), 0);
+        const rate = Math.round(totalArs / totalUsd);
+        setDbDolarRate(rate);
       }
 
       const existing = parseCategoryRules(config);
