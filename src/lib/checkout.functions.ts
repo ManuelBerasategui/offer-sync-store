@@ -78,6 +78,24 @@ async function revalidateOrderItems(
       return { validatedItems: [], total: 0, error: msg };
     }
 
+    const { isSuplemento, SUPLEMENTOS_MIN } = await import("./store");
+    const hasSupDynRule = !!catRules[normCat("Suplementos")]?.minAmount;
+    if (!hasSupDynRule) {
+      const supTotal = rawItems
+        .filter((i) => {
+          const prod = findProduct(dbProducts, i.nombre);
+          return isSuplemento(prod?.categoria, i.nombre);
+        })
+        .reduce((a, i) => a + i.qty * i.unitPrice, 0);
+      if (supTotal > 0 && supTotal < SUPLEMENTOS_MIN) {
+        return {
+          validatedItems: [],
+          total: 0,
+          error: `No se cumple el mínimo de compra para Suplementos ($${SUPLEMENTOS_MIN.toLocaleString("es-AR")}).`,
+        };
+      }
+    }
+
     const validatedItems: CheckoutItem[] = rawItems.map((item) => {
       const prod = findProduct(dbProducts, item.nombre);
       if (!prod) return item;

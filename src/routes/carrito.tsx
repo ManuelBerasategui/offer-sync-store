@@ -55,7 +55,7 @@ function CarritoPage() {
     });
   }, [cart.items, products]);
 
-  const items = cartItemsWithCat.map((i: { nombre: string; qty: number; unitPrice: number; productId?: string }) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice, productId: i.productId }));
+  const items = cartItemsWithCat.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice, productId: i.productId }));
 
   // Mínimos dinámicos por categoría
   const catRules = parseCategoryRules(config);
@@ -72,7 +72,7 @@ function CarritoPage() {
   const hasSupDynRule = !!catRules[normCat("Suplementos")]?.minAmount;
   const legacyViolations = !hasSupDynRule
     ? cartItemsWithCat
-        .filter((i: { categoria?: string }) => isSuplemento(i.categoria))
+        .filter((i: { categoria?: string; nombre?: string }) => isSuplemento(i.categoria, i.nombre))
         .reduce((a: number, i: { qty: number; unitPrice: number }) => a + i.qty * i.unitPrice, 0)
     : 0;
   const hasLegacyViolation = !hasSupDynRule && legacyViolations > 0 && legacyViolations < SUPLEMENTOS_MIN;

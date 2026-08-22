@@ -136,13 +136,23 @@ const slug = (v?: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-/** Busca el producto por id (tolerando espacios) o por nombre, para que no falle si movés celdas. */
+/** Busca el producto por id (tolerando espacios y formato compuesto id:var:talle) o por nombre. */
 export function findProduct(products: Product[], key: string) {
-  const k = String(key ?? "").trim();
+  const rawKey = String(key ?? "").trim();
+  if (!rawKey) return undefined;
+
+  // Extraer el ID base si la clave tiene formato id:variantId:talle
+  const baseId = rawKey.split(":")[0]?.trim() || rawKey;
+
+  // Limpiar sufijos como (Presentación: ...) o (Talle: ...) del nombre si la clave viene como nombre de ítem
+  const cleanName = rawKey.replace(/\s*\((?:Presentación|Talle):[^)]+\)/gi, "").trim();
+
   return (
-    products.find((p) => String(p.id ?? "").trim() === k) ??
-    products.find((p) => slug(p.id) === slug(k)) ??
-    products.find((p) => slug(p.nombre) === slug(k)) ??
+    products.find((p) => String(p.id ?? "").trim() === rawKey) ??
+    products.find((p) => String(p.id ?? "").trim() === baseId) ??
+    products.find((p) => slug(p.id) === slug(baseId)) ??
+    products.find((p) => slug(p.nombre) === slug(rawKey)) ??
+    products.find((p) => slug(p.nombre) === slug(cleanName)) ??
     undefined
   );
 }
@@ -186,11 +196,22 @@ export const SUPLEMENTOS_MIN = 250000;
 export const SUPLEMENTOS_MSG =
   "La compra mínima para suplementos es de $250.000. Agregá más productos al carrito y llevate todo junto!";
 
-/** ¿La categoría del producto (o del ítem del carrito) es suplementos? */
-export function isSuplemento(categoria?: string) {
-  return String(categoria ?? "")
-    .toLowerCase()
-    .includes("suplemento");
+/** ¿La categoría o nombre del producto (o del ítem del carrito) corresponde a suplementos? */
+export function isSuplemento(categoria?: string, nombre?: string) {
+  const cat = String(categoria ?? "").toLowerCase().normalize("NFC");
+  const nom = String(nombre ?? "").toLowerCase().normalize("NFC");
+
+  const catKeywords = ["suplement", "nutricion", "proteina", "creatina"];
+  const nameKeywords = [
+    "suplemento", "creatina", "proteina", "protein", "whey",
+    "bcaa", "glutamin", "colageno", "collagen", "pre entren",
+    "pre-workout", "preworkout", "gainer", "multivitaminico", "star nutrition"
+  ];
+
+  if (catKeywords.some((kw) => cat.includes(kw))) return true;
+  if (nameKeywords.some((kw) => nom.includes(kw))) return true;
+
+  return false;
 }
 
 /* ---------- Reglas de categoría (descuentos y mínimos dinámicos) ---------- */

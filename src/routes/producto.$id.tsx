@@ -29,6 +29,7 @@ import {
   tiersOf,
   unitPriceFor,
   waLink,
+  type ProductVariant,
 } from "@/lib/store";
 
 export const Route = createFileRoute("/producto/$id")({
