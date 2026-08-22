@@ -380,7 +380,6 @@ function ProductoPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (usesColors && !selectedVariant) return;
                       if (hasTalles && !selectedTalle) {
                         setTalleError(true);
                         return;
@@ -388,19 +387,15 @@ function ProductoPage() {
                       if (bloqueaCompra) setShowMin(true);
                       else setShowCheckout(true);
                     }}
-                    disabled={usesColors && !selectedVariant}
-                    className="btn-base w-full grad-urgente text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    className="btn-base w-full grad-urgente text-primary-foreground transition-all hover:shadow-md"
                   >
-                    {usesColors && !selectedVariant
-                      ? "Elegí un color para comprar"
-                      : hasTalles && !selectedTalle
-                        ? "Elegí tu talle para comprar"
-                        : "Comprar ya"}
+                    {hasTalles && !selectedTalle
+                      ? "Elegí tu talle para comprar"
+                      : "Comprar ya"}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      if (usesColors && !selectedVariant) return;
                       if (hasTalles && !selectedTalle) {
                         setTalleError(true);
                         return;
@@ -408,8 +403,7 @@ function ProductoPage() {
                       cart.add(cartItem);
                       navigate({ to: "/carrito" });
                     }}
-                    disabled={usesColors && !selectedVariant}
-                    className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary transition-colors"
                   >
                     Agregar al carrito
                   </button>
