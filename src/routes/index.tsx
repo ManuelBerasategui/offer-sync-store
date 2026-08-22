@@ -91,7 +91,7 @@ function Home() {
             className="inline-flex max-w-full items-center justify-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-amber-700 dark:text-amber-300 transition-all hover:bg-amber-500/20 active:scale-95 text-center leading-snug"
           >
             <span className="shrink-0 text-xs">ℹ️</span>
-            <span>Mínimos por categoría (ej: Suplementos $250k)</span>
+            <span>Aplican mínimos de compra según categoría</span>
             <span className="shrink-0 font-extrabold underline">Ver ↓</span>
           </a>
         </div>
