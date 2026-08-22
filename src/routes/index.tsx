@@ -40,7 +40,7 @@ function Home() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { products, banners, config } = data;
 
-  const ofertasDelDia = products.filter((p) => isYes(p.oferta)).slice(0, 3);
+  const ofertasDelDia = products.filter((p) => isYes(p.oferta));
   // Más vendidos: productos con ventas reales esta semana, ordenados de mayor a menor.
   // Fallback a 'destacado' si todavía no hay ventas registradas.
   const conVentas = [...products]

@@ -3,7 +3,9 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp, PackagePlus,
+  Flame, Sparkles, Percent, Save, Tag, Search, Check, RefreshCw, Zap, TrendingDown,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
@@ -413,6 +415,35 @@ function ProductModal({
               <label className="label-sm">Precio oferta ARS</label>
               <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => set("precio_oferta", e.target.value)} placeholder="Ej: 120000" />
             </div>
+            <div className="col-span-1 sm:col-span-2 rounded-xl bg-muted/40 p-3 border border-border/60">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                  <Percent className="h-3.5 w-3.5 text-primary" /> Atajo para precio de oferta:
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {[10, 15, 20, 25, 30, 40, 50, 70].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => {
+                        set("oferta", "SI");
+                        const baseArs = toNumber(form.precio);
+                        const baseUsd = toNumber(form.precio_usd);
+                        if (baseArs > 0) {
+                          set("precio_oferta", String(Math.round(baseArs * (1 - pct / 100))));
+                        }
+                        if (baseUsd > 0) {
+                          set("precio_oferta_usd", String(Math.round(baseUsd * (1 - pct / 100))));
+                        }
+                      }}
+                      className="rounded-lg bg-primary/10 hover:bg-primary/20 text-primary px-2 py-1 text-xs font-bold transition-all"
+                    >
+                      -{pct}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
             <div className="col-span-1 sm:col-span-2">
               <label className="label-sm">Descripción</label>
               <textarea className="input-base min-h-[80px] resize-y" value={form.descripcion ?? ""} onChange={(e) => set("descripcion", e.target.value)} placeholder="Descripción del producto..." />
@@ -663,6 +694,470 @@ function ProductModal({
 }
 
 /* ───────────────────────────────────────────────────────── */
+/*  Componentes para Panel de Ofertas del Día                */
+/* ───────────────────────────────────────────────────────── */
+
+function ActiveOfferCard({
+  product,
+  userEmail,
+  userToken,
+  onSaved,
+}: {
+  product: Product;
+  userEmail: string;
+  userToken: string;
+  onSaved: () => Promise<void>;
+}) {
+  const [precioOferta, setPrecioOferta] = useState(String(product.precio_oferta ?? ""));
+  const [precioOfertaUsd, setPrecioOfertaUsd] = useState(
+    String((product as Record<string, unknown>)["precio_oferta_usd"] ?? "")
+  );
+  const [saving, setSaving] = useState(false);
+
+  const basePrice = toNumber(product.precio);
+  const offerPrice = toNumber(precioOferta);
+  const discountPct =
+    basePrice > 0 && offerPrice > 0 && offerPrice < basePrice
+      ? Math.round(((basePrice - offerPrice) / basePrice) * 100)
+      : 0;
+
+  const applyPreset = (pct: number) => {
+    const baseArs = toNumber(product.precio);
+    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
+    if (baseArs > 0) setPrecioOferta(String(Math.round(baseArs * (1 - pct / 100))));
+    if (baseUsd > 0) setPrecioOfertaUsd(String(Math.round(baseUsd * (1 - pct / 100))));
+  };
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const input = productToInput(product);
+      input.oferta = "SI";
+      input.precio_oferta = precioOferta;
+      input.precio_oferta_usd = precioOfertaUsd;
+      const res = await upsertAdminProduct({ data: { email: userEmail, token: userToken, product: input } });
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(`Oferta guardada para ${product.nombre}`);
+        await onSaved();
+      }
+    } catch {
+      toast.error("Error al guardar la oferta.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRemove() {
+    setSaving(true);
+    try {
+      const input = productToInput(product);
+      input.oferta = "NO";
+      const res = await upsertAdminProduct({ data: { email: userEmail, token: userToken, product: input } });
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.info(`"${product.nombre}" quitado de Ofertas del Día.`);
+        await onSaved();
+      }
+    } catch {
+      toast.error("Error al quitar la oferta.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-card p-4 sm:p-5 shadow-sm hover:shadow-md transition-all">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <img
+          src={product.imagen_url || FALLBACK_IMAGE}
+          alt={product.nombre ?? ""}
+          className="h-16 w-16 rounded-xl object-cover border border-border shrink-0"
+          onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+        />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              🔥 Oferta Activa
+            </span>
+            {discountPct > 0 && (
+              <span className="rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-bold">
+                -{discountPct}% OFF
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground">{product.categoria}</span>
+          </div>
+          <h3 className="font-bold text-sm sm:text-base text-foreground mt-1 truncate">{product.nombre}</h3>
+          <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+            <span>Precio lista: <strong className="text-foreground">{money(product.precio)}</strong></span>
+          </div>
+        </div>
+      </div>
+
+      {/* Control de Precios & Presets */}
+      <div className="w-full sm:w-auto flex flex-col gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border">
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-[11px] font-medium text-muted-foreground">Calcular:</span>
+          {[10, 15, 20, 25, 30, 40, 50].map((pct) => (
+            <button
+              key={pct}
+              type="button"
+              onClick={() => applyPreset(pct)}
+              className="rounded-md bg-muted hover:bg-primary/20 hover:text-primary px-2 py-0.5 text-[11px] font-bold transition-colors"
+            >
+              -{pct}%
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-semibold text-muted-foreground">ARS:</span>
+            <input
+              type="text"
+              value={precioOferta}
+              onChange={(e) => setPrecioOferta(e.target.value)}
+              placeholder="Precio ARS"
+              className="input-base text-xs py-1.5 w-28 font-bold text-primary"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-semibold text-muted-foreground">USD:</span>
+            <input
+              type="text"
+              value={precioOfertaUsd}
+              onChange={(e) => setPrecioOfertaUsd(e.target.value)}
+              placeholder="Precio USD"
+              className="input-base text-xs py-1.5 w-24"
+            />
+          </div>
+
+          <button
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="btn-base bg-primary text-primary-foreground text-xs py-1.5 px-3 hover:opacity-90 flex items-center gap-1 disabled:opacity-50"
+          >
+            <Save className="h-3.5 w-3.5" /> Guardar
+          </button>
+          <button
+            onClick={() => void handleRemove()}
+            disabled={saving}
+            className="btn-base bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive text-xs py-1.5 px-2.5 disabled:opacity-50"
+            title="Quitar de ofertas"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CandidateOfferCard({
+  product,
+  userEmail,
+  userToken,
+  onSaved,
+}: {
+  product: Product;
+  userEmail: string;
+  userToken: string;
+  onSaved: () => Promise<void>;
+}) {
+  const [precioOferta, setPrecioOferta] = useState("");
+  const [precioOfertaUsd, setPrecioOfertaUsd] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const basePrice = toNumber(product.precio);
+  const offerPrice = toNumber(precioOferta);
+  const discountPct =
+    basePrice > 0 && offerPrice > 0 && offerPrice < basePrice
+      ? Math.round(((basePrice - offerPrice) / basePrice) * 100)
+      : 0;
+
+  const applyPreset = (pct: number) => {
+    const baseArs = toNumber(product.precio);
+    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
+    if (baseArs > 0) setPrecioOferta(String(Math.round(baseArs * (1 - pct / 100))));
+    if (baseUsd > 0) setPrecioOfertaUsd(String(Math.round(baseUsd * (1 - pct / 100))));
+  };
+
+  async function handleActivate() {
+    setSaving(true);
+    try {
+      const input = productToInput(product);
+      input.oferta = "SI";
+      if (precioOferta) input.precio_oferta = precioOferta;
+      if (precioOfertaUsd) input.precio_oferta_usd = precioOfertaUsd;
+      const res = await upsertAdminProduct({ data: { email: userEmail, token: userToken, product: input } });
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(`¡"${product.nombre}" agregado a Ofertas del Día!`);
+        await onSaved();
+      }
+    } catch {
+      toast.error("Error al activar la oferta.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <img
+          src={product.imagen_url || FALLBACK_IMAGE}
+          alt={product.nombre ?? ""}
+          className="h-14 w-14 rounded-xl object-cover border border-border shrink-0"
+          onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+        />
+        <div className="min-w-0">
+          <span className="text-[11px] text-muted-foreground font-semibold">{product.categoria}</span>
+          <h3 className="font-bold text-sm text-foreground truncate">{product.nombre}</h3>
+          <p className="text-xs font-semibold text-primary mt-0.5">Precio lista: {money(product.precio)}</p>
+        </div>
+      </div>
+
+      <div className="w-full sm:w-auto flex flex-col gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-border">
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-[11px] text-muted-foreground font-medium">Atajo dto:</span>
+          {[10, 15, 20, 25, 30, 50].map((pct) => (
+            <button
+              key={pct}
+              type="button"
+              onClick={() => applyPreset(pct)}
+              className="rounded-md bg-muted hover:bg-primary/20 hover:text-primary px-2 py-0.5 text-[11px] font-bold transition-colors"
+            >
+              -{pct}%
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            value={precioOferta}
+            onChange={(e) => setPrecioOferta(e.target.value)}
+            placeholder="Precio oferta ARS"
+            className="input-base text-xs py-1.5 w-32"
+          />
+          {discountPct > 0 && (
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md">
+              -{discountPct}%
+            </span>
+          )}
+          <button
+            onClick={() => void handleActivate()}
+            disabled={saving}
+            className="btn-base bg-primary text-primary-foreground text-xs py-1.5 px-3 hover:opacity-90 flex items-center gap-1 disabled:opacity-50 ml-auto sm:ml-0"
+          >
+            <Flame className="h-3.5 w-3.5" /> Poner en Oferta
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OfertasDelDiaPanel({
+  products,
+  userEmail,
+  userToken,
+  onRefresh,
+}: {
+  products: Product[];
+  userEmail: string;
+  userToken: string;
+  onRefresh: () => Promise<void>;
+}) {
+  const [subTab, setSubTab] = useState<"activas" | "agregar">("activas");
+  const [search, setSearch] = useState("");
+  const [clearingAll, setClearingAll] = useState(false);
+
+  const activeOffers = useMemo(() => {
+    return products.filter((p) => String(p.oferta ?? "").trim().toUpperCase() === "SI");
+  }, [products]);
+
+  const filteredActiveOffers = useMemo(() => {
+    if (!search.trim()) return activeOffers;
+    const q = search.toLowerCase();
+    return activeOffers.filter(
+      (p) =>
+        String(p.nombre ?? "").toLowerCase().includes(q) ||
+        String(p.categoria ?? "").toLowerCase().includes(q)
+    );
+  }, [activeOffers, search]);
+
+  const candidateProducts = useMemo(() => {
+    const nonOffers = products.filter((p) => String(p.oferta ?? "").trim().toUpperCase() !== "SI");
+    if (!search.trim()) return nonOffers;
+    const q = search.toLowerCase();
+    return nonOffers.filter(
+      (p) =>
+        String(p.nombre ?? "").toLowerCase().includes(q) ||
+        String(p.categoria ?? "").toLowerCase().includes(q)
+    );
+  }, [products, search]);
+
+  async function handleClearAllOffers() {
+    if (activeOffers.length === 0) return;
+    if (!confirm(`¿Seguro que querés quitar la etiqueta de Oferta del Día de los ${activeOffers.length} productos en oferta?`)) return;
+    setClearingAll(true);
+    try {
+      let count = 0;
+      for (const p of activeOffers) {
+        const input = productToInput(p);
+        input.oferta = "NO";
+        await upsertAdminProduct({ data: { email: userEmail, token: userToken, product: input } });
+        count++;
+      }
+      toast.success(`${count} ofertas desactivadas correctamente.`);
+      await onRefresh();
+    } catch {
+      toast.error("Ocurrió un error al desactivar las ofertas.");
+    } finally {
+      setClearingAll(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Banner promocional admin */}
+      <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-card to-card p-6 shadow-sm">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-primary/20 px-2.5 py-1 text-xs font-bold text-primary flex items-center gap-1 uppercase tracking-wider">
+                <Flame className="h-3.5 w-3.5 fill-primary" /> Panel de Ofertas del Día
+              </span>
+              <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-600 border border-emerald-500/20">
+                {activeOffers.length} {activeOffers.length === 1 ? "oferta activa" : "ofertas activas"}
+              </span>
+            </div>
+            <h2 className="text-xl font-bold text-foreground">Gestioná los Productos en Promoción</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl">
+              Los productos marcados en este panel se mostrarán inmediatamente en la sección{" "}
+              <strong className="text-primary">"Ofertas del Día"</strong> de la tienda con su precio de lista tachado y el distintivo de descuento.
+            </p>
+          </div>
+
+          {activeOffers.length > 0 && (
+            <button
+              onClick={() => void handleClearAllOffers()}
+              disabled={clearingAll}
+              className="btn-base bg-destructive/10 text-destructive hover:bg-destructive hover:text-white text-xs font-semibold px-4 py-2 flex items-center gap-1.5 shrink-0 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              {clearingAll ? "Desactivando..." : "Desactivar todas las ofertas"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Sub-tabs de ofertas */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border pb-4">
+        <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-xl border border-border">
+          <button
+            onClick={() => { setSubTab("activas"); setSearch(""); }}
+            className={`rounded-lg px-4 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
+              subTab === "activas"
+                ? "bg-card text-foreground shadow-xs border border-border"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Flame className="h-3.5 w-3.5 text-primary" />
+            Ofertas Activas
+            <span className="rounded-full bg-primary/10 text-primary text-[10px] px-1.5 py-0.2 font-bold">
+              {activeOffers.length}
+            </span>
+          </button>
+          <button
+            onClick={() => { setSubTab("agregar"); setSearch(""); }}
+            className={`rounded-lg px-4 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
+              subTab === "agregar"
+                ? "bg-card text-foreground shadow-xs border border-border"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Plus className="h-3.5 w-3.5 text-primary" />
+            Agregar Producto a Oferta
+            <span className="rounded-full bg-muted text-muted-foreground text-[10px] px-1.5 py-0.2 font-bold">
+              {candidateProducts.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Buscador dentro de panel */}
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={subTab === "activas" ? "Buscar entre ofertas..." : "Buscar producto del catálogo..."}
+            className="input-base text-xs pl-9 py-2"
+          />
+        </div>
+      </div>
+
+      {/* Contenido subtab */}
+      {subTab === "activas" ? (
+        filteredActiveOffers.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-14 text-center rounded-2xl border border-dashed border-border bg-card/50">
+            <Flame className="h-10 w-10 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground font-medium">
+              {search ? "No hay ofertas activas que coincidan con la búsqueda." : "No tenés ofertas del día activas."}
+            </p>
+            <button
+              onClick={() => { setSubTab("agregar"); setSearch(""); }}
+              className="btn-base bg-primary text-primary-foreground text-xs py-2 px-4 hover:opacity-90 mt-1 flex items-center gap-1.5"
+            >
+              <Plus className="h-4 w-4" /> Poner productos en oferta
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredActiveOffers.map((p) => (
+              <ActiveOfferCard
+                key={String(p.id)}
+                product={p}
+                userEmail={userEmail}
+                userToken={userToken}
+                onSaved={onRefresh}
+              />
+            ))}
+          </div>
+        )
+      ) : (
+        candidateProducts.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-14 text-center rounded-2xl border border-dashed border-border bg-card/50">
+            <Check className="h-10 w-10 text-emerald-500/50" />
+            <p className="text-sm text-muted-foreground font-medium">
+              {search ? "No se encontraron productos en el catálogo." : "¡Todos los productos ya están cargados como oferta!"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {candidateProducts.map((p) => (
+              <CandidateOfferCard
+                key={String(p.id)}
+                product={p}
+                userEmail={userEmail}
+                userToken={userToken}
+                onSaved={onRefresh}
+              />
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────── */
 /*  Página principal                                         */
 /* ───────────────────────────────────────────────────────── */
 
@@ -679,6 +1174,7 @@ function AdminProductosPage() {
   const [modal, setModal] = useState<ProductInput | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<"todos" | "ofertas">("todos");
 
   const userEmail = user?.email ?? "";
   const userToken = session?.access_token ?? "";
@@ -736,6 +1232,10 @@ function AdminProductosPage() {
     );
   });
 
+  const activeOffersCount = products.filter(
+    (p) => String(p.oferta ?? "").trim().toUpperCase() === "SI"
+  ).length;
+
   if (authLoading || !user || isAuthorized === false) return null;
 
   if (isAuthorized === null) {
@@ -757,7 +1257,7 @@ function AdminProductosPage() {
             <span className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-primary">
               Panel Admin
             </span>
-            <h1 className="mt-2 text-2xl font-bold">Gestión de Productos</h1>
+            <h1 className="mt-2 text-2xl font-bold">Gestión de Productos y Ofertas</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Link
@@ -781,102 +1281,170 @@ function AdminProductosPage() {
           </div>
         </div>
 
-        {/* Buscador */}
-        <div className="mt-6">
-          <input
-            className="input-base w-full max-w-sm"
-            placeholder="Buscar por nombre o categoría..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        {/* Navigation Tabs */}
+        <div className="mt-6 flex border-b border-border">
+          <button
+            onClick={() => setActiveTab("todos")}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-all ${
+              activeTab === "todos"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <PackagePlus className="h-4 w-4" />
+            Catálogo General
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold">
+              {products.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab("ofertas")}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-all ${
+              activeTab === "ofertas"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Flame className="h-4 w-4 text-primary fill-primary/20" />
+            Ofertas del Día
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                activeOffersCount > 0
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {activeOffersCount}
+            </span>
+          </button>
         </div>
 
         {/* Estado */}
         {loading && <p className="mt-8 text-center text-sm text-muted-foreground">Cargando productos...</p>}
         {error && <div className="mt-6 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 
-        {/* Tabla de productos */}
         {!loading && !error && (
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-card">
-            {filtered.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-16 text-center">
-                <PackagePlus className="h-10 w-10 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                  {search ? "Ningún producto coincide con la búsqueda." : "Todavía no hay productos cargados."}
-                </p>
-                {!search && (
-                  <button
-                    onClick={() => setModal(emptyProduct())}
-                    className="btn-base bg-primary text-primary-foreground hover:opacity-90 mt-2"
-                  >
-                    Crear primer producto
-                  </button>
-                )}
-              </div>
+          <div className="mt-6">
+            {activeTab === "ofertas" ? (
+              <OfertasDelDiaPanel
+                products={products}
+                userEmail={userEmail}
+                userToken={userToken}
+                onRefresh={loadProducts}
+              />
             ) : (
-              <table className="w-full min-w-[480px] text-sm">
-                <thead className="border-b border-border bg-muted/50">
-                  <tr>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Imagen</th>
-                    <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Nombre</th>
-                    <th className="hidden px-4 py-3 text-left font-semibold text-muted-foreground sm:table-cell">Categoría</th>
-                    <th className="hidden px-4 py-3 text-right font-semibold text-muted-foreground sm:table-cell">Precio</th>
-                    <th className="px-3 py-3 text-center font-semibold text-muted-foreground sm:px-4">Stock</th>
-                    <th className="px-3 py-3 text-right font-semibold text-muted-foreground sm:px-4">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filtered.map((p) => (
-                    <tr key={String(p.id)} className="hover:bg-muted/20 transition-colors">
-                      <td
-                        className="px-3 py-3 sm:px-4 cursor-pointer"
-                        onClick={() => setModal(productToInput(p))}
-                      >
-                        <img
-                          src={p.imagen_url || FALLBACK_IMAGE}
-                          alt={p.nombre}
-                          className="h-10 w-10 rounded-lg object-cover hover:opacity-80 transition-opacity"
-                          onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
-                        />
-                      </td>
-                      <td
-                        className="px-3 py-3 sm:px-4 font-medium cursor-pointer hover:text-primary transition-colors max-w-[150px] sm:max-w-none truncate sm:whitespace-normal"
-                        onClick={() => setModal(productToInput(p))}
-                      >
-                        {p.nombre}
-                      </td>
-                      <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
-                      <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
-                        {money(p.precio)}
-                      </td>
-                      <td className="px-3 py-3 sm:px-4 text-center">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${String(p.stock ?? "").toUpperCase() === "NO" ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>
-                          {String(p.stock ?? "SI").toUpperCase() === "NO" ? "Sin stock" : "Con stock"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 sm:px-4">
-                        <div className="flex items-center justify-end gap-1 sm:gap-2">
-                          <button
-                            onClick={() => setModal(productToInput(p))}
-                            className="rounded-lg p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
-                            title="Editar"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => void handleDelete(String(p.id))}
-                            disabled={deletingId === String(p.id)}
-                            className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-6">
+                {/* Buscador */}
+                <div>
+                  <input
+                    className="input-base w-full max-w-sm"
+                    placeholder="Buscar por nombre o categoría..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+
+                {/* Tabla de productos */}
+                <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+                  {filtered.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 py-16 text-center">
+                      <PackagePlus className="h-10 w-10 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground">
+                        {search ? "Ningún producto coincide con la búsqueda." : "Todavía no hay productos cargados."}
+                      </p>
+                      {!search && (
+                        <button
+                          onClick={() => setModal(emptyProduct())}
+                          className="btn-base bg-primary text-primary-foreground hover:opacity-90 mt-2"
+                        >
+                          Crear primer producto
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <table className="w-full min-w-[480px] text-sm">
+                      <thead className="border-b border-border bg-muted/50">
+                        <tr>
+                          <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Imagen</th>
+                          <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Nombre</th>
+                          <th className="hidden px-4 py-3 text-left font-semibold text-muted-foreground sm:table-cell">Categoría</th>
+                          <th className="hidden px-4 py-3 text-right font-semibold text-muted-foreground sm:table-cell">Precio</th>
+                          <th className="px-3 py-3 text-center font-semibold text-muted-foreground sm:px-4">Estado</th>
+                          <th className="px-3 py-3 text-right font-semibold text-muted-foreground sm:px-4">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {filtered.map((p) => {
+                          const isOffer = String(p.oferta ?? "").trim().toUpperCase() === "SI";
+                          return (
+                            <tr key={String(p.id)} className="hover:bg-muted/20 transition-colors">
+                              <td
+                                className="px-3 py-3 sm:px-4 cursor-pointer"
+                                onClick={() => setModal(productToInput(p))}
+                              >
+                                <img
+                                  src={p.imagen_url || FALLBACK_IMAGE}
+                                  alt={p.nombre}
+                                  className="h-10 w-10 rounded-lg object-cover hover:opacity-80 transition-opacity"
+                                  onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                                />
+                              </td>
+                              <td
+                                className="px-3 py-3 sm:px-4 font-medium cursor-pointer hover:text-primary transition-colors max-w-[150px] sm:max-w-none truncate sm:whitespace-normal"
+                                onClick={() => setModal(productToInput(p))}
+                              >
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span>{p.nombre}</span>
+                                  {isOffer && (
+                                    <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold flex items-center gap-0.5 border border-primary/20">
+                                      <Flame className="h-3 w-3 fill-primary" /> Oferta
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
+                              <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
+                                {isOffer && p.precio_oferta ? (
+                                  <div className="flex flex-col items-end">
+                                    <span className="font-bold text-primary">{money(p.precio_oferta)}</span>
+                                    <span className="line-through text-[11px] text-muted-foreground">{money(p.precio)}</span>
+                                  </div>
+                                ) : (
+                                  money(p.precio)
+                                )}
+                              </td>
+                              <td className="px-3 py-3 sm:px-4 text-center">
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${String(p.stock ?? "").toUpperCase() === "NO" ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>
+                                  {String(p.stock ?? "SI").toUpperCase() === "NO" ? "Sin stock" : "Con stock"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 sm:px-4">
+                                <div className="flex items-center justify-end gap-1 sm:gap-2">
+                                  <button
+                                    onClick={() => setModal(productToInput(p))}
+                                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                                    title="Editar"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => void handleDelete(String(p.id))}
+                                    disabled={deletingId === String(p.id)}
+                                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
+                                    title="Eliminar"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         )}
