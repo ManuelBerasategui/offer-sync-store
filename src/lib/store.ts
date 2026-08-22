@@ -358,10 +358,33 @@ export function checkCategoryMins(
   for (const item of items) {
     const raw = (item.categoria ?? "").trim();
     if (!raw) continue;
-    const match = findRuleForCat(normCat(raw), rules);
-    if (!match) continue; // sin regla configurada para esta categoría
-    catUnits[match.key] = (catUnits[match.key] ?? 0) + item.qty;
-    catAmount[match.key] = (catAmount[match.key] ?? 0) + item.qty * item.unitPrice;
+    const catNorm = normCat(raw);
+
+    // Busca la regla con mínimo (minUnits o minAmount) más aplicable para este ítem.
+    // Recorre todas las reglas y elige la que tenga mínimo y mejor match (más larga).
+    let minRuleKey: string | undefined;
+    let minRuleKeyLen = -1;
+    const catWithoutDe = catNorm.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
+
+    for (const [ruleKey, rule] of Object.entries(rules)) {
+      if (!rule.minUnits && !rule.minAmount) continue;
+      const cleanRuleKey = ruleKey.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
+      const matches =
+        catNorm === ruleKey ||
+        catWithoutDe === ruleKey ||
+        catWithoutDe === cleanRuleKey ||
+        catNorm.startsWith(ruleKey) ||
+        catWithoutDe.startsWith(cleanRuleKey);
+      if (matches && ruleKey.length > minRuleKeyLen) {
+        minRuleKey = ruleKey;
+        minRuleKeyLen = ruleKey.length;
+      }
+    }
+
+    if (minRuleKey) {
+      catUnits[minRuleKey] = (catUnits[minRuleKey] ?? 0) + item.qty;
+      catAmount[minRuleKey] = (catAmount[minRuleKey] ?? 0) + item.qty * item.unitPrice;
+    }
   }
 
   const violations: CategoryMinViolation[] = [];
