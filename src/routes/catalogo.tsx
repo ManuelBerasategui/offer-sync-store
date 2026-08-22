@@ -66,10 +66,10 @@ function Catalogo() {
   }, [products, search, cat, sort, onlyTop, onlyOffers]);
 
   const chip = (active: boolean) =>
-    `shrink-0 rounded-full border px-4 py-2 text-[13px] font-bold transition-colors ${
+    `shrink-0 rounded-full border px-3.5 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-[13px] font-bold transition-colors ${
       active
         ? "border-primary bg-primary/10 text-primary"
-        : "border-border text-muted-foreground"
+        : "border-border text-muted-foreground hover:text-foreground"
     }`;
 
   return (
@@ -95,7 +95,7 @@ function Catalogo() {
             className="w-full rounded-lg border border-input bg-card px-4 py-3 text-sm outline-none focus:border-primary"
           />
 
-          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+          <div className="no-scrollbar -mx-4 grid grid-rows-2 grid-flow-col auto-cols-max gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex sm:flex-wrap sm:overflow-visible sm:px-0">
             <button className={chip(cat === "todas")} onClick={() => setCat("todas")}>
               Todas
             </button>
