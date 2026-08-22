@@ -736,17 +736,6 @@ function AdminProductosPage() {
     );
   });
 
-  const dbDolarRate = useMemo(() => {
-    const prodsWithBoth = products.filter((p) => {
-      const ars = Number(p.precio) || 0;
-      const usd = Number((p as any).precio_usd) || 0;
-      return ars > 0 && usd > 0;
-    });
-    if (prodsWithBoth.length === 0) return null;
-    const rates = prodsWithBoth.map((p) => Number(p.precio) / Number((p as any).precio_usd));
-    return Math.round(rates.reduce((a, b) => a + b, 0) / rates.length);
-  }, [products]);
-
   if (authLoading || !user || isAuthorized === false) return null;
 
   if (isAuthorized === null) {
@@ -771,11 +760,6 @@ function AdminProductosPage() {
             <h1 className="mt-2 text-2xl font-bold">Gestión de Productos</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {dbDolarRate !== null && (
-              <span className="rounded-full bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                🗄️ Dólar DB: {money(dbDolarRate)}
-              </span>
-            )}
             <Link
               to="/admin/ordenes"
               className="btn-base bg-muted text-foreground hover:bg-muted/70 text-sm"
