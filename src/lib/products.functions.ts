@@ -488,3 +488,87 @@ export const deleteAdminBanner = createServerFn({ method: "POST" })
       return { error: err instanceof Error ? err.message : "Error al eliminar el combo." };
     }
   });
+
+/* ─── Actualización masiva de stock y variantes ────────────────── */
+
+export const bulkUpdateAdminStock = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string; productIds: string[]; stock: "SI" | "NO" }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    productIds: Array.isArray(data?.productIds) ? data.productIds.map((id) => str(id, 100)) : [],
+    stock: data?.stock === "NO" ? ("NO" as const) : ("SI" as const),
+  }))
+  .handler(async ({ data }): Promise<{ success?: boolean; error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+      if (data.productIds.length === 0) return { success: true };
+
+      // 1. Obtener productos para actualizar sus metadata de talles si aplica
+      const { data: prods, error: fetchErr } = await supabaseAdmin
+        .from("products")
+        .select("id, metadata")
+        .in("id", data.productIds);
+
+      if (fetchErr) throw fetchErr;
+
+      const defaultShoes = "35,36,37,38,39,40,41,42,43,44,45";
+      const defaultClothes = "XS,S,M,L,XL,XXL,XXXL";
+
+      for (const p of prods ?? []) {
+        const meta = (p.metadata as Record<string, string> | null) ?? {};
+        const tipo = String(meta["tipo_talles"] ?? "").toUpperCase();
+
+        if (tipo === "ZAPATILLAS" || tipo === "ROPA") {
+          const updatedMeta = { ...meta };
+          if (data.stock === "NO") {
+            updatedMeta["talles_disponibles"] = "";
+          } else {
+            updatedMeta["talles_disponibles"] = tipo === "ZAPATILLAS" ? defaultShoes : defaultClothes;
+          }
+          await supabaseAdmin
+            .from("products")
+            .update({ stock: data.stock, metadata: updatedMeta })
+            .eq("id", p.id);
+        } else {
+          await supabaseAdmin
+            .from("products")
+            .update({ stock: data.stock })
+            .eq("id", p.id);
+        }
+      }
+
+      // 2. Actualizar también todas las variantes de color pertenecientes a estos productos
+      await supabaseAdmin
+        .from("product_variants")
+        .update({ stock: data.stock })
+        .in("product_id", data.productIds);
+
+      return { success: true };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Error al actualizar stock masivo." };
+    }
+  });
+
+export const updateVariantStock = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string; variantId: string; stock: "SI" | "NO" }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    variantId: str(data?.variantId, 100),
+    stock: data?.stock === "NO" ? ("NO" as const) : ("SI" as const),
+  }))
+  .handler(async ({ data }): Promise<{ success?: boolean; error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+      const { error } = await supabaseAdmin
+        .from("product_variants")
+        .update({ stock: data.stock })
+        .eq("id", data.variantId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Error al actualizar stock de la variante." };
+    }
+  });
+
+

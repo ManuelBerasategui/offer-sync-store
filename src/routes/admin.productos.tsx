@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp, PackagePlus,
   Flame, Sparkles, Percent, Save, Tag, Search, Check, RefreshCw, Zap, TrendingDown,
@@ -20,6 +20,8 @@ import {
   getAdminBanners,
   upsertAdminBanner,
   deleteAdminBanner,
+  bulkUpdateAdminStock,
+  updateVariantStock,
   type ProductInput,
   type VariantInput,
   type BannerInput,
@@ -1570,6 +1572,68 @@ function AdminProductosPage() {
     );
   });
 
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [expandedVariants, setExpandedVariants] = useState<Record<string, boolean>>({});
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+
+  const toggleSelectAll = () => {
+    const allFilteredIds = filtered.map((p) => String(p.id ?? ""));
+    const allSelected = allFilteredIds.every((id) => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(allFilteredIds);
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleExpandVariants = (id: string) => {
+    setExpandedVariants((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  async function handleBulkStock(stock: "SI" | "NO") {
+    if (selectedIds.length === 0) return;
+    setBulkUpdating(true);
+    try {
+      const res = await bulkUpdateAdminStock({
+        data: { email: userEmail, token: userToken, productIds: selectedIds, stock },
+      });
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(`Stock actualizado a "${stock === "SI" ? "Con stock" : "Sin stock"}" en ${selectedIds.length} productos.`);
+        setSelectedIds([]);
+        await loadProducts();
+      }
+    } catch {
+      toast.error("Error al actualizar el stock masivo.");
+    } finally {
+      setBulkUpdating(false);
+    }
+  }
+
+  async function handleToggleVariantStock(variantId: string, currentStock: string) {
+    const nextStock = String(currentStock ?? "SI").toUpperCase() === "NO" ? "SI" : "NO";
+    try {
+      const res = await updateVariantStock({
+        data: { email: userEmail, token: userToken, variantId, stock: nextStock },
+      });
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(`Variante actualizada a "${nextStock === "SI" ? "Con stock" : "Sin stock"}".`);
+        await loadProducts();
+      }
+    } catch {
+      toast.error("Error al actualizar variante.");
+    }
+  }
+
   const activeOffersCount = products.filter(
     (p) => String(p.oferta ?? "").trim().toUpperCase() === "SI"
   ).length;
@@ -1689,6 +1753,15 @@ function AdminProductosPage() {
                     <table className="w-full min-w-[480px] text-sm">
                       <thead className="border-b border-border bg-muted/50">
                         <tr>
+                          <th className="px-3 py-3 text-center w-10">
+                            <input
+                              type="checkbox"
+                              checked={filtered.length > 0 && filtered.every((p) => selectedIds.includes(String(p.id)))}
+                              onChange={toggleSelectAll}
+                              className="h-4 w-4 rounded border-border text-primary accent-primary cursor-pointer"
+                              title="Seleccionar todos"
+                            />
+                          </th>
                           <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Imagen</th>
                           <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Nombre</th>
                           <th className="hidden px-4 py-3 text-left font-semibold text-muted-foreground sm:table-cell">Categoría</th>
@@ -1699,83 +1772,159 @@ function AdminProductosPage() {
                       </thead>
                       <tbody className="divide-y divide-border">
                         {filtered.map((p) => {
+                          const pid = String(p.id ?? "");
                           const isOffer = String(p.oferta ?? "").trim().toUpperCase() === "SI";
+                          const isSelected = selectedIds.includes(pid);
+                          const isExpanded = Boolean(expandedVariants[pid]);
+                          const variantsList = p.variants ?? [];
+
                           return (
-                            <tr key={String(p.id)} className="hover:bg-muted/20 transition-colors">
-                              <td
-                                className="px-3 py-3 sm:px-4 cursor-pointer"
-                                onClick={() => setModal(productToInput(p))}
-                              >
-                                <img
-                                  src={p.imagen_url || FALLBACK_IMAGE}
-                                  alt={p.nombre}
-                                  className="h-10 w-10 rounded-lg object-cover hover:opacity-80 transition-opacity"
-                                  onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
-                                />
-                              </td>
-                              <td
-                                className="px-3 py-3 sm:px-4 font-medium cursor-pointer hover:text-primary transition-colors max-w-[170px] sm:max-w-none"
-                                onClick={() => setModal(productToInput(p))}
-                              >
-                                <div className="flex flex-col gap-0.5">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span>{p.nombre}</span>
-                                    {isOffer && (
-                                      <span className="rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-bold flex items-center gap-0.5 border border-primary/20 shrink-0">
-                                        <Flame className="h-3 w-3 fill-primary" /> Oferta
-                                      </span>
+                            <Fragment key={pid}>
+                              <tr className={`hover:bg-muted/20 transition-colors ${isSelected ? "bg-primary/5" : ""}`}>
+                                <td className="px-3 py-3 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleSelectOne(pid)}
+                                    className="h-4 w-4 rounded border-border text-primary accent-primary cursor-pointer"
+                                  />
+                                </td>
+                                <td
+                                  className="px-3 py-3 sm:px-4 cursor-pointer"
+                                  onClick={() => setModal(productToInput(p))}
+                                >
+                                  <img
+                                    src={p.imagen_url || FALLBACK_IMAGE}
+                                    alt={p.nombre}
+                                    className="h-10 w-10 rounded-lg object-cover hover:opacity-80 transition-opacity"
+                                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                                  />
+                                </td>
+                                <td className="px-3 py-3 sm:px-4 font-medium max-w-[180px] sm:max-w-none">
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap cursor-pointer hover:text-primary transition-colors" onClick={() => setModal(productToInput(p))}>
+                                      <span>{p.nombre}</span>
+                                      {isOffer && (
+                                        <span className="rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-bold flex items-center gap-0.5 border border-primary/20 shrink-0">
+                                          <Flame className="h-3 w-3 fill-primary" /> Oferta
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Precio en Celular */}
+                                    <div className="text-xs font-bold text-primary sm:hidden">
+                                      {isOffer && p.precio_oferta ? (
+                                        <span className="flex items-center gap-1">
+                                          <span>{money(p.precio_oferta)}</span>
+                                          <span className="line-through text-[10px] text-muted-foreground font-normal">{money(p.precio)}</span>
+                                        </span>
+                                      ) : (
+                                        <span>{money(p.precio)}</span>
+                                      )}
+                                    </div>
+
+                                    {/* Botón para desplegar variantes de colores */}
+                                    {variantsList.length > 0 && (
+                                      <div className="mt-0.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleExpandVariants(pid)}
+                                          className="inline-flex items-center gap-1 rounded-md bg-muted/80 hover:bg-primary/20 hover:text-primary px-2 py-0.5 text-[10px] font-bold text-muted-foreground transition-colors"
+                                        >
+                                          <span>🎨 {variantsList.length} colores</span>
+                                          {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                        </button>
+                                      </div>
                                     )}
                                   </div>
-                                  
-                                  {/* Precio en Celular */}
-                                  <div className="text-xs font-bold text-primary sm:hidden">
-                                    {isOffer && p.precio_oferta ? (
-                                      <span className="flex items-center gap-1">
-                                        <span>{money(p.precio_oferta)}</span>
-                                        <span className="line-through text-[10px] text-muted-foreground font-normal">{money(p.precio)}</span>
-                                      </span>
-                                    ) : (
-                                      <span>{money(p.precio)}</span>
-                                    )}
+                                </td>
+                                <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
+                                <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
+                                  {isOffer && p.precio_oferta ? (
+                                    <div className="flex flex-col items-end">
+                                      <span className="font-bold text-primary">{money(p.precio_oferta)}</span>
+                                      <span className="line-through text-[11px] text-muted-foreground">{money(p.precio)}</span>
+                                    </div>
+                                  ) : (
+                                    money(p.precio)
+                                  )}
+                                </td>
+                                <td className="px-3 py-3 sm:px-4 text-center">
+                                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${String(p.stock ?? "").toUpperCase() === "NO" ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>
+                                    {String(p.stock ?? "SI").toUpperCase() === "NO" ? "Sin stock" : "Con stock"}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3 sm:px-4">
+                                  <div className="flex items-center justify-end gap-1 sm:gap-2">
+                                    <button
+                                      onClick={() => setModal(productToInput(p))}
+                                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                                      title="Editar"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => void handleDelete(pid)}
+                                      disabled={deletingId === pid}
+                                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
+                                      title="Eliminar"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
                                   </div>
-                                </div>
-                              </td>
-                              <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
-                              <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
-                                {isOffer && p.precio_oferta ? (
-                                  <div className="flex flex-col items-end">
-                                    <span className="font-bold text-primary">{money(p.precio_oferta)}</span>
-                                    <span className="line-through text-[11px] text-muted-foreground">{money(p.precio)}</span>
-                                  </div>
-                                ) : (
-                                  money(p.precio)
-                                )}
-                              </td>
-                              <td className="px-3 py-3 sm:px-4 text-center">
-                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${String(p.stock ?? "").toUpperCase() === "NO" ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>
-                                  {String(p.stock ?? "SI").toUpperCase() === "NO" ? "Sin stock" : "Con stock"}
-                                </span>
-                              </td>
-                              <td className="px-3 py-3 sm:px-4">
-                                <div className="flex items-center justify-end gap-1 sm:gap-2">
-                                  <button
-                                    onClick={() => setModal(productToInput(p))}
-                                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
-                                    title="Editar"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => void handleDelete(String(p.id))}
-                                    disabled={deletingId === String(p.id)}
-                                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
-                                    title="Eliminar"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
+                                </td>
+                              </tr>
+
+                              {/* Sub-fila de Variantes de Color */}
+                              {isExpanded && variantsList.length > 0 && (
+                                <tr className="bg-muted/30">
+                                  <td colSpan={7} className="px-4 py-3 border-t border-dashed border-border/80">
+                                    <div className="space-y-2">
+                                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                                        Variantes de color ({variantsList.length}):
+                                      </p>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                        {variantsList.map((v) => {
+                                          const isVarNoStock = String(v.stock ?? "SI").toUpperCase() === "NO";
+                                          return (
+                                            <div
+                                              key={v.id}
+                                              className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card p-2 px-3 text-xs shadow-xs"
+                                            >
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                {v.imagen_url && (
+                                                  <img
+                                                    src={v.imagen_url}
+                                                    alt={v.color}
+                                                    className="h-7 w-7 rounded-lg object-cover border border-border shrink-0"
+                                                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                                                  />
+                                                )}
+                                                <div className="min-w-0">
+                                                  <p className="font-bold text-foreground truncate">{v.color}</p>
+                                                  <p className="text-[10px] text-muted-foreground">{money(v.precio)}</p>
+                                                </div>
+                                              </div>
+                                              <button
+                                                type="button"
+                                                onClick={() => void handleToggleVariantStock(v.id, String(v.stock ?? "SI"))}
+                                                className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all shrink-0 ${
+                                                  isVarNoStock
+                                                    ? "bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20"
+                                                    : "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20"
+                                                }`}
+                                              >
+                                                {isVarNoStock ? "Sin stock" : "Con stock"}
+                                              </button>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
                           );
                         })}
                       </tbody>
@@ -1787,6 +1936,37 @@ function AdminProductosPage() {
           </div>
         )}
       </main>
+
+      {/* Barra Flotante de Acciones Masivas */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 rounded-2xl border border-border bg-card/95 backdrop-blur-md px-3.5 py-2.5 sm:px-5 sm:py-3 shadow-2xl max-w-[95vw]">
+          <span className="text-xs font-bold text-foreground shrink-0">
+            {selectedIds.length} {selectedIds.length === 1 ? "seleccionado" : "seleccionados"}
+          </span>
+          <div className="h-4 w-px bg-border shrink-0" />
+          <button
+            onClick={() => void handleBulkStock("SI")}
+            disabled={bulkUpdating}
+            className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 px-3 flex items-center gap-1 shrink-0 disabled:opacity-50"
+          >
+            🟢 Con stock
+          </button>
+          <button
+            onClick={() => void handleBulkStock("NO")}
+            disabled={bulkUpdating}
+            className="btn-base bg-red-600 hover:bg-red-700 text-white text-xs py-1.5 px-3 flex items-center gap-1 shrink-0 disabled:opacity-50"
+          >
+            🔴 Sin stock
+          </button>
+          <button
+            onClick={() => setSelectedIds([])}
+            className="rounded-lg p-1 text-muted-foreground hover:bg-muted shrink-0"
+            title="Deseleccionar todos"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <SiteFooter config={config} />
 
