@@ -57,8 +57,10 @@ function CarritoPage() {
 
   const items = cartItemsWithCat.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice, productId: i.productId }));
 
-  // Mínimos dinámicos por categoría
+  // Mínimos por categoría (dinámicos o estáticos)
   const catRules = parseCategoryRules(config);
+
+  // Violaciones de reglas dinámicas generales (excluyendo suplementos para evitar duplicación)
   const dynamicViolations = checkCategoryMins(
     cartItemsWithCat.map((i: { categoria?: string; qty: number; unitPrice: number }) => ({
       ...(i.categoria !== undefined ? { categoria: i.categoria } : {}),
@@ -66,26 +68,28 @@ function CarritoPage() {
       unitPrice: i.unitPrice,
     })),
     catRules,
-  );
+  ).filter((v) => normCat(v.category) !== normCat("Suplementos"));
 
-  // Fallback: chequeo hardcodeado de suplementos si no hay regla dinámica configurada
-  const hasSupDynRule = !!catRules[normCat("Suplementos")]?.minAmount;
-  const legacyViolations = !hasSupDynRule
-    ? cartItemsWithCat
-        .filter((i: { categoria?: string; nombre?: string }) => isSuplemento(i.categoria, i.nombre))
-        .reduce((a: number, i: { qty: number; unitPrice: number }) => a + i.qty * i.unitPrice, 0)
-    : 0;
-  const hasLegacyViolation = !hasSupDynRule && legacyViolations > 0 && legacyViolations < SUPLEMENTOS_MIN;
+  // Verificación directa e inquebrantable para Suplementos ($250.000)
+  const totalSuplementos = cartItemsWithCat
+    .filter((i: { categoria?: string; nombre?: string }) => isSuplemento(i.categoria, i.nombre))
+    .reduce((sum: number, i: { qty: number; unitPrice: number }) => sum + i.qty * i.unitPrice, 0);
 
-  const minViolations = [...dynamicViolations];
-  if (hasLegacyViolation) {
-    minViolations.push({
-      category: "Suplementos",
-      type: "amount",
-      min: SUPLEMENTOS_MIN,
-      current: legacyViolations,
-    });
-  }
+  const minSuplementos = catRules[normCat("Suplementos")]?.minAmount || SUPLEMENTOS_MIN;
+  const suplementosViolation =
+    totalSuplementos > 0 && totalSuplementos < minSuplementos
+      ? {
+          category: "Suplementos",
+          type: "amount" as const,
+          min: minSuplementos,
+          current: totalSuplementos,
+        }
+      : null;
+
+  const minViolations = [
+    ...(suplementosViolation ? [suplementosViolation] : []),
+    ...dynamicViolations,
+  ];
   const hasViolations = minViolations.length > 0;
 
   return (

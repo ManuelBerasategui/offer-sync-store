@@ -205,20 +205,19 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
           }
 
           const { isSuplemento, SUPLEMENTOS_MIN } = await import("./store");
-          const hasSupDynRule = !!catRules[normCat("Suplementos")]?.minAmount;
-          if (!hasSupDynRule) {
-            const supTotal = data.items
-              .filter((i) => {
-                const prod = findProduct(dbProducts as any, i.nombre);
-                return isSuplemento(prod?.categoria, i.nombre);
-              })
-              .reduce((a, i) => a + i.qty * i.unitPrice, 0);
-            if (supTotal > 0 && supTotal < SUPLEMENTOS_MIN) {
-              return {
-                status: "error",
-                message: `No se cumple el mínimo de compra para Suplementos ($${SUPLEMENTOS_MIN.toLocaleString("es-AR")}).`,
-              };
-            }
+          const minSuplementos = catRules[normCat("Suplementos")]?.minAmount || SUPLEMENTOS_MIN;
+          const supTotal = data.items
+            .filter((i) => {
+              const prod = findProduct(dbProducts as any, i.nombre);
+              return isSuplemento(prod?.categoria, i.nombre);
+            })
+            .reduce((a, i) => a + i.qty * i.unitPrice, 0);
+
+          if (supTotal > 0 && supTotal < minSuplementos) {
+            return {
+              status: "error",
+              message: `No se cumple el mínimo de compra para Suplementos ($${minSuplementos.toLocaleString("es-AR")}).`,
+            };
           }
 
           items = data.items.map((item) => {

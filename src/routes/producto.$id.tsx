@@ -152,8 +152,8 @@ function ProductoPage() {
       product_id: String(product.id ?? ""),
       color: defaultColor,
       precio: priceOf(product),
-      stock: product.stock,
-      imagen_url: product.imagen_url,
+      stock: product.stock ?? null,
+      imagen_url: product.imagen_url ?? null,
       talles_disponibles: productTalles,
     };
     return [defaultVar, ...variants];
