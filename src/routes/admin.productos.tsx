@@ -973,15 +973,16 @@ function CandidateOfferCard({
 function ComboBuilderPanel({
   userEmail,
   userToken,
+  initialBanners = [],
   onRefresh,
 }: {
-  products: Product[];
   userEmail: string;
   userToken: string;
+  initialBanners?: Banner[];
   onRefresh: () => Promise<void>;
 }) {
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [loadingBanners, setLoadingBanners] = useState(true);
+  const [banners, setBanners] = useState<Banner[]>(initialBanners);
+  const [loadingBanners, setLoadingBanners] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editingBanner, setEditingBanner] = useState<BannerInput | null>(null);
 
@@ -993,10 +994,11 @@ function ComboBuilderPanel({
   const [saving, setSaving] = useState(false);
 
   async function loadBanners() {
+    if (!userEmail || !userToken) return;
     setLoadingBanners(true);
     try {
       const res = await getAdminBanners({ data: { email: userEmail, token: userToken } });
-      if (res.banners) setBanners(res.banners);
+      if (res && Array.isArray(res.banners)) setBanners(res.banners);
     } catch {
       toast.error("Error al cargar las ofertas de combos.");
     } finally {
@@ -1005,7 +1007,9 @@ function ComboBuilderPanel({
   }
 
   useEffect(() => {
-    void loadBanners();
+    if (userEmail && userToken) {
+      void loadBanners();
+    }
   }, [userEmail, userToken]);
 
   function resetForm() {
@@ -1239,11 +1243,13 @@ function ComboBuilderPanel({
 
 function OfertasDelDiaPanel({
   products,
+  initialBanners = [],
   userEmail,
   userToken,
   onRefresh,
 }: {
   products: Product[];
+  initialBanners?: Banner[];
   userEmail: string;
   userToken: string;
   onRefresh: () => Promise<void>;
@@ -1394,7 +1400,7 @@ function OfertasDelDiaPanel({
       {/* Contenido subtab */}
       {subTab === "combos" ? (
         <ComboBuilderPanel
-          products={products}
+          initialBanners={initialBanners}
           userEmail={userEmail}
           userToken={userToken}
           onRefresh={onRefresh}
@@ -1458,7 +1464,7 @@ function OfertasDelDiaPanel({
 
 function AdminProductosPage() {
   const { data: storeData } = useSuspenseQuery(storeQueryOptions);
-  const { config } = storeData;
+  const { config, banners: initialBanners } = storeData;
   const { user, session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -1623,6 +1629,7 @@ function AdminProductosPage() {
             {activeTab === "ofertas" ? (
               <OfertasDelDiaPanel
                 products={products}
+                initialBanners={initialBanners}
                 userEmail={userEmail}
                 userToken={userToken}
                 onRefresh={loadProducts}
