@@ -11,6 +11,7 @@ import {
   priceOf,
   parseCategoryRules,
   categoryDiscountForUnits,
+  findRuleForCat,
   normCat,
 } from "./store";
 
@@ -132,11 +133,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const catRules = parseCategoryRules(config);
 
-    // Total de unidades por categoría en el carrito (para descuento de categoría)
+    // Agrupa por clave de regla (no categoría exacta) — subcategorías quedan juntas
     const catTotals: Record<string, number> = {};
     for (const item of items) {
-      const key = normCat(item.categoria ?? "");
-      if (key) catTotals[key] = (catTotals[key] ?? 0) + item.qty;
+      const catNorm = normCat(item.categoria ?? "");
+      if (!catNorm) continue;
+      const match = findRuleForCat(catNorm, catRules);
+      const key = match?.key ?? catNorm;
+      catTotals[key] = (catTotals[key] ?? 0) + item.qty;
     }
 
     return items.map((item) => {
@@ -144,12 +148,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (!product) return item;
 
       const catNorm = normCat(item.categoria ?? "");
-      const catRule = catNorm ? catRules[catNorm] : undefined;
+      const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
+      const catRule = match?.rule;
+      const ruleKey = match?.key;
 
       let unitPrice: number;
-      if (catRule?.discountTiers?.length) {
+      if (catRule?.discountTiers?.length && ruleKey) {
         // Descuento de categoría: reemplaza al individual del producto
-        const totalCatUnits = catTotals[catNorm] ?? 0;
+        const totalCatUnits = catTotals[ruleKey] ?? 0;
         const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
         const base = item.basePrice ?? priceOf(product);
         unitPrice = Math.round(base * (1 - percent / 100));

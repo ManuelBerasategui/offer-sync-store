@@ -240,41 +240,66 @@ export function categoryDiscountForUnits(tiers: CategoryTier[], totalUnits: numb
   return percent;
 }
 
+/**
+ * Busca la regla más aplicable para una categoría.
+ * Primero intenta match exacto; si no, busca por prefijo (más específico gana).
+ * Ej: "perfumes árabe" encuentra la regla "perfumes".
+ */
+export function findRuleForCat(
+  catNorm: string,
+  rules: Record<string, CategoryRule>,
+): { key: string; rule: CategoryRule } | undefined {
+  if (rules[catNorm]) return { key: catNorm, rule: rules[catNorm] };
+  // Prefix match: el prefijo más largo gana
+  let best: { key: string; rule: CategoryRule } | undefined;
+  for (const [ruleKey, rule] of Object.entries(rules)) {
+    if (catNorm.startsWith(ruleKey) && (!best || ruleKey.length > best.key.length)) {
+      best = { key: ruleKey, rule };
+    }
+  }
+  return best;
+}
+
 export type CategoryMinViolation = {
-  category: string;   // nombre original para mostrar
+  category: string;   // nombre para mostrar
   type: "units" | "amount";
   min: number;
   current: number;
 };
 
-/** Retorna las violaciones de mínimos de compra para el carrito actual */
+/**
+ * Retorna las violaciones de mínimos de compra para el carrito actual.
+ * Las subcategorías (ej. "Perfumes Árabe") se agrupan bajo la regla padre ("Perfumes").
+ */
 export function checkCategoryMins(
   items: { categoria?: string; qty: number; unitPrice: number }[],
   rules: Record<string, CategoryRule>,
 ): CategoryMinViolation[] {
+  // Acumula totales agrupados por la clave de regla (no por la categoría exacta del ítem)
   const catUnits: Record<string, number> = {};
   const catAmount: Record<string, number> = {};
-  const catDisplay: Record<string, string> = {};
 
   for (const item of items) {
     const raw = (item.categoria ?? "").trim();
     if (!raw) continue;
-    const key = normCat(raw);
-    catUnits[key] = (catUnits[key] ?? 0) + item.qty;
-    catAmount[key] = (catAmount[key] ?? 0) + item.qty * item.unitPrice;
-    if (!catDisplay[key]) catDisplay[key] = raw;
+    const match = findRuleForCat(normCat(raw), rules);
+    if (!match) continue; // sin regla configurada para esta categoría
+    catUnits[match.key] = (catUnits[match.key] ?? 0) + item.qty;
+    catAmount[match.key] = (catAmount[match.key] ?? 0) + item.qty * item.unitPrice;
   }
 
   const violations: CategoryMinViolation[] = [];
-  for (const [cat, rule] of Object.entries(rules)) {
-    const units = catUnits[cat] ?? 0;
-    if (units === 0) continue; // categoría no está en el carrito
+  for (const [key, rule] of Object.entries(rules)) {
+    const units = catUnits[key] ?? 0;
+    if (units === 0) continue;
+    // Display: capitaliza la clave de regla (ej "perfumes" → "Perfumes")
+    const display = key.charAt(0).toUpperCase() + key.slice(1);
     if (rule.minUnits && units < rule.minUnits) {
-      violations.push({ category: catDisplay[cat] ?? cat, type: "units", min: rule.minUnits, current: units });
+      violations.push({ category: display, type: "units", min: rule.minUnits, current: units });
     }
-    const amount = catAmount[cat] ?? 0;
+    const amount = catAmount[key] ?? 0;
     if (rule.minAmount && amount < rule.minAmount) {
-      violations.push({ category: catDisplay[cat] ?? cat, type: "amount", min: rule.minAmount, current: amount });
+      violations.push({ category: display, type: "amount", min: rule.minAmount, current: amount });
     }
   }
   return violations;
