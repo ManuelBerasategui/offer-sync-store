@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CarritoRouteImport } from './routes/carrito'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
 import { Route as GraciasRouteImport } from './routes/gracias'
+import { Route as AdminConfiguracionRouteImport } from './routes/admin.configuracion'
 import { Route as AdminOrdenesRouteImport } from './routes/admin.ordenes'
 import { Route as AdminProductosRouteImport } from './routes/admin.productos'
 import { Route as ComboIndexRouteImport } from './routes/combo.$index'
@@ -44,6 +45,11 @@ const GraciasRoute = GraciasRouteImport.update({
   path: '/gracias',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminConfiguracionRoute = AdminConfiguracionRouteImport.update({
+  id: '/admin/configuracion',
+  path: '/admin/configuracion',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminOrdenesRoute = AdminOrdenesRouteImport.update({
   id: '/admin/ordenes',
   path: '/admin/ordenes',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
   '/gracias': typeof GraciasRoute
+  '/admin/configuracion': typeof AdminConfiguracionRoute
   '/admin/ordenes': typeof AdminOrdenesRoute
   '/admin/productos': typeof AdminProductosRoute
   '/combo/$index': typeof ComboIndexRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
   '/gracias': typeof GraciasRoute
+  '/admin/configuracion': typeof AdminConfiguracionRoute
   '/admin/ordenes': typeof AdminOrdenesRoute
   '/admin/productos': typeof AdminProductosRoute
   '/combo/$index': typeof ComboIndexRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
   '/gracias': typeof GraciasRoute
+  '/admin/configuracion': typeof AdminConfiguracionRoute
   '/admin/ordenes': typeof AdminOrdenesRoute
   '/admin/productos': typeof AdminProductosRoute
   '/combo/$index': typeof ComboIndexRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/carrito'
     | '/catalogo'
     | '/gracias'
+    | '/admin/configuracion'
     | '/admin/ordenes'
     | '/admin/productos'
     | '/combo/$index'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/carrito'
     | '/catalogo'
     | '/gracias'
+    | '/admin/configuracion'
     | '/admin/ordenes'
     | '/admin/productos'
     | '/combo/$index'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/carrito'
     | '/catalogo'
     | '/gracias'
+    | '/admin/configuracion'
     | '/admin/ordenes'
     | '/admin/productos'
     | '/combo/$index'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   CarritoRoute: typeof CarritoRoute
   CatalogoRoute: typeof CatalogoRoute
   GraciasRoute: typeof GraciasRoute
+  AdminConfiguracionRoute: typeof AdminConfiguracionRoute
   AdminOrdenesRoute: typeof AdminOrdenesRoute
   AdminProductosRoute: typeof AdminProductosRoute
   ComboIndexRoute: typeof ComboIndexRoute
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GraciasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/configuracion': {
+      id: '/admin/configuracion'
+      path: '/admin/configuracion'
+      fullPath: '/admin/configuracion'
+      preLoaderRoute: typeof AdminConfiguracionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/ordenes': {
       id: '/admin/ordenes'
       path: '/admin/ordenes'
@@ -221,6 +241,7 @@ const rootRouteChildren: RootRouteChildren = {
   CarritoRoute: CarritoRoute,
   CatalogoRoute: CatalogoRoute,
   GraciasRoute: GraciasRoute,
+  AdminConfiguracionRoute: AdminConfiguracionRoute,
   AdminOrdenesRoute: AdminOrdenesRoute,
   AdminProductosRoute: AdminProductosRoute,
   ComboIndexRoute: ComboIndexRoute,

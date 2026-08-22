@@ -767,6 +767,12 @@ function AdminProductosPage() {
             >
               Ver órdenes
             </Link>
+            <Link
+              to="/admin/configuracion"
+              className="btn-base bg-muted text-foreground hover:bg-muted/70 text-sm"
+            >
+              Configuración
+            </Link>
             <button
               onClick={() => setModal(emptyProduct())}
               className="btn-base bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2"

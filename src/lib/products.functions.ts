@@ -6,6 +6,13 @@ const str = (v: unknown, max = 2000) => String(v ?? "").slice(0, max);
 
 /* ─── Tipos de entrada ─────────────────────────────────── */
 
+export type CategoryRuleInput = {
+  category: string;
+  discountTiers: { units: number; percent: number }[];
+  minType: "none" | "units" | "amount";
+  minValue: number;
+};
+
 export type VariantInput = {
   id?: string; // presente si ya existe en la DB
   color: string;
@@ -300,5 +307,57 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
     } catch (err) {
       console.error("Error al subir imagen:", err);
       return { error: err instanceof Error ? err.message : "Error al subir la imagen." };
+    }
+  });
+
+/* ─── Guardar reglas de categoría en site_config ─────────── */
+
+export const upsertCategoryRules = createServerFn({ method: "POST" })
+  .validator(
+    (data: { email?: string; token?: string; rules: CategoryRuleInput[] }) => ({
+      email: str(data?.email, 160).toLowerCase(),
+      token: str(data?.token, 2000),
+      rules: data.rules,
+    }),
+  )
+  .handler(async ({ data }): Promise<{ error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+
+      // Borra todas las reglas de categoría existentes
+      const { error: delErr } = await supabaseAdmin
+        .from("site_config")
+        .delete()
+        .like("clave", "cat_%");
+      if (delErr) throw delErr;
+
+      // Construye filas nuevas
+      const rows: { clave: string; valor: string }[] = [];
+      for (const rule of data.rules) {
+        const cat = rule.category.trim().toLowerCase().normalize("NFC");
+        if (!cat) continue;
+        const validTiers = rule.discountTiers
+          .filter((t) => t.units > 0 && t.percent > 0)
+          .sort((a, b) => a.units - b.units);
+        if (validTiers.length > 0) {
+          rows.push({ clave: `cat_discount_${cat}`, valor: JSON.stringify(validTiers) });
+        }
+        if (rule.minType === "units" && rule.minValue > 0) {
+          rows.push({ clave: `cat_min_units_${cat}`, valor: String(rule.minValue) });
+        }
+        if (rule.minType === "amount" && rule.minValue > 0) {
+          rows.push({ clave: `cat_min_amount_${cat}`, valor: String(rule.minValue) });
+        }
+      }
+
+      if (rows.length > 0) {
+        const { error: insErr } = await supabaseAdmin.from("site_config").insert(rows);
+        if (insErr) throw insErr;
+      }
+
+      return {};
+    } catch (err) {
+      console.error("Error in upsertCategoryRules:", err);
+      return { error: err instanceof Error ? err.message : "Error al guardar reglas." };
     }
   });

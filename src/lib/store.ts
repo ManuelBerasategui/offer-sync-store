@@ -178,7 +178,7 @@ export function unitPriceFor(p: Product, qty: number, basePrice = priceOf(p)) {
   return base * (1 - discountFor(p, qty) / 100);
 }
 
-/* ---------- Suplementos: compra mínima ---------- */
+/* ---------- Suplementos: compra mínima (legado) ---------- */
 
 export const SUPLEMENTOS_MIN = 250000;
 
@@ -190,4 +190,92 @@ export function isSuplemento(categoria?: string) {
   return String(categoria ?? "")
     .toLowerCase()
     .includes("suplemento");
+}
+
+/* ---------- Reglas de categoría (descuentos y mínimos dinámicos) ---------- */
+
+export type CategoryTier = { units: number; percent: number };
+
+export type CategoryRule = {
+  discountTiers: CategoryTier[];
+  minUnits?: number;
+  minAmount?: number;
+};
+
+/** Normaliza el nombre de una categoría para usarla como clave */
+export const normCat = (s: string) =>
+  String(s ?? "").trim().toLowerCase().normalize("NFC");
+
+/** Lee las reglas por categoría desde site_config */
+export function parseCategoryRules(config: SiteConfig): Record<string, CategoryRule> {
+  const rules: Record<string, CategoryRule> = {};
+  const getOrCreate = (cat: string): CategoryRule => {
+    if (!rules[cat]) rules[cat] = { discountTiers: [] };
+    return rules[cat];
+  };
+  for (const [key, val] of Object.entries(config)) {
+    const dm = key.match(/^cat_discount_(.+)$/i);
+    const um = key.match(/^cat_min_units_(.+)$/i);
+    const am = key.match(/^cat_min_amount_(.+)$/i);
+    if (dm) {
+      const rule = getOrCreate(normCat(dm[1]!));
+      try { rule.discountTiers = JSON.parse(val); } catch { /* ignore */ }
+    } else if (um) {
+      const rule = getOrCreate(normCat(um[1]!));
+      const n = Number(val); if (n > 0) rule.minUnits = n;
+    } else if (am) {
+      const rule = getOrCreate(normCat(am[1]!));
+      const n = Number(val); if (n > 0) rule.minAmount = n;
+    }
+  }
+  return rules;
+}
+
+/** % de descuento de categoría dado el total de unidades en carrito */
+export function categoryDiscountForUnits(tiers: CategoryTier[], totalUnits: number): number {
+  let percent = 0;
+  for (const tier of tiers ?? []) {
+    if (totalUnits >= tier.units) percent = tier.percent;
+  }
+  return percent;
+}
+
+export type CategoryMinViolation = {
+  category: string;   // nombre original para mostrar
+  type: "units" | "amount";
+  min: number;
+  current: number;
+};
+
+/** Retorna las violaciones de mínimos de compra para el carrito actual */
+export function checkCategoryMins(
+  items: { categoria?: string; qty: number; unitPrice: number }[],
+  rules: Record<string, CategoryRule>,
+): CategoryMinViolation[] {
+  const catUnits: Record<string, number> = {};
+  const catAmount: Record<string, number> = {};
+  const catDisplay: Record<string, string> = {};
+
+  for (const item of items) {
+    const raw = (item.categoria ?? "").trim();
+    if (!raw) continue;
+    const key = normCat(raw);
+    catUnits[key] = (catUnits[key] ?? 0) + item.qty;
+    catAmount[key] = (catAmount[key] ?? 0) + item.qty * item.unitPrice;
+    if (!catDisplay[key]) catDisplay[key] = raw;
+  }
+
+  const violations: CategoryMinViolation[] = [];
+  for (const [cat, rule] of Object.entries(rules)) {
+    const units = catUnits[cat] ?? 0;
+    if (units === 0) continue; // categoría no está en el carrito
+    if (rule.minUnits && units < rule.minUnits) {
+      violations.push({ category: catDisplay[cat] ?? cat, type: "units", min: rule.minUnits, current: units });
+    }
+    const amount = catAmount[cat] ?? 0;
+    if (rule.minAmount && amount < rule.minAmount) {
+      violations.push({ category: catDisplay[cat] ?? cat, type: "amount", min: rule.minAmount, current: amount });
+    }
+  }
+  return violations;
 }

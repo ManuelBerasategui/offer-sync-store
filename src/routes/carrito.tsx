@@ -9,13 +9,14 @@ import { useCart } from "@/lib/cart";
 import {
   FALLBACK_IMAGE,
   SUPLEMENTOS_MIN,
-  SUPLEMENTOS_MSG,
-  discountFor,
-  findProduct,
   isSuplemento,
   money,
   priceOf,
   waLink,
+  parseCategoryRules,
+  checkCategoryMins,
+  normCat,
+  findProduct,
 } from "@/lib/store";
 
 export const Route = createFileRoute("/carrito")({
@@ -43,9 +44,36 @@ function CarritoPage() {
 
   const items = cart.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice }));
 
-  const suplementosTotal = cart.items
-    .filter((i) => isSuplemento(i.categoria))
-    .reduce((a, i) => a + i.qty * i.unitPrice, 0);
+  // Mínimos dinámicos por categoría
+  const catRules = parseCategoryRules(config);
+  const dynamicViolations = checkCategoryMins(
+    cart.items.map((i): { categoria?: string; qty: number; unitPrice: number } => ({
+      ...(i.categoria !== undefined ? { categoria: i.categoria } : {}),
+      qty: i.qty,
+      unitPrice: i.unitPrice,
+    })),
+    catRules,
+  );
+
+  // Fallback: chequeo hardcodeado de suplementos si no hay regla dinámica configurada
+  const hasSupDynRule = !!catRules[normCat("Suplementos")]?.minAmount;
+  const legacyViolations = !hasSupDynRule
+    ? cart.items
+        .filter((i) => isSuplemento(i.categoria))
+        .reduce((a, i) => a + i.qty * i.unitPrice, 0)
+    : 0;
+  const hasLegacyViolation = !hasSupDynRule && legacyViolations > 0 && legacyViolations < SUPLEMENTOS_MIN;
+
+  const minViolations = [...dynamicViolations];
+  if (hasLegacyViolation) {
+    minViolations.push({
+      category: "Suplementos",
+      type: "amount",
+      min: SUPLEMENTOS_MIN,
+      current: legacyViolations,
+    });
+  }
+  const hasViolations = minViolations.length > 0;
 
   return (
     <div className="min-h-screen">
@@ -66,8 +94,12 @@ function CarritoPage() {
             <ul className="mt-6 flex flex-col gap-3">
               {cart.items.map((i) => {
                 const product = findProduct(products, i.productId || i.id || i.nombre);
-                const percent = product ? discountFor(product, i.qty) : 0;
                 const basePrice = i.basePrice ?? (product ? priceOf(product) : i.unitPrice);
+                // Muestra el descuento real según precio base vs precio de línea (funciona con descuentos de categoría también)
+                const percent =
+                  basePrice > 0 && i.unitPrice < basePrice
+                    ? Math.round((1 - i.unitPrice / basePrice) * 100)
+                    : 0;
 
                 const targetId = String(i.productId || i.id || i.nombre || "");
 
@@ -173,18 +205,28 @@ function CarritoPage() {
             </div>
 
             <div className="mt-4">
-              {suplementosTotal > 0 && suplementosTotal < SUPLEMENTOS_MIN ? (
-                <div className="card-soft p-5">
-                  <p className="text-sm font-semibold text-foreground">{SUPLEMENTOS_MSG}</p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Llevás {money(suplementosTotal)} en suplementos.
-                  </p>
-                  <Link
-                    to="/catalogo"
-                    className="btn-base grad-urgente mt-4 text-primary-foreground"
-                  >
-                    Seguir comprando
-                  </Link>
+              {hasViolations ? (
+                <div className="space-y-4">
+                  {minViolations.map((v, idx) => (
+                    <div key={idx} className="card-soft border border-amber-500/30 bg-amber-500/5 p-5">
+                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                        ⚠️ {v.type === "amount"
+                          ? `El pedido mínimo en ${v.category} es de ${money(v.min)}`
+                          : `El pedido mínimo en ${v.category} es de ${v.min} unidad${v.min !== 1 ? "es" : ""}`}
+                      </p>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        {v.type === "amount"
+                          ? `Llevas ${money(v.current)} en ${v.category}. Necesitás agregar ${money(v.min - v.current)} más.`
+                          : `Llevas ${v.current} unidad${v.current !== 1 ? "es" : ""} de ${v.category}. Necesitás agregar ${v.min - v.current} más.`}
+                      </p>
+                      <Link
+                        to="/catalogo"
+                        className="btn-base grad-urgente mt-4 text-primary-foreground"
+                      >
+                        Seguir comprando
+                      </Link>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <CheckoutFlow items={items} total={cart.total} />

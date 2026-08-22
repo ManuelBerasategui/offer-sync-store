@@ -9,7 +9,8 @@ import { HowItWorks, ReviewsCarousel } from "@/components/Social";
 import { storeQueryOptions } from "@/lib/store-query";
 import {
   FALLBACK_IMAGE, imageUrl,
-  onImageError, isYes, money, toNumber, waLink, type SiteConfig
+  onImageError, isYes, money, toNumber, waLink, type SiteConfig,
+  parseCategoryRules, normCat,
 } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
@@ -171,6 +172,70 @@ function Home() {
           </div>
         </div>
       </section>
+
+      {/* MÍNIMOS DE COMPRA */}
+      {(() => {
+        const catRules = parseCategoryRules(config);
+        const rulesWithMin = Object.entries(catRules)
+          .filter(([, r]) => r.minUnits || r.minAmount)
+          .map(([key, r]) => ({ key, rule: r }));
+
+        // Fallback hardcodeado de suplementos si no está en config
+        const hasSupRule = catRules[normCat("Suplementos")]?.minAmount;
+        const items: { label: string; desc: string; icon: string }[] = [];
+
+        for (const { key, rule } of rulesWithMin) {
+          const displayName = key.charAt(0).toUpperCase() + key.slice(1);
+          if (rule.minUnits) {
+            items.push({
+              label: displayName,
+              desc: `Mínimo ${rule.minUnits} unidades`,
+              icon: "📦",
+            });
+          } else if (rule.minAmount) {
+            items.push({
+              label: displayName,
+              desc: `Mínimo ${money(rule.minAmount)}`,
+              icon: "💰",
+            });
+          }
+        }
+
+        if (!hasSupRule) {
+          items.push({ label: "Suplementos", desc: "Mínimo $250.000", icon: "💰" });
+        }
+
+        if (items.length === 0) return null;
+
+        return (
+          <section className="px-4 py-10 sm:px-6">
+            <div className="mx-auto max-w-[1180px]">
+              <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/5 via-amber-500/[0.03] to-transparent p-5 sm:p-7">
+                <div className="flex items-start gap-3 mb-4">
+                  <span className="text-2xl">ℹ️</span>
+                  <div>
+                    <h2 className="font-sans text-base font-bold tracking-tight">Mínimos de compra por categoría</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Para ciertas categorías aplicamos un mínimo de compra. Podés combinar productos de la misma categoría para llegar al mínimo.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {items.map((it) => (
+                    <div key={it.label} className="flex items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-2.5">
+                      <span className="text-lg shrink-0">{it.icon}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold truncate">{it.label}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{it.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* NOSOTROS */}
       <section id="nosotros" className="relative overflow-hidden border-y border-border px-4 py-16 text-center sm:px-6">

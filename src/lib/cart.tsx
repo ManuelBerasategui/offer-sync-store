@@ -5,7 +5,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { storeQueryOptions } from "./store-query";
-import { findProduct, unitPriceFor } from "./store";
+import {
+  findProduct,
+  unitPriceFor,
+  priceOf,
+  parseCategoryRules,
+  categoryDiscountForUnits,
+  normCat,
+} from "./store";
 
 export type CartItem = {
   id: string;
@@ -120,15 +127,40 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const resolvedItems = useMemo(() => {
     const products = data?.products;
+    const config = data?.config ?? {};
     if (!products || products.length === 0) return items;
+
+    const catRules = parseCategoryRules(config);
+
+    // Total de unidades por categoría en el carrito (para descuento de categoría)
+    const catTotals: Record<string, number> = {};
+    for (const item of items) {
+      const key = normCat(item.categoria ?? "");
+      if (key) catTotals[key] = (catTotals[key] ?? 0) + item.qty;
+    }
 
     return items.map((item) => {
       const product = findProduct(products, item.productId || item.id || item.nombre);
       if (!product) return item;
-      const unitPrice = Math.round(unitPriceFor(product, item.qty, item.basePrice));
+
+      const catNorm = normCat(item.categoria ?? "");
+      const catRule = catNorm ? catRules[catNorm] : undefined;
+
+      let unitPrice: number;
+      if (catRule?.discountTiers?.length) {
+        // Descuento de categoría: reemplaza al individual del producto
+        const totalCatUnits = catTotals[catNorm] ?? 0;
+        const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
+        const base = item.basePrice ?? priceOf(product);
+        unitPrice = Math.round(base * (1 - percent / 100));
+      } else {
+        // Fallback: descuento individual por cantidad del producto
+        unitPrice = Math.round(unitPriceFor(product, item.qty, item.basePrice));
+      }
+
       return unitPrice === item.unitPrice ? item : { ...item, unitPrice };
     });
-  }, [items, data?.products]);
+  }, [items, data?.products, data?.config]);
 
   const add = useCallback((item: CartItem) => {
     setItems((prev) => {
