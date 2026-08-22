@@ -137,13 +137,6 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
       if (!token) return { status: "error", message: "Falta configurar MercadoPago." };
       if (!data.items.length) return { status: "error", message: "El carrito está vacío." };
 
-      const total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-      const orderCode = makeCode();
-      const identification =
-        data.docType && data.docNumber
-          ? { type: data.docType, number: data.docNumber }
-          : { type: "DNI", number: data.shipping.dni };
-
       if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
         console.error("Supabase no está configurado para crear la orden pendiente.");
         return {
@@ -152,13 +145,108 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
         };
       }
 
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      // Re-validar precios y mínimos en el servidor
+      let items = data.items;
+      let total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+
       try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const [{ data: dbProducts }, { data: dbConfigRows }] = await Promise.all([
+          (supabaseAdmin as any).from("products").select("*"),
+          (supabaseAdmin as any).from("site_config").select("*"),
+        ]);
+
+        if (dbProducts && dbProducts.length > 0) {
+          const {
+            findProduct,
+            priceOf,
+            unitPriceFor,
+            parseCategoryRules,
+            categoryDiscountForUnits,
+            findRuleForCat,
+            normCat,
+            checkCategoryMins,
+          } = await import("./store");
+
+          const configObj: Record<string, string> = {};
+          if (Array.isArray(dbConfigRows)) {
+            for (const row of (dbConfigRows as any[])) {
+              if (row.clave && row.valor !== undefined) configObj[row.clave] = String(row.valor);
+            }
+          }
+
+          const catRules = parseCategoryRules(configObj);
+          const catTotals: Record<string, number> = {};
+          const itemsWithCat: { categoria?: string; qty: number; unitPrice: number }[] = [];
+
+          for (const item of data.items) {
+            const prod = findProduct(dbProducts as any, item.nombre);
+            const cat = prod?.categoria ?? "";
+            const catNorm = normCat(cat);
+            if (catNorm) {
+              const match = findRuleForCat(catNorm, catRules);
+              const key = match?.key ?? catNorm;
+              catTotals[key] = (catTotals[key] ?? 0) + item.qty;
+            }
+            const baseP = prod ? priceOf(prod) : item.unitPrice;
+            itemsWithCat.push({ categoria: cat, qty: item.qty, unitPrice: baseP });
+          }
+
+          const violations = checkCategoryMins(itemsWithCat, catRules);
+          if (violations.length > 0) {
+            const v = violations[0]!;
+            const msg =
+              v.type === "amount"
+                ? `No se cumple el mínimo de compra para ${v.category} ($${v.min.toLocaleString("es-AR")}).`
+                : `No se cumple el mínimo de compra para ${v.category} (${v.min} unidades).`;
+            return { status: "error", message: msg };
+          }
+
+          items = data.items.map((item) => {
+            const prod = findProduct(dbProducts as any, item.nombre);
+            if (!prod) return item;
+
+            const catNorm = normCat(prod.categoria ?? "");
+            const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
+            const catRule = match?.rule;
+            const ruleKey = match?.key;
+
+            let unitPrice: number;
+            if (catRule?.discountTiers?.length && ruleKey) {
+              const totalCatUnits = catTotals[ruleKey] ?? 0;
+              const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
+              const base = priceOf(prod);
+              unitPrice = Math.round(base * (1 - percent / 100));
+            } else {
+              unitPrice = Math.round(unitPriceFor(prod, item.qty));
+            }
+
+            return {
+              nombre: item.nombre,
+              qty: item.qty,
+              unitPrice: unitPrice > 0 ? unitPrice : item.unitPrice,
+            };
+          });
+
+          total = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+        }
+      } catch (err) {
+        console.error("Error revalidando items en tarjeta:", err);
+      }
+
+      const orderCode = makeCode();
+      const identification =
+        data.docType && data.docNumber
+          ? { type: data.docType, number: data.docNumber }
+          : { type: "DNI", number: data.shipping.dni };
+
+      try {
         const { error } = await supabaseAdmin.from("orders").insert({
           order_code: orderCode,
           user_id: data.userId ?? null,
           ...data.shipping,
-          items: data.items,
+          items,
           total,
           estado: "pendiente",
           metodo_pago: "tarjeta",
@@ -229,7 +317,6 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
         };
       }
 
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { error: updateError } = await supabaseAdmin
         .from("orders")
         .update({ estado: "pagado" })
@@ -344,9 +431,9 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       if (mpStatus === "pending" || mpStatus === "in_process" || mpStatus === "authorized") {
         console.log(`Pago aún pendiente, estado de Mercado Pago: ${mpStatus}`);
         return {
-          orderCode: order?.order_code,
+          ...(order?.order_code ? { orderCode: order.order_code } : {}),
           estado: "pendiente",
-          total: order ? Number(order.total) : undefined,
+          ...(order?.total ? { total: Number(order.total) } : {}),
         };
       }
 

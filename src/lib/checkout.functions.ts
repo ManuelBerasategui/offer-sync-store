@@ -1,4 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
+import {
+  findProduct,
+  priceOf,
+  unitPriceFor,
+  parseCategoryRules,
+  categoryDiscountForUnits,
+  findRuleForCat,
+  normCat,
+  checkCategoryMins,
+} from "./store";
 
 type CheckoutItem = { nombre: string; qty: number; unitPrice: number };
 
@@ -13,6 +23,95 @@ type ShippingInput = {
   transporte: string;
   sucursal_correo: string;
 };
+
+async function revalidateOrderItems(
+  supabaseAdmin: any,
+  rawItems: CheckoutItem[],
+): Promise<{
+  validatedItems: CheckoutItem[];
+  total: number;
+  error?: string;
+}> {
+  try {
+    const [{ data: dbProducts }, { data: dbConfigRows }] = await Promise.all([
+      supabaseAdmin.from("products").select("*"),
+      supabaseAdmin.from("site_config").select("*"),
+    ]);
+
+    if (!dbProducts || dbProducts.length === 0) {
+      const total = rawItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+      return { validatedItems: rawItems, total };
+    }
+
+    const configObj: Record<string, string> = {};
+    if (Array.isArray(dbConfigRows)) {
+      for (const row of dbConfigRows) {
+        if (row.clave && row.valor !== undefined) configObj[row.clave] = String(row.valor);
+      }
+    }
+
+    const catRules = parseCategoryRules(configObj);
+
+    const catTotals: Record<string, number> = {};
+    const itemsWithCat: { categoria?: string; qty: number; unitPrice: number }[] = [];
+
+    for (const item of rawItems) {
+      const prod = findProduct(dbProducts, item.nombre);
+      const cat = prod?.categoria ?? "";
+      const catNorm = normCat(cat);
+      if (catNorm) {
+        const match = findRuleForCat(catNorm, catRules);
+        const key = match?.key ?? catNorm;
+        catTotals[key] = (catTotals[key] ?? 0) + item.qty;
+      }
+      const baseP = prod ? priceOf(prod) : item.unitPrice;
+      itemsWithCat.push({ categoria: cat, qty: item.qty, unitPrice: baseP });
+    }
+
+    const violations = checkCategoryMins(itemsWithCat, catRules);
+    if (violations.length > 0) {
+      const v = violations[0]!;
+      const msg =
+        v.type === "amount"
+          ? `No se cumple el mínimo de compra para ${v.category} ($${v.min.toLocaleString("es-AR")}).`
+          : `No se cumple el mínimo de compra para ${v.category} (${v.min} unidades).`;
+      return { validatedItems: [], total: 0, error: msg };
+    }
+
+    const validatedItems: CheckoutItem[] = rawItems.map((item) => {
+      const prod = findProduct(dbProducts, item.nombre);
+      if (!prod) return item;
+
+      const catNorm = normCat(prod.categoria ?? "");
+      const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
+      const catRule = match?.rule;
+      const ruleKey = match?.key;
+
+      let unitPrice: number;
+      if (catRule?.discountTiers?.length && ruleKey) {
+        const totalCatUnits = catTotals[ruleKey] ?? 0;
+        const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
+        const base = priceOf(prod);
+        unitPrice = Math.round(base * (1 - percent / 100));
+      } else {
+        unitPrice = Math.round(unitPriceFor(prod, item.qty));
+      }
+
+      return {
+        nombre: item.nombre,
+        qty: item.qty,
+        unitPrice: unitPrice > 0 ? unitPrice : item.unitPrice,
+      };
+    });
+
+    const total = validatedItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+    return { validatedItems, total };
+  } catch (err) {
+    console.error("Error al revalidar items en el servidor:", err);
+    const total = rawItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+    return { validatedItems: rawItems, total };
+  }
+}
 
 /**
  * Crea la preferencia de pago en Mercado Pago Y guarda la orden en Supabase
@@ -61,20 +160,31 @@ export const createCheckout = createServerFn({ method: "POST" })
       };
     }
 
+    if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+      console.error("Supabase no está configurado para crear la orden pendiente.");
+      return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
+    }
+
+    let items = data.items;
+    let total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const validation = await revalidateOrderItems(supabaseAdmin, data.items);
+      if (validation.error) {
+        return { error: validation.error };
+      }
+      items = validation.validatedItems;
+      total = validation.total;
+    } catch (err) {
+      console.error("Error al revalidar la orden:", err);
+    }
+
     // Generamos el código de orden
     const d = new Date();
     const stamp = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
     const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
     const orderCode = `TI-${stamp}-${rand}`;
-
-    const total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-
-    // La orden debe existir antes de abrir Mercado Pago. No continuamos si no se
-    // pudo registrar: de ese modo no quedan cobros sin pedido asociado.
-    if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
-      console.error("Supabase no está configurado para crear la orden pendiente.");
-      return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
-    }
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -82,7 +192,7 @@ export const createCheckout = createServerFn({ method: "POST" })
         order_code: orderCode,
         user_id: data.userId ?? null,
         ...data.shipping,
-        items: data.items,
+        items,
         total,
         estado: "pendiente",
         metodo_pago: "mercadopago",
@@ -106,7 +216,7 @@ export const createCheckout = createServerFn({ method: "POST" })
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        items: data.items.map((i) => ({
+        items: items.map((i) => ({
           title: i.nombre,
           quantity: i.qty,
           unit_price: i.unitPrice,
