@@ -55,6 +55,7 @@ function AdminConfiguracionPage() {
   const [rules, setRules] = useState<Record<string, CatRuleForm>>({});
   const [dolarRate, setDolarRate] = useState<string>(config["dolar_cotizacion"] ?? "1500");
   const [liveUsdt, setLiveUsdt] = useState<number | null>(null);
+  const [dbDolarRate, setDbDolarRate] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("https://dolarapi.com/v1/dolares/cripto")
@@ -82,6 +83,19 @@ function AdminConfiguracionPage() {
         return;
       }
       setIsAuthorized(true);
+
+      // Calcular la cotización implícita promedio usada actualmente en los productos de la DB
+      const prodsWithBoth = res.products.filter((p) => {
+        const ars = Number(p.precio) || 0;
+        const usd = Number((p as any).precio_usd) || 0;
+        return ars > 0 && usd > 0;
+      });
+
+      if (prodsWithBoth.length > 0) {
+        const rates = prodsWithBoth.map((p) => Number(p.precio) / Number((p as any).precio_usd));
+        const avg = Math.round(rates.reduce((a, b) => a + b, 0) / rates.length);
+        setDbDolarRate(avg);
+      }
 
       const existing = parseCategoryRules(config);
       const rawCats = res.products.map((p) => (p.categoria ?? "").trim()).filter(Boolean);
@@ -226,18 +240,25 @@ function AdminConfiguracionPage() {
 
         {/* Cotización Dólar para valor inicial */}
         <div className="mb-6 rounded-2xl border border-border bg-card p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h2 className="text-base font-bold flex items-center gap-2">
-              💵 Cotización del Dólar (Cálculo inicial)
+              💵 Cotización del Dólar
             </h2>
-            {liveUsdt !== null && (
-              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600 border border-emerald-500/20">
-                ⚡ Dólar Cripto / USDT Binance en vivo: {money(liveUsdt)}
-              </span>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {dbDolarRate !== null && (
+                <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  🗄️ Cotización activa en Base de Datos: {money(dbDolarRate)}
+                </span>
+              )}
+              {liveUsdt !== null && (
+                <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  ⚡ Dólar Cripto / USDT Binance en vivo: {money(liveUsdt)}
+                </span>
+              )}
+            </div>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            Al guardar un producto en dólares con precio ARS vacío, se consulta automáticamente la cotización USDT de Binance en tiempo real ({liveUsdt ? money(liveUsdt) : "en vivo"}) para la carga inicial. Si la API estuviese fuera de línea, se usará el valor de resguardo ingresado debajo.
+            Al guardar un producto en dólares con precio ARS vacío, se usa automáticamente la cotización USDT Binance ({liveUsdt ? money(liveUsdt) : "en vivo"}) para la carga inicial hasta que tu sincronizador actualice la Base de Datos ({dbDolarRate ? money(dbDolarRate) : "cotización activa"}).
           </p>
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-muted-foreground">$</span>

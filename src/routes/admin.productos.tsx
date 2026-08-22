@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp, PackagePlus,
 } from "lucide-react";
@@ -736,6 +736,17 @@ function AdminProductosPage() {
     );
   });
 
+  const dbDolarRate = useMemo(() => {
+    const prodsWithBoth = products.filter((p) => {
+      const ars = Number(p.precio) || 0;
+      const usd = Number((p as any).precio_usd) || 0;
+      return ars > 0 && usd > 0;
+    });
+    if (prodsWithBoth.length === 0) return null;
+    const rates = prodsWithBoth.map((p) => Number(p.precio) / Number((p as any).precio_usd));
+    return Math.round(rates.reduce((a, b) => a + b, 0) / rates.length);
+  }, [products]);
+
   if (authLoading || !user || isAuthorized === false) return null;
 
   if (isAuthorized === null) {
@@ -750,7 +761,6 @@ function AdminProductosPage() {
     <div className="min-h-screen bg-background">
       <SiteHeader config={config} />
 
-
       <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -761,6 +771,11 @@ function AdminProductosPage() {
             <h1 className="mt-2 text-2xl font-bold">Gestión de Productos</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {dbDolarRate !== null && (
+              <span className="rounded-full bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                🗄️ Dólar DB: {money(dbDolarRate)}
+              </span>
+            )}
             <Link
               to="/admin/ordenes"
               className="btn-base bg-muted text-foreground hover:bg-muted/70 text-sm"
