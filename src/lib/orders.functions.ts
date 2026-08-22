@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-export type OrderItem = { nombre: string; qty: number; unitPrice: number };
+export type OrderItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
 
 export type ShippingInput = {
   nombre: string;
@@ -46,6 +46,7 @@ function cleanItems(items: OrderItem[]): OrderItem[] {
     nombre: text(i.nombre),
     qty: Math.max(1, Math.min(9999, Math.round(Number(i.qty) || 1))),
     unitPrice: Math.max(1, Math.round(Number(i.unitPrice) || 0)),
+    ...(i.productId ? { productId: text(i.productId, 100) } : {}),
   }));
 }
 

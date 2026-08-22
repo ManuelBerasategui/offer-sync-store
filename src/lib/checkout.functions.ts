@@ -10,7 +10,7 @@ import {
   checkCategoryMins,
 } from "./store";
 
-type CheckoutItem = { nombre: string; qty: number; unitPrice: number };
+type CheckoutItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
 
 type ShippingInput = {
   nombre: string;
@@ -101,6 +101,7 @@ async function revalidateOrderItems(
         nombre: item.nombre,
         qty: item.qty,
         unitPrice: unitPrice > 0 ? unitPrice : item.unitPrice,
+        ...(item.productId ? { productId: item.productId } : {}),
       };
     });
 

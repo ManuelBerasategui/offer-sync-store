@@ -15,7 +15,7 @@ import { createCheckout } from "@/lib/checkout.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { money } from "@/lib/store";
 
-type CheckoutItem = { nombre: string; qty: number; unitPrice: number };
+type CheckoutItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
 
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
