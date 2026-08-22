@@ -42,7 +42,8 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
           })
           .map((v) => {
             const vObj = v as { id?: unknown; product_id?: unknown; color?: unknown; precio?: unknown; stock?: unknown; imagen_url?: unknown };
-            const colorKey = `talles_color_${String(vObj.color ?? '').toLowerCase().replace(/\s+/g, '_')}`;
+            const colorClean = String(vObj.color ?? '').trim();
+            const colorKey = `talles_color_${colorClean.toLowerCase().normalize("NFC").replace(/\s+/g, '_')}`;
             const rawTalles = meta[colorKey];
             const talles_disponibles: string[] = Array.isArray(rawTalles)
               ? (rawTalles as string[])

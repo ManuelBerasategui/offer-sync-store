@@ -99,7 +99,8 @@ export const getAdminProducts = createServerFn({ method: "POST" })
         const { metadata, ...rest } = p;
         const linkedVariants = variantsByProduct.get(String(p.id ?? "")) ?? [];
         const variants = linkedVariants.map((v) => {
-          const colorKey = `talles_color_${v.color.toLowerCase().replace(/\s+/g, "_")}`;
+          const colorClean = String(v.color ?? "").trim();
+          const colorKey = `talles_color_${colorClean.toLowerCase().normalize("NFC").replace(/\s+/g, "_")}`;
           const rawTalles = meta[colorKey];
           const talles_disponibles: string[] = Array.isArray(rawTalles)
             ? (rawTalles as string[])
@@ -148,9 +149,10 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
 
       if (p.variants) {
         for (const v of p.variants) {
-          if (v.talles_disponibles && v.talles_disponibles.length > 0) {
-            const key = `talles_color_${v.color.toLowerCase().replace(/\s+/g, "_")}`;
-            metadata[key] = v.talles_disponibles.join(",");
+          const colorClean = String(v.color ?? "").trim();
+          if (colorClean && v.talles_disponibles && v.talles_disponibles.length > 0) {
+            const key = `talles_color_${colorClean.toLowerCase().normalize("NFC").replace(/\s+/g, "_")}`;
+            metadata[key] = v.talles_disponibles.map((t) => String(t).trim()).filter(Boolean).join(",");
           }
         }
       }
@@ -214,7 +216,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
           const variantRows = p.variants.map((v) => ({
             id: crypto.randomUUID(),
             product_id: productId,
-            color: v.color,
+            color: String(v.color ?? "").trim(),
             precio: parsePrice(v.precio),
             stock: v.stock ?? "SI",
             imagen_url: v.imagen_url ?? null,

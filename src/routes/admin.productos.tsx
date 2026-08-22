@@ -503,16 +503,16 @@ function ProductModal({
                     ? ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"]
                     : ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
                   ).map((talle) => {
-                    const active = (form.talles_disponibles ?? []).includes(talle);
+                    const normalizedCurrent = (form.talles_disponibles ?? []).map((t) => String(t).trim());
+                    const active = normalizedCurrent.includes(talle);
                     return (
                       <button
                         key={talle}
                         type="button"
                         onClick={() => {
-                          const current = form.talles_disponibles ?? [];
                           const next = active
-                            ? current.filter((t) => t !== talle)
-                            : [...current, talle];
+                            ? normalizedCurrent.filter((t) => t !== talle)
+                            : [...normalizedCurrent, talle];
                           set("talles_disponibles", next);
                         }}
                         className={`h-9 min-w-10 rounded-lg px-2.5 text-xs font-bold transition-all border ${
@@ -569,16 +569,16 @@ function ProductModal({
                           ? ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"]
                           : ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
                         ).map((talle) => {
-                          const active = (v.talles_disponibles ?? []).includes(talle);
+                          const normalizedCurrent = (v.talles_disponibles ?? []).map((t) => String(t).trim());
+                          const active = normalizedCurrent.includes(talle);
                           return (
                             <button
                               key={talle}
                               type="button"
                               onClick={() => {
-                                const current = v.talles_disponibles ?? [];
                                 const next = active
-                                  ? current.filter((t) => t !== talle)
-                                  : [...current, talle];
+                                  ? normalizedCurrent.filter((t) => t !== talle)
+                                  : [...normalizedCurrent, talle];
                                 updateVariant(i, "talles_disponibles", next);
                               }}
                               className={`h-7 min-w-8 rounded-md px-1.5 text-[10px] font-bold transition-all border ${
