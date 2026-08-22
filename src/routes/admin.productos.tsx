@@ -16,10 +16,14 @@ import {
   upsertAdminProduct,
   deleteAdminProduct,
   uploadAdminProductImage,
+  getAdminBanners,
+  upsertAdminBanner,
+  deleteAdminBanner,
   type ProductInput,
   type VariantInput,
+  type BannerInput,
 } from "@/lib/products.functions";
-import type { Product } from "@/lib/store";
+import type { Product, Banner } from "@/lib/store";
 import { money, toNumber, FALLBACK_IMAGE } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/productos")({
@@ -962,6 +966,481 @@ function CandidateOfferCard({
   );
 }
 
+/* ───────────────────────────────────────────────────────── */
+/*  Armador / Creador de Combos y Packs Surtidos (10x + 1x)   */
+/* ───────────────────────────────────────────────────────── */
+
+type ComboItemInput = {
+  product: Product;
+  qty: number;
+};
+
+function ComboBuilderPanel({
+  products,
+  userEmail,
+  userToken,
+  onRefresh,
+}: {
+  products: Product[];
+  userEmail: string;
+  userToken: string;
+  onRefresh: () => Promise<void>;
+}) {
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [loadingBanners, setLoadingBanners] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [editingBanner, setEditingBanner] = useState<BannerInput | null>(null);
+
+  // Form State para el Armador
+  const [comboTitle, setComboTitle] = useState("");
+  const [comboSubtitle, setComboSubtitle] = useState("");
+  const [comboPrice, setComboPrice] = useState("");
+  const [comboImage, setComboImage] = useState("");
+  const [comboItems, setComboItems] = useState<ComboItemInput[]>([]);
+  const [searchProduct, setSearchProduct] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function loadBanners() {
+    setLoadingBanners(true);
+    try {
+      const res = await getAdminBanners({ data: { email: userEmail, token: userToken } });
+      if (res.banners) setBanners(res.banners);
+    } catch {
+      toast.error("Error al cargar los combos.");
+    } finally {
+      setLoadingBanners(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadBanners();
+  }, [userEmail, userToken]);
+
+  // Candidatos de búsqueda de productos
+  const filteredCandidates = useMemo(() => {
+    if (!searchProduct.trim()) return products.slice(0, 8);
+    const q = searchProduct.toLowerCase();
+    return products.filter(
+      (p) =>
+        String(p.nombre ?? "").toLowerCase().includes(q) ||
+        String(p.categoria ?? "").toLowerCase().includes(q)
+    );
+  }, [products, searchProduct]);
+
+  // Suma total regular de items en el combo
+  const totalRegularPrice = useMemo(() => {
+    return comboItems.reduce((acc, item) => {
+      const pPrice = toNumber(item.product.precio);
+      return acc + pPrice * item.qty;
+    }, 0);
+  }, [comboItems]);
+
+  // Auto-generar lista de subtítulo cuando cambian los items
+  useEffect(() => {
+    if (comboItems.length > 0 && !editingBanner) {
+      const lines = comboItems.map(
+        (it) => `• ${it.qty}x ${it.product.nombre}`
+      );
+      lines.push("✓ Envío gratis a todo el país");
+      lines.push("✓ Precio especial revendedor");
+      setComboSubtitle(lines.join("\n"));
+    }
+  }, [comboItems]);
+
+  const addProductToCombo = (product: Product) => {
+    setComboItems((prev) => {
+      const existing = prev.find((it) => String(it.product.id) === String(product.id));
+      if (existing) {
+        return prev.map((it) =>
+          String(it.product.id) === String(product.id) ? { ...it, qty: it.qty + 1 } : it
+        );
+      }
+      return [...prev, { product, qty: 1 }];
+    });
+
+    if (!comboImage && product.imagen_url) {
+      setComboImage(product.imagen_url);
+    }
+  };
+
+  const updateItemQty = (productId: string, qty: number) => {
+    if (qty <= 0) {
+      setComboItems((prev) => prev.filter((it) => String(it.product.id) !== productId));
+    } else {
+      setComboItems((prev) =>
+        prev.map((it) => (String(it.product.id) === productId ? { ...it, qty } : it))
+      );
+    }
+  };
+
+  const applyDiscountPreset = (pct: number) => {
+    if (totalRegularPrice > 0) {
+      const offer = Math.round(totalRegularPrice * (1 - pct / 100));
+      setComboPrice(String(offer));
+    }
+  };
+
+  function resetForm() {
+    setComboTitle("");
+    setComboSubtitle("");
+    setComboPrice("");
+    setComboImage("");
+    setComboItems([]);
+    setCreating(false);
+    setEditingBanner(null);
+  }
+
+  async function handleSaveCombo() {
+    if (!comboTitle.trim() || !comboPrice.trim()) {
+      toast.error("Ingresá un título y el precio especial para el combo.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const bannerInput: BannerInput = {
+        id: editingBanner?.id,
+        titulo: comboTitle,
+        subtitulo: comboSubtitle,
+        imagen_url: comboImage,
+        precio: comboPrice,
+        activo: "SI",
+      };
+
+      const res = await upsertAdminBanner({ data: { email: userEmail, token: userToken, banner: bannerInput } });
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(`¡Combo "${comboTitle}" guardado y publicado!`);
+        resetForm();
+        await loadBanners();
+        await onRefresh();
+      }
+    } catch {
+      toast.error("Error al guardar el combo.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteCombo(id: string, title: string) {
+    if (!confirm(`¿Eliminar el combo "${title}"?`)) return;
+    try {
+      const res = await deleteAdminBanner({ data: { email: userEmail, token: userToken, bannerId: id } });
+      if (res.error) toast.error(res.error);
+      else {
+        toast.info("Combo eliminado.");
+        await loadBanners();
+        await onRefresh();
+      }
+    } catch {
+      toast.error("Error al eliminar combo.");
+    }
+  }
+
+  const offerPriceNum = toNumber(comboPrice);
+  const savingsNum = totalRegularPrice > 0 && offerPriceNum > 0 ? totalRegularPrice - offerPriceNum : 0;
+  const savingsPct = totalRegularPrice > 0 && offerPriceNum > 0 ? Math.round((savingsNum / totalRegularPrice) * 100) : 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Header & Acción */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-muted/40 p-4 rounded-2xl border border-border">
+        <div>
+          <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" /> Armador de Combos y Packs Surtidos ({banners.length})
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Armá libremente paquetes combinados (ej: 10 Remeras + 1 Zapatilla) con un precio especial único para la tienda.
+          </p>
+        </div>
+        {!creating && (
+          <button
+            onClick={() => { resetForm(); setCreating(true); }}
+            className="btn-base bg-primary text-primary-foreground text-xs py-2 px-4 hover:opacity-90 flex items-center gap-1.5 shrink-0"
+          >
+            <Plus className="h-4 w-4" /> Armar Nuevo Combo
+          </button>
+        )}
+      </div>
+
+      {/* Formulario Armador */}
+      {creating && (
+        <div className="rounded-2xl border border-primary/30 bg-card p-5 sm:p-6 shadow-md space-y-6">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <h3 className="font-bold text-lg flex items-center gap-2 text-primary">
+              <Flame className="h-5 w-5 fill-primary" />
+              {editingBanner ? "Editar Combo en Oferta" : "Armador Interactivo de Combo"}
+            </h3>
+            <button onClick={resetForm} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Columna Izquierda: Selección de Productos */}
+            <div className="space-y-4">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+                1. Seleccioná Productos del Catálogo para Armar el Combo
+              </label>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={searchProduct}
+                  onChange={(e) => setSearchProduct(e.target.value)}
+                  placeholder="Buscar producto para sumar al combo..."
+                  className="input-base text-xs pl-9 py-2"
+                />
+              </div>
+
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                {filteredCandidates.map((p) => (
+                  <div
+                    key={String(p.id)}
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-border bg-muted/20 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={p.imagen_url || FALLBACK_IMAGE}
+                        alt={p.nombre ?? ""}
+                        className="h-10 w-10 rounded-lg object-cover border border-border shrink-0"
+                        onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-foreground truncate">{p.nombre}</p>
+                        <p className="text-[11px] text-muted-foreground">{money(p.precio)} c/u</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => addProductToCombo(p)}
+                      className="btn-base bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground text-xs py-1 px-2.5 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Agregar
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Items agregados */}
+              <div className="pt-3 border-t border-border">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                  Productos incluidos en este pack ({comboItems.length})
+                </span>
+
+                {comboItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic py-4 text-center border border-dashed rounded-xl">
+                    Hacé clic en "+ Agregar" en los productos de arriba para armar el pack (ej: 10 unidades de Remera + 1 de Zapatillas).
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {comboItems.map((it) => (
+                      <div key={String(it.product.id)} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-muted/40 border border-border">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold truncate">{it.product.nombre}</p>
+                          <p className="text-[11px] text-muted-foreground">{money(it.product.precio)} x {it.qty} = <strong>{money(toNumber(it.product.precio) * it.qty)}</strong></p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs font-semibold text-muted-foreground">Cant:</span>
+                          <input
+                            type="number"
+                            min={1}
+                            value={it.qty}
+                            onChange={(e) => updateItemQty(String(it.product.id), Number(e.target.value))}
+                            className="input-base text-xs text-center py-1 w-16 font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateItemQty(String(it.product.id), 0)}
+                            className="text-destructive hover:bg-destructive/10 p-1 rounded-md"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Columna Derecha: Configuración del Combo & Precio */}
+            <div className="space-y-4 border-t lg:border-t-0 pt-4 lg:pt-0 lg:border-l lg:pl-6 border-border">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+                2. Nombre del Pack & Precio Especial
+              </label>
+
+              <div>
+                <label className="label-sm">Nombre del Combo / Pack *</label>
+                <input
+                  type="text"
+                  value={comboTitle}
+                  onChange={(e) => setComboTitle(e.target.value)}
+                  placeholder="Ej: Pack Revendedor: 10 Remeras + 2 Zapatillas"
+                  className="input-base"
+                />
+              </div>
+
+              {totalRegularPrice > 0 && (
+                <div className="rounded-xl bg-muted/40 p-3 border border-border space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Suma de precios de lista:</span>
+                    <strong className="line-through text-muted-foreground">{money(totalRegularPrice)}</strong>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-border/60">
+                    <span className="text-xs font-semibold text-muted-foreground">Atajos de Descuento:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {[10, 15, 20, 25, 30, 40, 50].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => applyDiscountPreset(pct)}
+                          className="rounded bg-primary/10 hover:bg-primary/20 text-primary px-2 py-0.5 text-xs font-bold transition-colors"
+                        >
+                          -{pct}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="label-sm">Precio Especial Oferta Combo (ARS) *</label>
+                <input
+                  type="text"
+                  value={comboPrice}
+                  onChange={(e) => setComboPrice(e.target.value)}
+                  placeholder="Ej: 135000"
+                  className="input-base font-bold text-primary text-base"
+                />
+                {savingsNum > 0 && (
+                  <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                    <Check className="h-3.5 w-3.5" /> ¡El cliente ahorra {money(savingsNum)} ({savingsPct}% OFF)!
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="label-sm">Imagen de Portada del Combo</label>
+                <ImageDropzone
+                  value={comboImage}
+                  onChange={(url) => setComboImage(url)}
+                  bucket="storage-images"
+                  folder="combos"
+                  label="Subí una foto promocional del pack o arrastrá de un producto"
+                />
+              </div>
+
+              <div>
+                <label className="label-sm">Descripción del Pack (detalles incluidos)</label>
+                <textarea
+                  value={comboSubtitle}
+                  onChange={(e) => setComboSubtitle(e.target.value)}
+                  placeholder="Formato de lista de lo que incluye..."
+                  className="input-base min-h-[100px] resize-y text-xs font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+                <button type="button" onClick={resetForm} className="btn-base bg-muted text-foreground hover:bg-muted/70">
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveCombo()}
+                  disabled={saving}
+                  className="btn-base bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  {saving ? "Guardando..." : "Publicar Combo en Oferta"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de Combos Existentes */}
+      {loadingBanners ? (
+        <p className="text-xs text-muted-foreground text-center py-8">Cargando combos...</p>
+      ) : banners.length === 0 ? (
+        <div className="py-10 text-center border border-dashed rounded-2xl border-border bg-card/40 space-y-2">
+          <Sparkles className="h-8 w-8 text-muted-foreground/40 mx-auto" />
+          <p className="text-sm font-medium text-muted-foreground">Todavía no tenés combos armados.</p>
+          <button
+            onClick={() => { resetForm(); setCreating(true); }}
+            className="btn-base bg-primary text-primary-foreground text-xs py-2 px-4 hover:opacity-90"
+          >
+            Armar primer combo
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {banners.map((b, idx) => (
+            <div key={b.id ?? idx} className="flex flex-col sm:flex-row items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all">
+              <img
+                src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
+                alt={b.titulo ?? ""}
+                className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-cover border border-border shrink-0"
+                onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+              />
+              <div className="flex-1 min-w-0 space-y-1">
+                <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                  Combo en oferta
+                </span>
+                <h4 className="font-bold text-base text-foreground truncate">{b.titulo}</h4>
+                <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-line">{b.subtitulo}</p>
+                <p className="text-lg font-bold text-primary pt-1">{money(b.precio)}</p>
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    onClick={() => {
+                      setEditingBanner({
+                        id: b.id,
+                        titulo: b.titulo ?? "",
+                        subtitulo: b.subtitulo ?? "",
+                        imagen_url: b.imagen_url ?? "",
+                        precio: String(b.precio ?? ""),
+                        activo: b.activo ?? "SI",
+                      });
+                      setComboTitle(b.titulo ?? "");
+                      setComboSubtitle(b.subtitulo ?? "");
+                      setComboPrice(String(b.precio ?? ""));
+                      setComboImage(b.imagen_url ?? "");
+                      setCreating(true);
+                    }}
+                    className="btn-base bg-muted hover:bg-muted/80 text-foreground text-xs py-1 px-2.5 flex items-center gap-1"
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Editar
+                  </button>
+                  <button
+                    onClick={() => void handleDeleteCombo(String(b.id ?? idx), b.titulo ?? "Combo")}
+                    className="btn-base bg-destructive/10 text-destructive hover:bg-destructive hover:text-white text-xs py-1 px-2.5 flex items-center gap-1"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                  </button>
+                  <Link
+                    to="/combo/$index"
+                    params={{ index: String(idx) }}
+                    className="btn-base border border-border text-xs py-1 px-2.5 text-muted-foreground hover:text-foreground ml-auto"
+                  >
+                    Ver en tienda →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OfertasDelDiaPanel({
   products,
   userEmail,
@@ -973,7 +1452,7 @@ function OfertasDelDiaPanel({
   userToken: string;
   onRefresh: () => Promise<void>;
 }) {
-  const [subTab, setSubTab] = useState<"activas" | "agregar">("activas");
+  const [subTab, setSubTab] = useState<"activas" | "combos" | "agregar">("activas");
   const [search, setSearch] = useState("");
   const [clearingAll, setClearingAll] = useState(false);
 
@@ -1059,31 +1538,42 @@ function OfertasDelDiaPanel({
 
       {/* Sub-tabs de ofertas */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border pb-4">
-        <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-xl border border-border">
+        <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-xl border border-border flex-wrap">
           <button
             onClick={() => { setSubTab("activas"); setSearch(""); }}
-            className={`rounded-lg px-4 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
+            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
               subTab === "activas"
                 ? "bg-card text-foreground shadow-xs border border-border"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Flame className="h-3.5 w-3.5 text-primary" />
-            Ofertas Activas
+            <Flame className="h-3.5 w-3.5 text-primary fill-primary/20" />
+            Ofertas por Producto
             <span className="rounded-full bg-primary/10 text-primary text-[10px] px-1.5 py-0.2 font-bold">
               {activeOffers.length}
             </span>
           </button>
           <button
+            onClick={() => { setSubTab("combos"); setSearch(""); }}
+            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
+              subTab === "combos"
+                ? "bg-card text-foreground shadow-xs border border-border"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            Armador de Combos & Packs
+          </button>
+          <button
             onClick={() => { setSubTab("agregar"); setSearch(""); }}
-            className={`rounded-lg px-4 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
+            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
               subTab === "agregar"
                 ? "bg-card text-foreground shadow-xs border border-border"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <Plus className="h-3.5 w-3.5 text-primary" />
-            Agregar Producto a Oferta
+            Poner Producto en Oferta
             <span className="rounded-full bg-muted text-muted-foreground text-[10px] px-1.5 py-0.2 font-bold">
               {candidateProducts.length}
             </span>
@@ -1091,20 +1581,29 @@ function OfertasDelDiaPanel({
         </div>
 
         {/* Buscador dentro de panel */}
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={subTab === "activas" ? "Buscar entre ofertas..." : "Buscar producto del catálogo..."}
-            className="input-base text-xs pl-9 py-2"
-          />
-        </div>
+        {subTab !== "combos" && (
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={subTab === "activas" ? "Buscar entre ofertas..." : "Buscar producto del catálogo..."}
+              className="input-base text-xs pl-9 py-2"
+            />
+          </div>
+        )}
       </div>
 
       {/* Contenido subtab */}
-      {subTab === "activas" ? (
+      {subTab === "combos" ? (
+        <ComboBuilderPanel
+          products={products}
+          userEmail={userEmail}
+          userToken={userToken}
+          onRefresh={onRefresh}
+        />
+      ) : subTab === "activas" ? (
         filteredActiveOffers.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-14 text-center rounded-2xl border border-dashed border-border bg-card/50">
             <Flame className="h-10 w-10 text-muted-foreground/30" />

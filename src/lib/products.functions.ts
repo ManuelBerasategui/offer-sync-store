@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { Product, ProductVariant } from "@/lib/store";
+import type { Banner, Product, ProductVariant } from "@/lib/store";
 
 const str = (v: unknown, max = 2000) => String(v ?? "").slice(0, max);
 
@@ -390,5 +390,101 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
     } catch (err) {
       console.error("Error in upsertCategoryRules:", err);
       return { error: err instanceof Error ? err.message : "Error al guardar reglas." };
+    }
+  });
+
+/* ─── Tipos e Integración para Combos / Banners en Oferta ─── */
+
+export type BannerInput = {
+  id?: string;
+  titulo: string;
+  subtitulo?: string;
+  imagen_url?: string;
+  link?: string;
+  activo?: string;
+  precio: string;
+};
+
+export const getAdminBanners = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+  }))
+  .handler(async ({ data }): Promise<{ banners: Banner[]; error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+      const { data: resData, error } = await supabaseAdmin.from("banners").select("*");
+      if (error) throw error;
+      return { banners: (resData ?? []) as Banner[] };
+    } catch (err) {
+      return { banners: [], error: err instanceof Error ? err.message : "Error al cargar combos." };
+    }
+  });
+
+export const upsertAdminBanner = createServerFn({ method: "POST" })
+  .validator(
+    (data: { email?: string; token?: string; banner: BannerInput }) => ({
+      email: str(data?.email, 160).toLowerCase(),
+      token: str(data?.token, 2000),
+      banner: data.banner,
+    })
+  )
+  .handler(async ({ data }): Promise<{ id?: string; error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+      const b = data.banner;
+
+      const row = {
+        titulo: b.titulo,
+        subtitulo: b.subtitulo ?? "",
+        imagen_url: b.imagen_url ?? "",
+        link: b.link ?? "",
+        activo: b.activo ?? "SI",
+        precio: String(b.precio ?? "0"),
+      };
+
+      if (b.id) {
+        const { error } = await supabaseAdmin.from("banners").update(row).eq("id", b.id);
+        if (error) throw error;
+        return { id: b.id };
+      } else {
+        const newId = crypto.randomUUID();
+        const { data: inserted, error } = await supabaseAdmin
+          .from("banners")
+          .insert({ id: newId, ...row })
+          .select("id")
+          .single();
+        if (error) {
+          // Retry without id if id column is serial/auto
+          const { data: ins2, error: err2 } = await supabaseAdmin
+            .from("banners")
+            .insert(row)
+            .select("id")
+            .single();
+          if (err2) throw err2;
+          return { id: String(ins2?.id ?? "") };
+        }
+        return { id: String(inserted?.id ?? newId) };
+      }
+    } catch (err) {
+      console.error("Error in upsertAdminBanner:", err);
+      return { error: err instanceof Error ? err.message : "Error al guardar el combo." };
+    }
+  });
+
+export const deleteAdminBanner = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string; bannerId: string }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    bannerId: str(data?.bannerId, 100),
+  }))
+  .handler(async ({ data }): Promise<{ error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+      const { error } = await supabaseAdmin.from("banners").delete().eq("id", data.bannerId);
+      if (error) throw error;
+      return {};
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Error al eliminar el combo." };
     }
   });
