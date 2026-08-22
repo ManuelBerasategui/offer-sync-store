@@ -1714,16 +1714,30 @@ function AdminProductosPage() {
                                 />
                               </td>
                               <td
-                                className="px-3 py-3 sm:px-4 font-medium cursor-pointer hover:text-primary transition-colors max-w-[150px] sm:max-w-none truncate sm:whitespace-normal"
+                                className="px-3 py-3 sm:px-4 font-medium cursor-pointer hover:text-primary transition-colors max-w-[170px] sm:max-w-none"
                                 onClick={() => setModal(productToInput(p))}
                               >
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span>{p.nombre}</span>
-                                  {isOffer && (
-                                    <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold flex items-center gap-0.5 border border-primary/20">
-                                      <Flame className="h-3 w-3 fill-primary" /> Oferta
-                                    </span>
-                                  )}
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>{p.nombre}</span>
+                                    {isOffer && (
+                                      <span className="rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-bold flex items-center gap-0.5 border border-primary/20 shrink-0">
+                                        <Flame className="h-3 w-3 fill-primary" /> Oferta
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Precio en Celular */}
+                                  <div className="text-xs font-bold text-primary sm:hidden">
+                                    {isOffer && p.precio_oferta ? (
+                                      <span className="flex items-center gap-1">
+                                        <span>{money(p.precio_oferta)}</span>
+                                        <span className="line-through text-[10px] text-muted-foreground font-normal">{money(p.precio)}</span>
+                                      </span>
+                                    ) : (
+                                      <span>{money(p.precio)}</span>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                               <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
