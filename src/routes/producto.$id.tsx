@@ -298,7 +298,7 @@ function ProductoPage() {
                   <p className="text-xs font-semibold text-destructive">Sin talles con stock disponible en este momento.</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    {availableTalles.map((talle) => {
+                    {availableTalles.map((talle: string) => {
                       const isSelected = selectedTalle === talle;
                       return (
                         <button

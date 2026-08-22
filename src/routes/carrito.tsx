@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { Minus, Plus } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -42,12 +43,24 @@ function CarritoPage() {
   const { products, config } = data;
   const cart = useCart();
 
-  const items = cart.items.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice }));
+  // Garantizar que la categoría esté resuelta para cada ítem (usando el producto de la DB como fallback si i.categoria viene vacío)
+  const cartItemsWithCat = useMemo(() => {
+    return cart.items.map((i) => {
+      const prod = findProduct(products, i.productId || i.id || i.nombre);
+      const cat = i.categoria || prod?.categoria || "";
+      return {
+        ...i,
+        categoria: cat,
+      };
+    });
+  }, [cart.items, products]);
+
+  const items = cartItemsWithCat.map((i: { nombre: string; qty: number; unitPrice: number; productId?: string }) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice, productId: i.productId }));
 
   // Mínimos dinámicos por categoría
   const catRules = parseCategoryRules(config);
   const dynamicViolations = checkCategoryMins(
-    cart.items.map((i): { categoria?: string; qty: number; unitPrice: number } => ({
+    cartItemsWithCat.map((i: { categoria?: string; qty: number; unitPrice: number }) => ({
       ...(i.categoria !== undefined ? { categoria: i.categoria } : {}),
       qty: i.qty,
       unitPrice: i.unitPrice,
@@ -58,9 +71,9 @@ function CarritoPage() {
   // Fallback: chequeo hardcodeado de suplementos si no hay regla dinámica configurada
   const hasSupDynRule = !!catRules[normCat("Suplementos")]?.minAmount;
   const legacyViolations = !hasSupDynRule
-    ? cart.items
-        .filter((i) => isSuplemento(i.categoria))
-        .reduce((a, i) => a + i.qty * i.unitPrice, 0)
+    ? cartItemsWithCat
+        .filter((i: { categoria?: string }) => isSuplemento(i.categoria))
+        .reduce((a: number, i: { qty: number; unitPrice: number }) => a + i.qty * i.unitPrice, 0)
     : 0;
   const hasLegacyViolation = !hasSupDynRule && legacyViolations > 0 && legacyViolations < SUPLEMENTOS_MIN;
 
