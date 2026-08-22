@@ -11,7 +11,7 @@ import {
   upsertCategoryRules,
   type CategoryRuleInput,
 } from "@/lib/products.functions";
-import { parseCategoryRules, normCat, money } from "@/lib/store";
+import { parseCategoryRules, normCat, getBaseCategory, money } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/configuracion")({
   loader: ({ context }) => {
@@ -72,12 +72,14 @@ function AdminConfiguracionPage() {
       }
       setIsAuthorized(true);
 
-      const cats = [
-        ...new Set(res.products.map((p) => (p.categoria ?? "").trim()).filter(Boolean)),
-      ].sort();
+      const existing = parseCategoryRules(config);
+      const rawCats = res.products.map((p) => (p.categoria ?? "").trim()).filter(Boolean);
+      const baseCatsFromProds = rawCats.map(getBaseCategory);
+      const existingCats = Object.keys(existing).map((k) => k.charAt(0).toUpperCase() + k.slice(1));
+
+      const cats = [...new Set([...baseCatsFromProds, ...existingCats])].sort();
       setCategories(cats);
 
-      const existing = parseCategoryRules(config);
       const formRules: Record<string, CatRuleForm> = {};
       for (const cat of cats) {
         const key = normCat(cat);

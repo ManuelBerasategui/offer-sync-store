@@ -206,6 +206,16 @@ export type CategoryRule = {
 export const normCat = (s: string) =>
   String(s ?? "").trim().toLowerCase().normalize("NFC");
 
+/** Agrupa subcategorías conocidas en su categoría base (ej: "Perfumes Arabes" -> "Perfumes") */
+export function getBaseCategory(rawCat: string): string {
+  const clean = String(rawCat ?? "").trim();
+  const lower = clean.toLowerCase().normalize("NFC");
+  if (lower.startsWith("perfume")) return "Perfumes";
+  if (lower.startsWith("suplement")) return "Suplementos";
+  if (lower.startsWith("zapatilla")) return "Zapatillas";
+  return clean;
+}
+
 /** Lee las reglas por categoría desde site_config */
 export function parseCategoryRules(config: SiteConfig): Record<string, CategoryRule> {
   const rules: Record<string, CategoryRule> = {};
