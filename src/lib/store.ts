@@ -29,6 +29,7 @@ export type Product = {
 };
 
 export type Banner = {
+  id?: string;
   titulo?: string;
   subtitulo?: string;
   imagen_url?: string;

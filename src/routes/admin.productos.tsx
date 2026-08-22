@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp, PackagePlus,
   Flame, Sparkles, Percent, Save, Tag, Search, Check, RefreshCw, Zap, TrendingDown,
@@ -967,6 +967,40 @@ function CandidateOfferCard({
 }
 
 /* ───────────────────────────────────────────────────────── */
+/*  ErrorBoundary para proteger el panel de combos           */
+/* ───────────────────────────────────────────────────────── */
+
+class ComboPanelBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; errorMsg: string }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, errorMsg: "" };
+  }
+  static getDerivedStateFromError(error: unknown) {
+    return { hasError: true, errorMsg: error instanceof Error ? error.message : String(error) };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center space-y-3">
+          <p className="text-sm font-semibold text-destructive">Ocurrió un error al cargar el panel de combos.</p>
+          <p className="text-xs text-muted-foreground">{this.state.errorMsg}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, errorMsg: "" })}
+            className="btn-base bg-primary text-primary-foreground text-xs py-2 px-4 hover:opacity-90"
+          >
+            Reintentar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ───────────────────────────────────────────────────────── */
 /*  Gestión Simplificada de Combos / Packs en Oferta         */
 /* ───────────────────────────────────────────────────────── */
 
@@ -1399,12 +1433,14 @@ function OfertasDelDiaPanel({
 
       {/* Contenido subtab */}
       {subTab === "combos" ? (
-        <ComboBuilderPanel
-          initialBanners={initialBanners}
-          userEmail={userEmail}
-          userToken={userToken}
-          onRefresh={onRefresh}
-        />
+        <ComboPanelBoundary>
+          <ComboBuilderPanel
+            initialBanners={initialBanners}
+            userEmail={userEmail}
+            userToken={userToken}
+            onRefresh={onRefresh}
+          />
+        </ComboPanelBoundary>
       ) : subTab === "activas" ? (
         filteredActiveOffers.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-14 text-center rounded-2xl border border-dashed border-border bg-card/50">
