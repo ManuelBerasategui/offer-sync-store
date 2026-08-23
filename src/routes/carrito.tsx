@@ -118,7 +118,7 @@ function CarritoPage() {
                     ? Math.round((1 - i.unitPrice / basePrice) * 100)
                     : 0;
 
-                const targetId = String(i.productId || i.id || i.nombre || "");
+                const validProdId = i.productId || (product?.id ? String(product.id) : undefined);
 
                 return (
                   <li
@@ -127,29 +127,47 @@ function CarritoPage() {
                   >
                     {/* Image + name/price — full width on mobile, flexible on desktop */}
                     <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <Link
-                        to="/producto/$id"
-                        params={{ id: targetId }}
-                        className="shrink-0 transition-opacity hover:opacity-80"
-                      >
+                      {validProdId ? (
+                        <Link
+                          to="/producto/$id"
+                          params={{ id: validProdId }}
+                          className="shrink-0 transition-opacity hover:opacity-80"
+                        >
+                          <img
+                            src={i.imagen || FALLBACK_IMAGE}
+                            alt={i.nombre}
+                            referrerPolicy="no-referrer"
+                            className="h-16 w-16 rounded-lg object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = FALLBACK_IMAGE;
+                            }}
+                          />
+                        </Link>
+                      ) : (
                         <img
                           src={i.imagen || FALLBACK_IMAGE}
                           alt={i.nombre}
                           referrerPolicy="no-referrer"
-                          className="h-16 w-16 rounded-lg object-cover"
+                          className="h-16 w-16 rounded-lg object-cover shrink-0"
                           onError={(e) => {
                             e.currentTarget.src = FALLBACK_IMAGE;
                           }}
                         />
-                      </Link>
+                      )}
                       <div className="min-w-0 flex-1">
-                        <Link
-                          to="/producto/$id"
-                          params={{ id: targetId }}
-                          className="block truncate text-sm font-semibold hover:text-primary transition-colors"
-                        >
-                          {i.nombre}
-                        </Link>
+                        {validProdId ? (
+                          <Link
+                            to="/producto/$id"
+                            params={{ id: validProdId }}
+                            className="block truncate text-sm font-semibold hover:text-primary transition-colors"
+                          >
+                            {i.nombre}
+                          </Link>
+                        ) : (
+                          <span className="block truncate text-sm font-semibold">
+                            {i.nombre}
+                          </span>
+                        )}
                         <p className="tabular-nums text-sm text-muted-foreground">
                           {percent > 0 ? (
                             <>

@@ -85,8 +85,29 @@ function toCartRow(userId: string, item: CartItem) {
   };
 }
 
+const CART_STORAGE_KEY = "offer_sync_cart_items";
+
+function loadLocalCart(): CartItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalCart(items: CartItem[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // ignore
+  }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(() => loadLocalCart());
   const { data } = useQuery(storeQueryOptions);
   const { user, loading: authLoading } = useAuth();
 
@@ -97,12 +118,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     userRef.current = user;
   }, [user]);
 
-  // Cuando el usuario inicia sesión, carga el carrito desde la DB.
-  // Cuando cierra sesión, limpia el carrito en memoria.
+  // Cuando el usuario inicia sesión, carga el carrito desde la DB y sincroniza.
+  // Cuando no hay usuario, mantiene el carrito de localStorage.
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      setItems([]);
+      setItems(loadLocalCart());
       return;
     }
 
@@ -116,9 +137,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       if (error) {
         console.error("[cart] error loading cart from DB:", error);
+        setItems(loadLocalCart());
         return;
       }
-      setItems((rows ?? []).map(toCartItem));
+      const dbItems = (rows ?? []).map(toCartItem);
+      const localItems = loadLocalCart();
+      if (localItems.length > 0) {
+        const mergedMap = new Map<string, CartItem>();
+        for (const item of dbItems) mergedMap.set(item.id, item);
+        for (const item of localItems) {
+          const existing = mergedMap.get(item.id);
+          if (existing) {
+            mergedMap.set(item.id, { ...existing, qty: existing.qty + item.qty });
+          } else {
+            mergedMap.set(item.id, item);
+          }
+        }
+        const merged = Array.from(mergedMap.values());
+        setItems(merged);
+        void Promise.all(
+          merged.map((item) =>
+            supabase
+              .from("cart_items")
+              .upsert(toCartRow(user.id, item), { onConflict: "user_id,item_id" }),
+          ),
+        );
+        saveLocalCart([]);
+      } else {
+        setItems(dbItems);
+      }
     })();
 
     return () => {
@@ -153,7 +200,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const ruleKey = match?.key;
 
       let unitPrice: number;
-      if (catRule?.discountTiers?.length && ruleKey) {
+      if (Array.isArray(catRule?.discountTiers) && catRule.discountTiers.length > 0 && ruleKey) {
         // Descuento de categoría: reemplaza al individual del producto
         const totalCatUnits = catTotals[ruleKey] ?? 0;
         const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
@@ -183,6 +230,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
           .then(({ error }) => {
             if (error) console.error("[cart] upsert error:", error);
           });
+      } else {
+        saveLocalCart(next);
       }
       return next;
     });
@@ -201,6 +250,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
           .then(({ error }) => {
             if (error) console.error("[cart] delete error:", error);
           });
+      } else {
+        saveLocalCart(next);
       }
       return next;
     });
@@ -218,6 +269,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
           .then(({ error }) => {
             if (error) console.error("[cart] setQty upsert error:", error);
           });
+      } else {
+        saveLocalCart(next);
       }
       return next;
     });
@@ -225,6 +278,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clear = useCallback(() => {
     setItems([]);
+    saveLocalCart([]);
     const uid = userRef.current?.id;
     if (uid) {
       void supabase

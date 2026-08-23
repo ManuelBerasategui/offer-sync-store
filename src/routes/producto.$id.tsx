@@ -144,7 +144,7 @@ function ProductoPage() {
       : [];
 
   const hasDefaultInVariants = defaultColor
-    ? variants.some((v) => v.color.trim().toLowerCase() === defaultColor.toLowerCase())
+    ? variants.some((v) => (v?.color ?? "").trim().toLowerCase() === defaultColor.toLowerCase())
     : false;
 
   const allVariants: ProductVariant[] = useMemo(() => {
@@ -165,7 +165,7 @@ function ProductoPage() {
   const usesColors = allVariants.length > 0;
   const defaultVariant = defaultColor
     ? allVariants.find(
-        (variant) => variant.color.trim().toLowerCase() === defaultColor.toLowerCase(),
+        (variant) => (variant?.color ?? "").trim().toLowerCase() === defaultColor.toLowerCase(),
       ) ?? allVariants[0]
     : allVariants[0];
 

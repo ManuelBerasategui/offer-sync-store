@@ -250,7 +250,10 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     const am = key.match(/^cat_min_amount_(.+)$/i);
     if (dm) {
       const rule = getOrCreate(normCat(dm[1]!));
-      try { rule.discountTiers = JSON.parse(val); } catch { /* ignore */ }
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) rule.discountTiers = parsed;
+      } catch { /* ignore */ }
     } else if (um) {
       const rule = getOrCreate(normCat(um[1]!));
       const n = Number(val); if (n > 0) rule.minUnits = n;
