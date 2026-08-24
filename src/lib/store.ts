@@ -123,6 +123,9 @@ export function categoriesOf(products: Product[]) {
 
 /** Lee la columna "Whatsapp" de la planilla, sin importar mayúsculas ni espacios. */
 export function isWhatsappOnly(p: Product) {
+  // Si el producto ya tiene un precio asignado (> 0), se muestra el precio y NO se oculta como "Consultar"
+  if (priceOf(p) > 0) return false;
+
   for (const [key, value] of Object.entries(p)) {
     if (key.trim().toLowerCase().replace(/\s+/g, "") === "whatsapp") return isYes(typeof value === "string" ? value : undefined);
   }

@@ -52,7 +52,7 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
                 : [];
             return { ...vObj, talles_disponibles };
           });
-        return { ...rest, ...meta, variants } as Product;
+        return { ...meta, ...rest, variants } as Product;
       });
 
       const banners: Banner[] = (bannersRaw ?? []) as Banner[];

@@ -117,7 +117,7 @@ export const getAdminProducts = createServerFn({ method: "POST" })
               : [];
           return { ...v, talles_disponibles };
         });
-        return { ...rest, ...meta, variants } as Product;
+        return { ...meta, ...rest, variants } as Product;
       });
 
       return { products };
