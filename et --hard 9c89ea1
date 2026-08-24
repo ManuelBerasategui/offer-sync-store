@@ -1,0 +1,130 @@
+[33m01ed374[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{0}: reset: moving to HEAD~1
+[33m9c89ea1[m HEAD@{1}: reset: moving to HEAD~1
+[33m404b8c9[m HEAD@{2}: commit: fix
+[33m9c89ea1[m HEAD@{3}: commit: feat: add client-side pagination to public catalog and admin product table
+[33m01ed374[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{4}: commit: some fixes
+[33m6783872[m HEAD@{5}: commit: new changes
+[33m6348e0e[m HEAD@{6}: commit: fix cart
+[33mbf49197[m HEAD@{7}: reset: moving to bf49197
+[33mfdd7322[m HEAD@{8}: commit: fix: accurate discount percentage display and floor unit prices
+[33mbf49197[m HEAD@{9}: commit: fix: checkCategoryMins groups by rule with minUnits/minAmount not subcategory key
+[33m5f28140[m HEAD@{10}: commit: remove volume discounts from homepage, keep on product page
+[33mb6d47bc[m HEAD@{11}: commit: descuentos por cantidad en perfumes arabes y disenador
+[33mdfab7f9[m HEAD@{12}: commit: add dot
+[33me1f6e8a[m HEAD@{13}: commit: update hero minimums text
+[33mb19590b[m HEAD@{14}: commit: minimos
+[33m8540cc8[m HEAD@{15}: commit: validacion minima cantidad sup3
+[33mb4189ff[m HEAD@{16}: commit: validacion minima cantidad sup2
+[33m2b22102[m HEAD@{17}: commit: validacion minima cantidad sup
+[33mdbccebc[m HEAD@{18}: commit: ventas semana
+[33mcecfb3b[m HEAD@{19}: commit: orden cat
+[33me6d78fe[m HEAD@{20}: commit: Trigger Vercel build
+[33m75c4438[m HEAD@{21}: reset: moving to 75c4438
+[33md8370e5[m HEAD@{22}: commit: somne new improvemetns
+[33m0df5113[m HEAD@{23}: commit: updates
+[33m75c4438[m HEAD@{24}: commit: catalogo mejorado
+[33m548b96d[m HEAD@{25}: commit: stock org
+[33m8535f05[m HEAD@{26}: commit: mobile first
+[33m07fb0f5[m HEAD@{27}: commit: new
+[33m25cdaf5[m HEAD@{28}: commit: ofertas 6
+[33md87838c[m HEAD@{29}: commit: ofertas4
+[33mc41e110[m HEAD@{30}: commit: ofertas3
+[33m3e31b13[m HEAD@{31}: commit: ofertas2
+[33m7044f93[m HEAD@{32}: commit: ofertas
+[33m13163f7[m HEAD@{33}: commit: oferta del dia
+[33m117c388[m HEAD@{34}: commit: security: server-side price and category minimum revalidation before payment
+[33ma7707bb[m HEAD@{35}: commit: fix: use weighted average for DB exchange rate calculation
+[33me1fff1b[m HEAD@{36}: commit: fix: show DB dollar rate badge only in admin configuracion
+[33m1b86ff8[m HEAD@{37}: commit: feat: display current DB dollar rate badge in admin panel
+[33m6c6040d[m HEAD@{38}: commit: feat: fetch live USDT Binance rate for initial USD product creation
+[33mff1c13f[m HEAD@{39}: commit: fix: automatic initial ARS price calculation from USD
+[33maee4612[m HEAD@{40}: commit: fix: include default color in variant select options
+[33m196d1ff[m HEAD@{41}: commit: fix: allow purchasing without selecting color
+[33m175ce62[m HEAD@{42}: commit: Fixx
+[33mdfbc332[m HEAD@{43}: commit: new changes? yeah
+[33me3ba278[m HEAD@{44}: commit: new changes 3
+[33m670762a[m HEAD@{45}: commit: new changes
+[33m866d481[m HEAD@{46}: commit: fix del fix del fix
+[33mba523d8[m HEAD@{47}: commit: feat: sistema de talles zapatillas y ropa + fixes
+[33m808599c[m HEAD@{48}: commit: talles2
+[33m4685dcc[m HEAD@{49}: commit: talles
+[33m3a72a09[m HEAD@{50}: commit: another fix
+[33mff38bc8[m HEAD@{51}: commit: fix
+[33m2a0539a[m HEAD@{52}: commit: new changes 3763
+[33mdec49be[m HEAD@{53}: commit: new changes 3763
+[33m8552cdd[m HEAD@{54}: commit: new changes 3763
+[33ma01a24a[m HEAD@{55}: commit: new changes 3763
+[33m1873958[m HEAD@{56}: commit: new changes 3765
+[33m55a0069[m HEAD@{57}: commit: new changes 35
+[33mcdb566c[m HEAD@{58}: commit: new changes 34
+[33m37a5d59[m HEAD@{59}: commit: new changes 34
+[33m372418d[m HEAD@{60}: commit: new changes
+[33m39e851f[m HEAD@{61}: commit: feat: hacer que la foto y el nombre en la tabla de productos abran el modal de edicion
+[33m4b5183b[m HEAD@{62}: commit: fix: parsear strings de precio vacios a null en el servidor para evitar errores de cast
+[33mbb28bcf[m HEAD@{63}: commit: chore: mejorar mensajes de error al guardar producto
+[33mca53a25[m HEAD@{64}: commit: chore: renombrar boton panel admin en menu de usuario
+[33mce1d6a5[m HEAD@{65}: commit: chore: renombrar panel ordenes a Panel Admin
+[33m61263fd[m HEAD@{66}: commit: feat: agregar campos precio_usd y precio_oferta_usd al panel de productos
+[33m0cf5d83[m HEAD@{67}: commit: feat: panel admin de productos con drag and drop de imagenes y variantes
+[33m2b9bd92[m HEAD@{68}: commit: chore: limpiar logs de debug del carrito
+[33me0ebf50[m HEAD@{69}: commit: fix: usar userRef en carrito para evitar closures con user=null
+[33m818b17b[m HEAD@{70}: commit: refactor: carrito sin localStorage, solo DB para usuarios con sesion
+[33m2adfda1[m HEAD@{71}: commit: fix2
+[33m3146044[m HEAD@{72}: commit: fix: agregar import de supabaseAdmin en getAdminPaidOrders
+[33me3a5661[m HEAD@{73}: commit: fix
+[33ma4ba147[m HEAD@{74}: commit: newupd
+[33m922bfed[m HEAD@{75}: commit: new updates
+[33mb8756e5[m HEAD@{76}: commit: enhance SEO
+[33m7213dc4[m HEAD@{77}: commit: feat: agregar SEO dinamico a la pagina de producto
+[33m68d72a7[m HEAD@{78}: commit: type validation
+[33md0d5184[m HEAD@{79}: commit: revert to 10e66ac
+[33m10e66ac[m HEAD@{80}: reset: moving to 10e66ac
+[33m70fc775[m HEAD@{81}: commit: fix: prevent Dark Reader from overriding site colors
+[33m10e66ac[m HEAD@{82}: commit: fix: only count pagado orders in ventas_semana
+[33m4a65e16[m HEAD@{83}: commit: feat: real weekly best sellers via ventas_semana (orders JSONB + pg_cron)
+[33m827b267[m HEAD@{84}: commit: revert to e3faed3
+[33me3faed3[m HEAD@{85}: reset: moving to e3faed3
+[33m33d22f6[m HEAD@{86}: commit: fix: translate Supabase email send rate limit error
+[33m78acdce[m HEAD@{87}: commit: feat: improve email confirmation handling for signups
+[33m10df285[m HEAD@{88}: commit: force vercel redeploy
+[33me3faed3[m HEAD@{89}: reset: moving to e3faed3
+[33me3faed3[m HEAD@{90}: reset: moving to e3faed3
+[33me3faed3[m HEAD@{91}: reset: moving to e3faed3
+[33me3faed3[m HEAD@{92}: reset: moving to HEAD~1
+[33m877d2da[m HEAD@{93}: commit: fix: blend logo into dark header with mix-blend-mode screen
+[33me3faed3[m HEAD@{94}: commit: fix: handle null color_predeterminado from DB (String(null) was 'null')
+[33ma3abeb3[m HEAD@{95}: commit: color fix db5
+[33m0e6a26d[m HEAD@{96}: commit: color fix db4
+[33m3ab44af[m HEAD@{97}: commit: color fix db3
+[33m5adabe0[m HEAD@{98}: commit: color fix db2
+[33mf8b46a9[m HEAD@{99}: commit: color fix db
+[33m07071d4[m HEAD@{100}: commit: color db
+[33m585d0ae[m HEAD@{101}: reset: moving to HEAD
+[33m585d0ae[m HEAD@{102}: commit: new ux xperience
+[33md89ee34[m HEAD@{103}: reset: moving to HEAD
+[33md89ee34[m HEAD@{104}: commit: add icon to UI
+[33m6755973[m HEAD@{105}: reset: moving to HEAD
+[33m6755973[m HEAD@{106}: commit: tarjeta
+[33m0989f71[m HEAD@{107}: commit: tarjeta
+[33mab6c6f2[m HEAD@{108}: commit: $ db 2
+[33mc365752[m HEAD@{109}: commit: $ db products
+[33mc2394ca[m HEAD@{110}: commit: fix images display
+[33me53261c[m HEAD@{111}: commit: new icon
+[33m39a825d[m HEAD@{112}: commit: migrate db2
+[33m04521b7[m HEAD@{113}: commit: migrate db
+[33m851ff1c[m HEAD@{114}: commit: type length validation
+[33mddf9d97[m HEAD@{115}: commit: U User
+[33m3c7de8c[m HEAD@{116}: reset: moving to HEAD
+[33m3c7de8c[m HEAD@{117}: commit: new banner
+[33m6742466[m HEAD@{118}: commit: cart arrow2
+[33md4639df[m HEAD@{119}: commit: cart arrow
+[33m64ade02[m HEAD@{120}: commit: Fix carrito qty 2
+[33m775e90b[m HEAD@{121}: commit: Fix carrito qty
+[33mcebdb42[m HEAD@{122}: commit: data persistency on cart
+[33mfc368d4[m HEAD@{123}: commit: auth
+[33mf3708f6[m HEAD@{124}: commit: fix auth
+[33m708b8d6[m HEAD@{125}: commit: type validation register acc
+[33md7ca62d[m HEAD@{126}: commit: fix: ts error + verify payment robusto
+[33md1c3e66[m HEAD@{127}: commit: fix db2
+[33m026af9d[m HEAD@{128}: commit: fix db
+[33md1e4110[m HEAD@{129}: reset: 

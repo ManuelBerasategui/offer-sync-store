@@ -113,6 +113,7 @@ function productToInput(p: Product): ProductInput {
       id: String(v.id ?? ""),
       color: String(v.color ?? ""),
       precio: String(v.precio ?? ""),
+      precio_usd: String((v as any).precio_usd ?? ""),
       stock: String(v.stock ?? "SI"),
       imagen_url: v.imagen_url ?? "",
       talles_disponibles: v.talles_disponibles ?? [],
@@ -313,7 +314,7 @@ function ProductModal({
   const addVariant = () =>
     setForm((prev) => ({
       ...prev,
-      variants: [...(prev.variants ?? []), { color: "", precio: "", stock: "SI", imagen_url: "", talles_disponibles: [] }],
+      variants: [...(prev.variants ?? []), { color: "", precio: "", precio_usd: "", stock: "SI", imagen_url: "", talles_disponibles: [] }],
     }));
 
   const removeVariant = (i: number) =>
@@ -427,10 +428,20 @@ function ProductModal({
             <div>
               <label className="label-sm">Precio ARS (opcional)</label>
               <input className="input-base" value={form.precio} onChange={(e) => set("precio", e.target.value)} placeholder="Ej: 150000" />
+              {!form.id && (() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                <p className="mt-1 text-xs flex items-center gap-1" style={{color: "#16a34a"}}>
+                  <span style={{fontWeight: 600}}>Con recargo 7%:</span> ${Math.round(raw * 1.07).toLocaleString("es-AR")}
+                </p>
+              ) : null; })()}
             </div>
             <div>
               <label className="label-sm">Precio oferta ARS</label>
               <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => set("precio_oferta", e.target.value)} placeholder="Ej: 120000" />
+              {!form.id && (() => { const raw = Number(String(form.precio_oferta ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                <p className="mt-1 text-xs flex items-center gap-1" style={{color: "#16a34a"}}>
+                  <span style={{fontWeight: 600}}>Con recargo 7%:</span> ${Math.round(raw * 1.07).toLocaleString("es-AR")}
+                </p>
+              ) : null; })()}
             </div>
             <div className="col-span-1 sm:col-span-2 rounded-xl bg-muted/40 p-3 border border-border/60">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -601,12 +612,26 @@ function ProductModal({
                       <input className="input-base" value={v.color} onChange={(e) => updateVariant(i, "color", e.target.value)} placeholder="Ej: Rojo" />
                     </div>
                     <div>
-                      <label className="label-sm">Precio</label>
-                      <input className="input-base" value={String(v.precio)} onChange={(e) => updateVariant(i, "precio", e.target.value)} placeholder="Ej: 15000" />
-                    </div>
-                    <div className="col-span-1 sm:col-span-2">
                       <label className="label-sm">Stock (SI / NO)</label>
                       <input className="input-base" value={String(v.stock ?? "SI")} onChange={(e) => updateVariant(i, "stock", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="label-sm">Precio USD (u$d - opcional)</label>
+                      <input className="input-base" value={String(v.precio_usd ?? "")} onChange={(e) => updateVariant(i, "precio_usd", e.target.value)} placeholder="Ej: 150 (opcional)" />
+                      {!form.id && (() => { const raw = Number(String(v.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                        <p className="mt-1 text-[11px] flex items-center gap-1" style={{color: "#16a34a"}}>
+                          <span style={{fontWeight: 600}}>Con recargo 7%:</span> u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}
+                        </p>
+                      ) : null; })()}
+                    </div>
+                    <div>
+                      <label className="label-sm">Precio ARS (opcional)</label>
+                      <input className="input-base" value={String(v.precio ?? "")} onChange={(e) => updateVariant(i, "precio", e.target.value)} placeholder="Ej: 15000 (opcional)" />
+                      {!form.id && (() => { const raw = Number(String(v.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                        <p className="mt-1 text-[11px] flex items-center gap-1" style={{color: "#16a34a"}}>
+                          <span style={{fontWeight: 600}}>Con recargo 7%:</span> ${Math.round(raw * 1.07).toLocaleString("es-AR")}
+                        </p>
+                      ) : null; })()}
                     </div>
                   </div>
                   {form.tipo_talles && form.tipo_talles !== "NINGUNO" && (

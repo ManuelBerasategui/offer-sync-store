@@ -16,7 +16,8 @@ export type CategoryRuleInput = {
 export type VariantInput = {
   id?: string; // presente si ya existe en la DB
   color: string;
-  precio: number | string;
+  precio?: number | string;
+  precio_usd?: number | string;
   stock?: string | null;
   imagen_url?: string | null;
   talles_disponibles?: string[];
@@ -200,10 +201,25 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
 
       const rawPriceUsd = parsePrice(p.precio_usd);
       const priceUsd = rawPriceUsd !== null ? Math.round(rawPriceUsd * SURCHARGE * 100) / 100 : null;
-      const priceArs = parsePrice(p.precio) ?? (priceUsd !== null ? Math.round(priceUsd * rate) : null);
+
+      const rawPriceArs = parsePrice(p.precio);
+      const priceArs =
+        rawPriceArs !== null
+          ? Math.round(rawPriceArs * SURCHARGE)
+          : priceUsd !== null
+            ? Math.round(priceUsd * rate)
+            : null;
+
       const rawPriceOfertaUsd = parsePrice(p.precio_oferta_usd);
       const priceOfertaUsd = rawPriceOfertaUsd !== null ? Math.round(rawPriceOfertaUsd * SURCHARGE * 100) / 100 : null;
-      const priceOfertaArs = parsePrice(p.precio_oferta) ?? (priceOfertaUsd !== null ? Math.round(priceOfertaUsd * rate) : null);
+
+      const rawPriceOfertaArs = parsePrice(p.precio_oferta);
+      const priceOfertaArs =
+        rawPriceOfertaArs !== null
+          ? Math.round(rawPriceOfertaArs * SURCHARGE)
+          : priceOfertaUsd !== null
+            ? Math.round(priceOfertaUsd * rate)
+            : null;
 
       const row = {
         nombre: p.nombre,
@@ -248,14 +264,28 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
 
         // Insertar las nuevas
         if (p.variants.length > 0) {
-          const variantRows = p.variants.map((v) => ({
-            id: crypto.randomUUID(),
-            product_id: productId,
-            color: String(v.color ?? "").trim(),
-            precio: parsePrice(v.precio),
-            stock: v.stock ?? "SI",
-            imagen_url: v.imagen_url ?? null,
-          }));
+          const variantRows = p.variants.map((v) => {
+            const rawVPriceUsd = parsePrice(v.precio_usd);
+            const vPriceUsd = rawVPriceUsd !== null ? Math.round(rawVPriceUsd * SURCHARGE * 100) / 100 : null;
+
+            const rawVPriceArs = parsePrice(v.precio);
+            const vPriceArs =
+              rawVPriceArs !== null
+                ? Math.round(rawVPriceArs * SURCHARGE)
+                : vPriceUsd !== null
+                  ? Math.round(vPriceUsd * rate)
+                  : (priceArs ?? 0);
+
+            return {
+              id: crypto.randomUUID(),
+              product_id: productId,
+              color: String(v.color ?? "").trim(),
+              precio: vPriceArs,
+              precio_usd: vPriceUsd ?? (priceUsd ?? null),
+              stock: v.stock ?? "SI",
+              imagen_url: v.imagen_url ?? null,
+            };
+          });
           const { error: vErr } = await supabaseAdmin.from("product_variants").insert(variantRows);
           if (vErr) throw vErr;
         }
