@@ -411,38 +411,103 @@ function ProductModal({
               <label className="label-sm">Precio USD * (u$d)</label>
               <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => set("precio_usd", e.target.value)} placeholder="Ej: 150" />
               {!form.id && (() => { const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                <p className="mt-1 text-xs flex items-center gap-1" style={{color: "#16a34a"}}>
-                  <span style={{fontWeight: 600}}>Con recargo 7%:</span> u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}
-                </p>
+                <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <Sparkles className="h-3 w-3 shrink-0" />
+                  <span>Precio final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
+                </div>
               ) : null; })()}
             </div>
             <div>
               <label className="label-sm">Precio oferta USD (u$d)</label>
               <input className="input-base" value={form.precio_oferta_usd ?? ""} onChange={(e) => set("precio_oferta_usd", e.target.value)} placeholder="Ej: 120" />
               {!form.id && (() => { const raw = Number(String(form.precio_oferta_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                <p className="mt-1 text-xs flex items-center gap-1" style={{color: "#16a34a"}}>
-                  <span style={{fontWeight: 600}}>Con recargo 7%:</span> u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}
-                </p>
+                <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <Sparkles className="h-3 w-3 shrink-0" />
+                  <span>Oferta final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
+                </div>
               ) : null; })()}
             </div>
             <div>
               <label className="label-sm">Precio ARS (opcional)</label>
               <input className="input-base" value={form.precio} onChange={(e) => set("precio", e.target.value)} placeholder="Ej: 150000" />
               {!form.id && (() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                <p className="mt-1 text-xs flex items-center gap-1" style={{color: "#16a34a"}}>
-                  <span style={{fontWeight: 600}}>Con recargo 7%:</span> ${Math.round(raw * 1.07).toLocaleString("es-AR")}
-                </p>
+                <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <Sparkles className="h-3 w-3 shrink-0" />
+                  <span>Precio final (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                </div>
               ) : null; })()}
             </div>
             <div>
               <label className="label-sm">Precio oferta ARS</label>
               <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => set("precio_oferta", e.target.value)} placeholder="Ej: 120000" />
               {!form.id && (() => { const raw = Number(String(form.precio_oferta ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                <p className="mt-1 text-xs flex items-center gap-1" style={{color: "#16a34a"}}>
-                  <span style={{fontWeight: 600}}>Con recargo 7%:</span> ${Math.round(raw * 1.07).toLocaleString("es-AR")}
-                </p>
+                <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <Sparkles className="h-3 w-3 shrink-0" />
+                  <span>Oferta final (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                </div>
               ) : null; })()}
             </div>
+            {/* Resumen visual de Precios Finales a Guardar */}
+            {(() => {
+              const rawUsd = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, ""));
+              const rawArs = Number(String(form.precio ?? "").replace(/[^\d.-]/g, ""));
+              const rawOfUsd = Number(String(form.precio_oferta_usd ?? "").replace(/[^\d.-]/g, ""));
+              const rawOfArs = Number(String(form.precio_oferta ?? "").replace(/[^\d.-]/g, ""));
+              const surcharge = !form.id ? 1.07 : 1;
+
+              if (rawUsd <= 0 && rawArs <= 0) return null;
+
+              return (
+                <div className="col-span-1 sm:col-span-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2 border-b border-emerald-500/20 pb-1.5">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      {!form.id ? "Precios finales a guardar (con recargo 7% incluido):" : "Precios finales a guardar:"}
+                    </span>
+                    {!form.id && (
+                      <span className="rounded-full bg-emerald-600 text-white text-[10px] font-extrabold px-2 py-0.5 shadow-xs">
+                        +7% APLICADO
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    {rawUsd > 0 && (
+                      <div className="rounded-lg bg-card/90 p-2 border border-emerald-500/20 shadow-xs">
+                        <span className="block text-[10px] uppercase font-semibold text-muted-foreground">Precio USD</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                          u$d {(Math.round(rawUsd * surcharge * 100) / 100).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {rawArs > 0 && (
+                      <div className="rounded-lg bg-card/90 p-2 border border-emerald-500/20 shadow-xs">
+                        <span className="block text-[10px] uppercase font-semibold text-muted-foreground">Precio ARS</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                          ${Math.round(rawArs * surcharge).toLocaleString("es-AR")}
+                        </span>
+                      </div>
+                    )}
+                    {rawOfUsd > 0 && (
+                      <div className="rounded-lg bg-card/90 p-2 border border-emerald-500/20 shadow-xs">
+                        <span className="block text-[10px] uppercase font-semibold text-muted-foreground">Oferta USD</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                          u$d {(Math.round(rawOfUsd * surcharge * 100) / 100).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {rawOfArs > 0 && (
+                      <div className="rounded-lg bg-card/90 p-2 border border-emerald-500/20 shadow-xs">
+                        <span className="block text-[10px] uppercase font-semibold text-muted-foreground">Oferta ARS</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                          ${Math.round(rawOfArs * surcharge).toLocaleString("es-AR")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
             <div className="col-span-1 sm:col-span-2 rounded-xl bg-muted/40 p-3 border border-border/60">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
@@ -619,18 +684,20 @@ function ProductModal({
                       <label className="label-sm">Precio USD (u$d - opcional)</label>
                       <input className="input-base" value={String(v.precio_usd ?? "")} onChange={(e) => updateVariant(i, "precio_usd", e.target.value)} placeholder="Ej: 150 (opcional)" />
                       {!form.id && (() => { const raw = Number(String(v.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                        <p className="mt-1 text-[11px] flex items-center gap-1" style={{color: "#16a34a"}}>
-                          <span style={{fontWeight: 600}}>Con recargo 7%:</span> u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}
-                        </p>
+                        <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          <Sparkles className="h-2.5 w-2.5 shrink-0" />
+                          <span>Final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
+                        </div>
                       ) : null; })()}
                     </div>
                     <div>
                       <label className="label-sm">Precio ARS (opcional)</label>
                       <input className="input-base" value={String(v.precio ?? "")} onChange={(e) => updateVariant(i, "precio", e.target.value)} placeholder="Ej: 15000 (opcional)" />
                       {!form.id && (() => { const raw = Number(String(v.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                        <p className="mt-1 text-[11px] flex items-center gap-1" style={{color: "#16a34a"}}>
-                          <span style={{fontWeight: 600}}>Con recargo 7%:</span> ${Math.round(raw * 1.07).toLocaleString("es-AR")}
-                        </p>
+                        <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          <Sparkles className="h-2.5 w-2.5 shrink-0" />
+                          <span>Final (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                        </div>
                       ) : null; })()}
                     </div>
                   </div>
