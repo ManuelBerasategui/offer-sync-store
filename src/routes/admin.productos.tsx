@@ -1586,13 +1586,21 @@ function AdminProductosPage() {
   const [expandedVariants, setExpandedVariants] = useState<Record<string, boolean>>({});
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
+  const ADMIN_PAGE_SIZE = 20;
+  const [adminPage, setAdminPage] = useState(1);
+  // Resetear página al cambiar el buscador
+  useEffect(() => { setAdminPage(1); }, [search]);
+
+  const adminTotalPages = Math.max(1, Math.ceil(filtered.length / ADMIN_PAGE_SIZE));
+  const paginatedFiltered = filtered.slice((adminPage - 1) * ADMIN_PAGE_SIZE, adminPage * ADMIN_PAGE_SIZE);
+
   const toggleSelectAll = () => {
-    const allFilteredIds = filtered.map((p) => String(p.id ?? ""));
+    const allFilteredIds = paginatedFiltered.map((p) => String(p.id ?? ""));
     const allSelected = allFilteredIds.every((id) => selectedIds.includes(id));
     if (allSelected) {
-      setSelectedIds([]);
+      setSelectedIds((prev) => prev.filter((id) => !allFilteredIds.includes(id)));
     } else {
-      setSelectedIds(allFilteredIds);
+      setSelectedIds((prev) => [...new Set([...prev, ...allFilteredIds])]);
     }
   };
 
@@ -1733,13 +1741,23 @@ function AdminProductosPage() {
             ) : (
               <div className="space-y-6">
                 {/* Buscador */}
-                <div>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
                   <input
                     className="input-base w-full max-w-sm"
                     placeholder="Buscar por nombre o categoría..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
+                  {filtered.length > 0 && (
+                    <p className="text-xs text-muted-foreground shrink-0">
+                      {filtered.length} producto{filtered.length !== 1 ? "s" : ""}
+                      {adminTotalPages > 1 && (
+                        <span className="ml-1 text-muted-foreground/70">
+                          — pág. {adminPage}/{adminTotalPages}
+                        </span>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 {/* Tabla de productos */}
@@ -1760,16 +1778,17 @@ function AdminProductosPage() {
                       )}
                     </div>
                   ) : (
+                    <>
                     <table className="w-full min-w-[480px] text-sm">
                       <thead className="border-b border-border bg-muted/50">
                         <tr>
                           <th className="px-3 py-3 text-center w-10">
                             <input
                               type="checkbox"
-                              checked={filtered.length > 0 && filtered.every((p) => selectedIds.includes(String(p.id)))}
+                              checked={paginatedFiltered.length > 0 && paginatedFiltered.every((p) => selectedIds.includes(String(p.id)))}
                               onChange={toggleSelectAll}
                               className="h-4 w-4 rounded border-border text-primary accent-primary cursor-pointer"
-                              title="Seleccionar todos"
+                              title="Seleccionar todos en esta página"
                             />
                           </th>
                           <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Imagen</th>
@@ -1781,7 +1800,7 @@ function AdminProductosPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {filtered.map((p) => {
+                        {paginatedFiltered.map((p) => {
                           const pid = String(p.id ?? "");
                           const isOffer = String(p.oferta ?? "").trim().toUpperCase() === "SI";
                           const isSelected = selectedIds.includes(pid);
@@ -1939,6 +1958,51 @@ function AdminProductosPage() {
                         })}
                       </tbody>
                     </table>
+
+                    {/* Paginación admin */}
+                    {adminTotalPages > 1 && (
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap border-t border-border px-4 py-3 bg-muted/20">
+                        <button
+                          onClick={() => setAdminPage((p) => Math.max(1, p - 1))}
+                          disabled={adminPage === 1}
+                          className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          ← Anterior
+                        </button>
+                        {Array.from({ length: adminTotalPages }, (_, i) => i + 1)
+                          .filter((n) => n === 1 || n === adminTotalPages || Math.abs(n - adminPage) <= 2)
+                          .reduce<(number | "...")[]>((acc, n, idx, arr) => {
+                            if (idx > 0 && (arr[idx - 1] as number) < n - 1) acc.push("...");
+                            acc.push(n);
+                            return acc;
+                          }, [])
+                          .map((item, idx) =>
+                            item === "..." ? (
+                              <span key={`ellipsis-${idx}`} className="px-1 text-muted-foreground text-xs">…</span>
+                            ) : (
+                              <button
+                                key={item}
+                                onClick={() => setAdminPage(item as number)}
+                                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                  adminPage === item
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                                }`}
+                              >
+                                {item}
+                              </button>
+                            )
+                          )}
+                        <button
+                          onClick={() => setAdminPage((p) => Math.min(adminTotalPages, p + 1))}
+                          disabled={adminPage === adminTotalPages}
+                          className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Siguiente →
+                        </button>
+                      </div>
+                    )}
+                    </>
                   )}
                 </div>
               </div>

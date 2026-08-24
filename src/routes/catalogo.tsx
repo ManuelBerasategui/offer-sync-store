@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -42,6 +42,12 @@ function Catalogo() {
   const [onlyTop, setOnlyTop] = useState(false);
   const [onlyOffers, setOnlyOffers] = useState(false);
 
+  const PAGE_SIZE = 24;
+  const [page, setPage] = useState(1);
+
+  // Resetear página al cambiar cualquier filtro
+  useEffect(() => { setPage(1); }, [search, cat, sort, onlyTop, onlyOffers]);
+
   const cats = useMemo(() => {
     const all = categoriesOf(products);
     // Categorías que queremos ver primero (en este orden)
@@ -74,6 +80,9 @@ function Catalogo() {
       return (isYes(b.destacado) ? 1 : 0) - (isYes(a.destacado) ? 1 : 0);
     });
   }, [products, search, cat, sort, onlyTop, onlyOffers]);
+
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const chip = (active: boolean) =>
     `shrink-0 rounded-full border px-3.5 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-[13px] font-bold transition-colors ${
@@ -138,14 +147,65 @@ function Catalogo() {
 
         <p className="mb-4 mt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {list.length} producto{list.length === 1 ? "" : "s"}
+          {totalPages > 1 && (
+            <span className="ml-2 font-normal text-muted-foreground/70">
+              — Página {page} de {totalPages}
+            </span>
+          )}
         </p>
 
         {list.length ? (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            {list.map((p, i) => (
-              <ProductCard key={p.id ?? i} p={p} config={config} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+              {paginated.map((p, i) => (
+                <ProductCard key={p.id ?? i} p={p} config={config} />
+              ))}
+            </div>
+
+            {/* Paginación */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-center gap-1.5 flex-wrap">
+                <button
+                  onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  disabled={page === 1}
+                  className="rounded-lg border border-border px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  ← Anterior
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((n) => n === 1 || n === totalPages || Math.abs(n - page) <= 2)
+                  .reduce<(number | "...")[]>((acc, n, idx, arr) => {
+                    if (idx > 0 && (arr[idx - 1] as number) < n - 1) acc.push("...");
+                    acc.push(n);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === "..." ? (
+                      <span key={`ellipsis-${idx}`} className="px-1 text-muted-foreground text-xs">…</span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => { setPage(item as number); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                        className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors ${
+                          page === item
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+                <button
+                  onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  disabled={page === totalPages}
+                  className="rounded-lg border border-border px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Siguiente →
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="py-16 text-center text-sm text-muted-foreground">
             No encontramos productos con esos filtros. Probá otra búsqueda o cambiá de categoría.
