@@ -409,7 +409,7 @@ function ProductModal({
             <div>
               <label className="label-sm">Precio USD * (u$d)</label>
               <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => set("precio_usd", e.target.value)} placeholder="Ej: 150" />
-              {(() => { const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+              {!form.id && (() => { const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                 <p className="mt-1 text-xs flex items-center gap-1" style={{color: "#16a34a"}}>
                   <span style={{fontWeight: 600}}>Con recargo 7%:</span> u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}
                 </p>
@@ -418,7 +418,7 @@ function ProductModal({
             <div>
               <label className="label-sm">Precio oferta USD (u$d)</label>
               <input className="input-base" value={form.precio_oferta_usd ?? ""} onChange={(e) => set("precio_oferta_usd", e.target.value)} placeholder="Ej: 120" />
-              {(() => { const raw = Number(String(form.precio_oferta_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+              {!form.id && (() => { const raw = Number(String(form.precio_oferta_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                 <p className="mt-1 text-xs flex items-center gap-1" style={{color: "#16a34a"}}>
                   <span style={{fontWeight: 600}}>Con recargo 7%:</span> u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}
                 </p>

@@ -195,14 +195,13 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         rate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
       }
 
-      const SURCHARGE = 1.07; // 7% de recargo
+      // El recargo del 7% se aplica SOLO al crear un producto nuevo (no en ediciones)
+      const SURCHARGE = p.id ? 1 : 1.07;
 
       const rawPriceUsd = parsePrice(p.precio_usd);
-      // Aplicar recargo del 7% al precio USD antes de guardar
       const priceUsd = rawPriceUsd !== null ? Math.round(rawPriceUsd * SURCHARGE * 100) / 100 : null;
       const priceArs = parsePrice(p.precio) ?? (priceUsd !== null ? Math.round(priceUsd * rate) : null);
       const rawPriceOfertaUsd = parsePrice(p.precio_oferta_usd);
-      // Aplicar recargo del 7% al precio de oferta USD antes de guardar
       const priceOfertaUsd = rawPriceOfertaUsd !== null ? Math.round(rawPriceOfertaUsd * SURCHARGE * 100) / 100 : null;
       const priceOfertaArs = parsePrice(p.precio_oferta) ?? (priceOfertaUsd !== null ? Math.round(priceOfertaUsd * rate) : null);
 
