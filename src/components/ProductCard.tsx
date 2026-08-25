@@ -7,6 +7,7 @@ import {
   isWhatsappOnly,
   isYes,
   money,
+  tiersOf,
   waLink,
 } from "@/lib/store";
 import type { Product, SiteConfig } from "@/lib/store";
@@ -14,6 +15,8 @@ import type { Product, SiteConfig } from "@/lib/store";
 export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) {
   const offer = hasOffer(p);
   const consultar = isWhatsappOnly(p);
+  const tiers = tiersOf(p);
+  const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-[0_10px_30px_-18px_oklch(0_0_0/0.35)]">
@@ -49,7 +52,7 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
         <Link
           to="/producto/$id"
           params={{ id: String(p.id ?? p.nombre ?? "") }}
-          className="font-sans text-[15px] font-semibold normal-case leading-snug tracking-normal hover:text-primary"
+          className="font-sans text-[15px] font-semibold normal-case leading-snug tracking-normal hover:text-primary line-clamp-2"
         >
           {p.nombre}
         </Link>
@@ -58,13 +61,20 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
           {consultar ? (
             <span className="text-sm font-semibold text-muted-foreground">Consultá el precio</span>
           ) : (
-            <div className="flex items-baseline gap-2">
-              <span className="tabular-nums text-lg font-bold text-foreground">
-                {money(offer ? p.precio_oferta : p.precio)}
-              </span>
-              {offer && (
-                <span className="tabular-nums text-xs text-muted-foreground line-through">
-                  {money(p.precio)}
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="tabular-nums text-lg font-bold text-foreground">
+                  {money(offer ? p.precio_oferta : p.precio)}
+                </span>
+                {offer && (
+                  <span className="tabular-nums text-xs text-muted-foreground line-through">
+                    {money(p.precio)}
+                  </span>
+                )}
+              </div>
+              {maxTier && (
+                <span className="mt-1 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                  🎁 Hasta {maxTier.percent}% OFF x mayor
                 </span>
               )}
             </div>
