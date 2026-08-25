@@ -75,6 +75,23 @@ async function assertAdmin(email?: string, token?: string) {
   return supabaseAdmin;
 }
 
+export function calcArsFromUsd(
+  usd: number | string,
+  rate: number,
+  markupPct = 0,
+  increment = 10,
+  surcharge = 1
+): number {
+  const numUsd = typeof usd === "number" ? usd : Number(String(usd).replace(/[^\d.-]/g, ""));
+  if (!Number.isFinite(numUsd) || numUsd <= 0 || !rate || rate <= 0) return 0;
+  const baseUsdWithSurcharge = numUsd * surcharge;
+  const markup = markupPct / 100;
+  if (increment > 1) {
+    return Math.ceil((baseUsdWithSurcharge * rate * (1 + markup)) / increment) * increment;
+  }
+  return Math.round(baseUsdWithSurcharge * rate * (1 + markup));
+}
+
 /* ─── Listar todos los productos (admin, con variantes) ── */
 
 export const getAdminProducts = createServerFn({ method: "POST" })
@@ -82,16 +99,52 @@ export const getAdminProducts = createServerFn({ method: "POST" })
     email: str(data?.email, 160).toLowerCase(),
     token: str(data?.token, 2000),
   }))
-  .handler(async ({ data }): Promise<{ products: Product[]; error?: string }> => {
+  .handler(async ({ data }): Promise<{
+    products: Product[];
+    dolarRate?: number;
+    roundingIncrement?: number;
+    markupPercentage?: number;
+    error?: string;
+  }> => {
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
 
-      const [productsRes, variantsRes] = await Promise.all([
+      const [productsRes, variantsRes, pricingRes] = await Promise.all([
         supabaseAdmin.from("products").select("*").order("nombre"),
         supabaseAdmin.from("product_variants").select("*"),
+        (supabaseAdmin as any).from("pricing_settings").select("last_rate, markup_percentage, rounding_increment").eq("id", true).maybeSingle(),
       ]);
 
       if (productsRes.error) throw productsRes.error;
+
+      let dolarRate = 0;
+      let roundingIncrement = 10;
+      let markupPercentage = 0;
+
+      if (pricingRes?.data) {
+        if (Number(pricingRes.data.last_rate) > 0) dolarRate = Number(pricingRes.data.last_rate);
+        if (Number(pricingRes.data.rounding_increment) > 0) roundingIncrement = Number(pricingRes.data.rounding_increment);
+        if (pricingRes.data.markup_percentage !== undefined) markupPercentage = Number(pricingRes.data.markup_percentage);
+      }
+
+      if (!dolarRate) {
+        try {
+          const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", { signal: AbortSignal.timeout(3000) });
+          if (apiRes.ok) {
+            const apiData = (await apiRes.json()) as { venta?: number };
+            if (apiData?.venta && apiData.venta > 0) dolarRate = Math.round(apiData.venta);
+          }
+        } catch {}
+      }
+
+      if (!dolarRate) {
+        const { data: cfgRow } = await (supabaseAdmin as any)
+          .from("site_config")
+          .select("valor")
+          .eq("clave", "dolar_cotizacion")
+          .maybeSingle();
+        dolarRate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
+      }
 
       const variantsByProduct = new Map<string, ProductVariant[]>();
       for (const v of variantsRes.data ?? []) {
@@ -120,7 +173,7 @@ export const getAdminProducts = createServerFn({ method: "POST" })
         return { ...meta, ...rest, variants } as Product;
       });
 
-      return { products };
+      return { products, dolarRate, roundingIncrement, markupPercentage };
     } catch (err) {
       return { products: [], error: err instanceof Error ? err.message : "Error al cargar productos." };
     }
@@ -173,18 +226,35 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         return isNaN(num) ? null : num;
       };
 
-      // Cotización dólar USDT Cripto en vivo para cálculo inicial si no se ingresó precio ARS manual
+      // Cotización dólar y configuración de redondeo/markup desde pricing_settings
       let rate = 0;
+      let markup = 0;
+      let increment = 10;
+
       try {
-        const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", { signal: AbortSignal.timeout(3000) });
-        if (apiRes.ok) {
-          const apiData = (await apiRes.json()) as { venta?: number };
-          if (apiData?.venta && apiData.venta > 0) {
-            rate = Math.round(apiData.venta);
-          }
+        const { data: pSettings } = await (supabaseAdmin as any)
+          .from("pricing_settings")
+          .select("last_rate, markup_percentage, rounding_increment")
+          .eq("id", true)
+          .maybeSingle();
+
+        if (pSettings) {
+          if (Number(pSettings.last_rate) > 0) rate = Number(pSettings.last_rate);
+          if (pSettings.markup_percentage !== undefined) markup = Number(pSettings.markup_percentage) / 100;
+          if (Number(pSettings.rounding_increment) > 0) increment = Number(pSettings.rounding_increment);
         }
-      } catch {
-        // Fallback a site_config si falla la API
+      } catch {}
+
+      if (!rate) {
+        try {
+          const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", { signal: AbortSignal.timeout(3000) });
+          if (apiRes.ok) {
+            const apiData = (await apiRes.json()) as { venta?: number };
+            if (apiData?.venta && apiData.venta > 0) {
+              rate = Math.round(apiData.venta);
+            }
+          }
+        } catch {}
       }
 
       if (!rate) {
@@ -195,6 +265,13 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
           .maybeSingle();
         rate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
       }
+
+      const arsFromUsd = (usd: number) => {
+        if (increment > 1) {
+          return Math.ceil((usd * rate * (1 + markup)) / increment) * increment;
+        }
+        return Math.round(usd * rate * (1 + markup));
+      };
 
       // El recargo del 7% se aplica SOLO al crear un producto nuevo (no en ediciones)
       const SURCHARGE = p.id ? 1 : 1.07;
@@ -207,7 +284,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         rawPriceArs !== null
           ? Math.round(rawPriceArs * SURCHARGE)
           : priceUsd !== null
-            ? Math.round(priceUsd * rate)
+            ? arsFromUsd(priceUsd)
             : null;
 
       const rawPriceOfertaUsd = parsePrice(p.precio_oferta_usd);
@@ -218,7 +295,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         rawPriceOfertaArs !== null
           ? Math.round(rawPriceOfertaArs * SURCHARGE)
           : priceOfertaUsd !== null
-            ? Math.round(priceOfertaUsd * rate)
+            ? arsFromUsd(priceOfertaUsd)
             : null;
 
       const row = {
@@ -273,7 +350,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
               rawVPriceArs !== null
                 ? Math.round(rawVPriceArs * SURCHARGE)
                 : vPriceUsd !== null
-                  ? Math.round(vPriceUsd * rate)
+                  ? arsFromUsd(vPriceUsd)
                   : (priceArs ?? 0);
 
             return {

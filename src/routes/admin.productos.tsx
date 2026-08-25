@@ -22,6 +22,7 @@ import {
   deleteAdminBanner,
   bulkUpdateAdminStock,
   updateVariantStock,
+  calcArsFromUsd,
   type ProductInput,
   type VariantInput,
   type BannerInput,
@@ -248,40 +249,30 @@ function ImageDropzone({
 
         {uploading ? (
           <div className="flex flex-col items-center gap-2 text-primary">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <span className="text-xs">Subiendo e integrando imagen...</span>
+            <RefreshCw className="h-6 w-6 animate-spin" />
+            <span className="text-xs font-semibold">Subiendo imagen...</span>
           </div>
         ) : value ? (
-          <div className="flex flex-col items-center gap-2">
+          <div className="relative group w-full flex flex-col items-center gap-2">
             <img
               src={value}
               alt="Vista previa"
-              className="h-24 w-24 rounded-xl object-cover shadow-sm border border-border"
+              className="h-28 max-w-full rounded-lg object-contain border border-border shadow-xs"
               onError={(e) => {
-                e.currentTarget.src = FALLBACK_IMAGE;
+                (e.target as HTMLElement).style.display = "none";
               }}
             />
-            <span className="text-xs text-muted-foreground">Clic o arrastrá para cambiar</span>
+            <span className="text-[11px] text-muted-foreground group-hover:text-primary transition-colors">
+              Hacé clic o arrastrá para cambiar la imagen
+            </span>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
             <Upload className="h-6 w-6 text-primary/70" />
-            <span className="text-xs text-center">{label}</span>
+            <span className="text-xs font-medium">{label}</span>
           </div>
         )}
       </div>
-
-      {/* Input secundario para pegar enlace directo */}
-      <div className="flex items-center gap-2">
-        <input
-          type="url"
-          className="input-base text-xs py-1.5"
-          placeholder="O pegá un enlace directo de imagen (https://...)"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </div>
-
       {errorMsg && <p className="text-xs text-destructive font-semibold">{errorMsg}</p>}
     </div>
   );
@@ -297,12 +288,18 @@ function ProductModal({
   onSaved,
   userEmail,
   userToken,
+  dolarRate = 1500,
+  roundingIncrement = 10,
+  markupPercentage = 0,
 }: {
   initial: ProductInput;
   onClose: () => void;
   onSaved: () => void;
   userEmail: string;
   userToken: string;
+  dolarRate?: number;
+  roundingIncrement?: number;
+  markupPercentage?: number;
 }) {
   const [form, setForm] = useState<ProductInput>(initial);
   const [saving, setSaving] = useState(false);
@@ -310,6 +307,49 @@ function ProductModal({
 
   const set = (field: keyof ProductInput, value: unknown) =>
     setForm((prev) => ({ ...prev, [field]: value }));
+
+  const handlePriceUsdChange = (val: string) => {
+    set("precio_usd", val);
+    const numUsd = Number(val.replace(/[^\d.-]/g, ""));
+    if (numUsd > 0 && dolarRate > 0) {
+      const isNew = !form.id;
+      const calculatedArs = calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, isNew ? 1.07 : 1);
+      set("precio", String(calculatedArs));
+    }
+  };
+
+  const handlePriceOfertaUsdChange = (val: string) => {
+    set("precio_oferta_usd", val);
+    const numUsd = Number(val.replace(/[^\d.-]/g, ""));
+    if (numUsd > 0 && dolarRate > 0) {
+      const isNew = !form.id;
+      const calculatedArs = calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, isNew ? 1.07 : 1);
+      set("precio_oferta", String(calculatedArs));
+    } else if (!val.trim()) {
+      set("precio_oferta", "");
+    }
+  };
+
+  const updateVariantPriceUsd = (i: number, val: string) => {
+    const numUsd = Number(val.replace(/[^\d.-]/g, ""));
+    const isNew = !form.id;
+    const calculatedArs =
+      numUsd > 0 && dolarRate > 0
+        ? calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, isNew ? 1.07 : 1)
+        : "";
+    setForm((prev) => ({
+      ...prev,
+      variants: (prev.variants ?? []).map((v, idx) =>
+        idx === i
+          ? {
+              ...v,
+              precio_usd: val,
+              ...(calculatedArs ? { precio: String(calculatedArs) } : {}),
+            }
+          : v
+      ),
+    }));
+  };
 
   const addVariant = () =>
     setForm((prev) => ({
@@ -409,17 +449,23 @@ function ProductModal({
             </div>
             <div>
               <label className="label-sm">Precio USD * (u$d)</label>
-              <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => set("precio_usd", e.target.value)} placeholder="Ej: 150" />
+              <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => handlePriceUsdChange(e.target.value)} placeholder="Ej: 150" />
               {!form.id && (() => { const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3 w-3 shrink-0" />
                   <span>Precio final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
                 </div>
               ) : null; })()}
+              {Boolean(form.precio_usd?.trim()) && dolarRate > 0 && (
+                <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <Zap className="h-3 w-3 shrink-0" />
+                  <span>Actualiza pesos a <strong>{money(calcArsFromUsd(form.precio_usd ?? "", dolarRate, markupPercentage, roundingIncrement, !form.id ? 1.07 : 1))}</strong></span>
+                </div>
+              )}
             </div>
             <div>
               <label className="label-sm">Precio oferta USD (u$d)</label>
-              <input className="input-base" value={form.precio_oferta_usd ?? ""} onChange={(e) => set("precio_oferta_usd", e.target.value)} placeholder="Ej: 120" />
+              <input className="input-base" value={form.precio_oferta_usd ?? ""} onChange={(e) => handlePriceOfertaUsdChange(e.target.value)} placeholder="Ej: 120" />
               {!form.id && (() => { const raw = Number(String(form.precio_oferta_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3 w-3 shrink-0" />
@@ -428,7 +474,7 @@ function ProductModal({
               ) : null; })()}
             </div>
             <div>
-              <label className="label-sm">Precio ARS (opcional)</label>
+              <label className="label-sm">Precio ARS (calculado automáticamente)</label>
               <input className="input-base" value={form.precio} onChange={(e) => set("precio", e.target.value)} placeholder="Ej: 150000" />
               {!form.id && (() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
@@ -750,11 +796,17 @@ function ActiveOfferCard({
   userEmail,
   userToken,
   onSaved,
+  dolarRate = 1500,
+  roundingIncrement = 10,
+  markupPercentage = 0,
 }: {
   product: Product;
   userEmail: string;
   userToken: string;
   onSaved: () => Promise<void>;
+  dolarRate?: number;
+  roundingIncrement?: number;
+  markupPercentage?: number;
 }) {
   const [precioOferta, setPrecioOferta] = useState(String(product.precio_oferta ?? ""));
   const [precioOfertaUsd, setPrecioOfertaUsd] = useState(
@@ -769,11 +821,26 @@ function ActiveOfferCard({
       ? Math.round(((basePrice - offerPrice) / basePrice) * 100)
       : 0;
 
+  const handleOfferUsdChange = (val: string) => {
+    setPrecioOfertaUsd(val);
+    const numUsd = Number(val.replace(/[^\d.-]/g, ""));
+    if (numUsd > 0 && dolarRate > 0) {
+      const calculatedArs = calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, 1);
+      setPrecioOferta(String(calculatedArs));
+    } else if (!val.trim()) {
+      setPrecioOferta("");
+    }
+  };
+
   const applyPreset = (pct: number) => {
     const baseArs = toNumber(product.precio);
     const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
-    if (baseArs > 0) setPrecioOferta(String(Math.round(baseArs * (1 - pct / 100))));
-    if (baseUsd > 0) setPrecioOfertaUsd(String(Math.round(baseUsd * (1 - pct / 100))));
+    if (baseUsd > 0) {
+      const newUsd = Math.round(baseUsd * (1 - pct / 100) * 100) / 100;
+      handleOfferUsdChange(String(newUsd));
+    } else if (baseArs > 0) {
+      setPrecioOferta(String(Math.round(baseArs * (1 - pct / 100))));
+    }
   };
 
   async function handleSave() {
@@ -862,6 +929,16 @@ function ActiveOfferCard({
 
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1">
+            <span className="text-xs font-semibold text-muted-foreground">USD:</span>
+            <input
+              type="text"
+              value={precioOfertaUsd}
+              onChange={(e) => handleOfferUsdChange(e.target.value)}
+              placeholder="Precio USD"
+              className="input-base text-xs py-1.5 w-24"
+            />
+          </div>
+          <div className="flex items-center gap-1">
             <span className="text-xs font-semibold text-muted-foreground">ARS:</span>
             <input
               type="text"
@@ -869,16 +946,6 @@ function ActiveOfferCard({
               onChange={(e) => setPrecioOferta(e.target.value)}
               placeholder="Precio ARS"
               className="input-base text-xs py-1.5 w-28 font-bold text-primary"
-            />
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-xs font-semibold text-muted-foreground">USD:</span>
-            <input
-              type="text"
-              value={precioOfertaUsd}
-              onChange={(e) => setPrecioOfertaUsd(e.target.value)}
-              placeholder="Precio USD"
-              className="input-base text-xs py-1.5 w-24"
             />
           </div>
 
@@ -908,11 +975,17 @@ function CandidateOfferCard({
   userEmail,
   userToken,
   onSaved,
+  dolarRate = 1500,
+  roundingIncrement = 10,
+  markupPercentage = 0,
 }: {
   product: Product;
   userEmail: string;
   userToken: string;
   onSaved: () => Promise<void>;
+  dolarRate?: number;
+  roundingIncrement?: number;
+  markupPercentage?: number;
 }) {
   const [precioOferta, setPrecioOferta] = useState("");
   const [precioOfertaUsd, setPrecioOfertaUsd] = useState("");
@@ -925,11 +998,26 @@ function CandidateOfferCard({
       ? Math.round(((basePrice - offerPrice) / basePrice) * 100)
       : 0;
 
+  const handleOfferUsdChange = (val: string) => {
+    setPrecioOfertaUsd(val);
+    const numUsd = Number(val.replace(/[^\d.-]/g, ""));
+    if (numUsd > 0 && dolarRate > 0) {
+      const calculatedArs = calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, 1);
+      setPrecioOferta(String(calculatedArs));
+    } else if (!val.trim()) {
+      setPrecioOferta("");
+    }
+  };
+
   const applyPreset = (pct: number) => {
     const baseArs = toNumber(product.precio);
     const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
-    if (baseArs > 0) setPrecioOferta(String(Math.round(baseArs * (1 - pct / 100))));
-    if (baseUsd > 0) setPrecioOfertaUsd(String(Math.round(baseUsd * (1 - pct / 100))));
+    if (baseUsd > 0) {
+      const newUsd = Math.round(baseUsd * (1 - pct / 100) * 100) / 100;
+      handleOfferUsdChange(String(newUsd));
+    } else if (baseArs > 0) {
+      setPrecioOferta(String(Math.round(baseArs * (1 - pct / 100))));
+    }
   };
 
   async function handleActivate() {
@@ -963,16 +1051,18 @@ function CandidateOfferCard({
           onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
         />
         <div className="min-w-0">
-          <span className="text-[11px] text-muted-foreground font-semibold">{product.categoria}</span>
-          <h3 className="font-bold text-sm text-foreground truncate">{product.nombre}</h3>
-          <p className="text-xs font-semibold text-primary mt-0.5">Precio lista: {money(product.precio)}</p>
+          <span className="text-xs text-muted-foreground font-medium">{product.categoria}</span>
+          <h3 className="font-bold text-sm sm:text-base text-foreground truncate">{product.nombre}</h3>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            <span>Precio lista: <strong className="text-foreground">{money(product.precio)}</strong></span>
+          </div>
         </div>
       </div>
 
-      <div className="w-full sm:w-auto flex flex-col gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-border">
+      <div className="w-full sm:w-auto flex flex-col gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border">
         <div className="flex items-center gap-1 flex-wrap">
-          <span className="text-[11px] text-muted-foreground font-medium">Atajo dto:</span>
-          {[10, 15, 20, 25, 30, 50].map((pct) => (
+          <span className="text-[11px] font-medium text-muted-foreground">Descuento:</span>
+          {[10, 15, 20, 25, 30, 40, 50].map((pct) => (
             <button
               key={pct}
               type="button"
@@ -985,24 +1075,34 @@ function CandidateOfferCard({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <input
-            type="text"
-            value={precioOferta}
-            onChange={(e) => setPrecioOferta(e.target.value)}
-            placeholder="Precio oferta ARS"
-            className="input-base text-xs py-1.5 w-32"
-          />
-          {discountPct > 0 && (
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md">
-              -{discountPct}%
-            </span>
-          )}
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-semibold text-muted-foreground">USD:</span>
+            <input
+              type="text"
+              value={precioOfertaUsd}
+              onChange={(e) => handleOfferUsdChange(e.target.value)}
+              placeholder="Precio USD"
+              className="input-base text-xs py-1.5 w-24"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-semibold text-muted-foreground">ARS:</span>
+            <input
+              type="text"
+              value={precioOferta}
+              onChange={(e) => setPrecioOferta(e.target.value)}
+              placeholder="Precio ARS"
+              className="input-base text-xs py-1.5 w-28 font-bold text-primary"
+            />
+          </div>
+
           <button
             onClick={() => void handleActivate()}
             disabled={saving}
-            className="btn-base bg-primary text-primary-foreground text-xs py-1.5 px-3 hover:opacity-90 flex items-center gap-1 disabled:opacity-50 ml-auto sm:ml-0"
+            className="btn-base bg-primary text-primary-foreground text-xs py-1.5 px-3 hover:opacity-90 flex items-center gap-1 disabled:opacity-50"
           >
-            <Flame className="h-3.5 w-3.5" /> Poner en Oferta
+            <Flame className="h-3.5 w-3.5 fill-primary-foreground" />
+            Activar Oferta
           </button>
         </div>
       </div>
@@ -1325,12 +1425,18 @@ function OfertasDelDiaPanel({
   userEmail,
   userToken,
   onRefresh,
+  dolarRate = 1500,
+  roundingIncrement = 10,
+  markupPercentage = 0,
 }: {
   products: Product[];
   initialBanners?: Banner[];
   userEmail: string;
   userToken: string;
   onRefresh: () => Promise<void>;
+  dolarRate?: number;
+  roundingIncrement?: number;
+  markupPercentage?: number;
 }) {
   const [subTab, setSubTab] = useState<"activas" | "combos" | "agregar">("activas");
   const [search, setSearch] = useState("");
@@ -1556,6 +1662,9 @@ function AdminProductosPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"todos" | "ofertas">("todos");
+  const [dolarRate, setDolarRate] = useState<number>(1500);
+  const [roundingIncrement, setRoundingIncrement] = useState<number>(10);
+  const [markupPercentage, setMarkupPercentage] = useState<number>(0);
 
   const userEmail = user?.email ?? "";
   const userToken = session?.access_token ?? "";
@@ -1574,6 +1683,9 @@ function AdminProductosPage() {
       } else {
         setIsAuthorized(true);
         setProducts(res.products);
+        if (res.dolarRate) setDolarRate(res.dolarRate);
+        if (res.roundingIncrement) setRoundingIncrement(res.roundingIncrement);
+        if (res.markupPercentage !== undefined) setMarkupPercentage(res.markupPercentage);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar.");
@@ -1768,6 +1880,9 @@ function AdminProductosPage() {
                 userEmail={userEmail}
                 userToken={userToken}
                 onRefresh={loadProducts}
+                dolarRate={dolarRate}
+                roundingIncrement={roundingIncrement}
+                markupPercentage={markupPercentage}
               />
             ) : (
               <div className="space-y-6">
@@ -2083,6 +2198,9 @@ function AdminProductosPage() {
           onSaved={() => void loadProducts()}
           userEmail={userEmail}
           userToken={userToken}
+          dolarRate={dolarRate}
+          roundingIncrement={roundingIncrement}
+          markupPercentage={markupPercentage}
         />
       )}
     </div>
