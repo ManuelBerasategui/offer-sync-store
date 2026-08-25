@@ -18,6 +18,8 @@ export type VariantInput = {
   color: string;
   precio?: number | string;
   precio_usd?: number | string;
+  precio_base?: number | string;
+  moneda_base?: "USD" | "ARS" | string;
   stock?: string | null;
   imagen_url?: string | null;
   talles_disponibles?: string[];
@@ -31,8 +33,12 @@ export type ProductInput = {
   categoria: string;
   precio: string;
   precio_usd?: string;
+  precio_base?: number | string;
+  moneda_base?: "USD" | "ARS" | string;
   precio_oferta?: string;
   precio_oferta_usd?: string;
+  precio_oferta_base?: number | string;
+  moneda_oferta_base?: "USD" | "ARS" | string;
   descripcion?: string;
   destacado?: string;
   oferta?: string;
@@ -281,96 +287,91 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
 
       const isNew = !p.id;
 
-      const rawPriceUsd = parsePrice(p.precio_usd);
-      const rawPriceArs = parsePrice(p.precio);
-
-      let priceUsd: number | null = null;
-      let priceArs: number | null = null;
+      let row: Record<string, unknown>;
 
       if (isNew) {
         // AL CREAR PRODUCTO NUEVO:
-        if (rawPriceUsd !== null) {
+        // Se calcula precio base y precio final con recargo 7%
+        const rawPriceUsd = parsePrice(p.precio_usd ?? p.precio_base);
+        const rawPriceArs = parsePrice(p.precio);
+
+        let priceBase: number | null = null;
+        let monedaBase: string = "USD";
+        let priceUsd: number | null = null;
+        let priceArs: number | null = null;
+
+        if (rawPriceUsd !== null && rawPriceUsd > 0) {
+          priceBase = rawPriceUsd;
+          monedaBase = "USD";
           priceUsd = Math.round(rawPriceUsd * 1.07 * 100) / 100;
           priceArs = arsFromUsd(priceUsd);
-        } else if (rawPriceArs !== null) {
+        } else if (rawPriceArs !== null && rawPriceArs > 0) {
+          priceBase = rawPriceArs;
+          monedaBase = "ARS";
           priceArs = Math.round(rawPriceArs * 1.07);
           priceUsd = rate > 0 ? Math.round((priceArs / rate) * 100) / 100 : null;
         }
-      } else {
-        // AL EDITAR PRODUCTO EXISTENTE:
-        if (p.precio_usd_modified && rawPriceUsd !== null) {
-          // El usuario MODIFICÓ el precio USD en el formulario: aplicar 7% sobre el nuevo costo base ingresado
-          priceUsd = Math.round(rawPriceUsd * 1.07 * 100) / 100;
-          priceArs = arsFromUsd(priceUsd);
-        } else if (p.precio_modified && rawPriceArs !== null) {
-          // El usuario MODIFICÓ el precio ARS en el formulario: aplicar 7% sobre el nuevo costo base ingresado
-          priceArs = Math.round(rawPriceArs * 1.07);
-          priceUsd = rate > 0 ? Math.round((priceArs / rate) * 100) / 100 : null;
-        } else {
-          // El usuario NO MODIFICÓ los campos de precio (ej: solo cambió nombre, imagen, descripción o variante):
-          // Conservar los precios existentes sin re-aplicar recargos
-          priceArs = rawPriceArs;
-          priceUsd = rawPriceUsd;
-          if (priceArs === null && priceUsd !== null) {
-            priceArs = arsFromUsd(priceUsd);
-          } else if (priceUsd === null && priceArs !== null && rate > 0) {
-            priceUsd = Math.round((priceArs / rate) * 100) / 100;
-          }
-        }
-      }
 
-      const rawPriceOfertaUsd = parsePrice(p.precio_oferta_usd);
-      const rawPriceOfertaArs = parsePrice(p.precio_oferta);
-      let priceOfertaUsd: number | null = null;
-      let priceOfertaArs: number | null = null;
+        const rawPriceOfertaUsd = parsePrice(p.precio_oferta_usd ?? p.precio_oferta_base);
+        const rawPriceOfertaArs = parsePrice(p.precio_oferta);
+        let priceOfertaBase: number | null = null;
+        let monedaOfertaBase: string | null = null;
+        let priceOfertaUsd: number | null = null;
+        let priceOfertaArs: number | null = null;
 
-      if (isNew) {
-        if (rawPriceOfertaUsd !== null) {
+        if (rawPriceOfertaUsd !== null && rawPriceOfertaUsd > 0) {
+          priceOfertaBase = rawPriceOfertaUsd;
+          monedaOfertaBase = "USD";
           priceOfertaUsd = Math.round(rawPriceOfertaUsd * 1.07 * 100) / 100;
           priceOfertaArs = arsFromUsd(priceOfertaUsd);
-        } else if (rawPriceOfertaArs !== null) {
+        } else if (rawPriceOfertaArs !== null && rawPriceOfertaArs > 0) {
+          priceOfertaBase = rawPriceOfertaArs;
+          monedaOfertaBase = "ARS";
           priceOfertaArs = Math.round(rawPriceOfertaArs * 1.07);
           priceOfertaUsd = rate > 0 ? Math.round((priceOfertaArs / rate) * 100) / 100 : null;
         }
-      } else {
-        if (p.precio_oferta_usd_modified && rawPriceOfertaUsd !== null) {
-          priceOfertaUsd = Math.round(rawPriceOfertaUsd * 1.07 * 100) / 100;
-          priceOfertaArs = arsFromUsd(priceOfertaUsd);
-        } else if (p.precio_oferta_modified && rawPriceOfertaArs !== null) {
-          priceOfertaArs = Math.round(rawPriceOfertaArs * 1.07);
-          priceOfertaUsd = rate > 0 ? Math.round((priceOfertaArs / rate) * 100) / 100 : null;
-        } else {
-          priceOfertaArs = rawPriceOfertaArs;
-          priceOfertaUsd = rawPriceOfertaUsd;
-          if (priceOfertaArs === null && priceOfertaUsd !== null) {
-            priceOfertaArs = arsFromUsd(priceOfertaUsd);
-          } else if (priceOfertaUsd === null && priceOfertaArs !== null && rate > 0) {
-            priceOfertaUsd = Math.round((priceOfertaArs / rate) * 100) / 100;
-          }
-        }
-      }
 
-      const row = {
-        nombre: p.nombre,
-        categoria: p.categoria,
-        precio: priceArs,
-        precio_usd: priceUsd,
-        precio_oferta: priceOfertaArs,
-        precio_oferta_usd: priceOfertaUsd,
-        descripcion: p.descripcion ?? "",
-        destacado: p.destacado ?? "NO",
-        oferta: p.oferta ?? "NO",
-        stock: p.stock ?? "SI",
-        descuento: (p.tiers?.length ?? 0) > 0 ? "SI" : "NO",
-        color_predeterminado: p.color_predeterminado ?? null,
-        imagen_url: p.imagen_url ?? null,
-        metadata: Object.keys(metadata).length > 0 ? metadata : null,
-      };
+        row = {
+          nombre: p.nombre,
+          categoria: p.categoria,
+          precio_base: priceBase,
+          moneda_base: monedaBase,
+          precio: priceArs,
+          precio_usd: priceUsd,
+          precio_oferta_base: priceOfertaBase,
+          moneda_oferta_base: monedaOfertaBase,
+          precio_oferta: priceOfertaArs,
+          precio_oferta_usd: priceOfertaUsd,
+          descripcion: p.descripcion ?? "",
+          destacado: p.destacado ?? "NO",
+          oferta: p.oferta ?? "NO",
+          stock: p.stock ?? "SI",
+          descuento: (p.tiers?.length ?? 0) > 0 ? "SI" : "NO",
+          color_predeterminado: p.color_predeterminado ?? null,
+          imagen_url: p.imagen_url ?? null,
+          metadata: Object.keys(metadata).length > 0 ? metadata : null,
+        };
+      } else {
+        // EN EDICIÓN GENERAL DE PRODUCTO EXISTENTE:
+        // NO se tocan ni recalculan las columnas de precio bajo ninguna circunstancia
+        row = {
+          nombre: p.nombre,
+          categoria: p.categoria,
+          descripcion: p.descripcion ?? "",
+          destacado: p.destacado ?? "NO",
+          oferta: p.oferta ?? "NO",
+          stock: p.stock ?? "SI",
+          descuento: (p.tiers?.length ?? 0) > 0 ? "SI" : "NO",
+          color_predeterminado: p.color_predeterminado ?? null,
+          imagen_url: p.imagen_url ?? null,
+          metadata: Object.keys(metadata).length > 0 ? metadata : null,
+        };
+      }
 
       let productId: string;
 
       if (p.id) {
-        // Actualizar
+        // Actualizar datos generales
         const { error } = await supabaseAdmin.from("products").update(row).eq("id", p.id);
         if (error) throw error;
         productId = p.id;
@@ -386,53 +387,73 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         productId = String(inserted.id);
       }
 
-      // Gestionar variantes: reemplazar todas las del producto
+      // Gestionar variantes: si es creación o edición general
       if (p.variants !== undefined) {
+        // Leer variantes existentes para conservar precios si ya existían
+        const { data: existingVariants } = await supabaseAdmin
+          .from("product_variants")
+          .select("*")
+          .eq("product_id", productId);
+
+        const existingMap = new Map((existingVariants ?? []).map((v) => [v.color.toLowerCase().trim(), v]));
+
         // Borrar las existentes
         await supabaseAdmin.from("product_variants").delete().eq("product_id", productId);
 
         // Insertar las nuevas
         if (p.variants.length > 0) {
           const variantRows = p.variants.map((v) => {
-            const rawVPriceUsd = parsePrice(v.precio_usd);
-            const rawVPriceArs = parsePrice(v.precio);
-            let vPriceUsd: number | null = null;
-            let vPriceArs: number = 0;
+            const colorKey = String(v.color ?? "").toLowerCase().trim();
+            const existing = existingMap.get(colorKey);
+
+            let vBase = existing?.precio_base ?? null;
+            let vMoneda = existing?.moneda_base ?? "USD";
+            let vPriceUsd = existing?.precio_usd ?? null;
+            let vPriceArs = existing?.precio ?? 0;
 
             if (isNew) {
-              if (rawVPriceUsd !== null) {
+              const rawVPriceUsd = parsePrice(v.precio_usd ?? v.precio_base);
+              const rawVPriceArs = parsePrice(v.precio);
+
+              if (rawVPriceUsd !== null && rawVPriceUsd > 0) {
+                vBase = rawVPriceUsd;
+                vMoneda = "USD";
                 vPriceUsd = Math.round(rawVPriceUsd * 1.07 * 100) / 100;
                 vPriceArs = arsFromUsd(vPriceUsd);
-              } else if (rawVPriceArs !== null) {
+              } else if (rawVPriceArs !== null && rawVPriceArs > 0) {
+                vBase = rawVPriceArs;
+                vMoneda = "ARS";
                 vPriceArs = Math.round(rawVPriceArs * 1.07);
-                vPriceUsd = rate > 0 ? Math.round((vPriceArs / rate) * 100) / 100 : (priceUsd ?? null);
+                vPriceUsd = rate > 0 ? Math.round((vPriceArs / rate) * 100) / 100 : null;
               } else {
-                vPriceArs = priceArs ?? 0;
-                vPriceUsd = priceUsd ?? null;
+                vBase = (row.precio_base as number) ?? null;
+                vMoneda = (row.moneda_base as string) ?? "USD";
+                vPriceUsd = (row.precio_usd as number) ?? null;
+                vPriceArs = (row.precio as number) ?? 0;
               }
-            } else {
-              if (v.precio_usd_modified && rawVPriceUsd !== null) {
-                vPriceUsd = Math.round(rawVPriceUsd * 1.07 * 100) / 100;
-                vPriceArs = arsFromUsd(vPriceUsd);
-              } else if (v.precio_modified && rawVPriceArs !== null) {
-                vPriceArs = Math.round(rawVPriceArs * 1.07);
-                vPriceUsd = rate > 0 ? Math.round((vPriceArs / rate) * 100) / 100 : (priceUsd ?? null);
-              } else {
-                vPriceArs = rawVPriceArs ?? (priceArs ?? 0);
-                vPriceUsd = rawVPriceUsd ?? (priceUsd ?? null);
-              }
+            } else if (!existing) {
+              // Nueva variante agregada durante edición: toma el precio del producto padre
+              const parentPriceUsd = parsePrice(p.precio_usd);
+              const parentPriceArs = parsePrice(p.precio);
+              vBase = p.precio_base ? Number(p.precio_base) : (parentPriceUsd ?? null);
+              vMoneda = (p.moneda_base as string) ?? "USD";
+              vPriceUsd = parentPriceUsd ?? null;
+              vPriceArs = parentPriceArs ?? 0;
             }
 
             return {
               id: crypto.randomUUID(),
               product_id: productId,
               color: String(v.color ?? "").trim(),
+              precio_base: vBase,
+              moneda_base: vMoneda,
               precio: vPriceArs,
               precio_usd: vPriceUsd,
               stock: v.stock ?? "SI",
               imagen_url: v.imagen_url ?? null,
             };
           });
+
           const { error: vErr } = await supabaseAdmin.from("product_variants").insert(variantRows);
           if (vErr) throw vErr;
         }
@@ -443,6 +464,190 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       console.error("Error in upsertAdminProduct:", err);
       const msg = (err as any)?.message || (err as any)?.details || String(err);
       return { error: `Error al guardar: ${msg}` };
+    }
+  });
+
+/* ─── Actualizar exclusivamente precios (Admin, Modal de Precio) ── */
+
+export const updateProductPrice = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      email?: string;
+      token?: string;
+      productId: string;
+      sourceCurrency: "USD" | "ARS";
+      basePrice: number;
+      hasOffer?: boolean;
+      offerSourceCurrency?: "USD" | "ARS";
+      offerBasePrice?: number | null;
+      variants?: {
+        id?: string;
+        color: string;
+        sourceCurrency?: "USD" | "ARS";
+        basePrice?: number | null;
+      }[];
+    }) => ({
+      email: str(data?.email, 160).toLowerCase(),
+      token: str(data?.token, 2000),
+      productId: str(data?.productId, 100),
+      sourceCurrency: data?.sourceCurrency === "ARS" ? ("ARS" as const) : ("USD" as const),
+      basePrice: Number(data?.basePrice) || 0,
+      hasOffer: Boolean(data?.hasOffer),
+      offerSourceCurrency: data?.offerSourceCurrency === "ARS" ? ("ARS" as const) : ("USD" as const),
+      offerBasePrice: data?.offerBasePrice !== null && data?.offerBasePrice !== undefined ? Number(data.offerBasePrice) : null,
+      variants: Array.isArray(data?.variants)
+        ? data.variants.map((v) => ({
+            id: v.id ? str(v.id, 100) : undefined,
+            color: str(v.color, 100),
+            sourceCurrency: v.sourceCurrency === "ARS" ? ("ARS" as const) : ("USD" as const),
+            basePrice: v.basePrice !== null && v.basePrice !== undefined ? Number(v.basePrice) : null,
+          }))
+        : undefined,
+    }),
+  )
+  .handler(async ({ data }): Promise<{ success?: boolean; untouched?: boolean; error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+
+      if (!data.productId) throw new Error("ID de producto no provisto.");
+      if (data.basePrice <= 0) throw new Error("El precio base debe ser mayor a 0.");
+
+      // Leer settings de cotización
+      let rate = 1500;
+      let markup = 0;
+      let increment = 10;
+
+      try {
+        const { data: pSettings } = await (supabaseAdmin as any)
+          .from("pricing_settings")
+          .select("last_rate, markup_percentage, rounding_increment")
+          .eq("id", true)
+          .maybeSingle();
+
+        if (pSettings) {
+          if (Number(pSettings.last_rate) > 0) rate = Number(pSettings.last_rate);
+          if (pSettings.markup_percentage !== undefined) markup = Number(pSettings.markup_percentage) / 100;
+          if (Number(pSettings.rounding_increment) > 0) increment = Number(pSettings.rounding_increment);
+        }
+      } catch {}
+
+      if (!rate) {
+        try {
+          const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", { signal: AbortSignal.timeout(3000) });
+          if (apiRes.ok) {
+            const apiData = (await apiRes.json()) as { venta?: number };
+            if (apiData?.venta && apiData.venta > 0) rate = Math.round(apiData.venta);
+          }
+        } catch {}
+      }
+
+      if (!rate) {
+        const { data: cfgRow } = await (supabaseAdmin as any)
+          .from("site_config")
+          .select("valor")
+          .eq("clave", "dolar_cotizacion")
+          .maybeSingle();
+        rate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
+      }
+
+      const arsFromUsd = (usd: number) => {
+        if (increment > 1) {
+          return Math.ceil((usd * rate * (1 + markup)) / increment) * increment;
+        }
+        return Math.round(usd * rate * (1 + markup));
+      };
+
+      // 1. Calcular precio principal a partir del precio base + 7%
+      let finalUsd: number;
+      let finalArs: number;
+
+      if (data.sourceCurrency === "USD") {
+        finalUsd = Math.round(data.basePrice * 1.07 * 100) / 100;
+        finalArs = arsFromUsd(finalUsd);
+      } else {
+        finalArs = Math.round(data.basePrice * 1.07);
+        finalUsd = rate > 0 ? Math.round((finalArs / rate) * 100) / 100 : 0;
+      }
+
+      // 2. Calcular precio de oferta si aplica
+      let finalOfferUsd: number | null = null;
+      let finalOfferArs: number | null = null;
+      let offerBase: number | null = null;
+      let offerMoneda: string | null = null;
+
+      if (data.hasOffer && data.offerBasePrice && data.offerBasePrice > 0) {
+        offerBase = data.offerBasePrice;
+        offerMoneda = data.offerSourceCurrency;
+
+        if (data.offerSourceCurrency === "USD") {
+          finalOfferUsd = Math.round(data.offerBasePrice * 1.07 * 100) / 100;
+          finalOfferArs = arsFromUsd(finalOfferUsd);
+        } else {
+          finalOfferArs = Math.round(data.offerBasePrice * 1.07);
+          finalOfferUsd = rate > 0 ? Math.round((finalOfferArs / rate) * 100) / 100 : null;
+        }
+      }
+
+      const productUpdate: Record<string, unknown> = {
+        precio_base: data.basePrice,
+        moneda_base: data.sourceCurrency,
+        precio_usd: finalUsd,
+        precio: String(finalArs),
+        oferta: data.hasOffer ? "SI" : "NO",
+        precio_oferta_base: offerBase,
+        moneda_oferta_base: offerMoneda,
+        precio_oferta_usd: finalOfferUsd,
+        precio_oferta: finalOfferArs !== null ? String(finalOfferArs) : null,
+        precio_actualizado_en: new Date().toISOString(),
+      };
+
+      const { error: prodErr } = await supabaseAdmin
+        .from("products")
+        .update(productUpdate)
+        .eq("id", data.productId);
+
+      if (prodErr) throw prodErr;
+
+      // 3. Actualizar precios de variantes si corresponde
+      if (data.variants && data.variants.length > 0) {
+        for (const v of data.variants) {
+          let vBase = v.basePrice && v.basePrice > 0 ? v.basePrice : data.basePrice;
+          let vMoneda = v.basePrice && v.basePrice > 0 ? (v.sourceCurrency || data.sourceCurrency) : data.sourceCurrency;
+          let vFinalUsd: number;
+          let vFinalArs: number;
+
+          if (vMoneda === "USD") {
+            vFinalUsd = Math.round(vBase * 1.07 * 100) / 100;
+            vFinalArs = arsFromUsd(vFinalUsd);
+          } else {
+            vFinalArs = Math.round(vBase * 1.07);
+            vFinalUsd = rate > 0 ? Math.round((vFinalArs / rate) * 100) / 100 : 0;
+          }
+
+          const vUpdate = {
+            precio_base: vBase,
+            moneda_base: vMoneda,
+            precio_usd: vFinalUsd,
+            precio: vFinalArs,
+            precio_actualizado_en: new Date().toISOString(),
+          };
+
+          if (v.id) {
+            await supabaseAdmin.from("product_variants").update(vUpdate).eq("id", v.id);
+          } else {
+            await supabaseAdmin
+              .from("product_variants")
+              .update(vUpdate)
+              .eq("product_id", data.productId)
+              .eq("color", v.color);
+          }
+        }
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error("Error in updateProductPrice:", err);
+      return { error: err instanceof Error ? err.message : "Error al actualizar precios." };
     }
   });
 

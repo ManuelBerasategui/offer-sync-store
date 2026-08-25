@@ -4,6 +4,7 @@ import { Component, Fragment, type ReactNode, useCallback, useEffect, useMemo, u
 import {
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp, PackagePlus,
   Flame, Sparkles, Percent, Save, Tag, Search, Check, RefreshCw, Zap, TrendingDown,
+  DollarSign, Coins, ArrowRightLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   getAdminProducts,
   upsertAdminProduct,
+  updateProductPrice,
   deleteAdminProduct,
   uploadAdminProductImage,
   getAdminBanners,
@@ -47,40 +49,44 @@ export const Route = createFileRoute("/admin/productos")({
 /*  Helpers                                                  */
 /* ───────────────────────────────────────────────────────── */
 
-function emptyProduct(): ProductInput {
-  return {
-    nombre: "",
-    categoria: "",
-    precio: "",
-    precio_usd: "",
-    precio_oferta: "",
-    precio_oferta_usd: "",
-    descripcion: "",
-    destacado: "NO",
-    oferta: "NO",
-    stock: "SI",
-    descuento: "NO",
-    color_predeterminado: "",
-    imagen_url: "",
-    tipo_talles: "NINGUNO",
-    talles_disponibles: [],
-    tiers: [],
-    variants: [],
-  };
-}
+const emptyProduct = (): ProductInput => ({
+  nombre: "",
+  categoria: "",
+  precio: "",
+  precio_usd: "",
+  precio_base: "",
+  moneda_base: "USD",
+  precio_oferta: "",
+  precio_oferta_usd: "",
+  precio_oferta_base: "",
+  moneda_oferta_base: "USD",
+  descripcion: "",
+  destacado: "NO",
+  oferta: "NO",
+  stock: "SI",
+  descuento: "NO",
+  color_predeterminado: "",
+  imagen_url: "",
+  tipo_talles: "NINGUNO",
+  talles_disponibles: [],
+  tiers: [],
+  variants: [],
+});
 
 function productToInput(p: Product): ProductInput {
   const tiers: { units: number; percent: number }[] = [];
-  for (const [key, value] of Object.entries(p)) {
-    const m = key.match(/^(\d+)\s*unidad/i);
-    if (m) {
-      const percent = Number(String(value ?? "").replace(/[^0-9.,]/g, "").replace(",", ".")) || 0;
-      const units = Number(m[1]);
-      if (units > 0 && percent > 0) tiers.push({ units, percent });
+  const pRec = p as Record<string, unknown>;
+  const meta = pRec["metadata"];
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    for (const [k, v] of Object.entries(meta as Record<string, unknown>)) {
+      const uMatch = k.match(/(\d+)/);
+      const pMatch = String(v ?? "").match(/(\d+(?:\.\d+)?)/);
+      if (uMatch && pMatch) {
+        tiers.push({ units: Number(uMatch[1]), percent: Number(pMatch[1]) });
+      }
     }
   }
 
-  const pRec = p as Record<string, unknown>;
   const rawTipo = String(pRec["tipo_talles"] ?? "NINGUNO").toUpperCase();
   const tipo_talles: "ZAPATILLAS" | "ROPA" | "NINGUNO" =
     rawTipo === "ZAPATILLAS" ? "ZAPATILLAS" : rawTipo === "ROPA" ? "ROPA" : "NINGUNO";
@@ -98,8 +104,12 @@ function productToInput(p: Product): ProductInput {
     categoria: String(p.categoria ?? ""),
     precio: String(p.precio ?? ""),
     precio_usd: String(pRec["precio_usd"] ?? ""),
+    precio_base: pRec["precio_base"] !== undefined && pRec["precio_base"] !== null ? String(pRec["precio_base"]) : "",
+    moneda_base: String(pRec["moneda_base"] ?? "USD"),
     precio_oferta: String(p.precio_oferta ?? ""),
     precio_oferta_usd: String(pRec["precio_oferta_usd"] ?? ""),
+    precio_oferta_base: pRec["precio_oferta_base"] !== undefined && pRec["precio_oferta_base"] !== null ? String(pRec["precio_oferta_base"]) : "",
+    moneda_oferta_base: String(pRec["moneda_oferta_base"] ?? "USD"),
     descripcion: String(p.descripcion ?? ""),
     destacado: String(p.destacado ?? "NO"),
     oferta: String(p.oferta ?? "NO"),
@@ -110,15 +120,20 @@ function productToInput(p: Product): ProductInput {
     tipo_talles,
     talles_disponibles,
     tiers: tiers.sort((a, b) => a.units - b.units),
-    variants: (p.variants ?? []).map((v) => ({
-      id: String(v.id ?? ""),
-      color: String(v.color ?? ""),
-      precio: String(v.precio ?? ""),
-      precio_usd: String((v as any).precio_usd ?? ""),
-      stock: String(v.stock ?? "SI"),
-      imagen_url: v.imagen_url ?? "",
-      talles_disponibles: v.talles_disponibles ?? [],
-    })),
+    variants: (p.variants ?? []).map((v) => {
+      const vRec = v as Record<string, unknown>;
+      return {
+        id: String(v.id ?? ""),
+        color: String(v.color ?? ""),
+        precio: String(v.precio ?? ""),
+        precio_usd: String(vRec["precio_usd"] ?? ""),
+        precio_base: vRec["precio_base"] !== undefined && vRec["precio_base"] !== null ? String(vRec["precio_base"]) : "",
+        moneda_base: String(vRec["moneda_base"] ?? "USD"),
+        stock: String(v.stock ?? "SI"),
+        imagen_url: v.imagen_url ?? "",
+        talles_disponibles: v.talles_disponibles ?? [],
+      };
+    }),
   };
 }
 
@@ -279,13 +294,489 @@ function ImageDropzone({
 }
 
 /* ───────────────────────────────────────────────────────── */
-/*  Modal de formulario de producto                         */
+/*  Modal dedicado para Edición Exclusiva de Precios         */
+/* ───────────────────────────────────────────────────────── */
+
+function PriceModal({
+  product,
+  onClose,
+  onSaved,
+  userEmail,
+  userToken,
+  dolarRate = 1500,
+  roundingIncrement = 10,
+  markupPercentage = 0,
+}: {
+  product: Product;
+  onClose: () => void;
+  onSaved: () => void;
+  userEmail: string;
+  userToken: string;
+  dolarRate?: number;
+  roundingIncrement?: number;
+  markupPercentage?: number;
+}) {
+  const pRec = product as Record<string, unknown>;
+  const initialMoneda: "USD" | "ARS" =
+    String(pRec["moneda_base"] ?? "").toUpperCase() === "ARS" ? "ARS" : "USD";
+
+  const getInitialBase = () => {
+    if (pRec["precio_base"] !== null && pRec["precio_base"] !== undefined && Number(pRec["precio_base"]) > 0) {
+      return String(pRec["precio_base"]);
+    }
+    if (initialMoneda === "ARS") {
+      const num = toNumber(product.precio);
+      return num > 0 ? String(Math.round(num / 1.07)) : "";
+    }
+    const numUsd = Number(product.precio_usd) || (dolarRate > 0 ? toNumber(product.precio) / dolarRate : 0);
+    return numUsd > 0 ? String(Math.round((numUsd / 1.07) * 100) / 100) : "";
+  };
+
+  const [sourceCurrency, setSourceCurrency] = useState<"USD" | "ARS">(initialMoneda);
+  const [basePrice, setBasePrice] = useState<string>(getInitialBase());
+
+  const isOfferInit = String(product.oferta ?? "").trim().toUpperCase() === "SI";
+  const [hasOffer, setHasOffer] = useState<boolean>(isOfferInit);
+  const [offerSourceCurrency, setOfferSourceCurrency] = useState<"USD" | "ARS">(
+    String(pRec["moneda_oferta_base"] ?? "").toUpperCase() === "ARS" ? "ARS" : "USD"
+  );
+
+  const getInitialOfferBase = () => {
+    if (pRec["precio_oferta_base"] !== null && pRec["precio_oferta_base"] !== undefined && Number(pRec["precio_oferta_base"]) > 0) {
+      return String(pRec["precio_oferta_base"]);
+    }
+    if (offerSourceCurrency === "ARS") {
+      const num = toNumber(product.precio_oferta);
+      return num > 0 ? String(Math.round(num / 1.07)) : "";
+    }
+    const numUsd = Number(product.precio_oferta_usd) || (dolarRate > 0 ? toNumber(product.precio_oferta) / dolarRate : 0);
+    return numUsd > 0 ? String(Math.round((numUsd / 1.07) * 100) / 100) : "";
+  };
+
+  const [offerBasePrice, setOfferBasePrice] = useState<string>(getInitialOfferBase());
+
+  // Variantes
+  const [variantsState, setVariantsState] = useState(
+    (product.variants ?? []).map((v) => {
+      const vRec = v as Record<string, unknown>;
+      const vMoneda: "USD" | "ARS" =
+        String(vRec["moneda_base"] ?? "").toUpperCase() === "ARS" ? "ARS" : "USD";
+      const vBase =
+        vRec["precio_base"] !== null && vRec["precio_base"] !== undefined && Number(vRec["precio_base"]) > 0
+          ? String(vRec["precio_base"])
+          : "";
+      return {
+        id: v.id,
+        color: v.color,
+        hasCustom: Boolean(vBase),
+        sourceCurrency: vMoneda,
+        basePrice: vBase,
+      };
+    })
+  );
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  // Cálculos en vivo para el precio principal
+  const numBase = Number(basePrice.replace(/[^\d.-]/g, "")) || 0;
+  const surchargeAmt = numBase > 0 ? (sourceCurrency === "USD" ? Math.round(numBase * 0.07 * 100) / 100 : Math.round(numBase * 0.07)) : 0;
+  
+  let finalUsd = 0;
+  let finalArs = 0;
+
+  if (numBase > 0) {
+    if (sourceCurrency === "USD") {
+      finalUsd = Math.round(numBase * 1.07 * 100) / 100;
+      finalArs = calcArsFromUsd(finalUsd, dolarRate, markupPercentage, roundingIncrement, 1);
+    } else {
+      finalArs = Math.round(numBase * 1.07);
+      finalUsd = dolarRate > 0 ? Math.round((finalArs / dolarRate) * 100) / 100 : 0;
+    }
+  }
+
+  // Cálculos en vivo para el precio de oferta
+  const numOfferBase = Number(offerBasePrice.replace(/[^\d.-]/g, "")) || 0;
+  const offerSurchargeAmt = numOfferBase > 0 ? (offerSourceCurrency === "USD" ? Math.round(numOfferBase * 0.07 * 100) / 100 : Math.round(numOfferBase * 0.07)) : 0;
+  let finalOfferUsd = 0;
+  let finalOfferArs = 0;
+
+  if (hasOffer && numOfferBase > 0) {
+    if (offerSourceCurrency === "USD") {
+      finalOfferUsd = Math.round(numOfferBase * 1.07 * 100) / 100;
+      finalOfferArs = calcArsFromUsd(finalOfferUsd, dolarRate, markupPercentage, roundingIncrement, 1);
+    } else {
+      finalOfferArs = Math.round(numOfferBase * 1.07);
+      finalOfferUsd = dolarRate > 0 ? Math.round((finalOfferArs / dolarRate) * 100) / 100 : 0;
+    }
+  }
+
+  async function handleSavePrice() {
+    if (numBase <= 0) {
+      setError("El precio base principal debe ser mayor a 0.");
+      return;
+    }
+    if (hasOffer && numOfferBase <= 0) {
+      setError("Si la oferta está activada, debés ingresar un precio base de oferta.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      const res = await updateProductPrice({
+        data: {
+          email: userEmail,
+          token: userToken,
+          productId: String(product.id),
+          sourceCurrency,
+          basePrice: numBase,
+          hasOffer,
+          offerSourceCurrency,
+          offerBasePrice: hasOffer ? numOfferBase : null,
+          variants: variantsState.map((v) => ({
+            id: v.id,
+            color: v.color,
+            sourceCurrency: v.sourceCurrency,
+            basePrice: v.hasCustom && Number(v.basePrice) > 0 ? Number(v.basePrice) : null,
+          })),
+        },
+      });
+
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+
+      toast.success("Precios actualizados con éxito.");
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al guardar el precio.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 p-2 sm:p-4 backdrop-blur-sm">
+      <div className="relative my-4 sm:my-8 w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl bg-card border border-border shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border px-5 py-4 shrink-0 bg-muted/40">
+          <div className="flex items-center gap-2.5">
+            <div className="rounded-xl bg-primary/10 p-2 text-primary">
+              <Coins className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-foreground">
+                Editar Precios
+              </h2>
+              <p className="text-xs text-muted-foreground truncate max-w-[320px] sm:max-w-md">
+                {product.nombre}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="space-y-5 px-5 py-5 overflow-y-auto flex-1">
+          {error && (
+            <div className="rounded-xl bg-destructive/10 border border-destructive/20 px-4 py-2.5 text-sm text-destructive font-medium">
+              {error}
+            </div>
+          )}
+
+          {/* Selector de Moneda Fuente */}
+          <div className="rounded-2xl bg-muted/30 border border-border/80 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                1. Moneda Base de Entrada
+              </label>
+              <span className="text-[11px] text-muted-foreground">
+                Cotización: 1 USDT = <strong>{money(dolarRate)}</strong>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (sourceCurrency !== "USD") {
+                    setSourceCurrency("USD");
+                    if (numBase > 0 && dolarRate > 0) {
+                      setBasePrice(String(Math.round((numBase / dolarRate) * 100) / 100));
+                    }
+                  }
+                }}
+                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${
+                  sourceCurrency === "USD"
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                }`}
+              >
+                <span>💵 Dólares (USDT)</span>
+                {sourceCurrency === "USD" && <Check className="h-3.5 w-3.5" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (sourceCurrency !== "ARS") {
+                    setSourceCurrency("ARS");
+                    if (numBase > 0 && dolarRate > 0) {
+                      setBasePrice(String(Math.round(numBase * dolarRate)));
+                    }
+                  }
+                }}
+                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${
+                  sourceCurrency === "ARS"
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                }`}
+              >
+                <span>🇦🇷 Pesos (ARS)</span>
+                {sourceCurrency === "ARS" && <Check className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+
+            {/* Input Precio Base */}
+            <div>
+              <label className="label-sm">
+                Precio Base ({sourceCurrency === "USD" ? "u$d sin recargo" : "$ sin recargo"}) *
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
+                  {sourceCurrency === "USD" ? "u$d" : "$"}
+                </span>
+                <input
+                  className="input-base pl-11 text-base font-semibold"
+                  value={basePrice}
+                  onChange={(e) => setBasePrice(e.target.value)}
+                  placeholder={sourceCurrency === "USD" ? "Ej: 50" : "Ej: 80000"}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Desglose en vivo de cálculo */}
+            {numBase > 0 && (
+              <div className="rounded-xl bg-card border border-border p-3 space-y-2 text-xs">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Costo base ingresado:</span>
+                  <span>{sourceCurrency === "USD" ? `u$d ${numBase.toFixed(2)}` : money(numBase)}</span>
+                </div>
+                <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-medium">
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" /> Recargo tienda (+7%):
+                  </span>
+                  <span>+ {sourceCurrency === "USD" ? `u$d ${surchargeAmt.toFixed(2)}` : money(surchargeAmt)}</span>
+                </div>
+                <div className="h-px bg-border my-1" />
+                <div className="flex items-center justify-between font-bold text-foreground text-sm">
+                  <span>Precio final en Tienda:</span>
+                  <div className="text-right">
+                    <span className="text-primary">{money(finalArs)}</span>
+                    <span className="text-xs text-muted-foreground ml-2">(u$d {finalUsd.toFixed(2)})</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sección Precio de Oferta */}
+          <div className="rounded-2xl bg-muted/30 border border-border/80 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Flame className="h-4 w-4 text-primary fill-primary" /> 2. Precio de Oferta (Opcional)
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-foreground">
+                <input
+                  type="checkbox"
+                  checked={hasOffer}
+                  onChange={(e) => setHasOffer(e.target.checked)}
+                  className="h-4 w-4 rounded border-border text-primary accent-primary"
+                />
+                Activar oferta
+              </label>
+            </div>
+
+            {hasOffer && (
+              <div className="space-y-3 pt-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOfferSourceCurrency("USD")}
+                    className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                      offerSourceCurrency === "USD"
+                        ? "bg-primary/20 text-primary border-primary"
+                        : "bg-card text-muted-foreground border-border"
+                    }`}
+                  >
+                    Oferta en USD
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOfferSourceCurrency("ARS")}
+                    className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                      offerSourceCurrency === "ARS"
+                        ? "bg-primary/20 text-primary border-primary"
+                        : "bg-card text-muted-foreground border-border"
+                    }`}
+                  >
+                    Oferta en ARS
+                  </button>
+                </div>
+
+                <div>
+                  <label className="label-sm">
+                    Precio Base de Oferta ({offerSourceCurrency === "USD" ? "u$d" : "$"})
+                  </label>
+                  <input
+                    className="input-base"
+                    value={offerBasePrice}
+                    onChange={(e) => setOfferBasePrice(e.target.value)}
+                    placeholder={offerSourceCurrency === "USD" ? "Ej: 40" : "Ej: 64000"}
+                  />
+                </div>
+
+                {numOfferBase > 0 && (
+                  <div className="rounded-xl bg-card border border-border p-2.5 text-xs flex items-center justify-between">
+                    <span className="text-muted-foreground">Oferta final (+7%):</span>
+                    <span className="font-bold text-primary">
+                      {money(finalOfferArs)} <span className="text-muted-foreground font-normal">(u$d {finalOfferUsd.toFixed(2)})</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Sección Precios de Variantes de Color */}
+          {variantsState.length > 0 && (
+            <div className="rounded-2xl bg-muted/30 border border-border/80 p-4 space-y-3">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+                3. Precios de Variantes de Color ({variantsState.length})
+              </label>
+
+              <div className="space-y-2.5">
+                {variantsState.map((v, idx) => {
+                  const vNumBase = Number(String(v.basePrice).replace(/[^\d.-]/g, "")) || 0;
+                  const vFinalUsd = v.sourceCurrency === "USD" ? Math.round(vNumBase * 1.07 * 100) / 100 : (dolarRate > 0 ? Math.round((Math.round(vNumBase * 1.07) / dolarRate) * 100) / 100 : 0);
+                  const vFinalArs = v.sourceCurrency === "USD" ? calcArsFromUsd(vFinalUsd, dolarRate, markupPercentage, roundingIncrement, 1) : Math.round(vNumBase * 1.07);
+
+                  return (
+                    <div key={v.id || idx} className="rounded-xl border border-border bg-card p-3 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-foreground">{v.color}</span>
+                        <label className="flex items-center gap-1.5 cursor-pointer text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            checked={v.hasCustom}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setVariantsState((prev) =>
+                                prev.map((item, i) =>
+                                  i === idx
+                                    ? { ...item, hasCustom: checked, basePrice: checked ? (item.basePrice || basePrice) : "" }
+                                    : item
+                                )
+                              );
+                            }}
+                            className="h-3.5 w-3.5 rounded border-border accent-primary"
+                          />
+                          Precio personalizado
+                        </label>
+                      </div>
+
+                      {v.hasCustom ? (
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <div>
+                            <label className="label-sm">Moneda</label>
+                            <select
+                              className="input-base text-xs py-1"
+                              value={v.sourceCurrency}
+                              onChange={(e) => {
+                                const val = e.target.value as "USD" | "ARS";
+                                setVariantsState((prev) =>
+                                  prev.map((item, i) => (i === idx ? { ...item, sourceCurrency: val } : item))
+                                );
+                              }}
+                            >
+                              <option value="USD">USD (u$d)</option>
+                              <option value="ARS">ARS ($)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="label-sm">Precio Base ({v.sourceCurrency})</label>
+                            <input
+                              className="input-base text-xs py-1"
+                              value={v.basePrice}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setVariantsState((prev) =>
+                                  prev.map((item, i) => (i === idx ? { ...item, basePrice: val } : item))
+                                );
+                              }}
+                              placeholder="Ej: 50"
+                            />
+                          </div>
+                          {vNumBase > 0 && (
+                            <div className="col-span-2 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                              Final (+7%): <strong>{money(vFinalArs)}</strong> (u$d {vFinalUsd.toFixed(2)})
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground italic">
+                          Hereda el precio general del producto ({money(finalArs)})
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2.5 border-t border-border px-5 py-3.5 bg-muted/20 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="btn-base border border-border bg-card hover:bg-muted text-foreground px-4 py-2 text-xs font-semibold"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSavePrice()}
+            disabled={saving}
+            className="btn-base bg-primary text-primary-foreground hover:opacity-90 px-5 py-2 text-xs font-bold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+          >
+            {saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            <span>{saving ? "Guardando..." : "Guardar Precios"}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────── */
+/*  Modal de formulario de producto (General)               */
 /* ───────────────────────────────────────────────────────── */
 
 function ProductModal({
   initial,
   onClose,
   onSaved,
+  onOpenPriceModal,
   userEmail,
   userToken,
   dolarRate = 1500,
@@ -295,6 +786,7 @@ function ProductModal({
   initial: ProductInput;
   onClose: () => void;
   onSaved: () => void;
+  onOpenPriceModal?: (p: ProductInput) => void;
   userEmail: string;
   userToken: string;
   dolarRate?: number;
@@ -317,8 +809,8 @@ function ProductModal({
     setForm((prev) => ({
       ...prev,
       precio_usd: val,
-      precio_usd_modified: true,
-      precio_modified: false,
+      precio_base: val,
+      moneda_base: "USD",
       ...(calculatedArs ? { precio: String(calculatedArs) } : {}),
     }));
   };
@@ -333,8 +825,8 @@ function ProductModal({
     setForm((prev) => ({
       ...prev,
       precio: val,
-      precio_modified: true,
-      precio_usd_modified: false,
+      precio_base: val,
+      moneda_base: "ARS",
       ...(calculatedUsd !== "" ? { precio_usd: calculatedUsd } : {}),
     }));
   };
@@ -348,8 +840,8 @@ function ProductModal({
     setForm((prev) => ({
       ...prev,
       precio_oferta_usd: val,
-      precio_oferta_usd_modified: true,
-      precio_oferta_modified: false,
+      precio_oferta_base: val,
+      moneda_oferta_base: "USD",
       precio_oferta: val.trim() ? (calculatedArs ? String(calculatedArs) : (prev.precio_oferta ?? "")) : "",
     }));
   };
@@ -364,8 +856,8 @@ function ProductModal({
     setForm((prev) => ({
       ...prev,
       precio_oferta: val,
-      precio_oferta_modified: true,
-      precio_oferta_usd_modified: false,
+      precio_oferta_base: val,
+      moneda_oferta_base: "ARS",
       precio_oferta_usd: val.trim() ? (calculatedUsd !== "" ? calculatedUsd : (prev.precio_oferta_usd ?? "")) : "",
     }));
   };
@@ -383,8 +875,8 @@ function ProductModal({
           ? {
               ...v,
               precio_usd: val,
-              precio_usd_modified: true,
-              precio_modified: false,
+              precio_base: val,
+              moneda_base: "USD",
               ...(calculatedArs ? { precio: String(calculatedArs) } : {}),
             }
           : v
@@ -406,8 +898,8 @@ function ProductModal({
           ? {
               ...v,
               precio: val,
-              precio_modified: true,
-              precio_usd_modified: false,
+              precio_base: val,
+              moneda_base: "ARS",
               ...(calculatedUsd !== "" ? { precio_usd: calculatedUsd } : {}),
             }
           : v
@@ -444,13 +936,20 @@ function ProductModal({
 
   async function handleSave() {
     const hasName = Boolean(form.nombre.trim());
-    const hasPriceUsd = Boolean(form.precio_usd?.trim());
-    const hasPriceArs = Boolean(form.precio?.trim());
-
-    if (!hasName || (!hasPriceUsd && !hasPriceArs)) {
-      setError("El nombre y al menos un precio (USD o ARS) son obligatorios.");
+    if (!hasName) {
+      setError("El nombre del producto es obligatorio.");
       return;
     }
+
+    if (!form.id) {
+      const hasPriceUsd = Boolean(form.precio_usd?.trim());
+      const hasPriceArs = Boolean(form.precio?.trim());
+      if (!hasPriceUsd && !hasPriceArs) {
+        setError("Al dar de alta un producto, debés ingresar al menos un precio (USD o ARS).");
+        return;
+      }
+    }
+
     setSaving(true);
     setError("");
     try {
@@ -469,11 +968,11 @@ function ProductModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 p-2 sm:p-4 backdrop-blur-sm">
-      <div className="relative my-4 sm:my-8 w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-card shadow-2xl overflow-hidden">
+      <div className="relative my-4 sm:my-8 w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-card shadow-2xl overflow-hidden border border-border">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6 sm:py-4 shrink-0">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6 sm:py-4 shrink-0 bg-muted/30">
           <h2 className="text-base sm:text-lg font-bold">
-            {form.id ? "Editar producto" : "Nuevo producto"}
+            {form.id ? "Editar datos del producto" : "Nuevo producto"}
           </h2>
           <button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
             <X className="h-5 w-5" />
@@ -511,81 +1010,100 @@ function ProductModal({
               <label className="label-sm">Color predeterminado</label>
               <input className="input-base" value={form.color_predeterminado ?? ""} onChange={(e) => set("color_predeterminado", e.target.value)} placeholder="Ej: Negro" />
             </div>
-            <div>
-              <label className="label-sm">Precio USD * (u$d)</label>
-              <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => handlePriceUsdChange(e.target.value)} placeholder="Ej: 150" />
-              {(() => { const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && (!form.id || form.precio_usd_modified) ? (
-                <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  <Sparkles className="h-3 w-3 shrink-0" />
-                  <span>Nuevo precio final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
+
+            {/* SECCIÓN DE PRECIOS:
+                - Si es edición (form.id): muestra tarjeta informativa con botón dedicado "Editar precio"
+                - Si es alta nueva (!form.id): muestra los inputs de carga inicial */}
+            {form.id ? (
+              <div className="col-span-1 sm:col-span-2 rounded-2xl border border-primary/20 bg-primary/5 p-4 shadow-xs">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                      <Coins className="h-4 w-4" /> Precios Actuales en Tienda
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
+                      <div>
+                        <span className="text-xs text-muted-foreground">Precio ARS:</span>{" "}
+                        <strong className="text-foreground">{money(form.precio)}</strong>
+                      </div>
+                      {form.precio_usd && (
+                        <div>
+                          <span className="text-xs text-muted-foreground">Precio USDT:</span>{" "}
+                          <strong className="text-foreground">u$d {Number(form.precio_usd).toFixed(2)}</strong>
+                        </div>
+                      )}
+                      {form.precio_base && (
+                        <div>
+                          <span className="text-xs text-muted-foreground">Base ingresada:</span>{" "}
+                          <span className="text-xs font-semibold text-muted-foreground">
+                            {form.moneda_base === "ARS" ? money(form.precio_base) : `u$d ${form.precio_base}`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {form.precio_oferta && String(form.oferta).toUpperCase() === "SI" && (
+                      <div className="mt-2 text-xs text-primary font-semibold flex items-center gap-1.5">
+                        <Flame className="h-3.5 w-3.5 fill-primary" />
+                        Oferta activa: {money(form.precio_oferta)} {form.precio_oferta_usd ? `(u$d ${form.precio_oferta_usd})` : ""}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onOpenPriceModal) {
+                        onOpenPriceModal(form);
+                      }
+                    }}
+                    className="btn-base bg-primary text-primary-foreground hover:opacity-90 px-3.5 py-2 text-xs font-bold shrink-0 flex items-center gap-1.5 shadow-sm"
+                  >
+                    <DollarSign className="h-4 w-4" /> Modificar precio
+                  </button>
                 </div>
-              ) : null; })()}
-              {Boolean(form.precio_usd?.trim()) && dolarRate > 0 && (
-                <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                  <Zap className="h-3 w-3 shrink-0" />
-                  <span>Actualiza pesos a <strong>{money(calcArsFromUsd(form.precio_usd ?? "", dolarRate, markupPercentage, roundingIncrement, (!form.id || form.precio_usd_modified) ? 1.07 : 1))}</strong></span>
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="label-sm">Precio oferta USD (u$d)</label>
-              <input className="input-base" value={form.precio_oferta_usd ?? ""} onChange={(e) => handlePriceOfertaUsdChange(e.target.value)} placeholder="Ej: 120" />
-              {(() => { const raw = Number(String(form.precio_oferta_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && (!form.id || form.precio_oferta_usd_modified) ? (
-                <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  <Sparkles className="h-3 w-3 shrink-0" />
-                  <span>Oferta final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
-                </div>
-              ) : null; })()}
-            </div>
-            <div>
-              <label className="label-sm">Precio ARS (calculado automáticamente)</label>
-              <input className="input-base" value={form.precio} onChange={(e) => handlePriceArsChange(e.target.value)} placeholder="Ej: 150000" />
-              {(() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && (!form.id || form.precio_modified) && !form.precio_usd_modified ? (
-                <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  <Sparkles className="h-3 w-3 shrink-0" />
-                  <span>Nuevo precio final ARS (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
-                </div>
-              ) : null; })()}
-            </div>
-            <div>
-              <label className="label-sm">Precio oferta ARS</label>
-              <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => handlePriceOfertaArsChange(e.target.value)} placeholder="Ej: 120000" />
-              {(() => { const raw = Number(String(form.precio_oferta ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && (!form.id || form.precio_oferta_modified) && !form.precio_oferta_usd_modified ? (
-                <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  <Sparkles className="h-3 w-3 shrink-0" />
-                  <span>Oferta final ARS (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
-                </div>
-              ) : null; })()}
-            </div>
-            <div className="col-span-1 sm:col-span-2 rounded-xl bg-muted/40 p-3 border border-border/60">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                  <Percent className="h-3.5 w-3.5 text-primary" /> Atajo para precio de oferta:
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {[10, 15, 20, 25, 30, 40, 50, 70].map((pct) => (
-                    <button
-                      key={pct}
-                      type="button"
-                      onClick={() => {
-                        set("oferta", "SI");
-                        const baseArs = toNumber(form.precio);
-                        const baseUsd = toNumber(form.precio_usd);
-                        if (baseArs > 0) {
-                          set("precio_oferta", String(Math.round(baseArs * (1 - pct / 100))));
-                        }
-                        if (baseUsd > 0) {
-                          set("precio_oferta_usd", String(Math.round(baseUsd * (1 - pct / 100))));
-                        }
-                      }}
-                      className="rounded-lg bg-primary/10 hover:bg-primary/20 text-primary px-2 py-1 text-xs font-bold transition-all"
-                    >
-                      -{pct}%
-                    </button>
-                  ))}
-                </div>
+                <p className="mt-2.5 text-[11px] text-muted-foreground">
+                  ℹ️ Para proteger tus márgenes, editar los datos del producto (nombre, stock, fotos, etc.) nunca altera ni recalcula los precios.
+                </p>
               </div>
-            </div>
+            ) : (
+              <>
+                <div>
+                  <label className="label-sm">Precio Base USD (u$d)</label>
+                  <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => handlePriceUsdChange(e.target.value)} placeholder="Ej: 50" />
+                  {(() => { const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                    <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <Sparkles className="h-3 w-3 shrink-0" />
+                      <span>Precio final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
+                    </div>
+                  ) : null; })()}
+                  {Boolean(form.precio_usd?.trim()) && dolarRate > 0 && (
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                      <Zap className="h-3 w-3 shrink-0" />
+                      <span>Actualiza pesos a <strong>{money(calcArsFromUsd(form.precio_usd ?? "", dolarRate, markupPercentage, roundingIncrement, 1.07))}</strong></span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="label-sm">Precio Base ARS ($)</label>
+                  <input className="input-base" value={form.precio} onChange={(e) => handlePriceArsChange(e.target.value)} placeholder="Ej: 80000" />
+                  {(() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && !form.precio_usd?.trim() ? (
+                    <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <Sparkles className="h-3 w-3 shrink-0" />
+                      <span>Precio final ARS (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                    </div>
+                  ) : null; })()}
+                </div>
+                <div>
+                  <label className="label-sm">Precio oferta Base USD (u$d - opcional)</label>
+                  <input className="input-base" value={form.precio_oferta_usd ?? ""} onChange={(e) => handlePriceOfertaUsdChange(e.target.value)} placeholder="Ej: 40" />
+                </div>
+                <div>
+                  <label className="label-sm">Precio oferta Base ARS (opcional)</label>
+                  <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => handlePriceOfertaArsChange(e.target.value)} placeholder="Ej: 64000" />
+                </div>
+              </>
+            )}
+
             <div className="col-span-1 sm:col-span-2">
               <label className="label-sm">Descripción</label>
               <textarea className="input-base min-h-[80px] resize-y" value={form.descripcion ?? ""} onChange={(e) => set("descripcion", e.target.value)} placeholder="Descripción del producto..." />
@@ -598,80 +1116,114 @@ function ProductModal({
               <label key={field} className="flex cursor-pointer items-center gap-2 text-sm font-medium capitalize">
                 <div
                   onClick={() => set(field, form[field] === "SI" ? "NO" : "SI")}
-                  className={`relative h-5 w-9 rounded-full transition-colors ${form[field] === "SI" ? "bg-primary" : "bg-muted"}`}
+                  className={`h-5 w-9 rounded-full p-0.5 transition-colors ${
+                    form[field] === "SI" ? "bg-primary" : "bg-muted-foreground/30"
+                  }`}
                 >
-                  <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${form[field] === "SI" ? "left-4" : "left-0.5"}`} />
+                  <div
+                    className={`h-4 w-4 rounded-full bg-white transition-transform ${
+                      form[field] === "SI" ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
                 </div>
-                {field}
+                <span>{field}</span>
               </label>
             ))}
           </div>
 
-          {/* Configuración de Talles (Zapatillas / Ropa) */}
-          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
-              Configuración de Talles (Stock por talle)
-            </label>
-            <div className="flex flex-wrap gap-2">
+          {/* Descuento por cantidad */}
+          <div className="rounded-xl border border-border p-4 bg-muted/20">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <span className="text-sm font-bold text-foreground">Descuento por cantidad</span>
+                <p className="text-xs text-muted-foreground">Configurá escalas de descuento progresivas.</p>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  set("tipo_talles", "NINGUNO");
-                  set("talles_disponibles", []);
-                }}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
-                  (form.tipo_talles ?? "NINGUNO") === "NINGUNO"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-foreground border-border hover:bg-muted"
-                }`}
+                onClick={addTier}
+                className="btn-base bg-primary/10 text-primary hover:bg-primary/20 text-xs py-1 px-2.5 flex items-center gap-1"
               >
-                Sin talles
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const defaultShoes = ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"];
-                  set("tipo_talles", "ZAPATILLAS");
-                  if (!form.talles_disponibles || form.talles_disponibles.length === 0) {
-                    set("talles_disponibles", defaultShoes);
-                  }
-                }}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
-                  form.tipo_talles === "ZAPATILLAS"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-foreground border-border hover:bg-muted"
-                }`}
-              >
-                👟 Es Zapatilla
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const defaultClothes = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
-                  set("tipo_talles", "ROPA");
-                  if (!form.talles_disponibles || form.talles_disponibles.length === 0) {
-                    set("talles_disponibles", defaultClothes);
-                  }
-                }}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
-                  form.tipo_talles === "ROPA"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-foreground border-border hover:bg-muted"
-                }`}
-              >
-                👕 Es Ropa
+                <Plus className="h-3.5 w-3.5" /> Agregar escala
               </button>
             </div>
 
-            {form.tipo_talles && form.tipo_talles !== "NINGUNO" && (
-              <div className="mt-3 space-y-2 pt-2 border-t border-border/60">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    Hacé clic en los talles para marcar si están <strong className="text-emerald-600">EN STOCK (verde)</strong> o <strong className="text-muted-foreground">SIN STOCK (gris)</strong>:
-                  </span>
-                </div>
+            {form.tiers && form.tiers.length > 0 ? (
+              <div className="space-y-2">
+                {form.tiers.map((tier, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground min-w-[70px]">Desde</span>
+                    <input
+                      type="number"
+                      min="1"
+                      className="input-base w-24 text-center text-xs py-1"
+                      value={tier.units || ""}
+                      onChange={(e) => updateTier(idx, "units", Number(e.target.value))}
+                      placeholder="U."
+                    />
+                    <span className="text-xs text-muted-foreground">unidades:</span>
+                    <div className="relative flex-1 max-w-[120px]">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="100"
+                        className="input-base pr-6 text-center text-xs py-1"
+                        value={tier.percent || ""}
+                        onChange={(e) => updateTier(idx, "percent", Number(e.target.value))}
+                        placeholder="%"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">OFF</span>
+                    <button
+                      type="button"
+                      onClick={() => removeTier(idx)}
+                      className="rounded-lg p-1 text-destructive hover:bg-destructive/10 ml-auto"
+                      title="Eliminar escala"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">Sin escalas configuradas.</p>
+            )}
+          </div>
 
-                <div className="flex flex-wrap gap-2 pt-1">
+          {/* Tipo de Talles y Talles Disponibles */}
+          <div className="space-y-3 rounded-xl border border-border p-4 bg-muted/20">
+            <div>
+              <label className="label-sm mb-1 block">Tipo de talles</label>
+              <div className="flex flex-wrap gap-2">
+                {(["NINGUNO", "ZAPATILLAS", "ROPA"] as const).map((tipo) => (
+                  <button
+                    key={tipo}
+                    type="button"
+                    onClick={() => {
+                      set("tipo_talles", tipo);
+                      if (tipo === "NINGUNO") {
+                        set("talles_disponibles", []);
+                      }
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all border ${
+                      form.tipo_talles === tipo
+                        ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    {tipo === "NINGUNO" ? "Sin talles" : tipo === "ZAPATILLAS" ? "👟 Zapatillas (35-45)" : "👕 Ropa (XS-XXXL)"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {form.tipo_talles && form.tipo_talles !== "NINGUNO" && (
+              <div>
+                <label className="label-sm mb-1.5 block">
+                  Talles disponibles para el producto general ({form.tipo_talles === "ZAPATILLAS" ? "Números" : "Letras"})
+                </label>
+                <div className="flex flex-wrap gap-1.5">
                   {(form.tipo_talles === "ZAPATILLAS"
                     ? ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"]
                     : ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
@@ -688,10 +1240,10 @@ function ProductModal({
                             : [...normalizedCurrent, talle];
                           set("talles_disponibles", next);
                         }}
-                        className={`h-9 min-w-10 rounded-lg px-2.5 text-xs font-bold transition-all border ${
+                        className={`h-8 min-w-9 rounded-lg px-2 text-xs font-bold transition-all border ${
                           active
                             ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
-                            : "bg-muted/40 text-muted-foreground/60 border-border opacity-60 hover:opacity-100"
+                            : "bg-card text-muted-foreground border-border hover:bg-muted"
                         }`}
                       >
                         {talle} {active ? "✓" : ""}
@@ -729,26 +1281,37 @@ function ProductModal({
                       <label className="label-sm">Stock (SI / NO)</label>
                       <input className="input-base" value={String(v.stock ?? "SI")} onChange={(e) => updateVariant(i, "stock", e.target.value)} />
                     </div>
-                    <div>
-                      <label className="label-sm">Precio USD (u$d - opcional)</label>
-                      <input className="input-base" value={String(v.precio_usd ?? "")} onChange={(e) => updateVariantPriceUsd(i, e.target.value)} placeholder="Ej: 150 (opcional)" />
-                      {!form.id && (() => { const raw = Number(String(v.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                        <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                          <Sparkles className="h-2.5 w-2.5 shrink-0" />
-                          <span>Final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
+                    
+                    {/* Precios de variante solo en alta nueva */}
+                    {!form.id ? (
+                      <>
+                        <div>
+                          <label className="label-sm">Precio Base USD (u$d - opcional)</label>
+                          <input className="input-base" value={String(v.precio_usd ?? "")} onChange={(e) => updateVariantPriceUsd(i, e.target.value)} placeholder="Ej: 50 (opcional)" />
+                          {(() => { const raw = Number(String(v.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                            <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              <Sparkles className="h-2.5 w-2.5 shrink-0" />
+                              <span>Final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
+                            </div>
+                          ) : null; })()}
                         </div>
-                      ) : null; })()}
-                    </div>
-                    <div>
-                      <label className="label-sm">Precio ARS (opcional)</label>
-                      <input className="input-base" value={String(v.precio ?? "")} onChange={(e) => updateVariantPriceArs(i, e.target.value)} placeholder="Ej: 15000 (opcional)" />
-                      {!form.id && !v.precio_usd && (() => { const raw = Number(String(v.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                        <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                          <Sparkles className="h-2.5 w-2.5 shrink-0" />
-                          <span>Final (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                        <div>
+                          <label className="label-sm">Precio Base ARS (opcional)</label>
+                          <input className="input-base" value={String(v.precio ?? "")} onChange={(e) => updateVariantPriceArs(i, e.target.value)} placeholder="Ej: 80000 (opcional)" />
+                          {!v.precio_usd && (() => { const raw = Number(String(v.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                            <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              <Sparkles className="h-2.5 w-2.5 shrink-0" />
+                              <span>Final (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                            </div>
+                          ) : null; })()}
                         </div>
-                      ) : null; })()}
-                    </div>
+                      </>
+                    ) : (
+                      <div className="col-span-1 sm:col-span-2 flex items-center justify-between text-xs py-1.5 px-3 rounded-lg bg-muted/60 text-muted-foreground border border-border/60">
+                        <span>Precio actual en tienda: <strong className="text-foreground">{money(v.precio)}</strong> {v.precio_usd ? `(u$d ${v.precio_usd})` : ""}</span>
+                        <span className="text-[11px] text-primary font-medium">Editá precios desde "Modificar precio"</span>
+                      </div>
+                    )}
                   </div>
                   {form.tipo_talles && form.tipo_talles !== "NINGUNO" && (
                     <div className="mt-2 mb-3 space-y-1">
@@ -1723,6 +2286,7 @@ function AdminProductosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modal, setModal] = useState<ProductInput | null>(null);
+  const [priceModalProduct, setPriceModalProduct] = useState<Product | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"todos" | "ofertas">("todos");
@@ -2094,11 +2658,18 @@ function AdminProductosPage() {
                                   </span>
                                 </td>
                                 <td className="px-3 py-3 sm:px-4">
-                                  <div className="flex items-center justify-end gap-1 sm:gap-2">
+                                  <div className="flex items-center justify-end gap-1 sm:gap-1.5">
+                                    <button
+                                      onClick={() => setPriceModalProduct(p)}
+                                      className="rounded-lg p-1.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                                      title="Editar precio"
+                                    >
+                                      <DollarSign className="h-4 w-4" />
+                                    </button>
                                     <button
                                       onClick={() => setModal(productToInput(p))}
                                       className="rounded-lg p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
-                                      title="Editar"
+                                      title="Editar datos del producto"
                                     >
                                       <Pencil className="h-4 w-4" />
                                     </button>
@@ -2254,12 +2825,38 @@ function AdminProductosPage() {
 
       <SiteFooter config={config} />
 
-      {/* Modal */}
+      {/* Modal de Producto General */}
       {modal && (
         <ProductModal
           initial={modal}
           onClose={() => setModal(null)}
           onSaved={() => void loadProducts()}
+          onOpenPriceModal={(formInput) => {
+            setModal(null);
+            const found = products.find((pr) => String(pr.id) === String(formInput.id));
+            if (found) {
+              setPriceModalProduct(found);
+            } else {
+              setPriceModalProduct(formInput as unknown as Product);
+            }
+          }}
+          userEmail={userEmail}
+          userToken={userToken}
+          dolarRate={dolarRate}
+          roundingIncrement={roundingIncrement}
+          markupPercentage={markupPercentage}
+        />
+      )}
+
+      {/* Modal Dedicado de Edición de Precios */}
+      {priceModalProduct && (
+        <PriceModal
+          product={priceModalProduct}
+          onClose={() => setPriceModalProduct(null)}
+          onSaved={() => {
+            setPriceModalProduct(null);
+            void loadProducts();
+          }}
           userEmail={userEmail}
           userToken={userToken}
           dolarRate={dolarRate}

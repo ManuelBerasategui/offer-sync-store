@@ -6,6 +6,8 @@ export type ProductVariant = {
   color: string;
   precio: number | string;
   precio_usd?: number | string | null;
+  precio_base?: number | string | null;
+  moneda_base?: "USD" | "ARS" | string | null;
   stock?: string | null;
   imagen_url?: string | null;
   talles_disponibles?: string[];
@@ -16,7 +18,13 @@ export type Product = {
   nombre?: string;
   categoria?: string;
   precio?: string;
+  precio_usd?: number | string | null;
+  precio_base?: number | string | null;
+  moneda_base?: "USD" | "ARS" | string | null;
   precio_oferta?: string;
+  precio_oferta_usd?: number | string | null;
+  precio_oferta_base?: number | string | null;
+  moneda_oferta_base?: "USD" | "ARS" | string | null;
   imagen_url?: string;
   descripcion?: string;
   destacado?: string;
@@ -26,7 +34,7 @@ export type Product = {
   color_predeterminado?: string | null;
   ventas_semana?: number;
   variants?: ProductVariant[];
-  [key: string]: string | number | ProductVariant[] | undefined | null;
+  [key: string]: string | number | boolean | ProductVariant[] | undefined | null;
 };
 
 export type Banner = {
