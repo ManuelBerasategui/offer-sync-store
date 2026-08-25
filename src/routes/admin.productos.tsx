@@ -476,20 +476,20 @@ function ProductModal({
             <div>
               <label className="label-sm">Precio ARS (calculado automáticamente)</label>
               <input className="input-base" value={form.precio} onChange={(e) => set("precio", e.target.value)} placeholder="Ej: 150000" />
-              {!form.id && (() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+              {!form.id && !form.precio_usd?.trim() && (() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3 w-3 shrink-0" />
-                  <span>Precio final (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                  <span>Precio final ARS (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
                 </div>
               ) : null; })()}
             </div>
             <div>
               <label className="label-sm">Precio oferta ARS</label>
               <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => set("precio_oferta", e.target.value)} placeholder="Ej: 120000" />
-              {!form.id && (() => { const raw = Number(String(form.precio_oferta ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+              {!form.id && !form.precio_oferta_usd?.trim() && (() => { const raw = Number(String(form.precio_oferta ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3 w-3 shrink-0" />
-                  <span>Oferta final (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                  <span>Oferta final ARS (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
                 </div>
               ) : null; })()}
             </div>

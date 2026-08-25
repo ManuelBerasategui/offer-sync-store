@@ -280,31 +280,49 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       const priceUsd = rawPriceUsd !== null ? Math.round(rawPriceUsd * SURCHARGE * 100) / 100 : null;
 
       const rawPriceArs = parsePrice(p.precio);
-      const priceArs =
-        rawPriceArs !== null
-          ? Math.round(rawPriceArs * SURCHARGE)
-          : priceUsd !== null
-            ? arsFromUsd(priceUsd)
+      let priceArs: number | null = null;
+
+      if (priceUsd !== null) {
+        // Si se ingresó USD, ARS se calcula del USD (que ya tiene el recargo aplicado)
+        priceArs = arsFromUsd(priceUsd);
+      } else if (rawPriceArs !== null) {
+        // Si NO se ingresó USD y solo se ingresó ARS, se aplica el recargo al ARS
+        priceArs = Math.round(rawPriceArs * SURCHARGE);
+      }
+
+      const finalPriceUsd =
+        priceUsd !== null
+          ? priceUsd
+          : priceArs !== null && rate > 0
+            ? Math.round((priceArs / rate) * 100) / 100
             : null;
 
       const rawPriceOfertaUsd = parsePrice(p.precio_oferta_usd);
       const priceOfertaUsd = rawPriceOfertaUsd !== null ? Math.round(rawPriceOfertaUsd * SURCHARGE * 100) / 100 : null;
 
       const rawPriceOfertaArs = parsePrice(p.precio_oferta);
-      const priceOfertaArs =
-        rawPriceOfertaArs !== null
-          ? Math.round(rawPriceOfertaArs * SURCHARGE)
-          : priceOfertaUsd !== null
-            ? arsFromUsd(priceOfertaUsd)
+      let priceOfertaArs: number | null = null;
+
+      if (priceOfertaUsd !== null) {
+        priceOfertaArs = arsFromUsd(priceOfertaUsd);
+      } else if (rawPriceOfertaArs !== null) {
+        priceOfertaArs = Math.round(rawPriceOfertaArs * SURCHARGE);
+      }
+
+      const finalPriceOfertaUsd =
+        priceOfertaUsd !== null
+          ? priceOfertaUsd
+          : priceOfertaArs !== null && rate > 0
+            ? Math.round((priceOfertaArs / rate) * 100) / 100
             : null;
 
       const row = {
         nombre: p.nombre,
         categoria: p.categoria,
         precio: priceArs,
-        precio_usd: priceUsd,
+        precio_usd: finalPriceUsd,
         precio_oferta: priceOfertaArs,
-        precio_oferta_usd: priceOfertaUsd,
+        precio_oferta_usd: finalPriceOfertaUsd,
         descripcion: p.descripcion ?? "",
         destacado: p.destacado ?? "NO",
         oferta: p.oferta ?? "NO",
@@ -346,19 +364,27 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
             const vPriceUsd = rawVPriceUsd !== null ? Math.round(rawVPriceUsd * SURCHARGE * 100) / 100 : null;
 
             const rawVPriceArs = parsePrice(v.precio);
-            const vPriceArs =
-              rawVPriceArs !== null
-                ? Math.round(rawVPriceArs * SURCHARGE)
-                : vPriceUsd !== null
-                  ? arsFromUsd(vPriceUsd)
-                  : (priceArs ?? 0);
+            let vPriceArs: number;
+
+            if (vPriceUsd !== null) {
+              vPriceArs = arsFromUsd(vPriceUsd);
+            } else if (rawVPriceArs !== null) {
+              vPriceArs = Math.round(rawVPriceArs * SURCHARGE);
+            } else {
+              vPriceArs = priceArs ?? 0;
+            }
+
+            const finalVPriceUsd =
+              vPriceUsd !== null
+                ? vPriceUsd
+                : (finalPriceUsd ?? null);
 
             return {
               id: crypto.randomUUID(),
               product_id: productId,
               color: String(v.color ?? "").trim(),
               precio: vPriceArs,
-              precio_usd: vPriceUsd ?? (priceUsd ?? null),
+              precio_usd: finalVPriceUsd,
               stock: v.stock ?? "SI",
               imagen_url: v.imagen_url ?? null,
             };
