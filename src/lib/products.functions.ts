@@ -277,52 +277,64 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       const SURCHARGE = p.id ? 1 : 1.07;
 
       const rawPriceUsd = parsePrice(p.precio_usd);
-      const priceUsd = rawPriceUsd !== null ? Math.round(rawPriceUsd * SURCHARGE * 100) / 100 : null;
-
       const rawPriceArs = parsePrice(p.precio);
+
+      let priceUsd: number | null = null;
       let priceArs: number | null = null;
 
-      if (priceUsd !== null) {
-        // Si se ingresó USD, ARS se calcula del USD (que ya tiene el recargo aplicado)
-        priceArs = arsFromUsd(priceUsd);
-      } else if (rawPriceArs !== null) {
-        // Si NO se ingresó USD y solo se ingresó ARS, se aplica el recargo al ARS
-        priceArs = Math.round(rawPriceArs * SURCHARGE);
-      }
+      if (p.id) {
+        // EN EDICIONES DE PRODUCTO EXISTENTE:
+        // Se respetan los valores exactos enviados por el usuario (no se pisa el ARS editado con el USD viejo)
+        priceArs = rawPriceArs;
+        priceUsd = rawPriceUsd;
 
-      const finalPriceUsd =
-        priceUsd !== null
-          ? priceUsd
-          : priceArs !== null && rate > 0
-            ? Math.round((priceArs / rate) * 100) / 100
-            : null;
+        if (priceArs === null && priceUsd !== null) {
+          priceArs = arsFromUsd(priceUsd);
+        } else if (priceUsd === null && priceArs !== null && rate > 0) {
+          priceUsd = Math.round((priceArs / rate) * 100) / 100;
+        }
+      } else {
+        // EN CREACIÓN DE NUEVO PRODUCTO:
+        if (rawPriceUsd !== null) {
+          priceUsd = Math.round(rawPriceUsd * SURCHARGE * 100) / 100;
+          priceArs = arsFromUsd(priceUsd);
+        } else if (rawPriceArs !== null) {
+          priceArs = Math.round(rawPriceArs * SURCHARGE);
+          priceUsd = rate > 0 ? Math.round((priceArs / rate) * 100) / 100 : null;
+        }
+      }
 
       const rawPriceOfertaUsd = parsePrice(p.precio_oferta_usd);
-      const priceOfertaUsd = rawPriceOfertaUsd !== null ? Math.round(rawPriceOfertaUsd * SURCHARGE * 100) / 100 : null;
-
       const rawPriceOfertaArs = parsePrice(p.precio_oferta);
+      let priceOfertaUsd: number | null = null;
       let priceOfertaArs: number | null = null;
 
-      if (priceOfertaUsd !== null) {
-        priceOfertaArs = arsFromUsd(priceOfertaUsd);
-      } else if (rawPriceOfertaArs !== null) {
-        priceOfertaArs = Math.round(rawPriceOfertaArs * SURCHARGE);
-      }
+      if (p.id) {
+        priceOfertaArs = rawPriceOfertaArs;
+        priceOfertaUsd = rawPriceOfertaUsd;
 
-      const finalPriceOfertaUsd =
-        priceOfertaUsd !== null
-          ? priceOfertaUsd
-          : priceOfertaArs !== null && rate > 0
-            ? Math.round((priceOfertaArs / rate) * 100) / 100
-            : null;
+        if (priceOfertaArs === null && priceOfertaUsd !== null) {
+          priceOfertaArs = arsFromUsd(priceOfertaUsd);
+        } else if (priceOfertaUsd === null && priceOfertaArs !== null && rate > 0) {
+          priceOfertaUsd = Math.round((priceOfertaArs / rate) * 100) / 100;
+        }
+      } else {
+        if (rawPriceOfertaUsd !== null) {
+          priceOfertaUsd = Math.round(rawPriceOfertaUsd * SURCHARGE * 100) / 100;
+          priceOfertaArs = arsFromUsd(priceOfertaUsd);
+        } else if (rawPriceOfertaArs !== null) {
+          priceOfertaArs = Math.round(rawPriceOfertaArs * SURCHARGE);
+          priceOfertaUsd = rate > 0 ? Math.round((priceOfertaArs / rate) * 100) / 100 : null;
+        }
+      }
 
       const row = {
         nombre: p.nombre,
         categoria: p.categoria,
         precio: priceArs,
-        precio_usd: finalPriceUsd,
+        precio_usd: priceUsd,
         precio_oferta: priceOfertaArs,
-        precio_oferta_usd: finalPriceOfertaUsd,
+        precio_oferta_usd: priceOfertaUsd,
         descripcion: p.descripcion ?? "",
         destacado: p.destacado ?? "NO",
         oferta: p.oferta ?? "NO",

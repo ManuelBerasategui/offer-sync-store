@@ -318,6 +318,17 @@ function ProductModal({
     }
   };
 
+  const handlePriceArsChange = (val: string) => {
+    set("precio", val);
+    const numArs = Number(val.replace(/[^\d.-]/g, ""));
+    if (numArs > 0 && dolarRate > 0) {
+      const isNew = !form.id;
+      const effArs = isNew ? Math.round(numArs * 1.07) : numArs;
+      const calculatedUsd = Math.round((effArs / dolarRate) * 100) / 100;
+      set("precio_usd", String(calculatedUsd));
+    }
+  };
+
   const handlePriceOfertaUsdChange = (val: string) => {
     set("precio_oferta_usd", val);
     const numUsd = Number(val.replace(/[^\d.-]/g, ""));
@@ -327,6 +338,19 @@ function ProductModal({
       set("precio_oferta", String(calculatedArs));
     } else if (!val.trim()) {
       set("precio_oferta", "");
+    }
+  };
+
+  const handlePriceOfertaArsChange = (val: string) => {
+    set("precio_oferta", val);
+    const numArs = Number(val.replace(/[^\d.-]/g, ""));
+    if (numArs > 0 && dolarRate > 0) {
+      const isNew = !form.id;
+      const effArs = isNew ? Math.round(numArs * 1.07) : numArs;
+      const calculatedUsd = Math.round((effArs / dolarRate) * 100) / 100;
+      set("precio_oferta_usd", String(calculatedUsd));
+    } else if (!val.trim()) {
+      set("precio_oferta_usd", "");
     }
   };
 
@@ -345,6 +369,28 @@ function ProductModal({
               ...v,
               precio_usd: val,
               ...(calculatedArs ? { precio: String(calculatedArs) } : {}),
+            }
+          : v
+      ),
+    }));
+  };
+
+  const updateVariantPriceArs = (i: number, val: string) => {
+    const numArs = Number(val.replace(/[^\d.-]/g, ""));
+    const isNew = !form.id;
+    const effArs = isNew ? Math.round(numArs * 1.07) : numArs;
+    const calculatedUsd =
+      numArs > 0 && dolarRate > 0
+        ? Math.round((effArs / dolarRate) * 100) / 100
+        : "";
+    setForm((prev) => ({
+      ...prev,
+      variants: (prev.variants ?? []).map((v, idx) =>
+        idx === i
+          ? {
+              ...v,
+              precio: val,
+              ...(calculatedUsd !== "" ? { precio_usd: String(calculatedUsd) } : {}),
             }
           : v
       ),
@@ -475,7 +521,7 @@ function ProductModal({
             </div>
             <div>
               <label className="label-sm">Precio ARS (calculado automáticamente)</label>
-              <input className="input-base" value={form.precio} onChange={(e) => set("precio", e.target.value)} placeholder="Ej: 150000" />
+              <input className="input-base" value={form.precio} onChange={(e) => handlePriceArsChange(e.target.value)} placeholder="Ej: 150000" />
               {!form.id && !form.precio_usd?.trim() && (() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3 w-3 shrink-0" />
@@ -485,7 +531,7 @@ function ProductModal({
             </div>
             <div>
               <label className="label-sm">Precio oferta ARS</label>
-              <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => set("precio_oferta", e.target.value)} placeholder="Ej: 120000" />
+              <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => handlePriceOfertaArsChange(e.target.value)} placeholder="Ej: 120000" />
               {!form.id && !form.precio_oferta_usd?.trim() && (() => { const raw = Number(String(form.precio_oferta ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3 w-3 shrink-0" />
@@ -667,7 +713,7 @@ function ProductModal({
                     </div>
                     <div>
                       <label className="label-sm">Precio USD (u$d - opcional)</label>
-                      <input className="input-base" value={String(v.precio_usd ?? "")} onChange={(e) => updateVariant(i, "precio_usd", e.target.value)} placeholder="Ej: 150 (opcional)" />
+                      <input className="input-base" value={String(v.precio_usd ?? "")} onChange={(e) => updateVariantPriceUsd(i, e.target.value)} placeholder="Ej: 150 (opcional)" />
                       {!form.id && (() => { const raw = Number(String(v.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                         <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                           <Sparkles className="h-2.5 w-2.5 shrink-0" />
@@ -677,8 +723,8 @@ function ProductModal({
                     </div>
                     <div>
                       <label className="label-sm">Precio ARS (opcional)</label>
-                      <input className="input-base" value={String(v.precio ?? "")} onChange={(e) => updateVariant(i, "precio", e.target.value)} placeholder="Ej: 15000 (opcional)" />
-                      {!form.id && (() => { const raw = Number(String(v.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                      <input className="input-base" value={String(v.precio ?? "")} onChange={(e) => updateVariantPriceArs(i, e.target.value)} placeholder="Ej: 15000 (opcional)" />
+                      {!form.id && !v.precio_usd && (() => { const raw = Number(String(v.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                         <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                           <Sparkles className="h-2.5 w-2.5 shrink-0" />
                           <span>Final (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
