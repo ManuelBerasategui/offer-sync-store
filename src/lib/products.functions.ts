@@ -21,6 +21,8 @@ export type VariantInput = {
   stock?: string | null;
   imagen_url?: string | null;
   talles_disponibles?: string[];
+  precio_modified?: boolean;
+  precio_usd_modified?: boolean;
 };
 
 export type ProductInput = {
@@ -43,6 +45,10 @@ export type ProductInput = {
   /** Tiers: [{ units: 5, percent: 2.5 }, ...] */
   tiers?: { units: number; percent: number }[];
   variants?: VariantInput[];
+  precio_modified?: boolean;
+  precio_usd_modified?: boolean;
+  precio_oferta_modified?: boolean;
+  precio_oferta_usd_modified?: boolean;
 };
 
 /* ─── Helper de autorización ───────────────────────────── */
@@ -273,8 +279,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         return Math.round(usd * rate * (1 + markup));
       };
 
-      // El recargo del 7% se aplica SOLO al crear un producto nuevo (no en ediciones)
-      const SURCHARGE = p.id ? 1 : 1.07;
+      const isNew = !p.id;
 
       const rawPriceUsd = parsePrice(p.precio_usd);
       const rawPriceArs = parsePrice(p.precio);
@@ -282,25 +287,35 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       let priceUsd: number | null = null;
       let priceArs: number | null = null;
 
-      if (p.id) {
-        // EN EDICIONES DE PRODUCTO EXISTENTE:
-        // Se respetan los valores exactos enviados por el usuario (no se pisa el ARS editado con el USD viejo)
-        priceArs = rawPriceArs;
-        priceUsd = rawPriceUsd;
-
-        if (priceArs === null && priceUsd !== null) {
-          priceArs = arsFromUsd(priceUsd);
-        } else if (priceUsd === null && priceArs !== null && rate > 0) {
-          priceUsd = Math.round((priceArs / rate) * 100) / 100;
-        }
-      } else {
-        // EN CREACIÓN DE NUEVO PRODUCTO:
+      if (isNew) {
+        // AL CREAR PRODUCTO NUEVO:
         if (rawPriceUsd !== null) {
-          priceUsd = Math.round(rawPriceUsd * SURCHARGE * 100) / 100;
+          priceUsd = Math.round(rawPriceUsd * 1.07 * 100) / 100;
           priceArs = arsFromUsd(priceUsd);
         } else if (rawPriceArs !== null) {
-          priceArs = Math.round(rawPriceArs * SURCHARGE);
+          priceArs = Math.round(rawPriceArs * 1.07);
           priceUsd = rate > 0 ? Math.round((priceArs / rate) * 100) / 100 : null;
+        }
+      } else {
+        // AL EDITAR PRODUCTO EXISTENTE:
+        if (p.precio_usd_modified && rawPriceUsd !== null) {
+          // El usuario MODIFICÓ el precio USD en el formulario: aplicar 7% sobre el nuevo costo base ingresado
+          priceUsd = Math.round(rawPriceUsd * 1.07 * 100) / 100;
+          priceArs = arsFromUsd(priceUsd);
+        } else if (p.precio_modified && rawPriceArs !== null) {
+          // El usuario MODIFICÓ el precio ARS en el formulario: aplicar 7% sobre el nuevo costo base ingresado
+          priceArs = Math.round(rawPriceArs * 1.07);
+          priceUsd = rate > 0 ? Math.round((priceArs / rate) * 100) / 100 : null;
+        } else {
+          // El usuario NO MODIFICÓ los campos de precio (ej: solo cambió nombre, imagen, descripción o variante):
+          // Conservar los precios existentes sin re-aplicar recargos
+          priceArs = rawPriceArs;
+          priceUsd = rawPriceUsd;
+          if (priceArs === null && priceUsd !== null) {
+            priceArs = arsFromUsd(priceUsd);
+          } else if (priceUsd === null && priceArs !== null && rate > 0) {
+            priceUsd = Math.round((priceArs / rate) * 100) / 100;
+          }
         }
       }
 
@@ -309,22 +324,29 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       let priceOfertaUsd: number | null = null;
       let priceOfertaArs: number | null = null;
 
-      if (p.id) {
-        priceOfertaArs = rawPriceOfertaArs;
-        priceOfertaUsd = rawPriceOfertaUsd;
-
-        if (priceOfertaArs === null && priceOfertaUsd !== null) {
-          priceOfertaArs = arsFromUsd(priceOfertaUsd);
-        } else if (priceOfertaUsd === null && priceOfertaArs !== null && rate > 0) {
-          priceOfertaUsd = Math.round((priceOfertaArs / rate) * 100) / 100;
-        }
-      } else {
+      if (isNew) {
         if (rawPriceOfertaUsd !== null) {
-          priceOfertaUsd = Math.round(rawPriceOfertaUsd * SURCHARGE * 100) / 100;
+          priceOfertaUsd = Math.round(rawPriceOfertaUsd * 1.07 * 100) / 100;
           priceOfertaArs = arsFromUsd(priceOfertaUsd);
         } else if (rawPriceOfertaArs !== null) {
-          priceOfertaArs = Math.round(rawPriceOfertaArs * SURCHARGE);
+          priceOfertaArs = Math.round(rawPriceOfertaArs * 1.07);
           priceOfertaUsd = rate > 0 ? Math.round((priceOfertaArs / rate) * 100) / 100 : null;
+        }
+      } else {
+        if (p.precio_oferta_usd_modified && rawPriceOfertaUsd !== null) {
+          priceOfertaUsd = Math.round(rawPriceOfertaUsd * 1.07 * 100) / 100;
+          priceOfertaArs = arsFromUsd(priceOfertaUsd);
+        } else if (p.precio_oferta_modified && rawPriceOfertaArs !== null) {
+          priceOfertaArs = Math.round(rawPriceOfertaArs * 1.07);
+          priceOfertaUsd = rate > 0 ? Math.round((priceOfertaArs / rate) * 100) / 100 : null;
+        } else {
+          priceOfertaArs = rawPriceOfertaArs;
+          priceOfertaUsd = rawPriceOfertaUsd;
+          if (priceOfertaArs === null && priceOfertaUsd !== null) {
+            priceOfertaArs = arsFromUsd(priceOfertaUsd);
+          } else if (priceOfertaUsd === null && priceOfertaArs !== null && rate > 0) {
+            priceOfertaUsd = Math.round((priceOfertaArs / rate) * 100) / 100;
+          }
         }
       }
 
@@ -373,30 +395,40 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         if (p.variants.length > 0) {
           const variantRows = p.variants.map((v) => {
             const rawVPriceUsd = parsePrice(v.precio_usd);
-            const vPriceUsd = rawVPriceUsd !== null ? Math.round(rawVPriceUsd * SURCHARGE * 100) / 100 : null;
-
             const rawVPriceArs = parsePrice(v.precio);
-            let vPriceArs: number;
+            let vPriceUsd: number | null = null;
+            let vPriceArs: number = 0;
 
-            if (vPriceUsd !== null) {
-              vPriceArs = arsFromUsd(vPriceUsd);
-            } else if (rawVPriceArs !== null) {
-              vPriceArs = Math.round(rawVPriceArs * SURCHARGE);
+            if (isNew) {
+              if (rawVPriceUsd !== null) {
+                vPriceUsd = Math.round(rawVPriceUsd * 1.07 * 100) / 100;
+                vPriceArs = arsFromUsd(vPriceUsd);
+              } else if (rawVPriceArs !== null) {
+                vPriceArs = Math.round(rawVPriceArs * 1.07);
+                vPriceUsd = rate > 0 ? Math.round((vPriceArs / rate) * 100) / 100 : (priceUsd ?? null);
+              } else {
+                vPriceArs = priceArs ?? 0;
+                vPriceUsd = priceUsd ?? null;
+              }
             } else {
-              vPriceArs = priceArs ?? 0;
+              if (v.precio_usd_modified && rawVPriceUsd !== null) {
+                vPriceUsd = Math.round(rawVPriceUsd * 1.07 * 100) / 100;
+                vPriceArs = arsFromUsd(vPriceUsd);
+              } else if (v.precio_modified && rawVPriceArs !== null) {
+                vPriceArs = Math.round(rawVPriceArs * 1.07);
+                vPriceUsd = rate > 0 ? Math.round((vPriceArs / rate) * 100) / 100 : (priceUsd ?? null);
+              } else {
+                vPriceArs = rawVPriceArs ?? (priceArs ?? 0);
+                vPriceUsd = rawVPriceUsd ?? (priceUsd ?? null);
+              }
             }
-
-            const finalVPriceUsd =
-              vPriceUsd !== null
-                ? vPriceUsd
-                : (finalPriceUsd ?? null);
 
             return {
               id: crypto.randomUUID(),
               product_id: productId,
               color: String(v.color ?? "").trim(),
               precio: vPriceArs,
-              precio_usd: finalVPriceUsd,
+              precio_usd: vPriceUsd,
               stock: v.stock ?? "SI",
               imagen_url: v.imagen_url ?? null,
             };

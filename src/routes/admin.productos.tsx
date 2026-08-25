@@ -309,57 +309,72 @@ function ProductModal({
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handlePriceUsdChange = (val: string) => {
-    set("precio_usd", val);
     const numUsd = Number(val.replace(/[^\d.-]/g, ""));
-    if (numUsd > 0 && dolarRate > 0) {
-      const isNew = !form.id;
-      const calculatedArs = calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, isNew ? 1.07 : 1);
-      set("precio", String(calculatedArs));
-    }
+    const calculatedArs =
+      numUsd > 0 && dolarRate > 0
+        ? calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, 1.07)
+        : "";
+    setForm((prev) => ({
+      ...prev,
+      precio_usd: val,
+      precio_usd_modified: true,
+      precio_modified: false,
+      ...(calculatedArs ? { precio: String(calculatedArs) } : {}),
+    }));
   };
 
   const handlePriceArsChange = (val: string) => {
-    set("precio", val);
     const numArs = Number(val.replace(/[^\d.-]/g, ""));
+    let calculatedUsd = "";
     if (numArs > 0 && dolarRate > 0) {
-      const isNew = !form.id;
-      const effArs = isNew ? Math.round(numArs * 1.07) : numArs;
-      const calculatedUsd = Math.round((effArs / dolarRate) * 100) / 100;
-      set("precio_usd", String(calculatedUsd));
+      const effArs = Math.round(numArs * 1.07);
+      calculatedUsd = String(Math.round((effArs / dolarRate) * 100) / 100);
     }
+    setForm((prev) => ({
+      ...prev,
+      precio: val,
+      precio_modified: true,
+      precio_usd_modified: false,
+      ...(calculatedUsd !== "" ? { precio_usd: calculatedUsd } : {}),
+    }));
   };
 
   const handlePriceOfertaUsdChange = (val: string) => {
-    set("precio_oferta_usd", val);
     const numUsd = Number(val.replace(/[^\d.-]/g, ""));
-    if (numUsd > 0 && dolarRate > 0) {
-      const isNew = !form.id;
-      const calculatedArs = calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, isNew ? 1.07 : 1);
-      set("precio_oferta", String(calculatedArs));
-    } else if (!val.trim()) {
-      set("precio_oferta", "");
-    }
+    const calculatedArs =
+      numUsd > 0 && dolarRate > 0
+        ? calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, 1.07)
+        : "";
+    setForm((prev) => ({
+      ...prev,
+      precio_oferta_usd: val,
+      precio_oferta_usd_modified: true,
+      precio_oferta_modified: false,
+      precio_oferta: val.trim() ? (calculatedArs ? String(calculatedArs) : (prev.precio_oferta ?? "")) : "",
+    }));
   };
 
   const handlePriceOfertaArsChange = (val: string) => {
-    set("precio_oferta", val);
     const numArs = Number(val.replace(/[^\d.-]/g, ""));
+    let calculatedUsd = "";
     if (numArs > 0 && dolarRate > 0) {
-      const isNew = !form.id;
-      const effArs = isNew ? Math.round(numArs * 1.07) : numArs;
-      const calculatedUsd = Math.round((effArs / dolarRate) * 100) / 100;
-      set("precio_oferta_usd", String(calculatedUsd));
-    } else if (!val.trim()) {
-      set("precio_oferta_usd", "");
+      const effArs = Math.round(numArs * 1.07);
+      calculatedUsd = String(Math.round((effArs / dolarRate) * 100) / 100);
     }
+    setForm((prev) => ({
+      ...prev,
+      precio_oferta: val,
+      precio_oferta_modified: true,
+      precio_oferta_usd_modified: false,
+      precio_oferta_usd: val.trim() ? (calculatedUsd !== "" ? calculatedUsd : (prev.precio_oferta_usd ?? "")) : "",
+    }));
   };
 
   const updateVariantPriceUsd = (i: number, val: string) => {
     const numUsd = Number(val.replace(/[^\d.-]/g, ""));
-    const isNew = !form.id;
     const calculatedArs =
       numUsd > 0 && dolarRate > 0
-        ? calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, isNew ? 1.07 : 1)
+        ? calcArsFromUsd(numUsd, dolarRate, markupPercentage, roundingIncrement, 1.07)
         : "";
     setForm((prev) => ({
       ...prev,
@@ -368,6 +383,8 @@ function ProductModal({
           ? {
               ...v,
               precio_usd: val,
+              precio_usd_modified: true,
+              precio_modified: false,
               ...(calculatedArs ? { precio: String(calculatedArs) } : {}),
             }
           : v
@@ -377,12 +394,11 @@ function ProductModal({
 
   const updateVariantPriceArs = (i: number, val: string) => {
     const numArs = Number(val.replace(/[^\d.-]/g, ""));
-    const isNew = !form.id;
-    const effArs = isNew ? Math.round(numArs * 1.07) : numArs;
-    const calculatedUsd =
-      numArs > 0 && dolarRate > 0
-        ? Math.round((effArs / dolarRate) * 100) / 100
-        : "";
+    let calculatedUsd = "";
+    if (numArs > 0 && dolarRate > 0) {
+      const effArs = Math.round(numArs * 1.07);
+      calculatedUsd = String(Math.round((effArs / dolarRate) * 100) / 100);
+    }
     setForm((prev) => ({
       ...prev,
       variants: (prev.variants ?? []).map((v, idx) =>
@@ -390,7 +406,9 @@ function ProductModal({
           ? {
               ...v,
               precio: val,
-              ...(calculatedUsd !== "" ? { precio_usd: String(calculatedUsd) } : {}),
+              precio_modified: true,
+              precio_usd_modified: false,
+              ...(calculatedUsd !== "" ? { precio_usd: calculatedUsd } : {}),
             }
           : v
       ),
@@ -496,23 +514,23 @@ function ProductModal({
             <div>
               <label className="label-sm">Precio USD * (u$d)</label>
               <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => handlePriceUsdChange(e.target.value)} placeholder="Ej: 150" />
-              {!form.id && (() => { const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+              {(() => { const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && (!form.id || form.precio_usd_modified) ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3 w-3 shrink-0" />
-                  <span>Precio final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
+                  <span>Nuevo precio final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
                 </div>
               ) : null; })()}
               {Boolean(form.precio_usd?.trim()) && dolarRate > 0 && (
                 <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
                   <Zap className="h-3 w-3 shrink-0" />
-                  <span>Actualiza pesos a <strong>{money(calcArsFromUsd(form.precio_usd ?? "", dolarRate, markupPercentage, roundingIncrement, !form.id ? 1.07 : 1))}</strong></span>
+                  <span>Actualiza pesos a <strong>{money(calcArsFromUsd(form.precio_usd ?? "", dolarRate, markupPercentage, roundingIncrement, (!form.id || form.precio_usd_modified) ? 1.07 : 1))}</strong></span>
                 </div>
               )}
             </div>
             <div>
               <label className="label-sm">Precio oferta USD (u$d)</label>
               <input className="input-base" value={form.precio_oferta_usd ?? ""} onChange={(e) => handlePriceOfertaUsdChange(e.target.value)} placeholder="Ej: 120" />
-              {!form.id && (() => { const raw = Number(String(form.precio_oferta_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+              {(() => { const raw = Number(String(form.precio_oferta_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && (!form.id || form.precio_oferta_usd_modified) ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3 w-3 shrink-0" />
                   <span>Oferta final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
@@ -522,17 +540,17 @@ function ProductModal({
             <div>
               <label className="label-sm">Precio ARS (calculado automáticamente)</label>
               <input className="input-base" value={form.precio} onChange={(e) => handlePriceArsChange(e.target.value)} placeholder="Ej: 150000" />
-              {!form.id && !form.precio_usd?.trim() && (() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+              {(() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && (!form.id || form.precio_modified) && !form.precio_usd_modified ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3 w-3 shrink-0" />
-                  <span>Precio final ARS (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                  <span>Nuevo precio final ARS (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
                 </div>
               ) : null; })()}
             </div>
             <div>
               <label className="label-sm">Precio oferta ARS</label>
               <input className="input-base" value={form.precio_oferta ?? ""} onChange={(e) => handlePriceOfertaArsChange(e.target.value)} placeholder="Ej: 120000" />
-              {!form.id && !form.precio_oferta_usd?.trim() && (() => { const raw = Number(String(form.precio_oferta ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+              {(() => { const raw = Number(String(form.precio_oferta ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && (!form.id || form.precio_oferta_modified) && !form.precio_oferta_usd_modified ? (
                 <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Sparkles className="h-3 w-3 shrink-0" />
                   <span>Oferta final ARS (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
