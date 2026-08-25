@@ -1,12 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Check, Search, RefreshCw, MessageCircle, PackageCheck, DollarSign, ShoppingBag } from "lucide-react";
+import { Copy, Check, Search, RefreshCw, MessageCircle, PackageCheck, DollarSign, Building2, CheckCircle2 } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { AdminHeader } from "@/components/AdminHeader";
 import { storeQueryOptions } from "@/lib/store-query";
-import { getAdminPaidOrders, type AdminOrder } from "@/lib/orders.functions";
+import { getAdminPaidOrders, updateOrderStatus, type AdminOrder } from "@/lib/orders.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { money } from "@/lib/store";
 
@@ -97,6 +97,26 @@ function AdminOrdenesPage() {
     const promedio = count > 0 ? Math.round(totalVentas / count) : 0;
     return { totalVentas, count, promedio };
   }, [orders]);
+
+  const handleStatusChange = async (orderCode: string, newStatus: string) => {
+    try {
+      const res = await updateOrderStatus({
+        data: {
+          orderCode,
+          estado: newStatus,
+          token: session?.access_token ?? "",
+          email: user?.email ?? "",
+        },
+      });
+      if (res.status === "success") {
+        setOrders((prev) =>
+          prev.map((o) => (o.order_code === orderCode ? { ...o, estado: newStatus } : o)),
+        );
+      }
+    } catch (err) {
+      console.error("Error actualizando orden:", err);
+    }
+  };
 
   const copyShippingLabel = (order: AdminOrder) => {
     const text = `DESTINATARIO: ${order.nombre}
@@ -262,15 +282,24 @@ TOTAL: ${money(order.total)}`;
                 <div key={order.id} className="card-soft overflow-hidden p-3.5 sm:p-6 border border-border shadow-sm transition-all hover:border-primary/50">
                   {/* Encabezado de la orden */}
                   <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                       <span className="font-mono text-base font-bold text-primary bg-primary/10 px-3 py-1 rounded-lg">
                         {order.order_code}
                       </span>
-                      <span className="rounded-md bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase">
-                        ✓ Pagado
-                      </span>
+
+                      {order.estado === "pagado" ? (
+                        <span className="rounded-md bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase">
+                          ✓ Pagado
+                        </span>
+                      ) : (
+                        <span className="rounded-md bg-amber-500/15 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase">
+                          ⏳ Pendiente
+                        </span>
+                      )}
+
                       {order.metodo_pago && (
-                        <span className="rounded-md bg-surface border border-border px-2 py-0.5 text-xs text-muted-foreground capitalize">
+                        <span className="flex items-center gap-1 rounded-md bg-surface border border-border px-2 py-0.5 text-xs text-muted-foreground capitalize">
+                          {order.metodo_pago === "transferencia" && <Building2 className="h-3 w-3 text-emerald-600" />}
                           {order.metodo_pago}
                         </span>
                       )}
@@ -320,14 +349,33 @@ TOTAL: ${money(order.total)}`;
                         </div>
                       </div>
 
-                      {/* Acciones para el Cliente */}
+                      {/* Acciones para el Cliente y Estado */}
                       <div className="mt-4 pt-3 border-t border-border flex flex-wrap gap-2">
+                        {order.estado === "pendiente" ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleStatusChange(order.order_code, "pagado")}
+                            className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 flex items-center gap-1.5 shadow-sm"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Marcar como Pagado
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void handleStatusChange(order.order_code, "pendiente")}
+                            className="btn-base border border-border bg-background hover:bg-surface text-xs font-semibold py-2 px-3 text-muted-foreground"
+                          >
+                            Revertir a Pendiente
+                          </button>
+                        )}
+
                         {waClient && (
                           <a
                             href={waClient}
                             target="_blank"
                             rel="noreferrer"
-                            className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-3 flex items-center gap-1.5"
+                            className="btn-base bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#128C7E] dark:text-[#25D366] text-xs font-semibold py-2 px-3 flex items-center gap-1.5"
                           >
                             <MessageCircle className="h-3.5 w-3.5" />
                             WhatsApp Cliente

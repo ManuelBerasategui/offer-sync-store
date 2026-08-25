@@ -32,6 +32,8 @@ import {
   normCat,
   parseCategoryRules,
   findRuleForCat,
+  transferPrice,
+  transferDiscountPct,
   type ProductVariant,
 } from "@/lib/store";
 
@@ -244,18 +246,26 @@ function ProductoPage() {
               </p>
             ) : (
               <>
-                <div className="mt-4 flex flex-wrap items-baseline gap-2">
-                  {percent > 0 && (
-                    <span className="tabular-nums text-base text-muted-foreground line-through">
-                      {money(priceOf(product))}
+                <div className="mt-4 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    {percent > 0 && (
+                      <span className="tabular-nums text-base text-muted-foreground line-through">
+                        {money(priceOf(product))}
+                      </span>
+                    )}
+                    <span className="tabular-nums text-3xl font-bold text-foreground">
+                      {money(transferPrice(unit, transferDiscountPct(config)))}
                     </span>
-                  )}
-                  <span className="tabular-nums text-3xl font-bold text-foreground">
-                    {money(unit)}
-                  </span>
-                  {percent > 0 && (
-                    <span className="text-xs font-bold text-primary">-{percent}%</span>
-                  )}
+                    <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                      {transferDiscountPct(config)}% OFF con Transferencia
+                    </span>
+                    {percent > 0 && (
+                      <span className="text-xs font-bold text-primary">({percent}% OFF x volumen)</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    o <span className="font-semibold text-foreground/80">{money(unit)}</span> con tarjeta o Mercado Pago
+                  </p>
                 </div>
 
                 {/* AVISO DE MÍNIMO DE COMPRA POR CATEGORÍA EN LA FICHA DEL PRODUCTO */}

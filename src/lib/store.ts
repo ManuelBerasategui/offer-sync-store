@@ -68,6 +68,28 @@ export const hasOffer = (p: Product) => isYes(p.oferta) && toNumber(p.precio_ofe
 export const priceOf = (p: Product) =>
   hasOffer(p) ? toNumber(p.precio_oferta) : toNumber(p.precio);
 
+export const DEFAULT_TRANSFER_DISCOUNT = 7;
+
+export function transferDiscountPct(config?: SiteConfig): number {
+  const custom = Number(config?.["transferencia_descuento_pct"]);
+  return Number.isFinite(custom) && custom >= 0 && custom <= 50 ? custom : DEFAULT_TRANSFER_DISCOUNT;
+}
+
+export function transferPrice(price: number, discountPct = DEFAULT_TRANSFER_DISCOUNT): number {
+  if (price <= 0) return 0;
+  return Math.round(price * (1 - discountPct / 100));
+}
+
+export function getBankInfo(config?: SiteConfig) {
+  return {
+    alias: config?.["transferencia_alias"] || "teimportamos.mp",
+    cbu: config?.["transferencia_cbu"] || "0000003100012345678901",
+    titular: config?.["transferencia_titular"] || "Te Importamos Argentina",
+    banco: config?.["transferencia_banco"] || "Mercado Pago / Banco",
+    descuentoPct: transferDiscountPct(config),
+  };
+}
+
 /** Convierte links de Google Drive a una URL de imagen directa. */
 export function imageUrl(raw?: string) {
   const url = (raw ?? "").trim();

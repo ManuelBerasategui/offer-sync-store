@@ -18,6 +18,8 @@ import {
   checkCategoryMins,
   normCat,
   findProduct,
+  transferPrice,
+  transferDiscountPct,
 } from "@/lib/store";
 
 export const Route = createFileRoute("/carrito")({
@@ -232,11 +234,24 @@ function CarritoPage() {
               })}
             </ul>
 
-            <div className="mt-6 flex items-baseline justify-between rounded-xl border border-border bg-card p-5">
-              <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
-                Total
-              </span>
-              <span className="tabular-nums text-2xl font-bold">{money(cart.total)}</span>
+            <div className="mt-6 flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
+              <div className="flex items-baseline justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
+                    Total con Transferencia
+                  </span>
+                  <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                    {transferDiscountPct(config)}% OFF
+                  </span>
+                </div>
+                <span className="tabular-nums text-2xl font-bold text-foreground">
+                  {money(transferPrice(cart.total, transferDiscountPct(config)))}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
+                <span>Total con tarjeta o Mercado Pago:</span>
+                <span className="font-semibold tabular-nums text-foreground/80">{money(cart.total)}</span>
+              </div>
             </div>
 
             <div className="mt-4">

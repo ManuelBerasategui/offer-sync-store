@@ -58,6 +58,12 @@ function AdminConfiguracionPage() {
   const [liveUsdt, setLiveUsdt] = useState<number | null>(null);
   const [dbDolarRate, setDbDolarRate] = useState<number | null>(null);
 
+  const [bankAlias, setBankAlias] = useState<string>(config["transferencia_alias"] ?? "teimportamos.mp");
+  const [bankCbu, setBankCbu] = useState<string>(config["transferencia_cbu"] ?? "0000003100012345678901");
+  const [bankTitular, setBankTitular] = useState<string>(config["transferencia_titular"] ?? "Te Importamos Argentina");
+  const [bankBanco, setBankBanco] = useState<string>(config["transferencia_banco"] ?? "Mercado Pago");
+  const [bankDiscountPct, setBankDiscountPct] = useState<string>(config["transferencia_descuento_pct"] ?? "7");
+
   useEffect(() => {
     fetch("https://dolarapi.com/v1/dolares/cripto")
       .then((res) => res.json())
@@ -175,6 +181,13 @@ function AdminConfiguracionPage() {
           token: userToken,
           rules: ruleInputs,
           dolarCotizacion: Number(dolarRate) || 1500,
+          bankInfo: {
+            alias: bankAlias,
+            cbu: bankCbu,
+            titular: bankTitular,
+            banco: bankBanco,
+            descuentoPct: Number(bankDiscountPct) || 7,
+          },
         },
       });
       if (res.error) { setError(res.error); return; }
@@ -206,8 +219,8 @@ function AdminConfiguracionPage() {
 
       <main className="mx-auto max-w-[900px] px-3 py-4 sm:px-6 sm:py-8">
         <AdminHeader
-          title="Configuración de Categorías"
-          subtitle="Descuentos por cantidad y mínimos de compra según categoría."
+          title="Configuración de Tienda"
+          subtitle="Transferencias bancarias, cotizaciones y reglas de categoría."
           currentRoute="configuracion"
           actions={
             <button
@@ -230,6 +243,79 @@ function AdminConfiguracionPage() {
             ✓ {successMsg}
           </div>
         )}
+
+        {/* Datos Bancarios para Transferencia */}
+        <div className="mb-6 rounded-2xl border border-emerald-500/30 bg-card p-3.5 sm:p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-base font-bold flex items-center gap-2 text-foreground">
+              🏦 Datos de Transferencia Bancaria (Checkout con Descuento)
+            </h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Estos datos se mostrarán a los clientes al momento de pagar por transferencia en la web.
+          </p>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Alias</span>
+              <input
+                type="text"
+                className="input-base"
+                value={bankAlias}
+                onChange={(e) => setBankAlias(e.target.value)}
+                placeholder="ej: teimportamos.mp"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">CBU / CVU</span>
+              <input
+                type="text"
+                className="input-base font-mono"
+                value={bankCbu}
+                onChange={(e) => setBankCbu(e.target.value)}
+                placeholder="ej: 00000031000..."
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Titular de la cuenta</span>
+              <input
+                type="text"
+                className="input-base"
+                value={bankTitular}
+                onChange={(e) => setBankTitular(e.target.value)}
+                placeholder="ej: Manuel Berasategui"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Banco / Billetera</span>
+              <input
+                type="text"
+                className="input-base"
+                value={bankBanco}
+                onChange={(e) => setBankBanco(e.target.value)}
+                placeholder="ej: Mercado Pago"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Descuento por Transferencia (%)</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={50}
+                  className="input-base w-24 font-bold text-emerald-600"
+                  value={bankDiscountPct}
+                  onChange={(e) => setBankDiscountPct(e.target.value)}
+                />
+                <span className="text-xs font-semibold text-muted-foreground">% OFF en checkout</span>
+              </div>
+            </label>
+          </div>
+        </div>
 
         {/* Cotización Dólar para valor inicial */}
         <div className="mb-6 rounded-2xl border border-border bg-card p-3.5 sm:p-5">

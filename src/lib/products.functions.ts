@@ -724,11 +724,24 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
 
 export const upsertCategoryRules = createServerFn({ method: "POST" })
   .validator(
-    (data: { email?: string; token?: string; rules: CategoryRuleInput[]; dolarCotizacion?: number }) => ({
+    (data: {
+      email?: string;
+      token?: string;
+      rules: CategoryRuleInput[];
+      dolarCotizacion?: number;
+      bankInfo?: {
+        alias?: string;
+        cbu?: string;
+        titular?: string;
+        banco?: string;
+        descuentoPct?: number;
+      };
+    }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
       rules: data.rules,
       dolarCotizacion: data.dolarCotizacion,
+      bankInfo: data.bankInfo,
     }),
   )
   .handler(async ({ data }): Promise<{ error?: string }> => {
@@ -766,6 +779,19 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
           { clave: "dolar_cotizacion", valor: String(data.dolarCotizacion) },
           { onConflict: "clave" }
         );
+      }
+
+      if (data.bankInfo) {
+        const bankRows = [
+          { clave: "transferencia_alias", valor: data.bankInfo.alias ?? "teimportamos.mp" },
+          { clave: "transferencia_cbu", valor: data.bankInfo.cbu ?? "" },
+          { clave: "transferencia_titular", valor: data.bankInfo.titular ?? "" },
+          { clave: "transferencia_banco", valor: data.bankInfo.banco ?? "" },
+          { clave: "transferencia_descuento_pct", valor: String(data.bankInfo.descuentoPct ?? 7) },
+        ];
+        for (const bRow of bankRows) {
+          await (supabaseAdmin as any).from("site_config").upsert(bRow, { onConflict: "clave" });
+        }
       }
 
       if (rows.length > 0) {

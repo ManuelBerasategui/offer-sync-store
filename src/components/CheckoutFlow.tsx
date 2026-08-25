@@ -1,5 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { Copy, Check, Building2, CreditCard, Send } from "lucide-react";
 
 import {
   Dialog,
@@ -10,10 +12,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CardPaymentForm, type CardFormData } from "@/components/CardPaymentForm";
-import { payOrderWithCard } from "@/lib/orders.functions";
+import { payOrderWithCard, createTransferOrder } from "@/lib/orders.functions";
 import { createCheckout } from "@/lib/checkout.functions";
 import { useAuth } from "@/hooks/useAuth";
-import { money } from "@/lib/store";
+import { storeQueryOptions } from "@/lib/store-query";
+import { useCart } from "@/lib/cart";
+import {
+  money,
+  transferPrice,
+  transferDiscountPct,
+  getBankInfo,
+  waLink,
+} from "@/lib/store";
 
 type CheckoutItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
 
@@ -63,14 +73,24 @@ const EMPTY: ShippingForm = {
 export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: number }) {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const cart = useCart();
+  const { data: storeData } = useSuspenseQuery(storeQueryOptions);
+  const config = storeData?.config;
 
   const [step, setStep] = useState<"shipping" | "payment">("shipping");
+  const [paymentMethod, setPaymentMethod] = useState<"transfer" | "card">("transfer");
   const [form, setForm] = useState<ShippingForm>(EMPTY);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [promptShown, setPromptShown] = useState(false);
   const [mpLoading, setMpLoading] = useState(false);
+  const [transferLoading, setTransferLoading] = useState(false);
   const [cardMsg, setCardMsg] = useState("");
   const [error, setError] = useState("");
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const bankInfo = useMemo(() => getBankInfo(config), [config]);
+  const discPct = useMemo(() => transferDiscountPct(config), [config]);
+  const transferTotal = useMemo(() => transferPrice(total, discPct), [total, discPct]);
 
   // Autocompletar con los datos guardados si el usuario inició sesión.
   useEffect(() => {
@@ -115,6 +135,12 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
     [form],
   );
 
+  const copyToClipboard = (val: string, field: string) => {
+    void navigator.clipboard.writeText(val);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
   const submitShipping = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
@@ -156,6 +182,45 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
     setStep("payment");
   };
 
+  const confirmTransfer = async () => {
+    setError("");
+    setTransferLoading(true);
+    try {
+      const res = await createTransferOrder({
+        data: {
+          items,
+          shipping: form,
+          userId: user?.id,
+        },
+      });
+
+      if (res.status === "success" && res.orderCode) {
+        cart.clear();
+
+        // Abrir WhatsApp con el comprobante pre-armado y sentido de urgencia
+        const finalAmount = res.total ?? transferTotal;
+        const waMsg = `¡Hola! Acabo de hacer el pedido ${res.orderCode} por ${money(finalAmount)} mediante Transferencia Bancaria. Adjunto el comprobante de pago. (Reserva de stock válida por 24 hs)`;
+        const waUrl = waLink(config ?? {}, waMsg);
+        window.open(waUrl, "_blank");
+
+        // Navegar a la página de gracias
+        void navigate({
+          to: "/gracias",
+          search: {
+            code: res.orderCode,
+            status: "pending",
+          },
+        });
+      } else {
+        setError(res.message ?? "No pudimos registrar tu pedido. Probá de nuevo.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al procesar el pedido.");
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
   const goMercadoPago = async () => {
     setError("");
     setMpLoading(true);
@@ -189,9 +254,11 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
         },
       });
       if (res.status === "approved" && res.orderCode) {
-        navigate({ to: "/gracias", search: { code: res.orderCode, status: "approved" } });
+        cart.clear();
+        void navigate({ to: "/gracias", search: { code: res.orderCode, status: "approved" } });
       } else if (res.status === "pending" && res.orderCode) {
-        navigate({ to: "/gracias", search: { code: res.orderCode, status: "pending" } });
+        cart.clear();
+        void navigate({ to: "/gracias", search: { code: res.orderCode, status: "pending" } });
       } else {
         setCardMsg(res.message ?? "No pudimos procesar el pago con tarjeta.");
       }
@@ -299,50 +366,196 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
           {error && <p className="text-sm text-destructive">{error}</p>}
         </form>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
-              Total a pagar
-            </span>
-            <span className="tabular-nums text-xl font-bold">{money(total)}</span>
+        <div className="flex flex-col gap-5">
+          {/* Selector de Método de Pago */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setPaymentMethod("transfer")}
+              className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
+                paymentMethod === "transfer"
+                  ? "border-emerald-600 bg-emerald-500/10 shadow-sm"
+                  : "border-border bg-card hover:border-border/80"
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <Building2 className={`h-4 w-4 ${paymentMethod === "transfer" ? "text-emerald-600" : "text-muted-foreground"}`} />
+                <span className="text-xs font-bold">Transferencia</span>
+              </div>
+              <span className="mt-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                {discPct}% OFF
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPaymentMethod("card")}
+              className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
+                paymentMethod === "card"
+                  ? "border-primary bg-primary/10 shadow-sm"
+                  : "border-border bg-card hover:border-border/80"
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <CreditCard className={`h-4 w-4 ${paymentMethod === "card" ? "text-primary" : "text-muted-foreground"}`} />
+                <span className="text-xs font-bold">Tarjeta / MP</span>
+              </div>
+              <span className="mt-1 text-[10px] text-muted-foreground">
+                Precio de lista
+              </span>
+            </button>
           </div>
 
-          <div>
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
-              Pagar con tarjeta
-            </p>
-            <CardPaymentForm
-              amount={total}
-              email={form.email}
-              documentNumber={form.dni}
-              onPay={payWithCard}
-            />
-            {cardMsg && <p className="mt-2 text-sm text-destructive">{cardMsg}</p>}
-          </div>
+          {/* OPCIÓN TRANSFERENCIA BANCARIA */}
+          {paymentMethod === "transfer" ? (
+            <div className="flex flex-col gap-4">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs font-bold uppercase tracking-[1px] text-emerald-700 dark:text-emerald-400">
+                    Total con {discPct}% de descuento:
+                  </span>
+                  <span className="tabular-nums text-2xl font-bold text-foreground">
+                    {money(transferTotal)}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  (Precio regular: <span className="line-through">{money(total)}</span> — ¡Ahorrás {money(total - transferTotal)}!)
+                </p>
+              </div>
 
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <div className="h-px flex-1 bg-border" />
-            o
-            <div className="h-px flex-1 bg-border" />
-          </div>
+              {/* Datos Bancarios */}
+              <div className="space-y-2.5 rounded-xl border border-border bg-card p-4 text-xs">
+                <p className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                  Datos para transferir:
+                </p>
 
-          <button
-            onClick={goMercadoPago}
-            disabled={mpLoading}
-            className="btn-base bg-[#009ee3] text-white disabled:opacity-60"
-          >
-            {mpLoading ? "Redirigiendo..." : "Pagar con Mercado Pago"}
-          </button>
+                <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                  <div>
+                    <span className="text-muted-foreground">Alias: </span>
+                    <span className="font-mono font-bold text-foreground select-all">{bankInfo.alias}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(bankInfo.alias, "alias")}
+                    className="flex items-center gap-1 rounded bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground hover:bg-secondary/80"
+                  >
+                    {copiedField === "alias" ? (
+                      <>
+                        <Check className="h-3 w-3 text-emerald-600" /> Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3" /> Copiar
+                      </>
+                    )}
+                  </button>
+                </div>
 
-          <button
-            type="button"
-            onClick={() => setStep("shipping")}
-            className="text-xs font-semibold text-muted-foreground hover:text-primary"
-          >
-            ← Volver a mis datos
-          </button>
+                <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                  <div className="min-w-0 pr-2">
+                    <span className="text-muted-foreground">CBU / CVU: </span>
+                    <span className="font-mono font-bold text-foreground select-all break-all">{bankInfo.cbu}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(bankInfo.cbu, "cbu")}
+                    className="shrink-0 flex items-center gap-1 rounded bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground hover:bg-secondary/80"
+                  >
+                    {copiedField === "cbu" ? (
+                      <>
+                        <Check className="h-3 w-3 text-emerald-600" /> Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3" /> Copiar
+                      </>
+                    )}
+                  </button>
+                </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+                <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                  <span className="text-muted-foreground">Titular:</span>
+                  <span className="font-semibold text-foreground">{bankInfo.titular}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Banco / Entidad:</span>
+                  <span className="font-semibold text-foreground">{bankInfo.banco}</span>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
+                ⏳ <strong>Tu pedido está reservado:</strong> Tenés <strong>24 horas</strong> para enviar el comprobante de pago; de lo contrario, la orden se cancelará automáticamente para liberar el stock.
+              </div>
+
+              <button
+                type="button"
+                onClick={confirmTransfer}
+                disabled={transferLoading}
+                className="btn-base grad-urgente flex items-center justify-center gap-2 text-primary-foreground disabled:opacity-60"
+              >
+                <Send className="h-4 w-4" />
+                {transferLoading ? "Registrando pedido..." : "Confirmar pedido y enviar comprobante"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStep("shipping")}
+                className="text-xs font-semibold text-muted-foreground hover:text-primary text-center"
+              >
+                ← Volver a mis datos
+              </button>
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+            </div>
+          ) : (
+            /* OPCIÓN TARJETA / MERCADO PAGO */
+            <div className="flex flex-col gap-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
+                  Total a pagar
+                </span>
+                <span className="tabular-nums text-xl font-bold">{money(total)}</span>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                  Pagar con tarjeta
+                </p>
+                <CardPaymentForm
+                  amount={total}
+                  email={form.email}
+                  documentNumber={form.dni}
+                  onPay={payWithCard}
+                />
+                {cardMsg && <p className="mt-2 text-sm text-destructive">{cardMsg}</p>}
+              </div>
+
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="h-px flex-1 bg-border" />
+                o
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              <button
+                onClick={goMercadoPago}
+                disabled={mpLoading}
+                className="btn-base bg-[#009ee3] text-white disabled:opacity-60"
+              >
+                {mpLoading ? "Redirigiendo..." : "Pagar con Mercado Pago"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStep("shipping")}
+                className="text-xs font-semibold text-muted-foreground hover:text-primary text-center"
+              >
+                ← Volver a mis datos
+              </button>
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+            </div>
+          )}
         </div>
       )}
 

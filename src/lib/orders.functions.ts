@@ -572,11 +572,11 @@ export const getAdminPaidOrders = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
       .select("*")
-      .eq("estado", "pagado")
+      .in("estado", ["pagado", "pendiente"])
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error al consultar órdenes pagadas:", error);
+      console.error("Error al consultar órdenes:", error);
       return { orders: [], error: "No se pudieron obtener las órdenes de la base de datos." };
     }
 
@@ -600,5 +600,224 @@ export const getAdminPaidOrders = createServerFn({ method: "POST" })
     }));
 
     return { orders };
+  });
+
+/**
+ * Actualiza el estado de una orden (ej: de 'pendiente' a 'pagado') desde el panel de administración.
+ */
+export const updateOrderStatus = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      orderCode: string;
+      estado: string;
+      token?: string | undefined;
+      email?: string | undefined;
+    }) => ({
+      orderCode: text(data.orderCode, 40),
+      estado: text(data.estado, 40),
+      token: data.token ? text(data.token, 4000) : undefined,
+      email: data.email ? text(data.email, 254) : undefined,
+    }),
+  )
+  .handler(async ({ data }) => {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return { status: "error", message: "Error interno del servidor." };
+    }
+
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    let requestingEmail = data.email?.toLowerCase().trim();
+    if (data.token) {
+      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
+      if (userData?.user?.email) {
+        requestingEmail = userData.user.email.toLowerCase().trim();
+      }
+    }
+
+    if (!requestingEmail) {
+      return { status: "error", message: "Acceso denegado: Debés iniciar sesión." };
+    }
+
+    if (adminEmails.length > 0) {
+      if (!adminEmails.includes(requestingEmail)) {
+        return { status: "error", message: "Acceso denegado: Sin permisos de admin." };
+      }
+    }
+
+    const { error } = await supabaseAdmin
+      .from("orders")
+      .update({ estado: data.estado })
+      .eq("order_code", data.orderCode);
+
+    if (error) {
+      console.error("Error al actualizar estado de orden:", error);
+      return { status: "error", message: "No se pudo actualizar el estado de la orden." };
+    }
+
+    return { status: "success" };
+  });
+
+/**
+ * Registra una orden de pago por Transferencia Bancaria con el descuento aplicado.
+ */
+export const createTransferOrder = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      shipping: ShippingInput;
+      items: OrderItem[];
+      userId?: string | undefined;
+    }) => ({
+      shipping: cleanShipping(data.shipping),
+      items: cleanItems(data.items),
+      userId: data.userId ? text(data.userId, 64) : undefined,
+    }),
+  )
+  .handler(async ({ data }) => {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return { status: "error", message: "Error interno del servidor al procesar la orden." };
+    }
+
+    // 1. Revalidar precios y mínimos de categoría
+    let total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+    let items = data.items;
+
+    try {
+      const [{ data: dbProducts }, { data: dbConfig }] = await Promise.all([
+        supabaseAdmin.from("products").select("*"),
+        supabaseAdmin.from("site_config").select("*"),
+      ]);
+
+      if (dbProducts) {
+        const {
+          normCat,
+          parseCategoryRules,
+          findRuleForCat,
+          findProduct,
+          priceOf,
+          unitPriceFor,
+          categoryDiscountForUnits,
+          checkCategoryMins,
+          transferPrice,
+          transferDiscountPct,
+        } = await import("./store");
+
+        const configMap: Record<string, string> = {};
+        for (const row of dbConfig ?? []) {
+          if (row.clave && row.valor) configMap[row.clave] = row.valor;
+        }
+
+        const catRules = parseCategoryRules(configMap);
+        const catTotals: Record<string, number> = {};
+
+        for (const item of data.items) {
+          const prod = findProduct(dbProducts as any, item.nombre);
+          if (prod) {
+            const catNorm = normCat(prod.categoria ?? "");
+            const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
+            if (match) {
+              catTotals[match.key] = (catTotals[match.key] ?? 0) + item.qty;
+            }
+          }
+        }
+
+        const minViolations = checkCategoryMins(data.items as any, dbProducts as any, catRules);
+        if (minViolations.length > 0) {
+          const v = minViolations[0]!;
+          const msg =
+            v.type === "amount"
+              ? `No se cumple el mínimo de compra para ${v.category} ($${v.min.toLocaleString("es-AR")}).`
+              : `No se cumple el mínimo de compra para ${v.category} (${v.min} unidades).`;
+          return { status: "error", message: msg };
+        }
+
+        items = data.items.map((item) => {
+          const prod = findProduct(dbProducts as any, item.nombre);
+          if (!prod) return item;
+
+          const catNorm = normCat(prod.categoria ?? "");
+          const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
+          const catRule = match?.rule;
+          const ruleKey = match?.key;
+
+          let unitPrice: number;
+          if (catRule?.discountTiers?.length && ruleKey) {
+            const totalCatUnits = catTotals[ruleKey] ?? 0;
+            const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
+            const base = priceOf(prod);
+            unitPrice = Math.round(base * (1 - percent / 100));
+          } else {
+            unitPrice = Math.round(unitPriceFor(prod, item.qty));
+          }
+
+          return {
+            nombre: item.nombre,
+            qty: item.qty,
+            unitPrice: unitPrice > 0 ? unitPrice : item.unitPrice,
+          };
+        });
+
+        const listTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+        const discPct = transferDiscountPct(configMap);
+        total = transferPrice(listTotal, discPct);
+      }
+    } catch (err) {
+      console.error("Error revalidando items en transferencia:", err);
+    }
+
+    const orderCode = makeCode();
+
+    try {
+      const { error } = await supabaseAdmin.from("orders").insert({
+        order_code: orderCode,
+        user_id: data.userId ?? null,
+        ...data.shipping,
+        items,
+        total,
+        estado: "pendiente",
+        metodo_pago: "transferencia",
+      });
+
+      if (error) {
+        console.error("Error al registrar la orden por transferencia:", error);
+        return {
+          status: "error",
+          message: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos.",
+        };
+      }
+
+      if (data.userId) {
+        await supabaseAdmin.from("profiles").upsert(
+          {
+            id: data.userId,
+            nombre: data.shipping.nombre,
+            dni: data.shipping.dni,
+            telefono: data.shipping.telefono,
+            provincia: data.shipping.provincia,
+            ciudad: data.shipping.ciudad,
+            codigo_postal: data.shipping.codigo_postal,
+            transporte: data.shipping.transporte,
+            sucursal_correo: data.shipping.sucursal_correo,
+          },
+          { onConflict: "id" },
+        );
+      }
+
+      return {
+        status: "success",
+        orderCode,
+        total,
+      };
+    } catch (err) {
+      console.error("Error al registrar orden por transferencia:", err);
+      return {
+        status: "error",
+        message: "No pudimos registrar tu pedido. Probá de nuevo.",
+      };
+    }
   });
 

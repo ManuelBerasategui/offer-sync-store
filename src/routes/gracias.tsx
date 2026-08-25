@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Copy, Check } from "lucide-react";
 import { z } from "zod";
 
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
-import { money, waLink } from "@/lib/store";
+import { money, waLink, getBankInfo } from "@/lib/store";
 import { verifyOrderPayment } from "@/lib/orders.functions";
 
 const graciasSearchSchema = z
@@ -47,11 +48,20 @@ function GraciasPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { config } = data;
   const cart = useCart();
+  const bankInfo = getBankInfo(config);
 
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [orderState, setOrderState] = useState<{
     estado: "pagado" | "pendiente" | "rechazado" | "desconocido" | "cargando";
     total?: number | undefined;
+    metodo?: string | undefined;
   }>({ estado: "cargando" });
+
+  const copyToClipboard = (val: string, field: string) => {
+    void navigator.clipboard.writeText(val);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -69,7 +79,6 @@ function GraciasPage() {
             code,
             status: rawStatus,
             collectionStatus: collection_status,
-            // Usamos payment_id o collection_id (MP envía ambos, el que llegue sirve)
             paymentId: payment_id || collection_id,
           },
         });
@@ -81,7 +90,6 @@ function GraciasPage() {
         }
       } catch {
         if (!cancelled) {
-          // Si el estado enviado directamente en URL o tarjeta era approved
           const isApproved = rawStatus.toLowerCase() === "approved";
           setOrderState({ estado: isApproved ? "pagado" : "pendiente" });
           if (isApproved) cart.clear();
@@ -117,23 +125,22 @@ function GraciasPage() {
         ) : isLoading ? (
           <>
             <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              ⧗ Verificando pago…
+              ⧗ Verificando pedido…
             </span>
             <h1 className="text-3xl font-bold">Procesando tu pedido</h1>
             <p className="mt-4 text-muted-foreground">
-              Estamos confirmando el pago con Mercado Pago. Esto tarda solo unos segundos.
+              Estamos confirmando los detalles. Esto tarda solo unos segundos.
             </p>
           </>
         ) : isPending ? (
           <>
-            <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              ⧗ Pago pendiente
+            <span className="inline-block rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-2">
+              ⏳ Pedido Reservado
             </span>
-            <h1 className="text-3xl font-bold">Tu pedido fue registrado</h1>
-            <p className="mt-4 text-muted-foreground">
-              Estamos esperando la confirmación de Mercado Pago. Te avisaremos apenas el pago se
-              acredite.
-            </p>
+            <h1 className="text-3xl font-bold">¡Tu pedido fue registrado!</h1>
+            <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-800 dark:text-amber-300 text-left font-medium leading-relaxed">
+              ⚠️ <strong>Regla de reserva:</strong> Tu pedido y stock están reservados por <strong>24 horas</strong>. Por favor enviá el comprobante de transferencia a nuestro WhatsApp antes de que caduque el plazo; de lo contrario, la orden se cancelará automáticamente.
+            </div>
           </>
         ) : (
           <>
@@ -149,24 +156,65 @@ function GraciasPage() {
         )}
 
         {code && (
-          <div className="card-soft mt-6 p-4">
+          <div className="card-soft mt-6 p-4 text-left">
             <p className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
               Número de pedido
             </p>
-            <p className="mt-1 font-mono text-2xl font-bold tracking-wide">{code}</p>
+            <p className="mt-1 font-mono text-2xl font-bold tracking-wide text-primary">{code}</p>
             {orderState.total && orderState.total > 0 ? (
-              <p className="mt-1 text-xs font-bold text-foreground">
-                Total: {money(orderState.total)}
+              <p className="mt-1 text-sm font-bold text-foreground">
+                Total a abonar: {money(orderState.total)}
               </p>
             ) : null}
             <p className="mt-1 text-xs text-muted-foreground">
-              Guardalo, te va a servir para hacer el seguimiento.
+              Guardá este código para hacer el seguimiento.
             </p>
+
+            {isPending && (
+              <div className="mt-4 border-t border-border/60 pt-3 text-xs space-y-2">
+                <p className="font-bold text-foreground">Datos para realizar la transferencia:</p>
+                <div className="flex items-center justify-between">
+                  <span>Alias: <strong className="font-mono">{bankInfo.alias}</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(bankInfo.alias, "alias")}
+                    className="flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground"
+                  >
+                    {copiedField === "alias" ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                    {copiedField === "alias" ? "Copiado" : "Copiar"}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="min-w-0 pr-2">CBU: <strong className="font-mono break-all">{bankInfo.cbu}</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(bankInfo.cbu, "cbu")}
+                    className="shrink-0 flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground"
+                  >
+                    {copiedField === "cbu" ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                    {copiedField === "cbu" ? "Copiado" : "Copiar"}
+                  </button>
+                </div>
+                <p className="text-muted-foreground">Titular: <strong className="text-foreground">{bankInfo.titular}</strong></p>
+              </div>
+            )}
           </div>
         )}
 
         <div className="mt-8 flex flex-col gap-3">
-          {isRejected && !isLoading ? (
+          {isPending ? (
+            <a
+              className="btn-base w-full bg-whatsapp text-whatsapp-foreground font-bold shadow-md"
+              href={waLink(
+                config,
+                `¡Hola! Adjunto el comprobante de transferencia para el pedido ${code ?? ""} por ${orderState.total ? money(orderState.total) : ""}. (Reserva 24 hs)`
+              )}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Enviar comprobante por WhatsApp
+            </a>
+          ) : isRejected && !isLoading ? (
             <Link to="/carrito" className="btn-base w-full grad-urgente text-primary-foreground">
               Volver al carrito y reintentar
             </Link>
@@ -176,17 +224,16 @@ function GraciasPage() {
             </Link>
           )}
 
-          <p className="mt-4 text-sm text-muted-foreground">
-            Por cualquier consulta o para enviar comprobante:
-          </p>
-          <a
-            className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
-            href={waLink(config, code ? `Consulta sobre pedido ${code}` : undefined)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Escribinos por WhatsApp
-          </a>
+          {!isPending && (
+            <a
+              className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
+              href={waLink(config, code ? `Consulta sobre pedido ${code}` : undefined)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Escribinos por WhatsApp
+            </a>
+          )}
         </div>
       </div>
     </main>

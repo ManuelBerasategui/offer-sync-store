@@ -8,6 +8,9 @@ import {
   isYes,
   money,
   tiersOf,
+  transferPrice,
+  transferDiscountPct,
+  toNumber,
   waLink,
 } from "@/lib/store";
 import type { Product, SiteConfig } from "@/lib/store";
@@ -17,6 +20,10 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
   const consultar = isWhatsappOnly(p);
   const tiers = tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
+
+  const basePrice = offer ? toNumber(p.precio_oferta) : toNumber(p.precio);
+  const discPct = transferDiscountPct(config);
+  const tPrice = transferPrice(basePrice, discPct);
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-[0_10px_30px_-18px_oklch(0_0_0/0.35)]">
@@ -62,18 +69,22 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
             <span className="text-sm font-semibold text-muted-foreground">Consultá el precio</span>
           ) : (
             <div>
-              <div className="flex items-baseline gap-2">
-                <span className="tabular-nums text-lg font-bold text-foreground">
-                  {money(offer ? p.precio_oferta : p.precio)}
-                </span>
-                {offer && (
-                  <span className="tabular-nums text-xs text-muted-foreground line-through">
-                    {money(p.precio)}
+              <div className="flex flex-col">
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="tabular-nums text-lg font-bold text-foreground">
+                    {money(tPrice)}
                   </span>
-                )}
+                  <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                    {discPct}% OFF Transf.
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con tarjeta / MP
+                </p>
               </div>
+
               {maxTier && (
-                <span className="mt-1 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
                   🎁 Hasta {maxTier.percent}% OFF x mayor
                 </span>
               )}
