@@ -35,8 +35,10 @@ function AdminOrdenesPage() {
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const loadOrders = async () => {
-    setLoading(true);
+  const userId = user?.id;
+
+  const loadOrders = async (isInitial = false) => {
+    if (isInitial || orders.length === 0) setLoading(true);
     setError("");
     try {
       const res = await getAdminPaidOrders({
@@ -46,8 +48,7 @@ function AdminOrdenesPage() {
         },
       });
       if (res.error) {
-        setError(res.error);
-        setOrders([]);
+        if (orders.length === 0) setError(res.error);
         if (res.error.toLowerCase().includes("acceso denegado")) {
           setIsAuthorized(false);
           void navigate({ to: "/", replace: true });
@@ -57,7 +58,8 @@ function AdminOrdenesPage() {
         setOrders(res.orders ?? []);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar las órdenes pagadas.");
+      const msg = err instanceof Error ? err.message : "Error al cargar las órdenes pagadas.";
+      if (orders.length === 0) setError(msg);
     } finally {
       setLoading(false);
     }
@@ -65,13 +67,13 @@ function AdminOrdenesPage() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (!user) {
+      if (!userId) {
         void navigate({ to: "/", replace: true });
       } else {
-        void loadOrders();
+        void loadOrders(true);
       }
     }
-  }, [authLoading, user, session]);
+  }, [authLoading, userId]);
 
   // Filtrado en tiempo real
   const filteredOrders = useMemo(() => {

@@ -2296,14 +2296,23 @@ function AdminProductosPage() {
 
   const userEmail = user?.email ?? "";
   const userToken = session?.access_token ?? "";
+  const userId = user?.id;
 
-  async function loadProducts() {
-    setLoading(true);
+  async function loadProducts(isInitial = false) {
+    if (isInitial || products.length === 0) {
+      setLoading(true);
+    }
     setError("");
     try {
-      const res = await getAdminProducts({ data: { email: userEmail, token: userToken } });
+      const email = user?.email ?? "";
+      const token = session?.access_token ?? "";
+      const res = await getAdminProducts({ data: { email, token } });
       if (res.error) {
-        setError(res.error);
+        if (products.length === 0) {
+          setError(res.error);
+        } else {
+          toast.error(res.error);
+        }
         if (res.error.toLowerCase().includes("acceso denegado")) {
           setIsAuthorized(false);
           void navigate({ to: "/", replace: true });
@@ -2316,7 +2325,12 @@ function AdminProductosPage() {
         if (res.markupPercentage !== undefined) setMarkupPercentage(res.markupPercentage);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar.");
+      const msg = err instanceof Error ? err.message : "Error al cargar.";
+      if (products.length === 0) {
+        setError(msg);
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -2324,13 +2338,13 @@ function AdminProductosPage() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (!user) {
+      if (!userId) {
         void navigate({ to: "/", replace: true });
       } else {
-        void loadProducts();
+        void loadProducts(true);
       }
     }
-  }, [authLoading, user, session]);
+  }, [authLoading, userId]);
 
   async function handleDelete(id: string) {
     if (!confirm("¿Seguro que querés eliminar este producto? Se borrarán también sus variantes.")) return;
@@ -2496,10 +2510,14 @@ function AdminProductosPage() {
         </div>
 
         {/* Estado */}
-        {loading && <p className="mt-8 text-center text-sm text-muted-foreground">Cargando productos...</p>}
-        {error && <div className="mt-6 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+        {loading && products.length === 0 && (
+          <p className="mt-8 text-center text-sm text-muted-foreground">Cargando productos...</p>
+        )}
+        {error && products.length === 0 && (
+          <div className="mt-6 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
+        )}
 
-        {!loading && !error && (
+        {(!loading || products.length > 0) && (
           <div className="mt-6">
             {activeTab === "ofertas" ? (
               <OfertasDelDiaPanel

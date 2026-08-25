@@ -67,16 +67,17 @@ function AdminConfiguracionPage() {
       .catch(() => {});
   }, []);
 
-  const userEmail = user?.email ?? "";
-  const userToken = session?.access_token ?? "";
+  const userId = user?.id;
 
-  async function loadCategories() {
-    setLoading(true);
+  async function loadCategories(isInitial = false) {
+    if (isInitial || categories.length === 0) setLoading(true);
     setError("");
     try {
-      const res = await getAdminProducts({ data: { email: userEmail, token: userToken } });
+      const email = user?.email ?? "";
+      const token = session?.access_token ?? "";
+      const res = await getAdminProducts({ data: { email, token } });
       if (res.error) {
-        setError(res.error);
+        if (categories.length === 0) setError(res.error);
         if (res.error.toLowerCase().includes("acceso denegado")) {
           setIsAuthorized(false);
           void navigate({ to: "/", replace: true });
@@ -120,7 +121,8 @@ function AdminConfiguracionPage() {
       }
       setRules(formRules);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar.");
+      const msg = err instanceof Error ? err.message : "Error al cargar.";
+      if (categories.length === 0) setError(msg);
     } finally {
       setLoading(false);
     }
@@ -128,10 +130,10 @@ function AdminConfiguracionPage() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (!user) void navigate({ to: "/", replace: true });
-      else void loadCategories();
+      if (!userId) void navigate({ to: "/", replace: true });
+      else void loadCategories(true);
     }
-  }, [authLoading, user, session]);
+  }, [authLoading, userId]);
 
   /* ─── Handlers ──────────────────────────────────────── */
 
