@@ -1,0 +1,4 @@
+project_id = "dybzgnmghisqapdzgknv"
+
+[functions.sync-binance-prices]
+verify_jwt = false

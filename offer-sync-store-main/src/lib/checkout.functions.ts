@@ -1,0 +1,266 @@
+import { createServerFn } from "@tanstack/react-start";
+import {
+  findProduct,
+  priceOf,
+  unitPriceFor,
+  parseCategoryRules,
+  categoryDiscountForUnits,
+  findRuleForCat,
+  normCat,
+  checkCategoryMins,
+} from "./store";
+
+type CheckoutItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
+
+type ShippingInput = {
+  nombre: string;
+  dni: string;
+  telefono: string;
+  email: string;
+  provincia: string;
+  ciudad: string;
+  codigo_postal: string;
+  transporte: string;
+  sucursal_correo: string;
+};
+
+async function revalidateOrderItems(
+  supabaseAdmin: any,
+  rawItems: CheckoutItem[],
+): Promise<{
+  validatedItems: CheckoutItem[];
+  total: number;
+  error?: string;
+}> {
+  try {
+    const [{ data: dbProducts }, { data: dbConfigRows }] = await Promise.all([
+      supabaseAdmin.from("products").select("*"),
+      supabaseAdmin.from("site_config").select("*"),
+    ]);
+
+    if (!dbProducts || dbProducts.length === 0) {
+      const total = rawItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+      return { validatedItems: rawItems, total };
+    }
+
+    const configObj: Record<string, string> = {};
+    if (Array.isArray(dbConfigRows)) {
+      for (const row of dbConfigRows) {
+        if (row.clave && row.valor !== undefined) configObj[row.clave] = String(row.valor);
+      }
+    }
+
+    const catRules = parseCategoryRules(configObj);
+
+    const catTotals: Record<string, number> = {};
+    const itemsWithCat: { categoria?: string; qty: number; unitPrice: number }[] = [];
+
+    for (const item of rawItems) {
+      const prod = findProduct(dbProducts, item.nombre);
+      const cat = prod?.categoria ?? "";
+      const catNorm = normCat(cat);
+      if (catNorm) {
+        const match = findRuleForCat(catNorm, catRules);
+        const key = match?.key ?? catNorm;
+        catTotals[key] = (catTotals[key] ?? 0) + item.qty;
+      }
+      const baseP = prod ? priceOf(prod) : item.unitPrice;
+      itemsWithCat.push({ categoria: cat, qty: item.qty, unitPrice: baseP });
+    }
+
+    const violations = checkCategoryMins(itemsWithCat, catRules);
+    if (violations.length > 0) {
+      const v = violations[0]!;
+      const msg =
+        v.type === "amount"
+          ? `No se cumple el mínimo de compra para ${v.category} ($${v.min.toLocaleString("es-AR")}).`
+          : `No se cumple el mínimo de compra para ${v.category} (${v.min} unidades).`;
+      return { validatedItems: [], total: 0, error: msg };
+    }
+
+    const { isSuplemento, SUPLEMENTOS_MIN } = await import("./store");
+    const minSuplementos = catRules[normCat("Suplementos")]?.minAmount || SUPLEMENTOS_MIN;
+    const supTotal = rawItems
+      .filter((i) => {
+        const prod = findProduct(dbProducts, i.nombre);
+        return isSuplemento(prod?.categoria, i.nombre);
+      })
+      .reduce((a, i) => a + i.qty * i.unitPrice, 0);
+
+    if (supTotal > 0 && supTotal < minSuplementos) {
+      return {
+        validatedItems: [],
+        total: 0,
+        error: `No se cumple el mínimo de compra para Suplementos ($${minSuplementos.toLocaleString("es-AR")}).`,
+      };
+    }
+
+    const validatedItems: CheckoutItem[] = rawItems.map((item) => {
+      const prod = findProduct(dbProducts, item.nombre);
+      if (!prod) return item;
+
+      const catNorm = normCat(prod.categoria ?? "");
+      const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
+      const catRule = match?.rule;
+      const ruleKey = match?.key;
+
+      let unitPrice: number;
+      if (catRule?.discountTiers?.length && ruleKey) {
+        const totalCatUnits = catTotals[ruleKey] ?? 0;
+        const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
+        const base = priceOf(prod);
+        unitPrice = Math.round(base * (1 - percent / 100));
+      } else {
+        unitPrice = Math.round(unitPriceFor(prod, item.qty));
+      }
+
+      return {
+        nombre: item.nombre,
+        qty: item.qty,
+        unitPrice: unitPrice > 0 ? unitPrice : item.unitPrice,
+        ...(item.productId ? { productId: item.productId } : {}),
+      };
+    });
+
+    const total = validatedItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+    return { validatedItems, total };
+  } catch (err) {
+    console.error("Error al revalidar items en el servidor:", err);
+    const total = rawItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+    return { validatedItems: rawItems, total };
+  }
+}
+
+/**
+ * Crea la preferencia de pago en Mercado Pago Y guarda la orden en Supabase
+ * con estado "pendiente". Cuando MP confirma el pago,
+ * verifyOrderPayment la actualiza a "pagado".
+ */
+export const createCheckout = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      items: CheckoutItem[];
+      origin: string;
+      shipping: ShippingInput;
+      userId?: string | undefined;
+    }) => {
+      if (!data || !Array.isArray(data.items) || data.items.length === 0) {
+        throw new Error("Carrito vacío");
+      }
+      const s = data.shipping ?? ({} as ShippingInput);
+      return {
+        origin: String(data.origin ?? "").slice(0, 200),
+        userId: data.userId ? String(data.userId).slice(0, 60) : undefined,
+        shipping: {
+          nombre: String(s.nombre ?? "").slice(0, 120),
+          dni: String(s.dni ?? "").slice(0, 20),
+          telefono: String(s.telefono ?? "").slice(0, 30),
+          email: String(s.email ?? "").slice(0, 160),
+          provincia: String(s.provincia ?? "").slice(0, 60),
+          ciudad: String(s.ciudad ?? "").slice(0, 80),
+          codigo_postal: String(s.codigo_postal ?? "").slice(0, 12),
+          transporte: String(s.transporte ?? "Correo Argentino").slice(0, 40),
+          sucursal_correo: String(s.sucursal_correo ?? "").slice(0, 160),
+        },
+        items: data.items.slice(0, 50).map((i) => ({
+          nombre: String(i.nombre ?? "Producto").slice(0, 120),
+          qty: Math.max(1, Math.min(9999, Math.round(Number(i.qty) || 1))),
+          unitPrice: Math.max(1, Math.round(Number(i.unitPrice) || 0)),
+        })),
+      };
+    },
+  )
+  .handler(async ({ data }): Promise<{ url?: string; error?: string }> => {
+    const mpToken = process.env["MERCADOPAGO_ACCESS_TOKEN"];
+    if (!mpToken) {
+      return {
+        error: "Falta configurar MercadoPago. Escribinos por WhatsApp para completar tu compra.",
+      };
+    }
+
+    if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+      console.error("Supabase no está configurado para crear la orden pendiente.");
+      return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
+    }
+
+    let items = data.items;
+    let total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const validation = await revalidateOrderItems(supabaseAdmin, data.items);
+      if (validation.error) {
+        return { error: validation.error };
+      }
+      items = validation.validatedItems;
+      total = validation.total;
+    } catch (err) {
+      console.error("Error al revalidar la orden:", err);
+    }
+
+    // Generamos el código de orden
+    const d = new Date();
+    const stamp = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const orderCode = `TI-${stamp}-${rand}`;
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin.from("orders").insert({
+        order_code: orderCode,
+        user_id: data.userId ?? null,
+        ...data.shipping,
+        items,
+        total,
+        estado: "pendiente",
+        metodo_pago: "mercadopago",
+      });
+
+      if (error) {
+        console.error("Error al guardar orden pendiente:", error);
+        return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
+      }
+    } catch (err) {
+      console.error("Error al guardar orden pendiente:", err);
+      return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
+    }
+
+    const successUrl = `${data.origin}/gracias?code=${encodeURIComponent(orderCode)}`;
+
+    const res = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${mpToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        items: items.map((i) => ({
+          title: i.nombre,
+          quantity: i.qty,
+          unit_price: i.unitPrice,
+          currency_id: "ARS",
+        })),
+        external_reference: orderCode,
+        back_urls: {
+          success: successUrl,
+          pending: successUrl,
+          failure: `${data.origin}/carrito`,
+        },
+        auto_return: "approved",
+        payer: {
+          name: data.shipping.nombre,
+          email: data.shipping.email,
+        },
+      }),
+    });
+
+    const body = await res.text();
+    if (!res.ok) {
+      console.error(`MercadoPago error [${res.status}]: ${body}`);
+      return { error: "No pudimos iniciar el pago. Probá de nuevo o escribinos por WhatsApp." };
+    }
+
+    const json = JSON.parse(body) as { init_point?: string; sandbox_init_point?: string };
+    const url = json.init_point ?? json.sandbox_init_point;
+    return url ? { url } : { error: "No pudimos obtener el enlace de pago. Probá de nuevo." };
+  });
