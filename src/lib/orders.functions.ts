@@ -572,7 +572,7 @@ export const getAdminPaidOrders = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
       .select("*")
-      .in("estado", ["pagado", "pendiente"])
+      .eq("estado", "pagado")
       .order("created_at", { ascending: false });
 
     if (error) {
