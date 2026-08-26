@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Check, Search, RefreshCw, MessageCircle, PackageCheck, DollarSign, Building2, CheckCircle2 } from "lucide-react";
+import { Copy, Check, Search, RefreshCw, MessageCircle, PackageCheck, DollarSign, ShoppingBag, Building2, CheckCircle2 } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { AdminHeader } from "@/components/AdminHeader";
