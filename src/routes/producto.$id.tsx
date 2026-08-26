@@ -34,6 +34,8 @@ import {
   findRuleForCat,
   transferPrice,
   transferDiscountPct,
+  categoryDiscountForUnits,
+  checkCategoryMins,
   type ProductVariant,
 } from "@/lib/store";
 
@@ -190,8 +192,18 @@ function ProductoPage() {
   const displayNameWithTalle = selectedTalle ? `${displayName} (Talle: ${selectedTalle})` : displayName;
   const basePrice = selectedVariant ? Number(selectedVariant.precio) : priceOf(product);
   const selectedImage = selectedVariant?.imagen_url || product.imagen_url;
-  const percent = discountFor(product, qty);
-  const unit = unitPriceFor(product, qty, basePrice);
+  const catRules = useMemo(() => parseCategoryRules(config), [config]);
+  const categoryRuleMatch = useMemo(() => {
+    const category = normCat(product.categoria ?? "");
+    return category ? findRuleForCat(category, catRules) : undefined;
+  }, [product.categoria, catRules]);
+  const categoryPercent = categoryRuleMatch?.rule.discountTiers?.length
+    ? categoryDiscountForUnits(categoryRuleMatch.rule.discountTiers, qty)
+    : 0;
+  const percent = categoryPercent || discountFor(product, qty);
+  const unit = categoryPercent > 0
+    ? Math.round(basePrice * (1 - categoryPercent / 100))
+    : unitPriceFor(product, qty, basePrice);
   const total = unit * qty;
 
   const cartItem = {
@@ -208,7 +220,17 @@ function ProductoPage() {
   };
 
   const suplemento = isSuplemento(product.categoria);
-  const bloqueaCompra = suplemento && total < SUPLEMENTOS_MIN;
+  const categoryMinViolation = checkCategoryMins(
+    [{ categoria: product.categoria, qty, unitPrice: basePrice }],
+    catRules,
+  )[0];
+  const bloqueaCompra = (suplemento && total < SUPLEMENTOS_MIN) || Boolean(categoryMinViolation);
+  const minDialogTitle = categoryMinViolation
+    ? `Compra mínima de ${categoryMinViolation.category}`
+    : "Compra mínima de suplementos";
+  const minDialogDescription = categoryMinViolation
+    ? `Llevás ${categoryMinViolation.current} unidad${categoryMinViolation.current !== 1 ? "es" : ""}. Te faltan ${categoryMinViolation.min - categoryMinViolation.current} para alcanzar el mínimo de ${categoryMinViolation.min}.`
+    : SUPLEMENTOS_MSG;
 
   return (
     <div className="min-h-screen">
@@ -271,7 +293,6 @@ function ProductoPage() {
 
                 {/* AVISO DE MÍNIMO DE COMPRA POR CATEGORÍA EN LA FICHA DEL PRODUCTO */}
                 {(() => {
-                  const catRules = parseCategoryRules(config);
                   const catNorm = normCat(product.categoria ?? "");
                   const ruleMatch = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
                   const rule = ruleMatch?.rule;
@@ -320,7 +341,6 @@ function ProductoPage() {
 
                 {/* AVISO DE DESCUENTOS POR CANTIDAD (Categoría o Producto) */}
                 {(() => {
-                  const catRules = parseCategoryRules(config);
                   const catNorm = normCat(product.categoria ?? "");
                   const ruleMatch = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
                   const rule = ruleMatch?.rule;
@@ -609,8 +629,8 @@ function ProductoPage() {
       <Dialog open={showMin} onOpenChange={setShowMin}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Compra mínima de suplementos</DialogTitle>
-            <DialogDescription>{SUPLEMENTOS_MSG}</DialogDescription>
+            <DialogTitle>{minDialogTitle}</DialogTitle>
+            <DialogDescription>{minDialogDescription}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <button

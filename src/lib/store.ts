@@ -327,6 +327,21 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     rules["perfumes disenador"] = disenadorDefault;
   }
 
+  // Mates: compra mínima obligatoria de 10 unidades, combinables entre modelos.
+  // La regla se aplica también a la variante singular de la categoría.
+  const matesExisting = rules["mates"] ?? rules["mate"];
+  const { minAmount: _ignoredMateMinAmount, ...matesRuleBase } = matesExisting ?? { discountTiers: [] };
+  const matesRule: CategoryRule = {
+    ...matesRuleBase,
+    minUnits: 10,
+    discountTiers: [
+      { units: 5, percent: 5 },
+      { units: 10, percent: 10 },
+    ],
+  };
+  delete rules["mate"];
+  rules["mates"] = matesRule;
+
   return rules;
 }
 

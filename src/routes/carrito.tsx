@@ -15,8 +15,10 @@ import {
   priceOf,
   waLink,
   parseCategoryRules,
+  categoryDiscountForUnits,
   checkCategoryMins,
   normCat,
+  findRuleForCat,
   findProduct,
   transferPrice,
   transferDiscountPct,
@@ -61,6 +63,16 @@ function CarritoPage() {
 
   // Mínimos por categoría (dinámicos o estáticos)
   const catRules = parseCategoryRules(config);
+  const matesRuleMatch = findRuleForCat(normCat("Mates"), catRules);
+  const matesUnits = cartItemsWithCat
+    .filter((item) => {
+      const match = findRuleForCat(normCat(item.categoria ?? ""), catRules);
+      return match?.key === matesRuleMatch?.key;
+    })
+    .reduce((sum, item) => sum + item.qty, 0);
+  const matesDiscountPct = matesRuleMatch
+    ? categoryDiscountForUnits(matesRuleMatch.rule.discountTiers, matesUnits)
+    : 0;
 
   // Violaciones de reglas dinámicas generales (excluyendo suplementos para evitar duplicación)
   const dynamicViolations = checkCategoryMins(
@@ -235,6 +247,16 @@ function CarritoPage() {
             </ul>
 
             <div className="mt-6 flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
+              {matesUnits > 0 && (
+                <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2 text-xs">
+                  <span className="font-semibold text-foreground">
+                    Mates: {matesUnits} unidad{matesUnits !== 1 ? "es" : ""}
+                  </span>
+                  <span className="font-bold text-primary">
+                    {matesDiscountPct > 0 ? `${matesDiscountPct}% OFF aplicado` : "5% OFF desde 5 unidades"}
+                  </span>
+                </div>
+              )}
               <div className="flex items-baseline justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
