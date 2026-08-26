@@ -133,6 +133,7 @@ function ProductoPage() {
   const productRec = product as Record<string, unknown>;
   const rawTipo = String(productRec["tipo_talles"] ?? "NINGUNO").toUpperCase();
   const hasTalles = rawTipo === "ZAPATILLAS" || rawTipo === "ROPA";
+  const esZapatilla = productRec["es_zapatilla"] === true || String(productRec["es_zapatilla"] ?? "").toLowerCase() === "true";
 
   const consultar = isWhatsappOnly(product);
   const rawDefaultColor = product.color_predeterminado;
@@ -387,7 +388,7 @@ function ProductoPage() {
               </>
             )}
 
-            {!consultar && usesColors && (
+            {!consultar && !esZapatilla && usesColors && (
               <div className="mt-6">
                 <label
                   htmlFor="color"
@@ -415,7 +416,7 @@ function ProductoPage() {
             )}
 
             {/* Selector de Talle */}
-            {!consultar && hasTalles && (
+            {!consultar && !esZapatilla && hasTalles && (
               <div className="mt-6">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
@@ -460,7 +461,7 @@ function ProductoPage() {
             )}
 
             {/* Cantidad */}
-            {!consultar && (
+            {!consultar && !esZapatilla && (
               <div className="mt-6">
                 {tiers.length > 0 && (
                   <p className="mb-1 text-xs font-semibold text-muted-foreground">
@@ -511,14 +512,16 @@ function ProductoPage() {
             )}
 
             <div className="mt-6 flex flex-col gap-3">
-              {consultar ? (
+              {consultar || esZapatilla ? (
                 <a
                   className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
-                  href={waLink(config, product.nombre)}
+                  href={esZapatilla
+                    ? `https://wa.me/5493418051515?text=${encodeURIComponent(`Hola, quiero consultar por el modelo ${product.nombre ?? ""} de zapatillas.`)}`
+                    : waLink(config, product.nombre)}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Consultar por WhatsApp
+                  {esZapatilla ? "Consultar talle y colores por WhatsApp" : "Consultar por WhatsApp"}
                 </a>
               ) : showCheckout ? (
                 <CheckoutFlow

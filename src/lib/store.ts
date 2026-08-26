@@ -32,6 +32,7 @@ export type Product = {
   stock?: string;
   descuento?: string;
   color_predeterminado?: string | null;
+  es_zapatilla?: boolean | string | null;
   ventas_semana?: number;
   variants?: ProductVariant[];
   [key: string]: string | number | boolean | ProductVariant[] | undefined | null;

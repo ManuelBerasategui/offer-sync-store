@@ -45,6 +45,7 @@ export type ProductInput = {
   stock?: string;
   descuento?: string;
   color_predeterminado?: string | null;
+  es_zapatilla?: boolean;
   imagen_url?: string | null;
   tipo_talles?: "ZAPATILLAS" | "ROPA" | "NINGUNO";
   talles_disponibles?: string[];
@@ -208,6 +209,9 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
 
       // Construir metadata de descuentos y talles
       const metadata: Record<string, string> = {};
+      if (p.es_zapatilla) {
+        metadata["es_zapatilla"] = "true";
+      }
       for (const tier of p.tiers ?? []) {
         if (tier.units > 0 && tier.percent > 0) {
           metadata[`${tier.units} unidades`] = `${tier.percent}%`;

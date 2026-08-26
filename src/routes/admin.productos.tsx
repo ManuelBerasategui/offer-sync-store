@@ -65,6 +65,7 @@ const emptyProduct = (): ProductInput => ({
   oferta: "NO",
   stock: "SI",
   descuento: "NO",
+  es_zapatilla: false,
   color_predeterminado: "",
   imagen_url: "",
   tipo_talles: "NINGUNO",
@@ -115,6 +116,7 @@ function productToInput(p: Product): ProductInput {
     oferta: String(p.oferta ?? "NO"),
     stock: String(p.stock ?? "SI"),
     descuento: String(p.descuento ?? "NO"),
+    es_zapatilla: pRec["es_zapatilla"] === true || String(pRec["es_zapatilla"] ?? "").toLowerCase() === "true",
     color_predeterminado: p.color_predeterminado ?? "",
     imagen_url: p.imagen_url ?? "",
     tipo_talles,
@@ -999,17 +1001,24 @@ function ProductModal({
           {/* Campos básicos */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="col-span-1 sm:col-span-2">
-              <label className="label-sm">Nombre *</label>
-              <input className="input-base" value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder="Nombre del producto" />
+              <label className="label-sm">{form.es_zapatilla ? "Modelo *" : "Nombre *"}</label>
+              <input
+                className="input-base"
+                value={form.nombre}
+                onChange={(e) => set("nombre", e.target.value)}
+                placeholder={form.es_zapatilla ? "Modelo de zapatilla" : "Nombre del producto"}
+              />
             </div>
             <div>
               <label className="label-sm">Categoría</label>
               <input className="input-base" value={form.categoria} onChange={(e) => set("categoria", e.target.value)} placeholder="Ej: Suplementos" />
             </div>
-            <div>
-              <label className="label-sm">Color predeterminado</label>
-              <input className="input-base" value={form.color_predeterminado ?? ""} onChange={(e) => set("color_predeterminado", e.target.value)} placeholder="Ej: Negro" />
-            </div>
+            {!form.es_zapatilla && (
+              <div>
+                <label className="label-sm">Color predeterminado</label>
+                <input className="input-base" value={form.color_predeterminado ?? ""} onChange={(e) => set("color_predeterminado", e.target.value)} placeholder="Ej: Negro" />
+              </div>
+            )}
 
             {/* SECCIÓN DE PRECIOS:
                 - Si es edición (form.id): muestra tarjeta informativa con botón dedicado "Editar precio"
@@ -1112,6 +1121,19 @@ function ProductModal({
 
           {/* Toggles */}
           <div className="flex flex-wrap gap-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={Boolean(form.es_zapatilla)}
+                onChange={(e) => setForm((prev) => ({
+                  ...prev,
+                  es_zapatilla: e.target.checked,
+                  ...(e.target.checked ? { color_predeterminado: "", tipo_talles: "NINGUNO", talles_disponibles: [], variants: [] } : {}),
+                }))}
+                className="h-4 w-4 accent-primary"
+              />
+              <span>Es zapatilla</span>
+            </label>
             {(["destacado", "oferta", "stock"] as const).map((field) => (
               <label key={field} className="flex cursor-pointer items-center gap-2 text-sm font-medium capitalize">
                 <div
@@ -1192,7 +1214,7 @@ function ProductModal({
           </div>
 
           {/* Tipo de Talles y Talles Disponibles */}
-          <div className="space-y-3 rounded-xl border border-border p-4 bg-muted/20">
+          {!form.es_zapatilla && <div className="space-y-3 rounded-xl border border-border p-4 bg-muted/20">
             <div>
               <label className="label-sm mb-1 block">Tipo de talles</label>
               <div className="flex flex-wrap gap-2">
@@ -1253,10 +1275,10 @@ function ProductModal({
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Variantes de color */}
-          <div>
+          {!form.es_zapatilla && <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Variantes de color</label>
               <button type="button" onClick={addVariant} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10">
@@ -1357,7 +1379,7 @@ function ProductModal({
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
 
           {/* Descuentos por cantidad */}
           <div>
