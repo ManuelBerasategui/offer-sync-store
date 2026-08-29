@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CarritoRouteImport } from './routes/carrito'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
 import { Route as GraciasRouteImport } from './routes/gracias'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AdminConfiguracionRouteImport } from './routes/admin.configuracion'
 import { Route as AdminOrdenesRouteImport } from './routes/admin.ordenes'
 import { Route as AdminProductosRouteImport } from './routes/admin.productos'
@@ -43,6 +44,11 @@ const CatalogoRoute = CatalogoRouteImport.update({
 const GraciasRoute = GraciasRouteImport.update({
   id: '/gracias',
   path: '/gracias',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminConfiguracionRoute = AdminConfiguracionRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
   '/gracias': typeof GraciasRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/admin/configuracion': typeof AdminConfiguracionRoute
   '/admin/ordenes': typeof AdminOrdenesRoute
   '/admin/productos': typeof AdminProductosRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
   '/gracias': typeof GraciasRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/admin/configuracion': typeof AdminConfiguracionRoute
   '/admin/ordenes': typeof AdminOrdenesRoute
   '/admin/productos': typeof AdminProductosRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
   '/gracias': typeof GraciasRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/admin/configuracion': typeof AdminConfiguracionRoute
   '/admin/ordenes': typeof AdminOrdenesRoute
   '/admin/productos': typeof AdminProductosRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/carrito'
     | '/catalogo'
     | '/gracias'
+    | '/reset-password'
     | '/admin/configuracion'
     | '/admin/ordenes'
     | '/admin/productos'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/carrito'
     | '/catalogo'
     | '/gracias'
+    | '/reset-password'
     | '/admin/configuracion'
     | '/admin/ordenes'
     | '/admin/productos'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/carrito'
     | '/catalogo'
     | '/gracias'
+    | '/reset-password'
     | '/admin/configuracion'
     | '/admin/ordenes'
     | '/admin/productos'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   CarritoRoute: typeof CarritoRoute
   CatalogoRoute: typeof CatalogoRoute
   GraciasRoute: typeof GraciasRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   AdminConfiguracionRoute: typeof AdminConfiguracionRoute
   AdminOrdenesRoute: typeof AdminOrdenesRoute
   AdminProductosRoute: typeof AdminProductosRoute
@@ -195,6 +208,13 @@ declare module '@tanstack/react-router' {
       path: '/gracias'
       fullPath: '/gracias'
       preLoaderRoute: typeof GraciasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/configuracion': {
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   CarritoRoute: CarritoRoute,
   CatalogoRoute: CatalogoRoute,
   GraciasRoute: GraciasRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   AdminConfiguracionRoute: AdminConfiguracionRoute,
   AdminOrdenesRoute: AdminOrdenesRoute,
   AdminProductosRoute: AdminProductosRoute,

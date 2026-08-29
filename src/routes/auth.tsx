@@ -183,7 +183,7 @@ function AuthPage() {
         return;
       }
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth?mode=forgot`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
       if (err) throw err;
       setMsg("Te enviamos un mail para restablecer tu contraseña.");
