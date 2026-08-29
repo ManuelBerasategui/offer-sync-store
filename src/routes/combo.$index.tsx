@@ -74,12 +74,12 @@ function ComboPage() {
         </Link>
 
         <div className="mt-6 grid gap-8 lg:grid-cols-2">
-          <div className="mx-auto w-full max-w-[440px] overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="mx-auto flex aspect-square w-full max-w-[440px] items-center justify-center overflow-hidden rounded-xl border border-border bg-surface p-4">
             <img
               src={imageUrl(banner.imagen_url) || FALLBACK_IMAGE}
               alt={banner.titulo ?? "Combo en oferta"}
               referrerPolicy="no-referrer"
-              className="aspect-[4/3] w-full object-cover"
+              className="h-full w-full object-contain"
               onError={onImageError(banner.imagen_url)}
             />
           </div>

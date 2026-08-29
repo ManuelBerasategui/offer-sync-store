@@ -2058,7 +2058,7 @@ function ComboBuilderPanel({
               <img
                 src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
                 alt={b.titulo ?? ""}
-                className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-cover border border-border shrink-0"
+                className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-contain p-1.5 bg-surface border border-border shrink-0"
                 onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
               />
               <div className="flex-1 min-w-0 space-y-1">

@@ -127,21 +127,28 @@ function Home() {
                     className="group relative min-w-[280px] snap-start overflow-hidden rounded-xl border border-primary/15 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 sm:min-w-[420px]"
                     style={{ aspectRatio: "16 / 10" }}
                   >
+                    {/* Fondo difuminado ambiental para que cualquier formato de foto (cuadrada, vertical o apaisada) se vea armónico sin recortarse */}
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 bg-cover bg-center scale-110 blur-md opacity-35 brightness-75 transition-transform duration-300 group-hover:scale-125"
+                      style={{ backgroundImage: `url(${imageUrl(b.imagen_url) || FALLBACK_IMAGE})` }}
+                    />
+                    {/* Imagen completa sin recortes */}
                     <img
                       src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
                       alt={b.titulo ?? ""}
                       referrerPolicy="no-referrer"
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      className="relative h-full w-full object-contain p-2 sm:p-3 transition-transform duration-300 group-hover:scale-105"
                       onError={onImageError(b.imagen_url)}
                     />
-                    <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/25 to-transparent p-4">
-                      <span className="mb-2 inline-flex w-fit items-center gap-1 self-start rounded-full grad-urgente px-2.5 py-1 text-[10px] font-bold uppercase text-primary-foreground">
+                    <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/30 to-transparent p-3.5 sm:p-4">
+                      <span className="mb-1.5 inline-flex w-fit items-center gap-1 self-start rounded-full grad-urgente px-2.5 py-0.5 text-[10px] font-bold uppercase text-primary-foreground shadow-xs">
                         <Flame className="h-3 w-3" />
                         Combo en oferta
                       </span>
-                      <h3 className="text-lg font-bold text-white sm:text-xl">{b.titulo}</h3>
+                      <h3 className="text-base sm:text-lg font-bold text-white leading-snug drop-shadow-xs">{b.titulo}</h3>
                       {toNumber(b.precio) > 0 && (
-                        <p className="tabular-nums mt-1.5 w-fit rounded-md bg-white px-2 py-0.5 text-base font-bold text-foreground">
+                        <p className="tabular-nums mt-1 w-fit rounded-md bg-white px-2 py-0.5 text-sm sm:text-base font-bold text-foreground shadow-xs">
                           {money(b.precio)}
                         </p>
                       )}
