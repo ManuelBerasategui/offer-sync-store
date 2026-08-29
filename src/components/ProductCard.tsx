@@ -6,7 +6,6 @@ import {
   onImageError,
   isWhatsappOnly,
   waOnlyReasonOf,
-  priceOf,
   isYes,
   money,
   tiersOf,
@@ -21,8 +20,8 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
   const offer = hasOffer(p);
   const consultar = isWhatsappOnly(p);
   const waOnlyReason = waOnlyReasonOf(p as unknown as Record<string, unknown>);
-  // Ocultar precio solo cuando el producto es WA-only Y no tiene precio real
-  const hidePrice = Boolean(waOnlyReason) && priceOf(p) <= 0;
+  // Vapers no tienen precio — ocultar. Zapatillas/remeras sí tienen precio — mostrar.
+  const hidePrice = waOnlyReason === "vapers";
   const tiers = tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
 

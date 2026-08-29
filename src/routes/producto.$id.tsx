@@ -284,7 +284,7 @@ function ProductoPage() {
               {displayName}
             </h1>
 
-            {(waOnlyReason && priceOf(product) <= 0) ? (
+            {(waOnlyReason === "vapers") ? (
               <p className="mt-4 text-sm font-semibold text-muted-foreground">
                 Consultá el precio y disponibilidad por WhatsApp.
               </p>
