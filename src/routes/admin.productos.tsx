@@ -950,7 +950,7 @@ function ProductModal({
       return;
     }
 
-    if (!form.id) {
+    if (!form.id && !form.whatsapp_only_reason) {
       const hasPriceUsd = Boolean(form.precio_usd?.trim());
       const hasPriceArs = Boolean(form.precio?.trim());
       if (!hasPriceUsd && !hasPriceArs) {
