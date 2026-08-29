@@ -284,7 +284,7 @@ function ProductoPage() {
               {displayName}
             </h1>
 
-            {waOnlyReason ? (
+            {(waOnlyReason && priceOf(product) <= 0) ? (
               <p className="mt-4 text-sm font-semibold text-muted-foreground">
                 Consultá el precio y disponibilidad por WhatsApp.
               </p>

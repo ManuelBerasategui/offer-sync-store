@@ -5,6 +5,8 @@ import {
   imageUrl,
   onImageError,
   isWhatsappOnly,
+  waOnlyReasonOf,
+  priceOf,
   isYes,
   money,
   tiersOf,
@@ -18,6 +20,9 @@ import type { Product, SiteConfig } from "@/lib/store";
 export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) {
   const offer = hasOffer(p);
   const consultar = isWhatsappOnly(p);
+  const waOnlyReason = waOnlyReasonOf(p as unknown as Record<string, unknown>);
+  // Ocultar precio solo cuando el producto es WA-only Y no tiene precio real
+  const hidePrice = Boolean(waOnlyReason) && priceOf(p) <= 0;
   const tiers = tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
 
@@ -65,7 +70,7 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
         </Link>
 
         <div className="mt-auto pt-2">
-          {consultar ? (
+          {(hidePrice || consultar) ? (
             <span className="text-sm font-semibold text-muted-foreground">Consultá el precio</span>
           ) : (
             <div>
