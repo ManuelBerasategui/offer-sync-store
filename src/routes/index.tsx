@@ -54,25 +54,24 @@ function Home() {
       <SiteHeader config={config} />
 
       {/* HERO */}
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 py-10 text-center sm:px-6 sm:py-20">
+      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 py-16 text-center sm:px-6 sm:py-24">
         {/* decorative color wash — reemplaza el fondo plano */}
         <div aria-hidden className="pointer-events-none absolute -top-28 -left-20 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-10 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
 
-        <span className="relative mb-4 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary ring-1 ring-primary/20">
+        <span className="relative mb-5 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary ring-1 ring-primary/20">
           <Flame className="h-3.5 w-3.5" />
           Precio de importador, todos los días
         </span>
 
-        {/* H1 reducido ~15-20% — de clamp(40px,12vw,84px) a clamp(34px,10vw,70px) */}
-        <h1 className="relative mx-auto max-w-4xl text-[clamp(34px,10vw,70px)] leading-[0.95]">
+        <h1 className="relative mx-auto max-w-4xl text-[clamp(40px,12vw,84px)] leading-[0.95]">
           Importamos de todo
           <br />
           <span className="text-primary">para que revendas</span>
         </h1>
 
-        {/* 2 íconos centrados side-by-side — sin el 3ro "Precio de importador" (redundante con el badge) */}
-        <div className="relative mx-auto mt-6 flex items-center justify-center gap-8 text-sm font-medium text-muted-foreground">
+        {/* 2 íconos centrados side-by-side */}
+        <div className="relative mx-auto mt-9 flex items-center justify-center gap-8 text-sm font-medium text-muted-foreground">
           <span className="inline-flex items-center gap-2">
             <Truck className="h-4 w-4 text-primary" />
             Envíos a todo el país
@@ -83,18 +82,23 @@ function Home() {
           </span>
         </div>
 
-        {/* CTA principal sólido naranja */}
-        <div className="relative mt-7 flex flex-col items-center gap-2">
+        {/* CTA principal sólido naranja + pill de mínimos debajo */}
+        <div className="relative mt-7 flex flex-col items-center gap-3">
           <a
             href="/catalogo"
             className="btn-base grad-urgente inline-flex items-center justify-center gap-2 px-8 py-3 text-base font-bold text-primary-foreground shadow-md transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
           >
             Ver Catálogo Mayorista
           </a>
-          {/* Disclaimer reubicado — texto sutil, no compite con el CTA */}
-          <p className="text-[11px] text-muted-foreground">
-            * Aplican mínimos de compra según categoría.
-          </p>
+          {/* Pill ámbar de mínimos — siempre visible */}
+          <a
+            href="#minimos"
+            className="inline-flex max-w-full items-center justify-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-amber-700 dark:text-amber-300 transition-all hover:bg-amber-500/20 active:scale-95 text-center leading-snug"
+          >
+            <span className="shrink-0 text-xs">ℹ️</span>
+            <span>Aplican mínimos de compra según categoría.</span>
+            <span className="shrink-0 font-extrabold underline">Ver ↓</span>
+          </a>
         </div>
       </section>
 
