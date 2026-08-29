@@ -609,5 +609,9 @@ export function waOnlyReasonOf(product: Record<string, unknown>): WaOnlyReason |
   if (product["es_zapatilla"] === true || String(product["es_zapatilla"] ?? "").toLowerCase() === "true") {
     return "zapatillas";
   }
+  // Fallback por categoría: productos existentes sin whatsapp_only_reason en metadata
+  // Se detecta por la categoría del producto para retrocompatibilidad
+  const catRaw = String(product["categoria"] ?? "").toLowerCase().trim();
+  if (catRaw === "vapers" || catRaw === "vaper") return "vapers";
   return null;
 }
