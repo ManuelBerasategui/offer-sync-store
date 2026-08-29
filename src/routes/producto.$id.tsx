@@ -396,7 +396,10 @@ function ProductoPage() {
                               Descuento por cantidad en {categoryName}:
                             </p>
                             <ul className="mt-1.5 space-y-1 text-muted-foreground text-[11px] sm:text-xs">
-                              {rule.discountTiers.map((tier) => (
+                              {(rule.discountTiers.some(t => t.units >= 20)
+                                ? rule.discountTiers
+                                : [...rule.discountTiers, { units: 20, percent: 12 }]
+                              ).map((tier) => (
                                 <li key={tier.units} className="flex items-center gap-1.5">
                                   <span className="font-semibold text-foreground">
                                     Llevando {tier.units} u. o más:

@@ -344,6 +344,8 @@ export function categoryDiscountForUnits(tiers: CategoryTier[], totalUnits: numb
   for (const tier of tiers ?? []) {
     if (totalUnits >= tier.units) percent = tier.percent;
   }
+  // Tercer tramo global: 20+ unidades → mínimo 12% para cualquier regla de categoría con descuentos.
+  if ((tiers ?? []).length > 0 && totalUnits >= 20) percent = Math.max(percent, 12);
   return percent;
 }
 
