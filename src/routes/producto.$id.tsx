@@ -379,7 +379,28 @@ function ProductoPage() {
                     );
                   }
 
-                  return null;
+                  // Fallback universal: todos los productos aplican 12% para 20+ unidades
+                  return (
+                    <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 sm:p-3.5 text-xs text-foreground">
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-base shrink-0 mt-0.5">🎁</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-primary text-xs sm:text-sm">
+                            Descuento por cantidad:
+                          </p>
+                          <ul className="mt-1.5 space-y-1 text-muted-foreground text-[11px] sm:text-xs">
+                            <li className="flex items-center gap-1.5">
+                              <span className="font-semibold text-foreground">Llevando 20 u. o más:</span>
+                              <span className="font-bold text-primary">12% OFF</span>
+                            </li>
+                          </ul>
+                          <p className="mt-1.5 text-[10px] sm:text-[11px] text-muted-foreground">
+                            Descuento automático por volumen al agregar al carrito.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
                 })()}
 
                 {/* AVISO DE DESCUENTOS POR CANTIDAD (Categoría o Producto) */}

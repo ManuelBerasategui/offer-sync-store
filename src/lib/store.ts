@@ -207,9 +207,8 @@ export function discountFor(p: Product, qty: number) {
   const tiers = tiersOf(p);
   let percent = 0;
   for (const t of tiers) if (qty >= t.units) percent = t.percent;
-  // Tercer tramo global: 20+ unidades → mínimo 12% para todo producto con descuento activo.
-  // Math.max respeta tiers personalizados si alguno supera el 12%.
-  if (tiers.length > 0 && qty >= 20) percent = Math.max(percent, 12);
+  // Tercer tramo global: 20+ unidades → mínimo 12% para TODOS los productos.
+  if (qty >= 20) percent = Math.max(percent, 12);
   return percent;
 }
 
@@ -344,8 +343,8 @@ export function categoryDiscountForUnits(tiers: CategoryTier[], totalUnits: numb
   for (const tier of tiers ?? []) {
     if (totalUnits >= tier.units) percent = tier.percent;
   }
-  // Tercer tramo global: 20+ unidades → mínimo 12% para cualquier regla de categoría con descuentos.
-  if ((tiers ?? []).length > 0 && totalUnits >= 20) percent = Math.max(percent, 12);
+  // Tercer tramo global: 20+ unidades → mínimo 12% universal.
+  if (totalUnits >= 20) percent = Math.max(percent, 12);
   return percent;
 }
 

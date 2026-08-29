@@ -382,7 +382,14 @@ describe("discountFor — tercer tramo global", () => {
     expect(discountFor(makeTieredProduct(), 100)).toBe(12);
   });
 
-  it("producto sin descuento (descuento=NO) → 0% aunque qty >= 20", () => {
-    expect(discountFor(makeNoDiscountProduct(), 20)).toBe(0);
+  it("producto sin tiers configurados → 0% para qty < 20", () => {
+    const plain = { descuento: "NO" } as unknown as import("./store").Product;
+    expect(discountFor(plain, 4)).toBe(0);
+  });
+
+  it("producto sin tiers configurados → 12% para qty >= 20 (regla universal)", () => {
+    const plain = { descuento: "NO" } as unknown as import("./store").Product;
+    expect(discountFor(plain, 20)).toBe(12);
+    expect(discountFor(plain, 100)).toBe(12);
   });
 });
