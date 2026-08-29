@@ -310,18 +310,20 @@ function CarritoPage() {
                   </span>
                 </div>
               )}
-              <div className="flex items-baseline justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
-                    Total con Transferencia
+              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
+                {/* Label — linea propia en mobile, evita wrap con badge */}
+                <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
+                  Total con Transferencia
+                </span>
+                {/* Monto + badge verde — siempre juntos en la misma línea */}
+                <div className="flex items-baseline gap-2">
+                  <span className="tabular-nums text-2xl font-bold text-foreground">
+                    {money(transferPrice(cart.total, transferDiscountPct(config)))}
                   </span>
                   <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
                     {transferDiscountPct(config)}% OFF
                   </span>
                 </div>
-                <span className="tabular-nums text-2xl font-bold text-foreground">
-                  {money(transferPrice(cart.total, transferDiscountPct(config)))}
-                </span>
               </div>
               <div className="flex items-baseline justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
                 <span>Total con tarjeta o Mercado Pago:</span>
