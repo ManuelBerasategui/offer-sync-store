@@ -1,12 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Check, Search, RefreshCw, MessageCircle, PackageCheck, DollarSign, ShoppingBag, Building2, CheckCircle2 } from "lucide-react";
+import { Copy, Check, Search, RefreshCw, MessageCircle, PackageCheck, DollarSign, ShoppingBag, Building2, CheckCircle2, Clock } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { AdminHeader } from "@/components/AdminHeader";
 import { storeQueryOptions } from "@/lib/store-query";
-import { getAdminPaidOrders, updateOrderStatus, type AdminOrder } from "@/lib/orders.functions";
+import { getAdminPaidOrders, getAdminReservedOrders, updateOrderStatus, type AdminOrder } from "@/lib/orders.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { money } from "@/lib/store";
 
@@ -16,12 +16,14 @@ export const Route = createFileRoute("/admin/ordenes")({
   },
   head: () => ({
     meta: [
-      { title: "Panel de Órdenes Pagadas — Admin" },
+      { title: "Panel de Órdenes — Admin" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: AdminOrdenesPage,
 });
+
+type Tab = "pagadas" | "reservadas";
 
 function AdminOrdenesPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
@@ -29,37 +31,46 @@ function AdminOrdenesPage() {
   const { user, session, loading: authLoading } = useAuth();
 
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
-  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [tab, setTab] = useState<Tab>("reservadas");
+
+  // Estado independiente para cada tab
+  const [paidOrders, setPaidOrders] = useState<AdminOrder[]>([]);
+  const [reservedOrders, setReservedOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const userId = user?.id;
+  const authPayload = { email: user?.email ?? "", token: session?.access_token ?? "" };
 
   const loadOrders = async (isInitial = false) => {
-    if (isInitial || orders.length === 0) setLoading(true);
+    if (isInitial || (paidOrders.length === 0 && reservedOrders.length === 0)) setLoading(true);
     setError("");
     try {
-      const res = await getAdminPaidOrders({
-        data: {
-          email: user?.email ?? "",
-          token: session?.access_token ?? "",
-        },
-      });
-      if (res.error) {
-        if (orders.length === 0) setError(res.error);
-        if (res.error.toLowerCase().includes("acceso denegado")) {
+      const [paidRes, reservedRes] = await Promise.all([
+        getAdminPaidOrders({ data: authPayload }),
+        getAdminReservedOrders({ data: authPayload }),
+      ]);
+
+      if (paidRes.error) {
+        if (paidRes.error.toLowerCase().includes("acceso denegado")) {
           setIsAuthorized(false);
           void navigate({ to: "/", replace: true });
+          return;
         }
+        setError(paidRes.error);
       } else {
         setIsAuthorized(true);
-        setOrders(res.orders ?? []);
+        setPaidOrders(paidRes.orders ?? []);
+      }
+
+      if (!reservedRes.error) {
+        setReservedOrders(reservedRes.orders ?? []);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error al cargar las órdenes pagadas.";
-      if (orders.length === 0) setError(msg);
+      const msg = err instanceof Error ? err.message : "Error al cargar las órdenes.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -75,11 +86,14 @@ function AdminOrdenesPage() {
     }
   }, [authLoading, userId]);
 
+  // Órdenes activas según tab seleccionado
+  const activeOrders = tab === "pagadas" ? paidOrders : reservedOrders;
+
   // Filtrado en tiempo real
   const filteredOrders = useMemo(() => {
-    if (!search.trim()) return orders;
+    if (!search.trim()) return activeOrders;
     const term = search.toLowerCase().trim();
-    return orders.filter((o) => {
+    return activeOrders.filter((o) => {
       const codeMatch = o.order_code.toLowerCase().includes(term);
       const nameMatch = o.nombre.toLowerCase().includes(term);
       const dniMatch = o.dni.toLowerCase().includes(term);
@@ -88,15 +102,15 @@ function AdminOrdenesPage() {
       const itemMatch = o.items.some((i) => i.nombre.toLowerCase().includes(term));
       return codeMatch || nameMatch || dniMatch || emailMatch || cityMatch || itemMatch;
     });
-  }, [orders, search]);
+  }, [activeOrders, search]);
 
-  // Métricas / KPIs
+  // Métricas del tab activo
   const stats = useMemo(() => {
-    const totalVentas = orders.reduce((sum, o) => sum + o.total, 0);
-    const count = orders.length;
+    const totalVentas = activeOrders.reduce((sum, o) => sum + o.total, 0);
+    const count = activeOrders.length;
     const promedio = count > 0 ? Math.round(totalVentas / count) : 0;
     return { totalVentas, count, promedio };
-  }, [orders]);
+  }, [activeOrders]);
 
   const handleStatusChange = async (orderCode: string, newStatus: string) => {
     try {
@@ -109,9 +123,11 @@ function AdminOrdenesPage() {
         },
       });
       if (res.status === "success") {
-        setOrders((prev) =>
-          prev.map((o) => (o.order_code === orderCode ? { ...o, estado: newStatus } : o)),
-        );
+        // Actualiza el estado local en ambas listas
+        const updater = (prev: AdminOrder[]) =>
+          prev.map((o) => (o.order_code === orderCode ? { ...o, estado: newStatus } : o));
+        setPaidOrders(updater);
+        setReservedOrders(updater);
       }
     } catch (err) {
       console.error("Error actualizando orden:", err);
@@ -171,7 +187,6 @@ TOTAL: ${money(order.total)}`;
 
   if (authLoading || !user || isAuthorized === false) return null;
 
-  // Mostramos una pantalla en blanco o spinner mientras validamos si es admin en el servidor
   if (isAuthorized === null) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -186,7 +201,7 @@ TOTAL: ${money(order.total)}`;
 
       <main className="mx-auto max-w-[1180px] px-3 py-4 sm:px-6 sm:py-8">
         <AdminHeader
-          title="Órdenes Pagadas"
+          title="Órdenes"
           subtitle="Gestión de ventas y etiquetas de envío de la tienda."
           currentRoute="ordenes"
           actions={
@@ -201,14 +216,58 @@ TOTAL: ${money(order.total)}`;
           }
         />
 
-        {/* Tarjetas de Métricas (KPIs) - Rejilla responsiva compacta */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        {/* Tabs */}
+        <div className="mt-4 flex gap-1 rounded-xl border border-border bg-surface p-1">
+          <button
+            type="button"
+            onClick={() => { setTab("reservadas"); setSearch(""); }}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all ${
+              tab === "reservadas"
+                ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Clock className="h-4 w-4" />
+            Reservadas
+            {reservedOrders.length > 0 && (
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                tab === "reservadas" ? "bg-amber-500/20 text-amber-700 dark:text-amber-400" : "bg-muted text-muted-foreground"
+              }`}>
+                {reservedOrders.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTab("pagadas"); setSearch(""); }}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all ${
+              tab === "pagadas"
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <PackageCheck className="h-4 w-4" />
+            Pagadas
+            {paidOrders.length > 0 && (
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                tab === "pagadas" ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground"
+              }`}>
+                {paidOrders.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Tarjetas de Métricas (KPIs) */}
+        <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4">
           <div className="card-soft flex flex-col sm:flex-row items-center gap-2 sm:gap-4 p-2.5 sm:p-5 text-center sm:text-left">
             <div className="flex h-8 w-8 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
               <DollarSign className="h-4 w-4 sm:h-6 sm:w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">Recaudado</p>
+              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">
+                {tab === "pagadas" ? "Recaudado" : "Reservado"}
+              </p>
               <p className="text-xs sm:text-2xl font-bold tracking-tight text-foreground truncate">{money(stats.totalVentas)}</p>
             </div>
           </div>
@@ -235,7 +294,7 @@ TOTAL: ${money(order.total)}`;
         </div>
 
         {/* Buscador */}
-        <div className="mt-8 flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 shadow-xs">
+        <div className="mt-6 flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 shadow-xs">
           <Search className="h-5 w-5 text-muted-foreground shrink-0" />
           <input
             type="text"
@@ -261,17 +320,29 @@ TOTAL: ${money(order.total)}`;
           </div>
         )}
 
-        {loading && orders.length === 0 ? (
+        {loading && activeOrders.length === 0 ? (
           <div className="py-16 text-center">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-            <p className="mt-4 text-sm font-semibold text-muted-foreground">Cargando órdenes pagadas desde la base de datos...</p>
+            <p className="mt-4 text-sm font-semibold text-muted-foreground">
+              Cargando órdenes desde la base de datos...
+            </p>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="mt-8 rounded-xl border border-border bg-surface py-16 text-center">
-            <PackageCheck className="mx-auto h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mt-3 text-lg font-bold text-foreground">No hay órdenes pagadas para mostrar</h3>
+            {tab === "reservadas" ? (
+              <Clock className="mx-auto h-12 w-12 text-muted-foreground/50" />
+            ) : (
+              <PackageCheck className="mx-auto h-12 w-12 text-muted-foreground/50" />
+            )}
+            <h3 className="mt-3 text-lg font-bold text-foreground">
+              {tab === "reservadas" ? "No hay órdenes reservadas" : "No hay órdenes pagadas"}
+            </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {search ? "No encontramos ninguna orden que coincida con tu búsqueda." : "Aún no se han registrado pagos completados."}
+              {search
+                ? "No encontramos ninguna orden que coincida con tu búsqueda."
+                : tab === "reservadas"
+                  ? "No hay transferencias pendientes de confirmación."
+                  : "Aún no se han registrado pagos completados."}
             </p>
           </div>
         ) : (
@@ -279,7 +350,9 @@ TOTAL: ${money(order.total)}`;
             {filteredOrders.map((order) => {
               const waClient = getWaClientLink(order);
               return (
-                <div key={order.id} className="card-soft overflow-hidden p-3.5 sm:p-6 border border-border shadow-sm transition-all hover:border-primary/50">
+                <div key={order.id} className={`card-soft overflow-hidden p-3.5 sm:p-6 border shadow-sm transition-all hover:border-primary/50 ${
+                  tab === "reservadas" ? "border-amber-500/30" : "border-border"
+                }`}>
                   {/* Encabezado de la orden */}
                   <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">

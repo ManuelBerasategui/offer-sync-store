@@ -603,6 +603,86 @@ export const getAdminPaidOrders = createServerFn({ method: "POST" })
   });
 
 /**
+ * Retorna las órdenes reservadas: pendientes de pago por transferencia bancaria.
+ * Solo incluye estado="pendiente" con metodo_pago="transferencia".
+ */
+export const getAdminReservedOrders = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string }) => ({
+    email: text(data?.email, 160).toLowerCase(),
+    token: text(data?.token, 2000),
+  }))
+  .handler(async ({ data }): Promise<{ orders: AdminOrder[]; error?: string }> => {
+    if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+      return { orders: [], error: "Variables de Supabase no configuradas en el servidor." };
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
+    const adminEmails = adminEmailsRaw
+      .toLowerCase()
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    let requestingEmail = data.email ? data.email.toLowerCase().trim() : "";
+    if (data.token) {
+      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
+      if (userData?.user?.email) {
+        requestingEmail = userData.user.email.toLowerCase().trim();
+      }
+    }
+
+    if (!requestingEmail) {
+      return { orders: [], error: "Acceso denegado: Debés iniciar sesión como administrador." };
+    }
+
+    if (adminEmails.length > 0) {
+      if (!adminEmails.includes(requestingEmail)) {
+        return { orders: [], error: "Acceso denegado: El email no tiene permisos de administrador." };
+      }
+    } else {
+      const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
+      if (!defaultAdmins.includes(requestingEmail)) {
+        return { orders: [], error: "Acceso denegado: Configurá ADMIN_EMAILS en el archivo .env." };
+      }
+    }
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("estado", "pendiente")
+      .eq("metodo_pago", "transferencia")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error al consultar órdenes reservadas:", error);
+      return { orders: [], error: "No se pudieron obtener las órdenes reservadas." };
+    }
+
+    const orders: AdminOrder[] = (rows ?? []).map((row) => ({
+      id: String(row.id),
+      order_code: String(row.order_code ?? ""),
+      created_at: String(row.created_at ?? ""),
+      estado: String(row.estado ?? "pendiente"),
+      metodo_pago: row.metodo_pago ? String(row.metodo_pago) : null,
+      total: Number(row.total) || 0,
+      nombre: String(row.nombre ?? ""),
+      dni: String(row.dni ?? ""),
+      telefono: String(row.telefono ?? ""),
+      email: String(row.email ?? ""),
+      provincia: String(row.provincia ?? ""),
+      ciudad: String(row.ciudad ?? ""),
+      codigo_postal: String(row.codigo_postal ?? ""),
+      transporte: String(row.transporte ?? "Correo Argentino"),
+      sucursal_correo: String(row.sucursal_correo ?? ""),
+      items: Array.isArray(row.items) ? (row.items as OrderItem[]) : [],
+    }));
+
+    return { orders };
+  });
+
+/**
  * Actualiza el estado de una orden (ej: de 'pendiente' a 'pagado') desde el panel de administración.
  */
 export const updateOrderStatus = createServerFn({ method: "POST" })
