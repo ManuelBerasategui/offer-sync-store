@@ -333,3 +333,56 @@ describe("parseCategoryRules", () => {
     expect(rules["test"]?.minUnits).toBeUndefined();
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   discountFor — tercer tramo global (20+ → 12%)
+══════════════════════════════════════════════════════════════════ */
+
+import { discountFor } from "./store";
+
+// Producto con descuento activo y tiers 5→5%, 10→10% (como en DB existente)
+function makeTieredProduct(qty_field?: boolean) {
+  return {
+    descuento: "SI",
+    "5 unidades": "5%",
+    "10 unidades": "10%",
+  } as unknown as import("./store").Product;
+}
+
+function makeNoDiscountProduct() {
+  return { descuento: "NO" } as unknown as import("./store").Product;
+}
+
+describe("discountFor — tercer tramo global", () => {
+  it("4 unidades → sin descuento (0%)", () => {
+    expect(discountFor(makeTieredProduct(), 4)).toBe(0);
+  });
+
+  it("5 unidades → 5% OFF", () => {
+    expect(discountFor(makeTieredProduct(), 5)).toBe(5);
+  });
+
+  it("9 unidades → 5% OFF (sigue en primer tramo)", () => {
+    expect(discountFor(makeTieredProduct(), 9)).toBe(5);
+  });
+
+  it("10 unidades → 10% OFF", () => {
+    expect(discountFor(makeTieredProduct(), 10)).toBe(10);
+  });
+
+  it("19 unidades → 10% OFF (sigue en segundo tramo)", () => {
+    expect(discountFor(makeTieredProduct(), 19)).toBe(10);
+  });
+
+  it("20 unidades → 12% OFF (tercer tramo nuevo)", () => {
+    expect(discountFor(makeTieredProduct(), 20)).toBe(12);
+  });
+
+  it("100 unidades → 12% OFF (sin techo, mismo tramo)", () => {
+    expect(discountFor(makeTieredProduct(), 100)).toBe(12);
+  });
+
+  it("producto sin descuento (descuento=NO) → 0% aunque qty >= 20", () => {
+    expect(discountFor(makeNoDiscountProduct(), 20)).toBe(0);
+  });
+});

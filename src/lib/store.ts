@@ -207,6 +207,9 @@ export function discountFor(p: Product, qty: number) {
   const tiers = tiersOf(p);
   let percent = 0;
   for (const t of tiers) if (qty >= t.units) percent = t.percent;
+  // Tercer tramo global: 20+ unidades → mínimo 12% para todo producto con descuento activo.
+  // Math.max respeta tiers personalizados si alguno supera el 12%.
+  if (tiers.length > 0 && qty >= 20) percent = Math.max(percent, 12);
   return percent;
 }
 
@@ -303,21 +306,21 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     }
   }
 
-  // Perfumes Árabes: descuentos por defecto (5u→5%, 10u→10%)
+  // Perfumes Árabes: descuentos por defecto (5u→5%, 10u→10%, 20u→12%)
   if (!rules["perfumes arabes"]?.discountTiers?.length && !rules["perfumes arabe"]?.discountTiers?.length) {
     const arabesDefault: CategoryRule = {
       ...rules["perfumes arabes"],
-      discountTiers: [{ units: 5, percent: 5 }, { units: 10, percent: 10 }],
+      discountTiers: [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
     };
     rules["perfumes arabes"] = arabesDefault;
     rules["perfumes arabe"] = arabesDefault;
   }
 
-  // Perfumes Diseñador: descuentos por defecto (3u→5%, 7u→7%)
+  // Perfumes Diseñador: descuentos por defecto (3u→5%, 7u→7%, 20u→12%)
   if (!rules["perfumes de disenador"]?.discountTiers?.length && !rules["perfumes disenador"]?.discountTiers?.length) {
     const disenadorDefault: CategoryRule = {
       ...rules["perfumes de disenador"],
-      discountTiers: [{ units: 3, percent: 5 }, { units: 7, percent: 7 }],
+      discountTiers: [{ units: 3, percent: 5 }, { units: 7, percent: 7 }, { units: 20, percent: 12 }],
     };
     rules["perfumes de disenador"] = disenadorDefault;
     rules["perfumes disenador"] = disenadorDefault;
@@ -329,7 +332,7 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
   rules["mates"] = {
     ...matesRuleBase,
     minUnits: 10,
-    discountTiers: [{ units: 5, percent: 5 }, { units: 10, percent: 10 }],
+    discountTiers: [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
   };
   delete rules["mate"];
 
