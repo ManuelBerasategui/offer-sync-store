@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-import { Search, ArrowDownUp, Flame, Star, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, ArrowDownUp, Flame, Star, X, Loader2 } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -43,11 +43,15 @@ function Catalogo() {
   const [onlyTop, setOnlyTop] = useState(false);
   const [onlyOffers, setOnlyOffers] = useState(false);
 
-  const PAGE_SIZE = 24;
-  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Resetear página al cambiar cualquier filtro
-  useEffect(() => { setPage(1); }, [search, cat, sort, onlyTop, onlyOffers]);
+  // Resetear cantidad visible al cambiar cualquier filtro
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, cat, sort, onlyTop, onlyOffers]);
 
   const cats = useMemo(() => {
     const all = categoriesOf(products);
@@ -82,8 +86,38 @@ function Catalogo() {
     });
   }, [products, search, cat, sort, onlyTop, onlyOffers]);
 
-  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
-  const paginated = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visibleProducts = useMemo(() => {
+    return list.slice(0, visibleCount);
+  }, [list, visibleCount]);
+
+  const hasMore = visibleCount < list.length;
+
+  // IntersectionObserver para carga infinita suave
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first && first.isIntersecting && !isLoadingMore) {
+          setIsLoadingMore(true);
+          // Breve delay para renderizado suave y feedback visual
+          setTimeout(() => {
+            setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, list.length));
+            setIsLoadingMore(false);
+          }, 150);
+        }
+      },
+      {
+        rootMargin: "350px 0px", // Detectar antes de llegar al último elemento
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, list.length]);
 
   const chip = (active: boolean) =>
     `shrink-0 rounded-full border px-3 py-1 text-xs font-semibold sm:px-3.5 sm:py-1.5 sm:text-xs transition-all whitespace-nowrap inline-flex items-center gap-1 ${
@@ -172,64 +206,33 @@ function Catalogo() {
 
         <div className="mb-3 flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
           <span>
-            {list.length} {list.length === 1 ? "producto" : "productos"}
+            {list.length ? `Mostrando ${visibleProducts.length} de ${list.length} ${list.length === 1 ? "producto" : "productos"}` : "0 productos"}
           </span>
-          {totalPages > 1 && (
-            <span className="font-normal text-muted-foreground/70">
-              Página {page} de {totalPages}
-            </span>
-          )}
         </div>
 
         {list.length ? (
           <>
             <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
-              {paginated.map((p, i) => (
+              {visibleProducts.map((p, i) => (
                 <ProductCard key={p.id ?? i} p={p} config={config} />
               ))}
             </div>
 
-            {/* Paginación */}
-            {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-center gap-1.5 flex-wrap">
-                <button
-                  onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                  disabled={page === 1}
-                  className="rounded-lg border border-border px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  ← Anterior
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((n) => n === 1 || n === totalPages || Math.abs(n - page) <= 2)
-                  .reduce<(number | "...")[]>((acc, n, idx, arr) => {
-                    if (idx > 0 && (arr[idx - 1] as number) < n - 1) acc.push("...");
-                    acc.push(n);
-                    return acc;
-                  }, [])
-                  .map((item, idx) =>
-                    item === "..." ? (
-                      <span key={`ellipsis-${idx}`} className="px-1 text-muted-foreground text-xs">…</span>
-                    ) : (
-                      <button
-                        key={item}
-                        onClick={() => { setPage(item as number); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                        className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors ${
-                          page === item
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    )
-                  )}
-                <button
-                  onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                  disabled={page === totalPages}
-                  className="rounded-lg border border-border px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Siguiente →
-                </button>
+            {/* Sentinel para IntersectionObserver */}
+            {hasMore && <div ref={sentinelRef} className="h-6 w-full" />}
+
+            {/* Indicador de carga */}
+            {isLoadingMore && (
+              <div className="my-8 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="text-xs font-medium text-muted-foreground">Cargando más productos...</p>
+              </div>
+            )}
+
+            {/* Mensaje de fin de catálogo */}
+            {!hasMore && list.length > PAGE_SIZE && (
+              <div className="mt-8 border-t border-border/50 pt-6 text-center text-xs font-medium text-muted-foreground">
+                ✨ Has visto todos los productos disponibles ({list.length})
               </div>
             )}
           </>
