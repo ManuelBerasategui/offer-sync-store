@@ -12,6 +12,8 @@ import {
   SUPLEMENTOS_MIN,
   isSuplemento,
   isMate,
+  moqGroupOf,
+  findProduct,
   money,
   priceOf,
   waLink,
@@ -20,7 +22,6 @@ import {
   checkCategoryMins,
   normCat,
   findRuleForCat,
-  findProduct,
   transferPrice,
   transferDiscountPct,
 } from "@/lib/store";
@@ -67,20 +68,22 @@ function CarritoPage() {
   const matesRuleMatch = findRuleForCat(normCat("Mates"), catRules);
   // FIX: Los Mates tienen categoria="Bazar" en la DB, por eso el match por categoría
   // siempre fallaba. Ahora usamos isMate(nombre, categoria) como fuente de verdad.
-  const matesUnits = cartItemsWithCat
-    .filter((item) => isMate(item.nombre, item.categoria ?? ""))
-    .reduce((sum, item) => sum + item.qty, 0);
+  // matesUnits: usa moq_group del producto (v2) en lugar de isMate por nombre
+  const matesUnits = cartItemsWithCat.reduce((sum, item) => {
+    const prod = item.productId ? findProduct(products, item.productId) : undefined;
+    const mg = prod ? moqGroupOf(prod as Record<string, unknown>) : null;
+    return sum + (mg === "mates" ? item.qty : 0);
+  }, 0);
   const matesDiscountPct = matesRuleMatch
     ? categoryDiscountForUnits(matesRuleMatch.rule.discountTiers, matesUnits)
     : 0;
   // Violaciones de reglas dinámicas generales (excluyendo suplementos para evitar duplicación)
   const dynamicViolations = checkCategoryMins(
-    cartItemsWithCat.map((i) => ({
-      nombre: i.nombre,
-      categoria: i.categoria,
-      qty: i.qty,
-      unitPrice: i.unitPrice,
-    })),
+    cartItemsWithCat.map((i) => {
+      const prod = i.productId ? findProduct(products, i.productId) : undefined;
+      const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
+      return { nombre: i.nombre, categoria: i.categoria, moq_group, qty: i.qty, unitPrice: i.unitPrice };
+    }),
     catRules,
   ).filter((v) => normCat(v.category) !== normCat("Suplementos"));
 
@@ -288,8 +291,8 @@ function CarritoPage() {
                       </p>
                       <p className="mt-1.5 text-xs text-muted-foreground">
                         {v.type === "amount"
-                          ? `Llevas ${money(v.current)} en ${v.category}. Necesitás agregar ${money(v.min - v.current)} más.`
-                          : `Llevas ${v.current} unidad${v.current !== 1 ? "es" : ""} de ${v.category}. Necesitás agregar ${v.min - v.current} más.`}
+                          ? `Llevás ${money(v.current)} en ${v.category}. Necesitás agregar ${money(v.min - v.current)} más.`
+                          : (() => { const miss = v.min - v.current; return `Llevás ${v.current} unidad${v.current !== 1 ? "es" : ""} de ${v.category}. Te falta${miss !== 1 ? "n" : ""} ${miss} para alcanzar el mínimo de ${v.min}.`; })()}
                       </p>
                       <Link
                         to="/catalogo"

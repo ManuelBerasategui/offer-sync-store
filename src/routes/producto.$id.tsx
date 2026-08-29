@@ -26,6 +26,9 @@ import {
   isWhatsappOnly,
   isMate,
   hasMoq,
+  moqGroupOf,
+  meetsMoq,
+  type MoqInfo,
   money,
   priceOf,
   tiersOf,
@@ -223,7 +226,9 @@ function ProductoPage() {
 
   const suplemento = isSuplemento(product.categoria);
   const categoryMinViolation = checkCategoryMins(
-    [{ nombre: product.nombre, categoria: product.categoria, qty, unitPrice: basePrice }],
+    [{ nombre: product.nombre, categoria: product.categoria,
+       moq_group: moqGroupOf(product as Record<string, unknown>) ?? undefined,
+       qty, unitPrice: basePrice }],
     catRules,
   )[0];
   const bloqueaCompra = (suplemento && total < SUPLEMENTOS_MIN) || Boolean(categoryMinViolation);
@@ -234,9 +239,14 @@ function ProductoPage() {
     ? `Llevás ${categoryMinViolation.current} unidad${categoryMinViolation.current !== 1 ? "es" : ""}. Te faltan ${categoryMinViolation.min - categoryMinViolation.current} para alcanzar el mínimo de ${categoryMinViolation.min}.`
     : SUPLEMENTOS_MSG;
 
-  // Productos con MOQ (Mates u otros con minUnits/minAmount) ocultan el botón "Comprar ya".
-  // El usuario debe agregar al carrito para respetar la validación agregada.
-  const hasMoqProduct = hasMoq(product, catRules);
+  // MOQ: usa el campo moq_group del producto (fuente de verdad v2).
+  // hasMoq retorna MoqInfo|null. meetsMoq compara qty vs minUnits en tiempo real.
+  const moqInfo: MoqInfo | null = hasMoq(product as Record<string, unknown>, catRules);
+  const moqMet = meetsMoq(moqInfo, qty, basePrice);
+  // Cuanto falta para alcanzar el minimo (mensaje reactivo)
+  const moqMissing = moqInfo?.minUnits
+    ? Math.max(0, moqInfo.minUnits - qty)
+    : 0;
 
   return (
     <div className="min-h-screen">
@@ -575,9 +585,20 @@ function ProductoPage() {
                 />
               ) : (
                 <>
-                  {/* Ocultar "Comprar ya" para productos con MOQ (Mates u otros).
-                      El usuario debe usar el carrito, donde la validación agregada funciona. */}
-                  {!hasMoqProduct && (
+                  {/* Mensaje de progreso de MOQ (reactivo al qty) */}
+                  {moqInfo && !moqMet && moqInfo.minUnits && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs">
+                      <p className="font-bold text-amber-700 dark:text-amber-400">
+                        Compra mínima de {moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
+                      </p>
+                      <p className="mt-0.5 text-muted-foreground">
+                        Llevás {qty} unidad{qty !== 1 ? "es" : ""}. Te falta{moqMissing !== 1 ? "n" : ""}
+                        {" "}{moqMissing} para alcanzar el mínimo de {moqInfo.minUnits}.
+                      </p>
+                    </div>
+                  )}
+                  {/* "Comprar ya": visible para productos sin MOQ o cuando el MOQ ya se cumple */}
+                  {(!moqInfo || moqMet) && (
                     <button
                       type="button"
                       id="btn-comprar-ya"

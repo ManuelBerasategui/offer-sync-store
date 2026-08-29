@@ -35,7 +35,7 @@ export type Product = {
   es_zapatilla?: boolean | string | null;
   ventas_semana?: number;
   variants?: ProductVariant[];
-  [key: string]: string | number | boolean | ProductVariant[] | undefined | null;
+  [key: string]: string | number | boolean | ProductVariant[] | undefined | null | Record<string, unknown>;
 };
 
 export type Banner = {
@@ -154,9 +154,7 @@ export function categoriesOf(products: Product[]) {
 
 /** Lee la columna "Whatsapp" de la planilla, sin importar mayúsculas ni espacios. */
 export function isWhatsappOnly(p: Product) {
-  // Si el producto ya tiene un precio asignado (> 0), se muestra el precio y NO se oculta como "Consultar"
   if (priceOf(p) > 0) return false;
-
   for (const [key, value] of Object.entries(p)) {
     if (key.trim().toLowerCase().replace(/\s+/g, "") === "whatsapp") return isYes(typeof value === "string" ? value : undefined);
   }
@@ -175,13 +173,8 @@ const slug = (v?: string) =>
 export function findProduct(products: Product[], key: string) {
   const rawKey = String(key ?? "").trim();
   if (!rawKey) return undefined;
-
-  // Extraer el ID base si la clave tiene formato id:variantId:talle
   const baseId = rawKey.split(":")[0]?.trim() || rawKey;
-
-  // Limpiar sufijos como (Presentación: ...) o (Talle: ...) del nombre si la clave viene como nombre de ítem
   const cleanName = rawKey.replace(/\s*\((?:Presentación|Talle):[^)]+\)/gi, "").trim();
-
   return (
     products.find((p) => String(p.id ?? "").trim() === rawKey) ??
     products.find((p) => String(p.id ?? "").trim() === baseId) ??
@@ -197,7 +190,6 @@ export function findProduct(products: Product[], key: string) {
 
 export type Tier = { units: number; percent: number };
 
-/** Lee las columnas tipo "5 unidades" = "2.50%" de la planilla. */
 export function tiersOf(p: Product): Tier[] {
   if (!isYes(p.descuento)) return [];
   const tiers: Tier[] = [];
@@ -211,7 +203,6 @@ export function tiersOf(p: Product): Tier[] {
   return tiers.sort((a, b) => a.units - b.units);
 }
 
-/** Porcentaje de descuento que corresponde a esa cantidad. */
 export function discountFor(p: Product, qty: number) {
   const tiers = tiersOf(p);
   let percent = 0;
@@ -220,63 +211,47 @@ export function discountFor(p: Product, qty: number) {
 }
 
 export function unitPriceFor(p: Product, qty: number, basePrice = priceOf(p)) {
-  const base = basePrice;
-  return base * (1 - discountFor(p, qty) / 100);
+  return basePrice * (1 - discountFor(p, qty) / 100);
 }
 
 /* ---------- Suplementos: compra mínima (legado) ---------- */
 
 export const SUPLEMENTOS_MIN = 250000;
-
 export const SUPLEMENTOS_MSG =
   "La compra mínima para suplementos es de $250.000. Agregá más productos al carrito y llevate todo junto!";
 
-/** ¿La categoría o nombre del producto (o del ítem del carrito) corresponde a suplementos? */
 export function isSuplemento(categoria?: string, nombre?: string) {
   const cat = String(categoria ?? "").toLowerCase().normalize("NFC");
   const nom = String(nombre ?? "").toLowerCase().normalize("NFC");
-
   const catKeywords = ["suplement", "nutricion", "proteina", "creatina"];
   const nameKeywords = [
     "suplemento", "creatina", "proteina", "protein", "whey",
     "bcaa", "glutamin", "colageno", "collagen", "pre entren",
-    "pre-workout", "preworkout", "gainer", "multivitaminico", "star nutrition"
+    "pre-workout", "preworkout", "gainer", "multivitaminico", "star nutrition",
   ];
-
   if (catKeywords.some((kw) => cat.includes(kw))) return true;
   if (nameKeywords.some((kw) => nom.includes(kw))) return true;
-
   return false;
 }
 
-/* ---------- Mates: identificación canónica ---------- */
+/* ---------- Mates: identificación canónica (uso interno / sugerencia de admin) ---------- */
 
 /**
- * ¿El producto corresponde a un Mate?
- * Fuente de verdad canónica para identificar Mates dentro de la categoría Bazar.
- * Usa keywords sobre el nombre (igual que isSuplemento) porque no existe
- * una categoría "Mates" separada — todos están bajo "Bazar".
- *
- * La función se usa en:
- *   - checkCategoryMins: para acumular ítems bajo la regla "mates"
- *   - carrito.tsx: para calcular matesUnits en tiempo real
- *   - hasMoq: para determinar si ocultar el botón "Comprar ya"
+ * Heurística para detectar si un producto es un Mate por nombre/categoría.
+ * YA NO SE USA EN RUNTIME para decidir MOQ — solo como sugerencia en el panel admin
+ * y para retrocompatibilidad en tests legacy.
+ * La fuente de verdad en runtime es `moq_group` (campo metadata del producto).
  */
 export function isMate(nombre?: string, categoria?: string): boolean {
-  // Si la categoría ya se llama «mates» o «mate» (por si alguna vez existe), match directo.
   const cat = String(categoria ?? "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
   if (cat === "mates" || cat === "mate") return true;
-
-  // Identificación por nombre: busca la palabra «mate» como token independiente
-  // para evitar falsos positivos ("tomate", "material", etc.).
   const nom = String(nombre ?? "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-  // Regex: «mate» precedido y seguido por límite de palabra, espacios, puntuación o inicio/fin de string
   return /(?:^|[\s,;/\-_(])mate(?:[\s,;/\-_)s]|$)/i.test(nom);
 }
 
@@ -298,7 +273,6 @@ export const normCat = (s: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-/** Devuelve la categoría limpia para administración */
 export function getBaseCategory(rawCat: string): string {
   return String(rawCat ?? "").trim();
 }
@@ -329,54 +303,39 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     }
   }
 
-  // Reglas de descuento por defecto para Perfumes Árabes (5u -> 5%, 10u -> 10%)
+  // Perfumes Árabes: descuentos por defecto (5u→5%, 10u→10%)
   if (!rules["perfumes arabes"]?.discountTiers?.length && !rules["perfumes arabe"]?.discountTiers?.length) {
     const arabesDefault: CategoryRule = {
       ...rules["perfumes arabes"],
-      discountTiers: [
-        { units: 5, percent: 5 },
-        { units: 10, percent: 10 },
-      ],
+      discountTiers: [{ units: 5, percent: 5 }, { units: 10, percent: 10 }],
     };
     rules["perfumes arabes"] = arabesDefault;
     rules["perfumes arabe"] = arabesDefault;
   }
 
-  // Reglas de descuento por defecto para Perfumes Diseñador (3u -> 5%, 7u -> 7%)
-  if (
-    !rules["perfumes de disenador"]?.discountTiers?.length &&
-    !rules["perfumes disenador"]?.discountTiers?.length
-  ) {
+  // Perfumes Diseñador: descuentos por defecto (3u→5%, 7u→7%)
+  if (!rules["perfumes de disenador"]?.discountTiers?.length && !rules["perfumes disenador"]?.discountTiers?.length) {
     const disenadorDefault: CategoryRule = {
       ...rules["perfumes de disenador"],
-      discountTiers: [
-        { units: 3, percent: 5 },
-        { units: 7, percent: 7 },
-      ],
+      discountTiers: [{ units: 3, percent: 5 }, { units: 7, percent: 7 }],
     };
     rules["perfumes de disenador"] = disenadorDefault;
     rules["perfumes disenador"] = disenadorDefault;
   }
 
-  // Mates: compra mínima obligatoria de 10 unidades, combinables entre modelos.
-  // La regla se aplica también a la variante singular de la categoría.
+  // Mates: compra mínima obligatoria de 10 unidades.
   const matesExisting = rules["mates"] ?? rules["mate"];
-  const { minAmount: _ignoredMateMinAmount, ...matesRuleBase } = matesExisting ?? { discountTiers: [] };
-  const matesRule: CategoryRule = {
+  const { minAmount: _ignored, ...matesRuleBase } = matesExisting ?? { discountTiers: [] };
+  rules["mates"] = {
     ...matesRuleBase,
     minUnits: 10,
-    discountTiers: [
-      { units: 5, percent: 5 },
-      { units: 10, percent: 10 },
-    ],
+    discountTiers: [{ units: 5, percent: 5 }, { units: 10, percent: 10 }],
   };
   delete rules["mate"];
-  rules["mates"] = matesRule;
 
   return rules;
 }
 
-/** % de descuento de categoría dado el total de unidades en carrito */
 export function categoryDiscountForUnits(tiers: CategoryTier[], totalUnits: number): number {
   let percent = 0;
   for (const tier of tiers ?? []) {
@@ -385,10 +344,6 @@ export function categoryDiscountForUnits(tiers: CategoryTier[], totalUnits: numb
   return percent;
 }
 
-/**
- * Busca la regla más aplicable para una categoría.
- * Soporta match exacto, sin "de", singular/plural y prefijo.
- */
 export function findRuleForCat(
   catNorm: string,
   rules: Record<string, CategoryRule>,
@@ -396,17 +351,14 @@ export function findRuleForCat(
   if (!catNorm) return undefined;
   if (rules[catNorm]) return { key: catNorm, rule: rules[catNorm] };
 
-  // Variante quitando "de"
   const catWithoutDe = catNorm.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
   if (rules[catWithoutDe]) return { key: catWithoutDe, rule: rules[catWithoutDe] };
 
-  // Variante singular/plural
   const catPlural = catNorm.endsWith("s") ? catNorm : catNorm + "s";
   const catSingular = catNorm.endsWith("s") ? catNorm.slice(0, -1) : catNorm;
   if (rules[catPlural]) return { key: catPlural, rule: rules[catPlural] };
   if (rules[catSingular]) return { key: catSingular, rule: rules[catSingular] };
 
-  // Match por prefijo (el prefijo más largo gana)
   let best: { key: string; rule: CategoryRule } | undefined;
   for (const [ruleKey, rule] of Object.entries(rules)) {
     const cleanRuleKey = ruleKey.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
@@ -420,29 +372,84 @@ export function findRuleForCat(
   return best;
 }
 
+/* ---------- MOQ explícito por producto (fuente de verdad v2) ---------- */
+
 /**
- * ¿El producto tiene una regla de mínimo de compra (MOQ)?
- * Retorna true si el producto tiene minUnits > 0 o minAmount > 0 en las reglas
- * de categoría dinámicas, o si es un Mate (cuyo mínimo está hardcodeado).
- * Usar en la product page para decidir si mostrar el botón "Comprar ya".
+ * Lee el campo `moq_group` desde el metadata del producto.
+ * Valores:
+ *   "none"        → el producto no tiene MOQ aunque su nombre o categoría sugieran lo contrario
+ *   "mates"       → acumula bajo la regla "mates" (mín 10 u.)
+ *   "<ruleKey>"   → acumula bajo la regla indicada
+ *   "" / null     → sin asignación manual; se aplica solo el match por categoría
  */
+export function moqGroupOf(product: Record<string, unknown>): string | null {
+  const meta = product["metadata"];
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    const mg = (meta as Record<string, unknown>)["moq_group"];
+    if (typeof mg === "string") return mg;
+  }
+  return null;
+}
+
+/**
+ * Información de MOQ para un producto dado.
+ * Retorna null si el producto no tiene MOQ aplicable.
+ * Retorna un objeto con group, minUnits y/o minAmount si tiene MOQ.
+ *
+ * Fuente de verdad: `metadata.moq_group` del producto.
+ *   - "none"       → null (sin MOQ)
+ *   - "<ruleKey>"  → busca la regla directamente
+ *   - "" / null    → match por categoría (sin fallback de nombre)
+ */
+export type MoqInfo = {
+  group: string;
+  minUnits?: number;
+  minAmount?: number;
+};
+
 export function hasMoq(
-  product: { nombre?: string; categoria?: string },
+  product: Record<string, unknown>,
   catRules: Record<string, CategoryRule>,
-): boolean {
-  // Los Mates siempre tienen MOQ (hardcodeado en parseCategoryRules)
-  if (isMate(product.nombre, product.categoria)) return true;
-  const catNorm = normCat(product.categoria ?? "");
-  if (!catNorm) return false;
+): MoqInfo | null {
+  const mg = moqGroupOf(product);
+
+  // Explícito "none" → nunca tiene MOQ
+  if (mg === "none") return null;
+
+  // Explícito con clave de regla → lookup directo (no usa nombre ni categoría)
+  if (mg && mg !== "") {
+    const rule = catRules[mg];
+    if (!rule) return null;
+    if (!rule.minUnits && !rule.minAmount) return null;
+    return { group: mg, minUnits: rule.minUnits, minAmount: rule.minAmount };
+  }
+
+  // Sin asignación manual → match por categoría solamente (sin heurística de nombre)
+  const catNorm = normCat(String(product["categoria"] ?? ""));
+  if (!catNorm) return null;
   const match = findRuleForCat(catNorm, catRules);
-  return Boolean(
-    (match && (match.rule.minUnits ?? 0) > 0) ||
-    (match && (match.rule.minAmount ?? 0) > 0)
-  );
+  if (!match) return null;
+  if (!match.rule.minUnits && !match.rule.minAmount) return null;
+  return { group: match.key, minUnits: match.rule.minUnits, minAmount: match.rule.minAmount };
+}
+
+/**
+ * ¿La cantidad `qty` del producto cumple su MOQ?
+ * Retorna true si no tiene MOQ o si qty >= minUnits (y precio * qty >= minAmount).
+ */
+export function meetsMoq(
+  moqInfo: MoqInfo | null,
+  qty: number,
+  unitPrice = 0,
+): boolean {
+  if (!moqInfo) return true;
+  if (moqInfo.minUnits && qty < moqInfo.minUnits) return false;
+  if (moqInfo.minAmount && qty * unitPrice < moqInfo.minAmount) return false;
+  return true;
 }
 
 export type CategoryMinViolation = {
-  category: string;   // nombre para mostrar
+  category: string;
   type: "units" | "amount";
   min: number;
   current: number;
@@ -450,31 +457,46 @@ export type CategoryMinViolation = {
 
 /**
  * Retorna las violaciones de mínimos de compra para el carrito actual.
- * Las subcategorías (ej. "Perfumes Árabe") se agrupan bajo la regla padre ("Perfumes").
  *
- * FIX: los Mates tienen categoria="Bazar" en la DB, no "Mates".
- * Cuando el match por categoría falla, se usa isMate(nombre, categoria) como fallback
- * para acumularlos bajo la clave "mates" y aplicar el minUnits=10 correctamente.
+ * v2: cada ítem puede tener `moq_group` explícito (leído desde metadata del producto).
+ *   - moq_group === "none"    → ítem ignorado para cálculos de MOQ
+ *   - moq_group === "<key>"   → se acumula bajo esa clave de regla directamente
+ *   - moq_group === "" / null → match por categoría (sin fallback de nombre)
  */
 export function checkCategoryMins(
-  items: { categoria?: string; nombre?: string; qty: number; unitPrice: number }[],
+  items: {
+    categoria?: string;
+    nombre?: string;
+    moq_group?: string | null;
+    qty: number;
+    unitPrice: number;
+  }[],
   rules: Record<string, CategoryRule>,
 ): CategoryMinViolation[] {
-  // Acumula totales agrupados por la clave de regla (no por la categoría exacta del ítem)
   const catUnits: Record<string, number> = {};
   const catAmount: Record<string, number> = {};
 
   for (const item of items) {
-    const raw = (item.categoria ?? "").trim();
-    const catNorm = normCat(raw);
+    const mg = item.moq_group ?? null;
 
-    // Busca la regla con mínimo (minUnits o minAmount) más aplicable para este ítem.
-    // Recorre todas las reglas y elige la que tenga mínimo y mejor match (más larga).
+    // moq_group explícito "none" → ignorar
+    if (mg === "none") continue;
+
     let minRuleKey: string | undefined;
-    let minRuleKeyLen = -1;
-    const catWithoutDe = catNorm.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
 
-    if (raw) {
+    if (mg && mg !== "") {
+      // moq_group explícito con clave → usa directamente si la regla tiene mínimo
+      const rule = rules[mg];
+      if (rule && (rule.minUnits || rule.minAmount)) {
+        minRuleKey = mg;
+      }
+    } else {
+      // Sin asignación manual → match por categoría
+      const raw = (item.categoria ?? "").trim();
+      const catNorm = normCat(raw);
+      const catWithoutDe = catNorm.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
+
+      let minRuleKeyLen = -1;
       for (const [ruleKey, rule] of Object.entries(rules)) {
         if (!rule.minUnits && !rule.minAmount) continue;
         const cleanRuleKey = ruleKey.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
@@ -489,13 +511,7 @@ export function checkCategoryMins(
           minRuleKeyLen = ruleKey.length;
         }
       }
-    }
-
-    // Fallback: si el ítem pertenece a "Bazar" (u otra cat sin regla propia) pero
-    // su nombre lo identifica como un Mate, acumúlalo bajo la regla "mates".
-    // Esto repara el bug donde categoria="Bazar" nunca matcheaba la regla "mates".
-    if (!minRuleKey && isMate(item.nombre, raw)) {
-      minRuleKey = "mates";
+      // Sin fallback de nombre — se eliminó isMate para evitar falsos positivos
     }
 
     if (minRuleKey) {
@@ -508,7 +524,6 @@ export function checkCategoryMins(
   for (const [key, rule] of Object.entries(rules)) {
     const units = catUnits[key] ?? 0;
     if (units === 0) continue;
-    // Display: capitaliza la clave de regla (ej "perfumes" → "Perfumes")
     const display = key.charAt(0).toUpperCase() + key.slice(1);
     if (rule.minUnits && units < rule.minUnits) {
       violations.push({ category: display, type: "units", min: rule.minUnits, current: units });

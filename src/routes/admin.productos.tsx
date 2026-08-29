@@ -30,7 +30,7 @@ import {
   type BannerInput,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl, isMate } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/productos")({
   loader: ({ context }) => {
@@ -66,6 +66,7 @@ const emptyProduct = (): ProductInput => ({
   stock: "SI",
   descuento: "NO",
   es_zapatilla: false,
+  moq_group: "",
   color_predeterminado: "",
   imagen_url: "",
   tipo_talles: "NINGUNO",
@@ -117,6 +118,7 @@ function productToInput(p: Product): ProductInput {
     stock: String(p.stock ?? "SI"),
     descuento: String(p.descuento ?? "NO"),
     es_zapatilla: pRec["es_zapatilla"] === true || String(pRec["es_zapatilla"] ?? "").toLowerCase() === "true",
+    moq_group: typeof pRec["moq_group"] === "string" ? pRec["moq_group"] : "",
     color_predeterminado: p.color_predeterminado ?? "",
     imagen_url: p.imagen_url ?? "",
     tipo_talles,
@@ -1134,6 +1136,27 @@ function ProductModal({
               />
               <span>Es zapatilla</span>
             </label>
+            {/* Selector de MOQ (Compra mínima) */}
+            <div className="flex flex-col gap-1 min-w-[220px]">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Compra mínima</label>
+              <select
+                id="moq_group_selector"
+                value={form.moq_group ?? ""}
+                onChange={(e) => set("moq_group", e.target.value)}
+                className="input-base text-sm py-1.5"
+              >
+                <option value="">Automático (por categoría)</option>
+                <option value="none">Sin mínimo de compra</option>
+                <option value="mates">Mates — mín. 10 unidades</option>
+                <option value="perfumes arabes">Perfumes Árabes — mín. 5 u.</option>
+                <option value="perfumes disenador">Perfumes Diseñador — mín. 3 u.</option>
+              </select>
+              {isMate(form.nombre, form.categoria) && !form.moq_group && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+                  ⚠ El nombre sugiere que es un Mate. Confirmá o corregí el mínimo.
+                </p>
+              )}
+            </div>
             {(["destacado", "oferta", "stock"] as const).map((field) => (
               <label key={field} className="flex cursor-pointer items-center gap-2 text-sm font-medium capitalize">
                 <div

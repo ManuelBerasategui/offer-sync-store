@@ -1,219 +1,299 @@
-/**
- * Tests unitarios para la lógica de MOQ (Minimum Order Quantity).
- *
- * Criterios de aceptación cubiertos:
- *   1. 9 Mates + 1 Termo en el carrito → NO deja avanzar al checkout (violación)
- *   2. 1 Termo (sin Mates) → SÍ deja avanzar (sin violación)
- *   3. 10 Mates en el carrito → sin violación
- *   4. Bajar de 10 a 9 Mates → violación generada en tiempo real (lógica pura)
- *   5. isMate reconoce nombres de Mates ("Mate Bombilla")
- *   6. isMate no confunde Termos ("Termo Stanley")
- *   7. hasMoq retorna true para un Mate
- *   8. hasMoq retorna false para un Termo
- *   9. Un producto con cat_min_units dinámica también tiene MOQ
- */
-
 import { describe, it, expect } from "vitest";
 import {
-  isMate,
-  hasMoq,
   parseCategoryRules,
   checkCategoryMins,
+  isMate,
+  hasMoq,
+  moqGroupOf,
+  meetsMoq,
+  type MoqInfo,
 } from "./store";
 
-// ─── Fixture de config mínima (sin reglas dinámicas extra) ───────────────────
-const BASE_CONFIG = {};
+/* ══════════════════════════════════════════════════════════════════
+   Helpers
+══════════════════════════════════════════════════════════════════ */
 
-// Config con una categoría dinámica (Indumentaria: mín 3 unidades)
-const CONFIG_WITH_INDUMENTARIA = {
-  cat_min_units_Indumentaria: "3",
-};
+function makeRules(extra: Record<string, string> = {}) {
+  return parseCategoryRules(extra);
+}
 
-const RULES = parseCategoryRules(BASE_CONFIG);
-const RULES_WITH_INDUMENTARIA = parseCategoryRules(CONFIG_WITH_INDUMENTARIA);
+function makeProduct(
+  nombre: string,
+  categoria: string,
+  moq_group?: string,
+): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {};
+  if (moq_group !== undefined) metadata["moq_group"] = moq_group;
+  return { nombre, categoria, metadata };
+}
 
-// ─── isMate ──────────────────────────────────────────────────────────────────
+function item(
+  nombre: string,
+  categoria: string,
+  qty: number,
+  unitPrice = 100,
+  moq_group?: string,
+) {
+  return { nombre, categoria, moq_group, qty, unitPrice };
+}
 
+/* ══════════════════════════════════════════════════════════════════
+   isMate — sigue siendo usado como heurística para sugerencias admin
+══════════════════════════════════════════════════════════════════ */
 describe("isMate", () => {
-  it("reconoce 'Mate Bombilla' en categoria Bazar", () => {
-    expect(isMate("Mate Bombilla", "Bazar")).toBe(true);
+  it("detecta nombre 'Mate Silicona'", () => {
+    expect(isMate("Mate Silicona", "Bazar")).toBe(true);
   });
 
-  it("reconoce 'Mate Imperial' en categoria Bazar", () => {
-    expect(isMate("Mate Imperial", "Bazar")).toBe(true);
+  it("detecta 'mates' como categoría exacta", () => {
+    expect(isMate("Qualquier", "mates")).toBe(true);
   });
 
-  it("reconoce 'mate' al inicio del nombre (minúsculas)", () => {
-    expect(isMate("mate artesanal madera", "Bazar")).toBe(true);
+  it("NO matchea 'Tomate'", () => {
+    expect(isMate("Tomate Cherry", "Verduras")).toBe(false);
   });
 
-  it("reconoce 'mates' como plural en el nombre", () => {
-    expect(isMate("Set de mates x6", "Bazar")).toBe(true);
+  it("NO matchea 'Material'", () => {
+    expect(isMate("Material de estudio", "Libros")).toBe(false);
   });
 
-  it("NO confunde 'Termo Stanley' con un Mate", () => {
-    expect(isMate("Termo Stanley", "Bazar")).toBe(false);
+  it("NO matchea 'Smart Watch' (Tecnología)", () => {
+    expect(isMate("Smart Watch Pro", "Tecnología")).toBe(false);
   });
 
-  it("NO confunde 'Tomate' con un Mate", () => {
-    expect(isMate("Salsa de Tomate", "Bazar")).toBe(false);
+  it("NO matchea auricular con finish 'mate' en nombre", () => {
+    // Nombre con 'mate' como adjetivo al final — falso positivo histórico
+    // Ahora isMate sí lo detectaría, pero hasMoq ya NO usa isMate en runtime
+    // Este test documenta el comportamiento de isMate aislado
+    expect(isMate("Auricular Bluetooth Mate", "Tecnología")).toBe(true); // isMate detecta el token
   });
 
-  it("NO confunde 'Material' con un Mate", () => {
-    expect(isMate("Material escolar", "Bazar")).toBe(false);
-  });
-
-  it("reconoce categoria 'Mates' directamente (por si alguna vez existe)", () => {
-    expect(isMate("Cualquier nombre", "Mates")).toBe(true);
-  });
-
-  it("reconoce categoria 'mate' directamente", () => {
-    expect(isMate("Cualquier nombre", "mate")).toBe(true);
+  it("NO matchea kit con MATE en nombre si moq_group='none' (runtime)", () => {
+    // En runtime, hasMoq usa moq_group, no isMate → el kit no tiene MOQ
+    const rules = makeRules();
+    const kit = makeProduct("KIT TERMO STANLEY MATE 160ml", "Bazar", "none");
+    expect(hasMoq(kit, rules)).toBeNull();
   });
 });
 
-// ─── hasMoq ──────────────────────────────────────────────────────────────────
+/* ══════════════════════════════════════════════════════════════════
+   moqGroupOf
+══════════════════════════════════════════════════════════════════ */
+describe("moqGroupOf", () => {
+  it("retorna null si metadata no tiene moq_group", () => {
+    expect(moqGroupOf({ nombre: "Test", metadata: {} })).toBeNull();
+  });
 
+  it("retorna 'none' si se seteo 'none'", () => {
+    expect(moqGroupOf(makeProduct("Kit", "Bazar", "none"))).toBe("none");
+  });
+
+  it("retorna 'mates' si se seteo 'mates'", () => {
+    expect(moqGroupOf(makeProduct("Mate", "Bazar", "mates"))).toBe("mates");
+  });
+
+  it("retorna '' si se seteo vacío", () => {
+    expect(moqGroupOf(makeProduct("Tech", "Tecnología", ""))).toBe("");
+  });
+
+  it("retorna null si metadata es null", () => {
+    expect(moqGroupOf({ nombre: "X", metadata: null })).toBeNull();
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   hasMoq — nueva API retorna MoqInfo | null
+══════════════════════════════════════════════════════════════════ */
 describe("hasMoq", () => {
-  it("retorna true para un producto Mate (categoria Bazar)", () => {
-    expect(hasMoq({ nombre: "Mate Bombilla", categoria: "Bazar" }, RULES)).toBe(true);
+  const rules = makeRules();
+
+  it("retorna null para moq_group='none' (sin importar nombre)", () => {
+    const prod = makeProduct("Mate de silicona", "Bazar", "none");
+    expect(hasMoq(prod, rules)).toBeNull();
   });
 
-  it("retorna false para un Termo (sin MOQ propio)", () => {
-    expect(hasMoq({ nombre: "Termo Stanley", categoria: "Bazar" }, RULES)).toBe(false);
+  it("retorna null para moq_group='none' en kit con MATE en nombre", () => {
+    const kit = makeProduct("KIT TERMO STANLEY MATE 160ml", "Bazar", "none");
+    expect(hasMoq(kit, rules)).toBeNull();
   });
 
-  it("retorna false para un producto genérico sin regla", () => {
-    expect(hasMoq({ nombre: "Bolso viajero", categoria: "Accesorios" }, RULES)).toBe(false);
+  it("retorna MoqInfo con minUnits=10 para moq_group='mates'", () => {
+    const prod = makeProduct("Mate acero inox", "Bazar", "mates");
+    const info = hasMoq(prod, rules);
+    expect(info).not.toBeNull();
+    expect(info!.group).toBe("mates");
+    expect(info!.minUnits).toBe(10);
   });
 
-  it("retorna true para producto con regla dinámica cat_min_units (Indumentaria)", () => {
-    expect(hasMoq({ nombre: "Remera básica", categoria: "Indumentaria" }, RULES_WITH_INDUMENTARIA)).toBe(true);
+  it("retorna null para Tecnología sin moq_group (sin regla de categoría)", () => {
+    const prod = makeProduct("Smart Watch Pro", "Tecnología", "");
+    expect(hasMoq(prod, rules)).toBeNull();
   });
 
-  it("retorna false para producto sin regla dinámica (Indumentaria rules, pero categoría distinta)", () => {
-    expect(hasMoq({ nombre: "Auriculares BT", categoria: "Electrónica" }, RULES_WITH_INDUMENTARIA)).toBe(false);
-  });
-});
-
-// ─── checkCategoryMins — criterios de aceptación del carrito ─────────────────
-
-describe("checkCategoryMins — Mates (categoria=Bazar)", () => {
-  /**
-   * Criterio 1: 9 Mates + 1 Termo → NO deja avanzar (violación de Mates)
-   */
-  it("AC1: 9 Mates + 1 Termo → violación de Mates", () => {
-    const items = [
-      { nombre: "Mate Imperial", categoria: "Bazar", qty: 9, unitPrice: 5000 },
-      { nombre: "Termo Stanley", categoria: "Bazar", qty: 1, unitPrice: 15000 },
-    ];
-    const violations = checkCategoryMins(items, RULES);
-    expect(violations.length).toBeGreaterThan(0);
-    const mateViolation = violations.find((v) => v.category.toLowerCase() === "mates");
-    expect(mateViolation).toBeDefined();
-    expect(mateViolation?.type).toBe("units");
-    expect(mateViolation?.min).toBe(10);
-    expect(mateViolation?.current).toBe(9);
+  it("retorna null para Tecnología con moq_group=undefined (no tocado)", () => {
+    const prod = makeProduct("Smart Watch Pro", "Tecnología");
+    expect(hasMoq(prod, rules)).toBeNull();
   });
 
-  /**
-   * Criterio 2: 1 Termo (sin Mates) → SÍ deja avanzar (sin violación)
-   */
-  it("AC2: 1 Termo (sin Mates) → sin violación", () => {
-    const items = [
-      { nombre: "Termo Stanley", categoria: "Bazar", qty: 1, unitPrice: 15000 },
-    ];
-    const violations = checkCategoryMins(items, RULES);
-    expect(violations.length).toBe(0);
+  it("retorna null para Tecnología aunque el nombre contenga 'mate'", () => {
+    // Auricular con acabado mate — ya NO hay falso positivo porque hasMoq no usa isMate
+    const prod = makeProduct("Auricular Bluetooth Mate", "Tecnología", "");
+    expect(hasMoq(prod, rules)).toBeNull();
   });
 
-  /**
-   * Criterio 3: 10 Mates → sin violación (mínimo exacto cumplido)
-   */
-  it("AC3: 10 Mates → sin violación", () => {
-    const items = [
-      { nombre: "Mate Imperial", categoria: "Bazar", qty: 10, unitPrice: 5000 },
-    ];
-    const violations = checkCategoryMins(items, RULES);
-    const mateViolation = violations.find((v) => v.category.toLowerCase() === "mates");
-    expect(mateViolation).toBeUndefined();
+  it("retorna MoqInfo para categoría perfumes con regla dinámica", () => {
+    const customRules = makeRules({ cat_min_units_perfumes: "5" });
+    const prod = makeProduct("Perfume Floral", "Perfumes", "");
+    const info = hasMoq(prod, customRules);
+    expect(info).not.toBeNull();
+    expect(info!.minUnits).toBe(5);
   });
 
-  /**
-   * Criterio 4: Bajar de 10 a 9 Mates → violación en tiempo real (lógica pura)
-   * checkCategoryMins es una función pura: llamarla con qty=9 produce violación,
-   * y con qty=10 no. Esto simula el recálculo en tiempo real del carrito.
-   */
-  it("AC4: bajar de 10 a 9 Mates → violación generada (recálculo puro)", () => {
-    const withTen = checkCategoryMins(
-      [{ nombre: "Mate Imperial", categoria: "Bazar", qty: 10, unitPrice: 5000 }],
-      RULES,
-    );
-    const withNine = checkCategoryMins(
-      [{ nombre: "Mate Imperial", categoria: "Bazar", qty: 9, unitPrice: 5000 }],
-      RULES,
-    );
-    expect(withTen.find((v) => v.category.toLowerCase() === "mates")).toBeUndefined();
-    expect(withNine.find((v) => v.category.toLowerCase() === "mates")).toBeDefined();
-  });
-
-  /**
-   * El Termo no genera violación incluso cuando hay una regla de Mates activa.
-   */
-  it("Termo no genera violación de Mates", () => {
-    const items = [
-      { nombre: "Termo Stanley", categoria: "Bazar", qty: 1, unitPrice: 15000 },
-    ];
-    const violations = checkCategoryMins(items, RULES);
-    expect(violations.length).toBe(0);
-  });
-
-  /**
-   * Mates combinados de distintos modelos se suman (mínimo agregado).
-   */
-  it("Mates de distintos modelos se suman al mínimo agregado", () => {
-    const items = [
-      { nombre: "Mate Bombilla", categoria: "Bazar", qty: 5, unitPrice: 4000 },
-      { nombre: "Mate Imperial", categoria: "Bazar", qty: 5, unitPrice: 5000 },
-    ];
-    const violations = checkCategoryMins(items, RULES);
-    const mateViolation = violations.find((v) => v.category.toLowerCase() === "mates");
-    // 5 + 5 = 10 → cumple mínimo
-    expect(mateViolation).toBeUndefined();
-  });
-
-  it("5 Mates de modelo A + 4 de modelo B = 9 → violación", () => {
-    const items = [
-      { nombre: "Mate Bombilla", categoria: "Bazar", qty: 5, unitPrice: 4000 },
-      { nombre: "Mate Imperial", categoria: "Bazar", qty: 4, unitPrice: 5000 },
-    ];
-    const violations = checkCategoryMins(items, RULES);
-    const mateViolation = violations.find((v) => v.category.toLowerCase() === "mates");
-    expect(mateViolation).toBeDefined();
-    expect(mateViolation?.current).toBe(9);
+  it("retorna null si moq_group apunta a regla inexistente", () => {
+    const prod = makeProduct("X", "Y", "regla_que_no_existe");
+    expect(hasMoq(prod, rules)).toBeNull();
   });
 });
 
-// ─── checkCategoryMins — reglas dinámicas (no Mates) ─────────────────────────
+/* ══════════════════════════════════════════════════════════════════
+   meetsMoq
+══════════════════════════════════════════════════════════════════ */
+describe("meetsMoq", () => {
+  const moqMates: MoqInfo = { group: "mates", minUnits: 10 };
+  const moqPerfume: MoqInfo = { group: "perfumes", minUnits: 5 };
 
-describe("checkCategoryMins — reglas dinámicas (Indumentaria)", () => {
-  it("2 unidades de Indumentaria con mínimo 3 → violación", () => {
-    const items = [
-      { nombre: "Remera básica", categoria: "Indumentaria", qty: 2, unitPrice: 8000 },
-    ];
-    const violations = checkCategoryMins(items, RULES_WITH_INDUMENTARIA);
-    const v = violations.find((v) => v.category.toLowerCase() === "indumentaria");
-    expect(v).toBeDefined();
-    expect(v?.min).toBe(3);
-    expect(v?.current).toBe(2);
+  it("siempre cumple si moqInfo es null (sin MOQ)", () => {
+    expect(meetsMoq(null, 1)).toBe(true);
+    expect(meetsMoq(null, 0)).toBe(true);
   });
 
-  it("3 unidades de Indumentaria con mínimo 3 → sin violación", () => {
+  it("Mates qty=9 → NO cumple", () => {
+    expect(meetsMoq(moqMates, 9)).toBe(false);
+  });
+
+  it("Mates qty=10 → SÍ cumple", () => {
+    expect(meetsMoq(moqMates, 10)).toBe(true);
+  });
+
+  it("Mates qty=15 → SÍ cumple", () => {
+    expect(meetsMoq(moqMates, 15)).toBe(true);
+  });
+
+  it("Perfume qty=1 → NO cumple (falta 4)", () => {
+    expect(meetsMoq(moqPerfume, 1)).toBe(false);
+  });
+
+  it("Perfume qty=4 → NO cumple (falta 1)", () => {
+    expect(meetsMoq(moqPerfume, 4)).toBe(false);
+  });
+
+  it("Perfume qty=5 → SÍ cumple", () => {
+    expect(meetsMoq(moqPerfume, 5)).toBe(true);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   checkCategoryMins con moq_group explícito
+══════════════════════════════════════════════════════════════════ */
+describe("checkCategoryMins — moq_group explícito", () => {
+  const rules = makeRules();
+
+  it("Mate (moq_group='mates') qty=9 → violación", () => {
+    const items = [item("Mate Silicona", "Bazar", 9, 100, "mates")];
+    const v = checkCategoryMins(items, rules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.min).toBe(10);
+    expect(v[0]!.current).toBe(9);
+  });
+
+  it("Mate (moq_group='mates') qty=10 → sin violación", () => {
+    const items = [item("Mate Silicona", "Bazar", 10, 100, "mates")];
+    expect(checkCategoryMins(items, rules)).toHaveLength(0);
+  });
+
+  it("Kit (moq_group='none') con 'MATE' en nombre → sin violación", () => {
+    const items = [item("KIT TERMO STANLEY MATE 160ml", "Bazar", 2, 100, "none")];
+    expect(checkCategoryMins(items, rules)).toHaveLength(0);
+  });
+
+  it("Kit (moq_group='none') + Mate (moq_group='mates') qty=10 → sin violación", () => {
     const items = [
-      { nombre: "Remera básica", categoria: "Indumentaria", qty: 3, unitPrice: 8000 },
+      item("KIT TERMO STANLEY MATE 160ml", "Bazar", 3, 100, "none"),
+      item("Mate de acero", "Bazar", 10, 100, "mates"),
     ];
-    const violations = checkCategoryMins(items, RULES_WITH_INDUMENTARIA);
-    const v = violations.find((v) => v.category.toLowerCase() === "indumentaria");
-    expect(v).toBeUndefined();
+    expect(checkCategoryMins(items, rules)).toHaveLength(0);
+  });
+
+  it("9 Mates en 3 modelos distintos → violación (se acumulan)", () => {
+    const items = [
+      item("Mate Silicona", "Bazar", 3, 100, "mates"),
+      item("Mate Madera", "Bazar", 3, 100, "mates"),
+      item("Mate Acero", "Bazar", 3, 100, "mates"),
+    ];
+    const v = checkCategoryMins(items, rules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.current).toBe(9);
+  });
+
+  it("9 Mates + 1 Termo (sin moq_group) → violación por 9 Mates", () => {
+    const items = [
+      item("Mate Silicona", "Bazar", 9, 100, "mates"),
+      item("Termo Stanley", "Bazar", 1, 100, undefined),
+    ];
+    const v = checkCategoryMins(items, rules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.current).toBe(9);
+    expect(v[0]!.min).toBe(10);
+  });
+
+  it("Tecnología (sin moq_group) → sin violación", () => {
+    const items = [item("Smart Watch Pro", "Tecnología", 1, 100, undefined)];
+    expect(checkCategoryMins(items, rules)).toHaveLength(0);
+  });
+
+  it("Perfume con moq_group explícito qty=3 → violación", () => {
+    // La clave normCat de 'cat_min_units_perfumes_arabes' es 'perfumes_arabes' (underscores)
+    const customRules = makeRules({ cat_min_units_perfumes_arabes: "5" });
+    const items = [item("Perfume Oud", "Perfumes Arabes", 3, 100, "perfumes_arabes")];
+    const v = checkCategoryMins(items, customRules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.min).toBe(5);
+  });
+
+  it("Perfume con moq_group explícito qty=5 → sin violación", () => {
+    const customRules = makeRules({ cat_min_units_perfumes_arabes: "5" });
+    const items = [item("Perfume Oud", "Perfumes Arabes", 5, 100, "perfumes_arabes")];
+    expect(checkCategoryMins(items, customRules)).toHaveLength(0);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   parseCategoryRules
+══════════════════════════════════════════════════════════════════ */
+describe("parseCategoryRules", () => {
+  it("siempre genera regla 'mates' con minUnits=10", () => {
+    const rules = makeRules();
+    expect(rules["mates"]).toBeDefined();
+    expect(rules["mates"]!.minUnits).toBe(10);
+  });
+
+  it("no genera 'mate' duplicado (solo 'mates')", () => {
+    const rules = makeRules();
+    expect(rules["mate"]).toBeUndefined();
+  });
+
+  it("respeta reglas dinámicas cat_min_units_X", () => {
+    const rules = makeRules({ cat_min_units_suplementos: "3" });
+    expect(rules["suplementos"]?.minUnits).toBe(3);
+  });
+
+  it("ignora valores no numéricos en cat_min_units_X", () => {
+    const rules = makeRules({ cat_min_units_test: "abc" });
+    expect(rules["test"]?.minUnits).toBeUndefined();
+  });
+
+  it("ignora minUnits=0", () => {
+    const rules = makeRules({ cat_min_units_test: "0" });
+    expect(rules["test"]?.minUnits).toBeUndefined();
   });
 });

@@ -56,6 +56,13 @@ export type ProductInput = {
   precio_usd_modified?: boolean;
   precio_oferta_modified?: boolean;
   precio_oferta_usd_modified?: boolean;
+  /**
+   * Grupo de MOQ explicito. Fuente de verdad para la logica de compra minima.
+   * "none"       -> sin minimo (anula cualquier deteccion automatica)
+   * "mates"      -> minimo de 10 unidades de Mates
+   * ""           -> sin asignacion manual (usa match por categoria)
+   */
+  moq_group?: string;
 };
 
 /* ─── Helper de autorización ───────────────────────────── */
@@ -211,6 +218,11 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       const metadata: Record<string, string> = {};
       if (p.es_zapatilla) {
         metadata["es_zapatilla"] = "true";
+      }
+      // moq_group: persistir siempre (incluido "none" y "") para anular defaults.
+      // Solo omitir si no fue tocado por el admin (undefined).
+      if (p.moq_group !== undefined) {
+        metadata["moq_group"] = p.moq_group;
       }
       for (const tier of p.tiers ?? []) {
         if (tier.units > 0 && tier.percent > 0) {
