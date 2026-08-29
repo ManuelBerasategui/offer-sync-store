@@ -116,6 +116,9 @@ function ProductoPage() {
   const product = findProduct(products, id);
 
   const [qty, setQty] = useState(1);
+  // qtyStr: valor de display del input — permite borrar y reescribir en mobile sin que
+  // el campo salte a 1 en cada keystroke. Se sincroniza con qty en onBlur.
+  const [qtyStr, setQtyStr] = useState("1");
   const [custom, setCustom] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showMin, setShowMin] = useState(false);
@@ -531,46 +534,69 @@ function ProductoPage() {
                     Llevá más, pagá menos!
                   </p>
                 )}
-                <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                <label
+                  htmlFor="qty-input"
+                  className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground"
+                >
                   Cantidad
                 </label>
-                {custom ? (
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      value={qty}
-                      onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
-                      className="w-32 rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCustom(false);
-                        setQty(1);
-                      }}
-                      className="text-sm font-semibold text-muted-foreground hover:text-primary"
-                    >
-                      Volver a la lista
-                    </button>
-                  </div>
-                ) : (
-                  <select
-                    value={qty}
-                    onChange={(e) => {
-                      if (e.target.value === "otro") setCustom(true);
-                      else setQty(Number(e.target.value));
+                <div className="mt-2 flex items-center gap-2">
+                  {/* Botón – */}
+                  <button
+                    type="button"
+                    id="qty-decrement"
+                    aria-label="Reducir cantidad"
+                    onClick={() => {
+                      const next = Math.max(1, qty - 1);
+                      setQty(next);
+                      setQtyStr(String(next));
                     }}
-                    className="mt-2 w-full max-w-[220px] rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-background text-lg font-bold text-foreground transition hover:bg-muted active:scale-95"
                   >
-                    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={n}>
-                        {n} {n === 1 ? "unidad" : "unidades"}
-                      </option>
-                    ))}
-                    <option value="otro">Otro (personalizado)</option>
-                  </select>
-                )}
+                    −
+                  </button>
+
+                  {/* Campo numérico editable */}
+                  <input
+                    id="qty-input"
+                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    min={1}
+                    value={qtyStr}
+                    onChange={(e) => {
+                      // Permitir campo vacío o número mientras el usuario escribe
+                      const raw = e.target.value.replace(/[^0-9]/g, "");
+                      setQtyStr(raw);
+                      const parsed = parseInt(raw, 10);
+                      if (!isNaN(parsed) && parsed >= 1) setQty(parsed);
+                    }}
+                    onBlur={() => {
+                      // Al salir del campo, garantizar entero >= 1
+                      const parsed = parseInt(qtyStr, 10);
+                      const clamped = isNaN(parsed) || parsed < 1 ? 1 : parsed;
+                      setQty(clamped);
+                      setQtyStr(String(clamped));
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    className="h-10 w-20 rounded-lg border border-input bg-background px-3 text-center text-sm font-semibold outline-none focus:border-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+
+                  {/* Botón + */}
+                  <button
+                    type="button"
+                    id="qty-increment"
+                    aria-label="Aumentar cantidad"
+                    onClick={() => {
+                      const next = qty + 1;
+                      setQty(next);
+                      setQtyStr(String(next));
+                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-background text-lg font-bold text-foreground transition hover:bg-muted active:scale-95"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             )}
 
