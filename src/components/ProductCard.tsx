@@ -24,6 +24,9 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
   const hidePrice = waOnlyReason === "vapers";
   const tiers = tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
+  // El tercer tramo global (20+ u → 12%) se aplica en discountFor/categoryDiscountForUnits.
+  // Reflejamos ese mínimo garantizado en el badge del catálogo.
+  const maxPercent = maxTier ? Math.max(maxTier.percent, 12) : null;
 
   const basePrice = offer ? toNumber(p.precio_oferta) : toNumber(p.precio);
   const discPct = transferDiscountPct(config);
@@ -87,9 +90,9 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
                 </p>
               </div>
 
-              {maxTier && (
+              {maxPercent !== null && (
                 <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
-                  🎁 Hasta {maxTier.percent}% OFF x mayor
+                  🎁 Hasta {maxPercent}% OFF x mayor
                 </span>
               )}
             </div>
