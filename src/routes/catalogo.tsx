@@ -231,8 +231,10 @@ function Catalogo() {
 
             {/* Mensaje de fin de catálogo */}
             {!hasMore && list.length > PAGE_SIZE && (
-              <div className="mt-8 border-t border-border/50 pt-6 text-center text-xs font-medium text-muted-foreground">
-                ✨ Has visto todos los productos disponibles ({list.length})
+              <div className="mt-10 flex items-center justify-center gap-3 text-xs font-semibold text-muted-foreground/60">
+                <span className="h-px w-12 bg-border/60" />
+                <span>Fin del catálogo</span>
+                <span className="h-px w-12 bg-border/60" />
               </div>
             )}
           </>
