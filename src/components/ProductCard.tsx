@@ -24,9 +24,9 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
   const hidePrice = waOnlyReason === "vapers";
   const tiers = tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
-  // El tercer tramo global (20+ u → 12%) se aplica en discountFor/categoryDiscountForUnits.
-  // Reflejamos ese mínimo garantizado en el badge del catálogo.
-  const maxPercent = maxTier ? Math.max(maxTier.percent, 12) : null;
+  // El tercer tramo global (20+ u → 12%) aplica a TODOS los productos con precio.
+  // maxPercent es 12 como mínimo universal; más si hay tiers propios por encima de 12%.
+  const maxPercent = (!hidePrice && !consultar) ? Math.max(maxTier?.percent ?? 12, 12) : null;
 
   const basePrice = offer ? toNumber(p.precio_oferta) : toNumber(p.precio);
   const discPct = transferDiscountPct(config);
