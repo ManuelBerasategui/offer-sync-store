@@ -420,7 +420,7 @@ function PriceModal({
 
   async function handleSavePrice() {
     // Productos WA-only no requieren precio (se consulta por WhatsApp)
-    const isWaOnly = Boolean(form.whatsapp_only_reason);
+    const isWaOnly = Boolean(pRec["whatsapp_only_reason"]);
     if (!isWaOnly && numBase <= 0) {
       setError("El precio base principal debe ser mayor a 0.");
       return;

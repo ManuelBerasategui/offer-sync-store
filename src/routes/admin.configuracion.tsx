@@ -74,6 +74,8 @@ function AdminConfiguracionPage() {
   }, []);
 
   const userId = user?.id;
+  const userEmail = user?.email ?? "";
+  const userToken = session?.access_token ?? "";
 
   async function loadCategories(isInitial = false) {
     if (isInitial || categories.length === 0) setLoading(true);
