@@ -65,7 +65,6 @@ const emptyProduct = (): ProductInput => ({
   oferta: "NO",
   stock: "SI",
   descuento: "NO",
-  es_zapatilla: false,
   whatsapp_only_reason: "",
   moq_group: "",
   color_predeterminado: "",
@@ -118,10 +117,9 @@ function productToInput(p: Product): ProductInput {
     oferta: String(p.oferta ?? "NO"),
     stock: String(p.stock ?? "SI"),
     descuento: String(p.descuento ?? "NO"),
-    es_zapatilla: pRec["es_zapatilla"] === true || String(pRec["es_zapatilla"] ?? "").toLowerCase() === "true",
-    whatsapp_only_reason: typeof pRec["whatsapp_only_reason"] === "string"
+    // Fuente única: whatsapp_only_reason. Retrocompat: si es_zapatilla=true y no hay reason, usar "zapatillas"
+    whatsapp_only_reason: typeof pRec["whatsapp_only_reason"] === "string" && pRec["whatsapp_only_reason"]
       ? pRec["whatsapp_only_reason"]
-      // Retrocompatibilidad: si no hay campo nuevo pero es_zapatilla=true, usar "zapatillas"
       : (pRec["es_zapatilla"] === true || String(pRec["es_zapatilla"] ?? "").toLowerCase() === "true" ? "zapatillas" : ""),
     moq_group: typeof pRec["moq_group"] === "string" ? pRec["moq_group"] : "",
     color_predeterminado: p.color_predeterminado ?? "",
@@ -421,7 +419,9 @@ function PriceModal({
   }
 
   async function handleSavePrice() {
-    if (numBase <= 0) {
+    // Productos WA-only no requieren precio (se consulta por WhatsApp)
+    const isWaOnly = Boolean(form.whatsapp_only_reason);
+    if (!isWaOnly && numBase <= 0) {
       setError("El precio base principal debe ser mayor a 0.");
       return;
     }
@@ -1008,19 +1008,19 @@ function ProductModal({
           {/* Campos básicos */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="col-span-1 sm:col-span-2">
-              <label className="label-sm">{form.es_zapatilla ? "Modelo *" : "Nombre *"}</label>
+              <label className="label-sm">{form.whatsapp_only_reason === "zapatillas" ? "Modelo *" : "Nombre *"}</label>
               <input
                 className="input-base"
                 value={form.nombre}
                 onChange={(e) => set("nombre", e.target.value)}
-                placeholder={form.es_zapatilla ? "Modelo de zapatilla" : "Nombre del producto"}
+                placeholder={form.whatsapp_only_reason === "zapatillas" ? "Modelo de zapatilla" : "Nombre del producto"}
               />
             </div>
             <div>
               <label className="label-sm">Categoría</label>
               <input className="input-base" value={form.categoria} onChange={(e) => set("categoria", e.target.value)} placeholder="Ej: Suplementos" />
             </div>
-            {!form.es_zapatilla && (
+            {!form.whatsapp_only_reason && (
               <div>
                 <label className="label-sm">Color predeterminado</label>
                 <input className="input-base" value={form.color_predeterminado ?? ""} onChange={(e) => set("color_predeterminado", e.target.value)} placeholder="Ej: Negro" />
@@ -1136,13 +1136,15 @@ function ProductModal({
                 value={form.whatsapp_only_reason ?? ""}
                 onChange={(e) => {
                   const reason = e.target.value;
+                  // Auto-set tipo_talles según el tipo de venta WA-only
+                  const autoTalles: "ZAPATILLAS" | "ROPA" | "NINGUNO" =
+                    reason === "zapatillas" ? "ZAPATILLAS" :
+                    reason === "remeras"    ? "ROPA"       : "NINGUNO";
                   setForm((prev) => ({
                     ...prev,
                     whatsapp_only_reason: reason,
-                    es_zapatilla: reason === "zapatillas",
-                    // Al cambiar a WA-only limpiar campos de variantes/talles si era zapatilla
-                    ...(reason !== "zapatillas" && prev.es_zapatilla
-                      ? { color_predeterminado: "", tipo_talles: "NINGUNO", talles_disponibles: [], variants: [] }
+                    ...(reason
+                      ? { tipo_talles: autoTalles }
                       : {}),
                   }));
                 }}
@@ -1255,7 +1257,8 @@ function ProductModal({
           </div>
 
           {/* Tipo de Talles y Talles Disponibles */}
-          {!form.es_zapatilla && <div className="space-y-3 rounded-xl border border-border p-4 bg-muted/20">
+          {/* Tipo de talles se oculta para productos WA-only (zapatillas/vapers/remeras) */}
+          {!form.whatsapp_only_reason && <div className="space-y-3 rounded-xl border border-border p-4 bg-muted/20">
             <div>
               <label className="label-sm mb-1 block">Tipo de talles</label>
               <div className="flex flex-wrap gap-2">
@@ -1319,7 +1322,7 @@ function ProductModal({
           </div>}
 
           {/* Variantes de color */}
-          {!form.es_zapatilla && <div>
+          {!form.whatsapp_only_reason && <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Variantes de color</label>
               <button type="button" onClick={addVariant} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10">

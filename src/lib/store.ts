@@ -383,6 +383,9 @@ export function findRuleForCat(
  *   "" / null     → sin asignación manual; se aplica solo el match por categoría
  */
 export function moqGroupOf(product: Record<string, unknown>): string | null {
+  // Leer moq_group: primero top-level (metadata expandido), luego dentro de metadata raw
+  const topMg = product["moq_group"];
+  if (typeof topMg === "string") return topMg;
   const meta = product["metadata"];
   if (meta && typeof meta === "object" && !Array.isArray(meta)) {
     const mg = (meta as Record<string, unknown>)["moq_group"];
@@ -583,20 +586,26 @@ export const WA_ONLY_CONFIG: Record<
  * Compatible con el campo legacy `es_zapatilla` y con el nuevo `whatsapp_only_reason`.
  */
 export function waOnlyReasonOf(product: Record<string, unknown>): WaOnlyReason | null {
+  // 1. Campo nuevo: whatsapp_only_reason — puede estar en metadata (raw) o en top-level
+  //    (getStoreData y getAdminProducts expanden metadata al nivel raíz, eliminando el objeto)
+  const checkReason = (val: unknown): WaOnlyReason | null => {
+    if (typeof val === "string" && val in WA_ONLY_CONFIG) return val as WaOnlyReason;
+    return null;
+  };
+  // Top-level (metadata expandido) — caso más común en runtime
+  const topReason = checkReason(product["whatsapp_only_reason"]);
+  if (topReason) return topReason;
+  // Dentro de metadata (raw, por si acaso)
   const meta = product["metadata"];
   if (meta && typeof meta === "object" && !Array.isArray(meta)) {
     const m = meta as Record<string, unknown>;
-    // Nuevo campo: whatsapp_only_reason (string)
-    const reason = m["whatsapp_only_reason"];
-    if (typeof reason === "string" && reason in WA_ONLY_CONFIG) {
-      return reason as WaOnlyReason;
-    }
-    // Legacy: es_zapatilla boolean → "zapatillas"
+    const metaReason = checkReason(m["whatsapp_only_reason"]);
+    if (metaReason) return metaReason;
     if (m["es_zapatilla"] === true || String(m["es_zapatilla"] ?? "").toLowerCase() === "true") {
       return "zapatillas";
     }
   }
-  // Legacy top-level es_zapatilla (metafields expandidos al nivel raíz)
+  // Legacy: es_zapatilla top-level (retrocompatibilidad)
   if (product["es_zapatilla"] === true || String(product["es_zapatilla"] ?? "").toLowerCase() === "true") {
     return "zapatillas";
   }
