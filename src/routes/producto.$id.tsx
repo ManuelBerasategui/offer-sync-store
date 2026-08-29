@@ -24,6 +24,8 @@ import {
   isSuplemento,
   onImageError,
   isWhatsappOnly,
+  isMate,
+  hasMoq,
   money,
   priceOf,
   tiersOf,
@@ -221,7 +223,7 @@ function ProductoPage() {
 
   const suplemento = isSuplemento(product.categoria);
   const categoryMinViolation = checkCategoryMins(
-    [{ categoria: product.categoria, qty, unitPrice: basePrice }],
+    [{ nombre: product.nombre, categoria: product.categoria, qty, unitPrice: basePrice }],
     catRules,
   )[0];
   const bloqueaCompra = (suplemento && total < SUPLEMENTOS_MIN) || Boolean(categoryMinViolation);
@@ -231,6 +233,10 @@ function ProductoPage() {
   const minDialogDescription = categoryMinViolation
     ? `Llevás ${categoryMinViolation.current} unidad${categoryMinViolation.current !== 1 ? "es" : ""}. Te faltan ${categoryMinViolation.min - categoryMinViolation.current} para alcanzar el mínimo de ${categoryMinViolation.min}.`
     : SUPLEMENTOS_MSG;
+
+  // Productos con MOQ (Mates u otros con minUnits/minAmount) ocultan el botón "Comprar ya".
+  // El usuario debe agregar al carrito para respetar la validación agregada.
+  const hasMoqProduct = hasMoq(product, catRules);
 
   return (
     <div className="min-h-screen">
@@ -311,6 +317,25 @@ function ProductoPage() {
                             </p>
                             <p className="mt-0.5 text-muted-foreground leading-relaxed text-[11px] sm:text-xs">
                               Podés combinar distintos productos de esta categoría en tu carrito hasta alcanzar el mínimo.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Aviso especial para Mates (categoria="Bazar" pero tienen MOQ propio)
+                  if (isMate(product.nombre, product.categoria)) {
+                    return (
+                      <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 sm:p-3.5 text-xs text-foreground">
+                        <div className="flex items-start gap-2.5">
+                          <span className="text-base shrink-0 mt-0.5">ℹ️</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-amber-700 dark:text-amber-400 text-xs sm:text-sm">
+                              Compra mínima para Mates: 10 unidades
+                            </p>
+                            <p className="mt-0.5 text-muted-foreground leading-relaxed text-[11px] sm:text-xs">
+                              Podés combinar distintos modelos de Mates en tu carrito hasta alcanzar el mínimo.
                             </p>
                           </div>
                         </div>
@@ -550,24 +575,30 @@ function ProductoPage() {
                 />
               ) : (
                 <>
+                  {/* Ocultar "Comprar ya" para productos con MOQ (Mates u otros).
+                      El usuario debe usar el carrito, donde la validación agregada funciona. */}
+                  {!hasMoqProduct && (
+                    <button
+                      type="button"
+                      id="btn-comprar-ya"
+                      onClick={() => {
+                        if (hasTalles && !selectedTalle) {
+                          setTalleError(true);
+                          return;
+                        }
+                        if (bloqueaCompra) setShowMin(true);
+                        else setShowCheckout(true);
+                      }}
+                      className="btn-base w-full grad-urgente text-primary-foreground transition-all hover:shadow-md"
+                    >
+                      {hasTalles && !selectedTalle
+                        ? "Elegí tu talle para comprar"
+                        : "Comprar ya"}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => {
-                      if (hasTalles && !selectedTalle) {
-                        setTalleError(true);
-                        return;
-                      }
-                      if (bloqueaCompra) setShowMin(true);
-                      else setShowCheckout(true);
-                    }}
-                    className="btn-base w-full grad-urgente text-primary-foreground transition-all hover:shadow-md"
-                  >
-                    {hasTalles && !selectedTalle
-                      ? "Elegí tu talle para comprar"
-                      : "Comprar ya"}
-                  </button>
-                  <button
-                    type="button"
+                    id="btn-agregar-carrito"
                     onClick={() => {
                       if (hasTalles && !selectedTalle) {
                         setTalleError(true);

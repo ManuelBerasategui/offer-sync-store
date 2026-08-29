@@ -11,6 +11,7 @@ import {
   FALLBACK_IMAGE,
   SUPLEMENTOS_MIN,
   isSuplemento,
+  isMate,
   money,
   priceOf,
   waLink,
@@ -64,20 +65,19 @@ function CarritoPage() {
   // Mínimos por categoría (dinámicos o estáticos)
   const catRules = parseCategoryRules(config);
   const matesRuleMatch = findRuleForCat(normCat("Mates"), catRules);
+  // FIX: Los Mates tienen categoria="Bazar" en la DB, por eso el match por categoría
+  // siempre fallaba. Ahora usamos isMate(nombre, categoria) como fuente de verdad.
   const matesUnits = cartItemsWithCat
-    .filter((item) => {
-      const match = findRuleForCat(normCat(item.categoria ?? ""), catRules);
-      return match?.key === matesRuleMatch?.key;
-    })
+    .filter((item) => isMate(item.nombre, item.categoria ?? ""))
     .reduce((sum, item) => sum + item.qty, 0);
   const matesDiscountPct = matesRuleMatch
     ? categoryDiscountForUnits(matesRuleMatch.rule.discountTiers, matesUnits)
     : 0;
-
   // Violaciones de reglas dinámicas generales (excluyendo suplementos para evitar duplicación)
   const dynamicViolations = checkCategoryMins(
-    cartItemsWithCat.map((i: { categoria?: string; qty: number; unitPrice: number }) => ({
-      ...(i.categoria !== undefined ? { categoria: i.categoria } : {}),
+    cartItemsWithCat.map((i) => ({
+      nombre: i.nombre,
+      categoria: i.categoria,
       qty: i.qty,
       unitPrice: i.unitPrice,
     })),
