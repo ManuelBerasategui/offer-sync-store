@@ -424,8 +424,16 @@ export function hasMoq(
     return { group: mg, minUnits: rule.minUnits, minAmount: rule.minAmount };
   }
 
-  // Sin asignación manual → match por categoría solamente (sin heurística de nombre)
-  const catNorm = normCat(String(product["categoria"] ?? ""));
+  // Sin moq_group explícito → isMate fallback + match por categoría
+  const nombre = String(product["nombre"] ?? "");
+  const categoria = String(product["categoria"] ?? "");
+  if (isMate(nombre, categoria)) {
+    const matesRule = catRules["mates"];
+    if (matesRule && (matesRule.minUnits || matesRule.minAmount)) {
+      return { group: "mates", minUnits: matesRule.minUnits, minAmount: matesRule.minAmount };
+    }
+  }
+  const catNorm = normCat(categoria);
   if (!catNorm) return null;
   const match = findRuleForCat(catNorm, catRules);
   if (!match) return null;
@@ -511,7 +519,15 @@ export function checkCategoryMins(
           minRuleKeyLen = ruleKey.length;
         }
       }
-      // Sin fallback de nombre — se eliminó isMate para evitar falsos positivos
+      // Fallback: isMate (detecta Mates por nombre/categoría)
+      // Nota: introduce el falso positivo del kit, aceptado provisionalmente
+      // hasta que todos los productos tengan moq_group explícito en admin.
+      if (!minRuleKey && isMate(item.nombre ?? "", item.categoria ?? "")) {
+        const matesRule = rules["mates"];
+        if (matesRule && (matesRule.minUnits || matesRule.minAmount)) {
+          minRuleKey = "mates";
+        }
+      }
     }
 
     if (minRuleKey) {

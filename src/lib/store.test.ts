@@ -24,6 +24,7 @@ function makeProduct(
 ): Record<string, unknown> {
   const metadata: Record<string, unknown> = {};
   if (moq_group !== undefined) metadata["moq_group"] = moq_group;
+  // nombre y categoria también al nivel raíz para que isMate fallback en hasMoq los lea
   return { nombre, categoria, metadata };
 }
 
@@ -125,19 +126,40 @@ describe("hasMoq", () => {
     expect(info!.minUnits).toBe(10);
   });
 
+  it("retorna MoqInfo via isMate fallback (sin moq_group explícito)", () => {
+    // Productos Mates sin moq_group seteado en DB usan isMate como fallback
+    const prod = makeProduct("Mate de silicona", "Bazar"); // sin moq_group
+    const info = hasMoq(prod, rules);
+    expect(info).not.toBeNull();
+    expect(info!.group).toBe("mates");
+    expect(info!.minUnits).toBe(10);
+  });
+
   it("retorna null para Tecnología sin moq_group (sin regla de categoría)", () => {
+    // 'Smart Watch Pro' no contiene la palabra 'mate' → no matchea isMate → null ✓
     const prod = makeProduct("Smart Watch Pro", "Tecnología", "");
     expect(hasMoq(prod, rules)).toBeNull();
   });
 
   it("retorna null para Tecnología con moq_group=undefined (no tocado)", () => {
+    // Idem: nombre no contiene 'mate' → null ✓
     const prod = makeProduct("Smart Watch Pro", "Tecnología");
     expect(hasMoq(prod, rules)).toBeNull();
   });
 
-  it("retorna null para Tecnología aunque el nombre contenga 'mate'", () => {
-    // Auricular con acabado mate — ya NO hay falso positivo porque hasMoq no usa isMate
+  it("isMate fallback aplica aunque la categoría sea 'Tecnología' si el nombre contiene 'mate'", () => {
+    // Falso positivo conocido (aceptado provisionalmente): producto con 'mate' en nombre
+    // queda restringido incluso si no es un Mate. Se resuelve con moq_group='none' en admin.
     const prod = makeProduct("Auricular Bluetooth Mate", "Tecnología", "");
+    const info = hasMoq(prod, rules);
+    // isMate detecta 'Mate' al final del nombre → hasMoq retorna MoqInfo
+    expect(info).not.toBeNull();
+    expect(info!.group).toBe("mates");
+  });
+
+  it("moq_group='none' anula isMate fallback (fix para kits/combos)", () => {
+    // Con moq_group='none' explícito, el kit no queda restringido aunque el nombre contenga 'mate'
+    const prod = makeProduct("Auricular Bluetooth Mate", "Tecnología", "none");
     expect(hasMoq(prod, rules)).toBeNull();
   });
 
@@ -248,6 +270,20 @@ describe("checkCategoryMins — moq_group explícito", () => {
 
   it("Tecnología (sin moq_group) → sin violación", () => {
     const items = [item("Smart Watch Pro", "Tecnología", 1, 100, undefined)];
+    expect(checkCategoryMins(items, rules)).toHaveLength(0);
+  });
+
+  it("Mate sin moq_group explícito (isMate fallback) qty=9 → violación", () => {
+    // Simula producto existente en DB sin moq_group seteado aún
+    const items = [item("Mate Silicona", "Bazar", 9, 100, undefined)];
+    const v = checkCategoryMins(items, rules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.min).toBe(10);
+    expect(v[0]!.current).toBe(9);
+  });
+
+  it("Mate sin moq_group explícito qty=10 → sin violación", () => {
+    const items = [item("Mate Silicona", "Bazar", 10, 100, undefined)];
     expect(checkCategoryMins(items, rules)).toHaveLength(0);
   });
 
