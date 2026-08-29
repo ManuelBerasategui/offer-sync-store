@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -25,6 +25,78 @@ import {
   transferPrice,
   transferDiscountPct,
 } from "@/lib/store";
+
+/**
+ * Input de cantidad para el carrito con buffer de display.
+ * Permite borrar el campo y escribir números multi-dígito en mobile
+ * sin que el valor salte a 1 en cada keystroke.
+ */
+function CartQtyInput({
+  itemId,
+  qty,
+  nombre,
+  onDecrease,
+  onIncrease,
+  onSetQty,
+}: {
+  itemId: string;
+  qty: number;
+  nombre: string;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  onSetQty: (q: number) => void;
+}) {
+  const [display, setDisplay] = useState(String(qty));
+
+  return (
+    <div className="flex shrink-0 items-center rounded-md border border-input bg-background">
+      <button
+        type="button"
+        onClick={() => {
+          onDecrease();
+          setDisplay(String(Math.max(1, qty - 1)));
+        }}
+        disabled={qty <= 1}
+        className="flex h-8 w-7 items-center justify-center text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label={`Quitar una unidad de ${nombre}`}
+      >
+        <Minus className="h-3 w-3" />
+      </button>
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={display}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/\D/g, "");
+          setDisplay(raw);
+          const parsed = parseInt(raw, 10);
+          if (!isNaN(parsed) && parsed >= 1) onSetQty(parsed);
+        }}
+        onBlur={() => {
+          const parsed = parseInt(display, 10);
+          const clamped = isNaN(parsed) || parsed < 1 ? 1 : parsed;
+          setDisplay(String(clamped));
+          onSetQty(clamped);
+        }}
+        onFocus={(e) => e.target.select()}
+        className="h-8 w-10 border-x border-input bg-background text-center text-xs outline-none focus:border-primary"
+        aria-label={`Cantidad de ${nombre}`}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          onIncrease();
+          setDisplay(String(qty + 1));
+        }}
+        className="flex h-8 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
+        aria-label={`Agregar una unidad de ${nombre}`}
+      >
+        <Plus className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/carrito")({
   loader: ({ context }) => {
@@ -201,37 +273,15 @@ function CarritoPage() {
 
                     {/* Qty stepper + subtotal + remove — own row on mobile so nothing gets squeezed */}
                     <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
-                      <div className="flex shrink-0 items-center rounded-md border border-input bg-background">
-                        <button
-                          type="button"
-                          onClick={() => cart.setQty(i.id, i.qty - 1)}
-                          disabled={i.qty <= 1}
-                          className="flex h-8 w-7 items-center justify-center text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                          aria-label={`Quitar una unidad de ${i.nombre}`}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={i.qty}
-                          onChange={(e) => {
-                            const digits = e.target.value.replace(/\D/g, "");
-                            cart.setQty(i.id, digits ? Number(digits) : 1);
-                          }}
-                          className="h-8 w-8 border-x border-input bg-background text-center text-xs outline-none focus:border-primary"
-                          aria-label={`Cantidad de ${i.nombre}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => cart.setQty(i.id, i.qty + 1)}
-                          className="flex h-8 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
-                          aria-label={`Agregar una unidad de ${i.nombre}`}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
+                      <CartQtyInput
+                        key={i.id}
+                        itemId={i.id}
+                        qty={i.qty}
+                        nombre={i.nombre}
+                        onDecrease={() => cart.setQty(i.id, i.qty - 1)}
+                        onIncrease={() => cart.setQty(i.id, i.qty + 1)}
+                        onSetQty={(q) => cart.setQty(i.id, q)}
+                      />
 
                       <p className="w-20 shrink-0 text-right tabular-nums text-sm font-bold sm:w-24">
                         {money(i.unitPrice * i.qty)}
