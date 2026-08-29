@@ -620,10 +620,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const supabaseAdmin = getSupabaseAdmin();
-    if (!supabaseAdmin) {
-      return { status: "error", message: "Error interno del servidor." };
-    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const adminEmails = (process.env.ADMIN_EMAILS || "")
       .split(",")
@@ -677,10 +674,7 @@ export const createTransferOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const supabaseAdmin = getSupabaseAdmin();
-    if (!supabaseAdmin) {
-      return { status: "error", message: "Error interno del servidor al procesar la orden." };
-    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // 1. Revalidar precios y mínimos de categoría
     let total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
