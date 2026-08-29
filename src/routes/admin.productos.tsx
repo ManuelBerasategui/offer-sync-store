@@ -30,7 +30,7 @@ import {
   type BannerInput,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl, isMate } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl, isMate, waOnlyReasonOf } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/productos")({
   loader: ({ context }) => {
@@ -66,6 +66,7 @@ const emptyProduct = (): ProductInput => ({
   stock: "SI",
   descuento: "NO",
   es_zapatilla: false,
+  whatsapp_only_reason: "",
   moq_group: "",
   color_predeterminado: "",
   imagen_url: "",
@@ -118,6 +119,10 @@ function productToInput(p: Product): ProductInput {
     stock: String(p.stock ?? "SI"),
     descuento: String(p.descuento ?? "NO"),
     es_zapatilla: pRec["es_zapatilla"] === true || String(pRec["es_zapatilla"] ?? "").toLowerCase() === "true",
+    whatsapp_only_reason: typeof pRec["whatsapp_only_reason"] === "string"
+      ? pRec["whatsapp_only_reason"]
+      // Retrocompatibilidad: si no hay campo nuevo pero es_zapatilla=true, usar "zapatillas"
+      : (pRec["es_zapatilla"] === true || String(pRec["es_zapatilla"] ?? "").toLowerCase() === "true" ? "zapatillas" : ""),
     moq_group: typeof pRec["moq_group"] === "string" ? pRec["moq_group"] : "",
     color_predeterminado: p.color_predeterminado ?? "",
     imagen_url: p.imagen_url ?? "",
@@ -1123,19 +1128,32 @@ function ProductModal({
 
           {/* Toggles */}
           <div className="flex flex-wrap gap-4">
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                checked={Boolean(form.es_zapatilla)}
-                onChange={(e) => setForm((prev) => ({
-                  ...prev,
-                  es_zapatilla: e.target.checked,
-                  ...(e.target.checked ? { color_predeterminado: "", tipo_talles: "NINGUNO", talles_disponibles: [], variants: [] } : {}),
-                }))}
-                className="h-4 w-4 accent-primary"
-              />
-              <span>Es zapatilla</span>
-            </label>
+            {/* Selector: tipo de venta (compra normal vs. WA-only) */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Tipo de venta</label>
+              <select
+                id="whatsapp_only_reason_selector"
+                value={form.whatsapp_only_reason ?? ""}
+                onChange={(e) => {
+                  const reason = e.target.value;
+                  setForm((prev) => ({
+                    ...prev,
+                    whatsapp_only_reason: reason,
+                    es_zapatilla: reason === "zapatillas",
+                    // Al cambiar a WA-only limpiar campos de variantes/talles si era zapatilla
+                    ...(reason !== "zapatillas" && prev.es_zapatilla
+                      ? { color_predeterminado: "", tipo_talles: "NINGUNO", talles_disponibles: [], variants: [] }
+                      : {}),
+                  }));
+                }}
+                className="input-base text-sm py-1.5"
+              >
+                <option value="">Compra normal</option>
+                <option value="zapatillas">Zapatillas — solo por WhatsApp</option>
+                <option value="vapers">Vapers — solo por WhatsApp</option>
+                <option value="remeras">Remeras — solo por WhatsApp</option>
+              </select>
+            </div>
             {/* Selector de MOQ (Compra mínima) */}
             <div className="flex flex-col gap-1 min-w-[220px]">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Compra mínima</label>

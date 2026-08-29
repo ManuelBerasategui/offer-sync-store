@@ -63,6 +63,12 @@ export type ProductInput = {
    * ""           -> sin asignacion manual (usa match por categoria)
    */
   moq_group?: string;
+  /**
+   * Tipo de producto WA-only. Si está presente, oculta compra directa
+   * y muestra solo un botón de WhatsApp con texto y mensaje específico.
+   * Valores: "zapatillas" | "vapers" | "remeras" | "" (compra normal)
+   */
+  whatsapp_only_reason?: string;
 };
 
 /* ─── Helper de autorización ───────────────────────────── */
@@ -223,6 +229,16 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       // Solo omitir si no fue tocado por el admin (undefined).
       if (p.moq_group !== undefined) {
         metadata["moq_group"] = p.moq_group;
+      }
+      // whatsapp_only_reason: fuente de verdad para flujo WA-only
+      if (p.whatsapp_only_reason !== undefined) {
+        metadata["whatsapp_only_reason"] = p.whatsapp_only_reason;
+        // Retrocompatibilidad: sincronizar con es_zapatilla legacy
+        if (p.whatsapp_only_reason === "zapatillas") {
+          metadata["es_zapatilla"] = "true";
+        } else {
+          metadata["es_zapatilla"] = "";
+        }
       }
       for (const tier of p.tiers ?? []) {
         if (tier.units > 0 && tier.percent > 0) {

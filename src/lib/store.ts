@@ -535,3 +535,54 @@ export function checkCategoryMins(
   }
   return violations;
 }
+
+/* ---------- Productos WA-Only (zapatillas, vapers, remeras, etc.) ---------- */
+
+export type WaOnlyReason = "zapatillas" | "vapers" | "remeras";
+
+/**
+ * Configuración centralizada por tipo de producto WA-only.
+ * Añadir aquí nuevos tipos sin tocar ningún otro archivo.
+ */
+export const WA_ONLY_CONFIG: Record<
+  WaOnlyReason,
+  { btnText: string; waMsg: (nombre: string) => string }
+> = {
+  zapatillas: {
+    btnText: "Consultar talle y colores por WhatsApp",
+    waMsg: (n) => `Hola, quiero consultar por el modelo ${n} de zapatillas.`,
+  },
+  vapers: {
+    btnText: "Consultar precio y colores por WhatsApp",
+    waMsg: (n) => `Hola, quiero consultar por el vaper ${n}.`,
+  },
+  remeras: {
+    btnText: "Consultar talle y colores por WhatsApp",
+    waMsg: (n) => `Hola, quiero consultar por la remera ${n}.`,
+  },
+};
+
+/**
+ * Retorna el motivo WA-only del producto, o null si es compra normal.
+ * Compatible con el campo legacy `es_zapatilla` y con el nuevo `whatsapp_only_reason`.
+ */
+export function waOnlyReasonOf(product: Record<string, unknown>): WaOnlyReason | null {
+  const meta = product["metadata"];
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    const m = meta as Record<string, unknown>;
+    // Nuevo campo: whatsapp_only_reason (string)
+    const reason = m["whatsapp_only_reason"];
+    if (typeof reason === "string" && reason in WA_ONLY_CONFIG) {
+      return reason as WaOnlyReason;
+    }
+    // Legacy: es_zapatilla boolean → "zapatillas"
+    if (m["es_zapatilla"] === true || String(m["es_zapatilla"] ?? "").toLowerCase() === "true") {
+      return "zapatillas";
+    }
+  }
+  // Legacy top-level es_zapatilla (metafields expandidos al nivel raíz)
+  if (product["es_zapatilla"] === true || String(product["es_zapatilla"] ?? "").toLowerCase() === "true") {
+    return "zapatillas";
+  }
+  return null;
+}
