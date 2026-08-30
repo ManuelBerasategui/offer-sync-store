@@ -136,11 +136,21 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
  * Fire-and-forget: no lanza error si falla, solo loguea.
  */
 export async function notifyNewOrder(order: NotifyOrderInput): Promise<void> {
-  const apiKey = process.env["RESEND_API_KEY"];
+  const apiKey =
+    process.env["RESEND_API_KEY"] ||
+    process.env["VITE_RESEND_API_KEY"] ||
+    (typeof import.meta !== "undefined" && import.meta.env ? (import.meta.env["VITE_RESEND_API_KEY"] as string | undefined) || (import.meta.env["RESEND_API_KEY"] as string | undefined) : undefined);
+
   if (!apiKey) {
     console.warn("[email] RESEND_API_KEY no está configurada — se omite el email de notificación.");
     return;
   }
+
+  const fromAddress =
+    process.env["RESEND_FROM"] ||
+    process.env["VITE_RESEND_FROM"] ||
+    (typeof import.meta !== "undefined" && import.meta.env ? (import.meta.env["VITE_RESEND_FROM"] as string | undefined) || (import.meta.env["RESEND_FROM"] as string | undefined) : undefined) ||
+    "Te Importamos <onboarding@resend.dev>";
 
   const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
 
@@ -152,7 +162,7 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<void> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: process.env["RESEND_FROM"] ?? "Te Importamos <onboarding@resend.dev>",
+        from: fromAddress,
         to: ADMIN_EMAILS,
         subject: `🛒 Nueva venta ${order.metodoPago === "transferencia" ? "— esperando transferencia" : "— pago aprobado"} | ${order.orderCode}`,
         reply_to: "teimportamosar@gmail.com",
