@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   getAdminProducts,
   upsertCategoryRules,
+  testAdminResendEmail,
   type CategoryRuleInput,
 } from "@/lib/products.functions";
 import { parseCategoryRules, normCat, getBaseCategory, money } from "@/lib/store";
@@ -63,6 +64,11 @@ function AdminConfiguracionPage() {
   const [bankTitular, setBankTitular] = useState<string>(config["transferencia_titular"] ?? "Te Importamos Argentina");
   const [bankBanco, setBankBanco] = useState<string>(config["transferencia_banco"] ?? "Mercado Pago");
   const [bankDiscountPct, setBankDiscountPct] = useState<string>(config["transferencia_descuento_pct"] ?? "7");
+
+  const [resendApiKey, setResendApiKey] = useState<string>(config["resend_api_key"] ?? "");
+  const [resendFrom, setResendFrom] = useState<string>(config["resend_from"] ?? "Te Importamos <noreply@teimportamosarg.com>");
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testEmailMsg, setTestEmailMsg] = useState<{ success?: boolean; text?: string } | null>(null);
 
   useEffect(() => {
     fetch("https://dolarapi.com/v1/dolares/cripto")
@@ -190,15 +196,43 @@ function AdminConfiguracionPage() {
             banco: bankBanco,
             descuentoPct: Number(bankDiscountPct) || 7,
           },
+          resendConfig: {
+            apiKey: resendApiKey,
+            from: resendFrom,
+          },
         },
       });
       if (res.error) { setError(res.error); return; }
-      setSuccessMsg("¡Configuración guardada!");
+      setSuccessMsg("¡Configuración guardada correctamente!");
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al guardar.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleTestEmail() {
+    setTestingEmail(true);
+    setTestEmailMsg(null);
+    try {
+      // Guardar primero para que use la clave más reciente en la DB
+      await handleSave();
+      const res = await testAdminResendEmail({
+        data: {
+          email: userEmail,
+          token: userToken,
+          targetEmail: userEmail,
+        },
+      });
+      setTestEmailMsg({ success: res.success, text: res.message });
+    } catch (err) {
+      setTestEmailMsg({
+        success: false,
+        text: err instanceof Error ? err.message : "Error al enviar email de prueba.",
+      });
+    } finally {
+      setTestingEmail(false);
     }
   }
 
@@ -315,6 +349,62 @@ function AdminConfiguracionPage() {
                 />
                 <span className="text-xs font-semibold text-muted-foreground">% OFF en checkout</span>
               </div>
+            </label>
+          </div>
+        </div>
+
+        {/* Configuración de Notificaciones por Email (Resend) */}
+        <div className="mb-6 rounded-2xl border border-border bg-card p-3.5 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h2 className="text-base font-bold flex items-center gap-2">
+              ✉️ Notificaciones de Compras por Email (Resend)
+            </h2>
+            <button
+              type="button"
+              onClick={() => void handleTestEmail()}
+              disabled={testingEmail || saving}
+              className="rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50 transition-colors"
+            >
+              {testingEmail ? "Enviando prueba..." : "Enviar email de prueba"}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Configurá tu API Key de Resend para despachar las notificaciones de ventas a los administradores y al cliente comprador.
+          </p>
+
+          {testEmailMsg && (
+            <div
+              className={`mb-4 rounded-xl p-3 text-xs font-medium border ${
+                testEmailMsg.success
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+                  : "bg-destructive/10 text-destructive border-destructive/20"
+              }`}
+            >
+              {testEmailMsg.text}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Resend API Key (re_...)</span>
+              <input
+                type="password"
+                className="input-base"
+                value={resendApiKey}
+                onChange={(e) => setResendApiKey(e.target.value)}
+                placeholder="re_1234567890abcdef..."
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Remitente (From)</span>
+              <input
+                type="text"
+                className="input-base"
+                value={resendFrom}
+                onChange={(e) => setResendFrom(e.target.value)}
+                placeholder="Te Importamos <noreply@teimportamosarg.com>"
+              />
             </label>
           </div>
         </div>

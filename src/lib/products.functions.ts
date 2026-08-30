@@ -768,12 +768,17 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         banco?: string;
         descuentoPct?: number;
       };
+      resendConfig?: {
+        apiKey?: string;
+        from?: string;
+      };
     }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
       rules: data.rules,
       dolarCotizacion: data.dolarCotizacion,
       bankInfo: data.bankInfo,
+      resendConfig: data.resendConfig,
     }),
   )
   .handler(async ({ data }): Promise<{ error?: string }> => {
@@ -826,6 +831,21 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         }
       }
 
+      if (data.resendConfig) {
+        if (data.resendConfig.apiKey) {
+          await (supabaseAdmin as any).from("site_config").upsert(
+            { clave: "resend_api_key", valor: data.resendConfig.apiKey.trim() },
+            { onConflict: "clave" }
+          );
+        }
+        if (data.resendConfig.from) {
+          await (supabaseAdmin as any).from("site_config").upsert(
+            { clave: "resend_from", valor: data.resendConfig.from.trim() },
+            { onConflict: "clave" }
+          );
+        }
+      }
+
       if (rows.length > 0) {
         const { error: insErr } = await (supabaseAdmin as any).from("site_config").insert(rows);
         if (insErr) throw insErr;
@@ -835,6 +855,25 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
     } catch (err) {
       console.error("Error in upsertCategoryRules:", err);
       return { error: err instanceof Error ? err.message : "Error al guardar reglas." };
+    }
+  });
+
+export const testAdminResendEmail = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string; targetEmail?: string }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    targetEmail: str(data?.targetEmail, 160).toLowerCase(),
+  }))
+  .handler(async ({ data }): Promise<{ success: boolean; message: string }> => {
+    try {
+      await assertAdmin(data.email, data.token);
+      const { sendTestOrderEmail } = await import("@/lib/email.functions");
+      return await sendTestOrderEmail(data.targetEmail || data.email);
+    } catch (err) {
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : "Error de autorización.",
+      };
     }
   });
 

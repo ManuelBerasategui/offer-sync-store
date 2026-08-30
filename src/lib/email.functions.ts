@@ -238,24 +238,48 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
  * Envía notificación a los emails de admin y al comprador cuando se realiza una nueva venta.
  * Fire-and-forget: no lanza error si falla, solo loguea.
  */
-export async function notifyNewOrder(order: NotifyOrderInput): Promise<void> {
-  const apiKey =
+export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success: boolean; error?: string }> {
+  let apiKey =
     process.env["RESEND_API_KEY"] ||
     process.env["VITE_RESEND_API_KEY"] ||
     (typeof import.meta !== "undefined" && import.meta.env ? (import.meta.env["VITE_RESEND_API_KEY"] as string | undefined) || (import.meta.env["RESEND_API_KEY"] as string | undefined) : undefined);
 
-  if (!apiKey) {
-    console.warn("[email] RESEND_API_KEY no está configurada — se omite el email de notificación.");
-    return;
-  }
-
-  const fromAddress =
+  let fromAddress =
     process.env["RESEND_FROM"] ||
     process.env["VITE_RESEND_FROM"] ||
-    (typeof import.meta !== "undefined" && import.meta.env ? (import.meta.env["VITE_RESEND_FROM"] as string | undefined) || (import.meta.env["RESEND_FROM"] as string | undefined) : undefined) ||
-    "Te Importamos <noreply@teimportamosarg.com>";
+    (typeof import.meta !== "undefined" && import.meta.env ? (import.meta.env["VITE_RESEND_FROM"] as string | undefined) || (import.meta.env["RESEND_FROM"] as string | undefined) : undefined);
+
+  // Fallback: leer de la tabla site_config de Supabase
+  if (!apiKey || !fromAddress) {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: rows } = await (supabaseAdmin as any)
+        .from("site_config")
+        .select("clave, valor")
+        .in("clave", ["resend_api_key", "resend_from"]);
+
+      if (rows && Array.isArray(rows)) {
+        for (const r of rows) {
+          if (r.clave === "resend_api_key" && r.valor && !apiKey) apiKey = String(r.valor);
+          if (r.clave === "resend_from" && r.valor && !fromAddress) fromAddress = String(r.valor);
+        }
+      }
+    } catch (err) {
+      console.error("[email] Error leyendo site_config para Resend:", err);
+    }
+  }
+
+  fromAddress = fromAddress || "Te Importamos <noreply@teimportamosarg.com>";
+
+  if (!apiKey) {
+    const msg = "[email] RESEND_API_KEY no está configurada ni en env ni en site_config — se omite el email.";
+    console.warn(msg);
+    return { success: false, error: msg };
+  }
 
   const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
+  let adminSuccess = false;
+  let adminError = "";
 
   try {
     // 1. Enviar notificación al equipo Administrador
@@ -292,8 +316,10 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<void> {
 
     if (!resAdmin.ok) {
       const body = await resAdmin.text().catch(() => "");
+      adminError = `Error ${resAdmin.status}: ${body}`;
       console.error(`[email] Error al enviar notificación a admins: ${resAdmin.status}`, body);
     } else {
+      adminSuccess = true;
       console.log(`[email] Notificación a admins enviada para orden: ${order.orderCode}`);
     }
 
@@ -322,7 +348,42 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<void> {
         console.log(`[email] Confirmación enviada al cliente: ${customerEmail}`);
       }
     }
+
+    return { success: adminSuccess, error: adminError || undefined };
   } catch (err) {
+    const errStr = err instanceof Error ? err.message : String(err);
     console.error("[email] Error inesperado al enviar emails de orden:", err);
+    return { success: false, error: errStr };
   }
+}
+
+/**
+ * Enviar un email de prueba directamente desde el panel de administración
+ */
+export async function sendTestOrderEmail(targetEmail?: string): Promise<{ success: boolean; message: string }> {
+  const testOrder: NotifyOrderInput = {
+    orderCode: "TEST-" + Math.floor(1000 + Math.random() * 9000),
+    total: 25000,
+    metodoPago: "transferencia",
+    shipping: {
+      nombre: "Cliente de Prueba",
+      email: targetEmail || "teimportamosar@gmail.com",
+      telefono: "1123456789",
+      dni: "35123456",
+      ciudad: "Rosario",
+      provincia: "Santa Fe",
+      codigo_postal: "2000",
+      transporte: "Correo Argentino",
+      sucursal_correo: "Sucursal Centro",
+    },
+    items: [
+      { nombre: "Perfume Árabe Asad Lattafa 100ml", qty: 1, unitPrice: 25000 },
+    ],
+  };
+
+  const res = await notifyNewOrder(testOrder);
+  if (res.success) {
+    return { success: true, message: "¡Email de prueba enviado con éxito! Revisá la bandeja de entrada (y Spam)." };
+  }
+  return { success: false, message: res.error || "No se pudo enviar el email de prueba. Verificá tu API Key de Resend." };
 }
