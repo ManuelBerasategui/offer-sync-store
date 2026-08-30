@@ -24,6 +24,7 @@ export const Route = createFileRoute("/admin/ordenes")({
 });
 
 type Tab = "pagadas" | "reservadas";
+type SubFilter = "all" | "transferencia" | "tarjeta" | "mercadopago";
 
 function AdminOrdenesPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
@@ -32,6 +33,7 @@ function AdminOrdenesPage() {
 
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [tab, setTab] = useState<Tab>("reservadas");
+  const [subFilter, setSubFilter] = useState<SubFilter>("all");
 
   // Estado independiente para cada tab
   const [paidOrders, setPaidOrders] = useState<AdminOrder[]>([]);
@@ -89,11 +91,24 @@ function AdminOrdenesPage() {
   // Órdenes activas según tab seleccionado
   const activeOrders = tab === "pagadas" ? paidOrders : reservedOrders;
 
-  // Filtrado en tiempo real
+  // Conteos por método de pago para los filtros
+  const methodCounts = useMemo(() => {
+    const all = activeOrders.length;
+    const transfer = activeOrders.filter((o) => (o.metodo_pago ?? "").toLowerCase() === "transferencia").length;
+    const card = activeOrders.filter((o) => (o.metodo_pago ?? "").toLowerCase() === "tarjeta").length;
+    const mp = activeOrders.filter((o) => (o.metodo_pago ?? "").toLowerCase() === "mercadopago").length;
+    return { all, transfer, card, mp };
+  }, [activeOrders]);
+
+  // Filtrado en tiempo real por método y búsqueda
   const filteredOrders = useMemo(() => {
-    if (!search.trim()) return activeOrders;
+    let list = activeOrders;
+    if (subFilter !== "all") {
+      list = list.filter((o) => (o.metodo_pago ?? "").toLowerCase() === subFilter);
+    }
+    if (!search.trim()) return list;
     const term = search.toLowerCase().trim();
-    return activeOrders.filter((o) => {
+    return list.filter((o) => {
       const codeMatch = o.order_code.toLowerCase().includes(term);
       const nameMatch = o.nombre.toLowerCase().includes(term);
       const dniMatch = o.dni.toLowerCase().includes(term);
@@ -102,15 +117,15 @@ function AdminOrdenesPage() {
       const itemMatch = o.items.some((i) => i.nombre.toLowerCase().includes(term));
       return codeMatch || nameMatch || dniMatch || emailMatch || cityMatch || itemMatch;
     });
-  }, [activeOrders, search]);
+  }, [activeOrders, subFilter, search]);
 
   // Métricas del tab activo
   const stats = useMemo(() => {
-    const totalVentas = activeOrders.reduce((sum, o) => sum + o.total, 0);
-    const count = activeOrders.length;
+    const totalVentas = filteredOrders.reduce((sum, o) => sum + o.total, 0);
+    const count = filteredOrders.length;
     const promedio = count > 0 ? Math.round(totalVentas / count) : 0;
     return { totalVentas, count, promedio };
-  }, [activeOrders]);
+  }, [filteredOrders]);
 
   const handleStatusChange = async (orderCode: string, newStatus: string) => {
     try {
@@ -255,6 +270,55 @@ TOTAL: ${money(order.total)}`;
                 {paidOrders.length}
               </span>
             )}
+          </button>
+        </div>
+
+        {/* Sub-filtros por método de pago */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSubFilter("all")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+              subFilter === "all"
+                ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                : "bg-surface text-muted-foreground border-border hover:text-foreground hover:bg-muted/50"
+            }`}
+          >
+            Todas ({methodCounts.all})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubFilter("transferencia")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+              subFilter === "transferencia"
+                ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                : "bg-surface text-muted-foreground border-border hover:text-foreground hover:bg-muted/50"
+            }`}
+          >
+            <Building2 className="h-3 w-3" />
+            Transferencia ({methodCounts.transfer})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubFilter("tarjeta")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+              subFilter === "tarjeta"
+                ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                : "bg-surface text-muted-foreground border-border hover:text-foreground hover:bg-muted/50"
+            }`}
+          >
+            💳 Tarjeta ({methodCounts.card})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubFilter("mercadopago")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+              subFilter === "mercadopago"
+                ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                : "bg-surface text-muted-foreground border-border hover:text-foreground hover:bg-muted/50"
+            }`}
+          >
+            🔵 Mercado Pago ({methodCounts.mp})
           </button>
         </div>
 
