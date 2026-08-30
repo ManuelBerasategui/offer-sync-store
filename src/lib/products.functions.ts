@@ -887,6 +887,10 @@ export type BannerInput = {
   link?: string;
   activo?: string;
   precio: string;
+  precio_base?: number | string | null;
+  moneda_base?: "USD" | "ARS" | string | null;
+  precio_usd?: number | string | null;
+  precio_actualizado_en?: string | null;
 };
 
 export const getAdminBanners = createServerFn({ method: "POST" })
@@ -894,12 +898,41 @@ export const getAdminBanners = createServerFn({ method: "POST" })
     email: str(data?.email, 160).toLowerCase(),
     token: str(data?.token, 2000),
   }))
-  .handler(async ({ data }): Promise<{ banners: Banner[]; error?: string }> => {
+  .handler(async ({ data }): Promise<{ banners: Banner[]; dolarRate?: number; roundingIncrement?: number; markupPercentage?: number; error?: string }> => {
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
-      const { data: resData, error } = await supabaseAdmin.from("banners").select("*");
-      if (error) throw error;
-      return { banners: (resData ?? []) as Banner[] };
+      const [bannersRes, pricingRes] = await Promise.all([
+        supabaseAdmin.from("banners").select("*"),
+        (supabaseAdmin as any).from("pricing_settings").select("last_rate, markup_percentage, rounding_increment").eq("id", true).maybeSingle(),
+      ]);
+      if (bannersRes.error) throw bannersRes.error;
+
+      let dolarRate = 0;
+      let roundingIncrement = 10;
+      let markupPercentage = 0;
+
+      if (pricingRes?.data) {
+        if (Number(pricingRes.data.last_rate) > 0) dolarRate = Number(pricingRes.data.last_rate);
+        if (Number(pricingRes.data.rounding_increment) > 0) roundingIncrement = Number(pricingRes.data.rounding_increment);
+        if (pricingRes.data.markup_percentage !== undefined) markupPercentage = Number(pricingRes.data.markup_percentage);
+      }
+
+      if (!dolarRate) {
+        try {
+          const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", { signal: AbortSignal.timeout(3000) });
+          if (apiRes.ok) {
+            const apiData = (await apiRes.json()) as { venta?: number };
+            if (apiData?.venta && apiData.venta > 0) dolarRate = Math.round(apiData.venta);
+          }
+        } catch {}
+      }
+
+      return {
+        banners: (bannersRes.data ?? []) as Banner[],
+        dolarRate: dolarRate || 1500,
+        roundingIncrement,
+        markupPercentage,
+      };
     } catch (err) {
       return { banners: [], error: err instanceof Error ? err.message : "Error al cargar combos." };
     }
@@ -925,6 +958,10 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
         link: b.link ?? "",
         activo: b.activo ?? "SI",
         precio: String(b.precio ?? "0"),
+        precio_base: b.precio_base !== undefined && b.precio_base !== null && b.precio_base !== "" ? Number(b.precio_base) : null,
+        moneda_base: b.moneda_base ?? "USD",
+        precio_usd: b.precio_usd !== undefined && b.precio_usd !== null && b.precio_usd !== "" ? Number(b.precio_usd) : null,
+        precio_actualizado_en: new Date().toISOString(),
       };
 
       if (b.id) {

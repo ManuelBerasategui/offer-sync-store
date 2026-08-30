@@ -46,6 +46,10 @@ export type Banner = {
   link?: string;
   activo?: string;
   precio?: string;
+  precio_usd?: number | string | null;
+  precio_base?: number | string | null;
+  moneda_base?: "USD" | "ARS" | string | null;
+  precio_actualizado_en?: string | null;
 };
 
 export type SiteConfig = Record<string, string>;

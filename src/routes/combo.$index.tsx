@@ -6,7 +6,16 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
-import { FALLBACK_IMAGE, imageUrl, onImageError, money, toNumber, waLink } from "@/lib/store";
+import {
+  FALLBACK_IMAGE,
+  imageUrl,
+  onImageError,
+  money,
+  toNumber,
+  waLink,
+  transferPrice,
+  transferDiscountPct,
+} from "@/lib/store";
 
 export const Route = createFileRoute("/combo/$index")({
   loader: ({ context }) => {
@@ -55,12 +64,16 @@ function ComboPage() {
     );
   }
 
-  const price = toNumber(banner.precio);
+  const basePrice = toNumber(banner.precio);
+  const discPct = transferDiscountPct(config);
+  const tPrice = transferPrice(basePrice, discPct);
+
   const item = {
     id: `combo-${index}`,
     nombre: banner.titulo ?? "Combo",
     qty: 1,
-    unitPrice: Math.round(price),
+    unitPrice: Math.round(basePrice),
+    basePrice: Math.round(basePrice),
     imagen: imageUrl(banner.imagen_url),
   };
 
@@ -97,8 +110,22 @@ function ComboPage() {
                 .trim()}
             </p>
 
-            {price > 0 && (
-              <p className="mt-6 tabular-nums text-3xl font-bold text-foreground">{money(price)}</p>
+            {basePrice > 0 && (
+              <div className="mt-6 rounded-2xl border border-border/80 bg-surface/40 p-4 sm:p-5">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="tabular-nums text-3xl sm:text-4xl font-extrabold text-foreground">
+                      {money(tPrice)}
+                    </span>
+                    <span className="rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                      {discPct}% OFF Transferencia
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con tarjeta o Mercado Pago
+                  </p>
+                </div>
+              </div>
             )}
 
             <div className="mt-6 flex flex-col gap-3">
@@ -111,7 +138,7 @@ function ComboPage() {
                 <>
                   <button
                     onClick={() => setShowCheckout(true)}
-                    disabled={price <= 0}
+                    disabled={basePrice <= 0}
                     className="btn-base grad-urgente text-primary-foreground disabled:opacity-60"
                   >
                     Comprar ya

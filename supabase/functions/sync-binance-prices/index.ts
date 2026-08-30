@@ -71,6 +71,10 @@ Deno.serve(async (request) => {
       .from("product_variants")
       .select("id, precio, precio_usd");
     if (variantsError) throw new Error(`No se pudieron leer las variantes: ${variantsError.message}`);
+    const { data: banners, error: bannersError } = await supabase
+      .from("banners")
+      .select("id, precio, precio_usd, precio_base, moneda_base");
+    if (bannersError) console.warn("No se pudieron leer banners para sync:", bannersError.message);
 
     const markup = Number(settings.markup_percentage) / 100;
     const increment = Number(settings.rounding_increment);
@@ -145,6 +149,36 @@ Deno.serve(async (request) => {
       if (updateError) throw new Error(`No se pudieron actualizar los precios por color: ${updateError.message}`);
     }
 
+    const bannerUpdates = (banners ?? []).flatMap((b) => {
+      const isUsd = String(b.moneda_base ?? "").toUpperCase() === "USD" || (Number(b.precio_usd) > 0);
+      if (!isUsd) return [];
+      const baseUsd = Number(b.precio_usd) || (Number(b.precio_base) > 0 ? Number(b.precio_base) * 1.07 : parseArs(b.precio) / rate);
+      if (!Number.isFinite(baseUsd) || baseUsd <= 0) return [];
+      return [
+        {
+          id: b.id,
+          precio: String(arsFromUsd(baseUsd, rate, markup, increment)),
+          precio_usd: Number(baseUsd.toFixed(6)),
+          precio_actualizado_en: now,
+        },
+      ];
+    });
+    for (let offset = 0; offset < bannerUpdates.length; offset += 20) {
+      const batch = bannerUpdates.slice(offset, offset + 20);
+      await Promise.all(
+        batch.map((b) =>
+          supabase
+            .from("banners")
+            .update({
+              precio: b.precio,
+              precio_usd: b.precio_usd,
+              precio_actualizado_en: b.precio_actualizado_en,
+            })
+            .eq("id", b.id),
+        ),
+      );
+    }
+
     const { error: saveError } = await supabase.from("pricing_settings").update({
       last_rate: rate,
       last_rate_at: now,
@@ -153,9 +187,10 @@ Deno.serve(async (request) => {
     }).eq("id", true);
     if (saveError) throw new Error(`No se pudo guardar la cotización: ${saveError.message}`);
     return json({
-      updated: updates.length + variantUpdates.length,
+      updated: updates.length + variantUpdates.length + bannerUpdates.length,
       updatedProducts: updates.length,
       updatedVariants: variantUpdates.length,
+      updatedBanners: bannerUpdates.length,
       rate,
       roundingIncrement: increment,
       markupPercentage: Number(settings.markup_percentage),

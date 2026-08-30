@@ -10,7 +10,7 @@ import { storeQueryOptions } from "@/lib/store-query";
 import {
   FALLBACK_IMAGE, imageUrl,
   onImageError, isYes, money, toNumber, waLink, type SiteConfig,
-  parseCategoryRules, normCat,
+  parseCategoryRules, normCat, transferPrice, transferDiscountPct,
 } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
@@ -119,42 +119,56 @@ function Home() {
           {banners.length > 0 && (
             <div className="relative -mx-4 mb-6 sm:mx-0">
               <div className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0">
-                {banners.map((b, i) => (
-                  <Link
-                    key={i}
-                    to="/combo/$index"
-                    params={{ index: String(i) }}
-                    className="group relative min-w-[280px] snap-start overflow-hidden rounded-xl border border-primary/15 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 sm:min-w-[420px]"
-                    style={{ aspectRatio: "16 / 10" }}
-                  >
-                    {/* Fondo difuminado ambiental para que cualquier formato de foto (cuadrada, vertical o apaisada) se vea armónico sin recortarse */}
-                    <div
-                      aria-hidden="true"
-                      className="absolute inset-0 bg-cover bg-center scale-110 blur-md opacity-35 brightness-75 transition-transform duration-300 group-hover:scale-125"
-                      style={{ backgroundImage: `url(${imageUrl(b.imagen_url) || FALLBACK_IMAGE})` }}
-                    />
-                    {/* Imagen completa sin recortes */}
-                    <img
-                      src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
-                      alt={b.titulo ?? ""}
-                      referrerPolicy="no-referrer"
-                      className="relative h-full w-full object-contain p-2 sm:p-3 transition-transform duration-300 group-hover:scale-105"
-                      onError={onImageError(b.imagen_url)}
-                    />
-                    <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/30 to-transparent p-3.5 sm:p-4">
-                      <span className="mb-1.5 inline-flex w-fit items-center gap-1 self-start rounded-full grad-urgente px-2.5 py-0.5 text-[10px] font-bold uppercase text-primary-foreground shadow-xs">
-                        <Flame className="h-3 w-3" />
-                        Combo en oferta
-                      </span>
-                      <h3 className="text-base sm:text-lg font-bold text-white leading-snug drop-shadow-xs">{b.titulo}</h3>
-                      {toNumber(b.precio) > 0 && (
-                        <p className="tabular-nums mt-1 w-fit rounded-md bg-white px-2 py-0.5 text-sm sm:text-base font-bold text-foreground shadow-xs">
-                          {money(b.precio)}
-                        </p>
-                      )}
-                    </div>
-                  </Link>
-                ))}
+                {banners.map((b, i) => {
+                  const basePrice = toNumber(b.precio);
+                  const discPct = transferDiscountPct(config);
+                  const tPrice = transferPrice(basePrice, discPct);
+
+                  return (
+                    <Link
+                      key={i}
+                      to="/combo/$index"
+                      params={{ index: String(i) }}
+                      className="group relative min-w-[280px] snap-start overflow-hidden rounded-xl border border-primary/15 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 sm:min-w-[420px]"
+                      style={{ aspectRatio: "16 / 10" }}
+                    >
+                      {/* Fondo difuminado ambiental para que cualquier formato de foto (cuadrada, vertical o apaisada) se vea armónico sin recortarse */}
+                      <div
+                        aria-hidden="true"
+                        className="absolute inset-0 bg-cover bg-center scale-110 blur-md opacity-35 brightness-75 transition-transform duration-300 group-hover:scale-125"
+                        style={{ backgroundImage: `url(${imageUrl(b.imagen_url) || FALLBACK_IMAGE})` }}
+                      />
+                      {/* Imagen completa sin recortes */}
+                      <img
+                        src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
+                        alt={b.titulo ?? ""}
+                        referrerPolicy="no-referrer"
+                        className="relative h-full w-full object-contain p-2 sm:p-3 transition-transform duration-300 group-hover:scale-105"
+                        onError={onImageError(b.imagen_url)}
+                      />
+                      <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/30 to-transparent p-3.5 sm:p-4">
+                        <span className="mb-1.5 inline-flex w-fit items-center gap-1 self-start rounded-full grad-urgente px-2.5 py-0.5 text-[10px] font-bold uppercase text-primary-foreground shadow-xs">
+                          <Flame className="h-3 w-3" />
+                          Combo en oferta
+                        </span>
+                        <h3 className="text-base sm:text-lg font-bold text-white leading-snug drop-shadow-xs">{b.titulo}</h3>
+                        {basePrice > 0 && (
+                          <div className="mt-1 flex items-baseline gap-2 flex-wrap">
+                            <span className="tabular-nums rounded-md bg-white px-2 py-0.5 text-sm sm:text-base font-bold text-foreground shadow-xs">
+                              {money(tPrice)}
+                            </span>
+                            <span className="rounded bg-emerald-500/90 px-1.5 py-0.5 text-[10px] sm:text-xs font-bold text-white shadow-xs">
+                              {discPct}% OFF Transf.
+                            </span>
+                            <span className="text-[11px] font-medium text-white/80 drop-shadow-xs hidden sm:inline">
+                              o {money(basePrice)} con tarjeta / MP
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
               {/* Hint that there's more to scroll on wider screens where cards don't peek off-edge */}
               <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />

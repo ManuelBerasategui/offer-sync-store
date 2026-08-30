@@ -30,7 +30,7 @@ import {
   type BannerInput,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl, isMate, waOnlyReasonOf } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/productos")({
   loader: ({ context }) => {
@@ -1846,23 +1846,55 @@ function ComboBuilderPanel({
   userToken,
   initialBanners = [],
   onRefresh,
+  dolarRate = 1500,
+  roundingIncrement = 10,
+  markupPercentage = 0,
 }: {
   userEmail: string;
   userToken: string;
   initialBanners?: Banner[];
   onRefresh: () => Promise<void>;
+  dolarRate?: number;
+  roundingIncrement?: number;
+  markupPercentage?: number;
 }) {
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [loadingBanners, setLoadingBanners] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editingBanner, setEditingBanner] = useState<BannerInput | null>(null);
 
-  // Form State Simplificado
+  // Form State
   const [comboTitle, setComboTitle] = useState("");
   const [comboSubtitle, setComboSubtitle] = useState("");
-  const [comboPrice, setComboPrice] = useState("");
   const [comboImage, setComboImage] = useState("");
+  const [sourceCurrency, setSourceCurrency] = useState<"USD" | "ARS">("USD");
+  const [basePrice, setBasePrice] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Cálculos en vivo
+  const numBase = Number(basePrice.replace(/[^\d.-]/g, "")) || 0;
+  const surchargeAmt =
+    numBase > 0
+      ? sourceCurrency === "USD"
+        ? Math.round(numBase * 0.07 * 100) / 100
+        : Math.round(numBase * 0.07)
+      : 0;
+
+  let finalUsd = 0;
+  let finalArs = 0;
+
+  if (numBase > 0) {
+    if (sourceCurrency === "USD") {
+      finalUsd = Math.round(numBase * 1.07 * 100) / 100;
+      finalArs = calcArsFromUsd(finalUsd, dolarRate, markupPercentage, roundingIncrement, 1);
+    } else {
+      finalArs = Math.round(numBase * 1.07);
+      finalUsd = dolarRate > 0 ? Math.round((finalArs / dolarRate) * 100) / 100 : 0;
+    }
+  }
+
+  const discPct = 7;
+  const tPrice = transferPrice(finalArs, discPct);
 
   async function loadBanners() {
     if (!userEmail || !userToken) return;
@@ -1886,15 +1918,54 @@ function ComboBuilderPanel({
   function resetForm() {
     setComboTitle("");
     setComboSubtitle("");
-    setComboPrice("");
     setComboImage("");
+    setSourceCurrency("USD");
+    setBasePrice("");
     setCreating(false);
     setEditingBanner(null);
   }
 
+  function handleEditClick(b: Banner) {
+    const isArs = String(b.moneda_base ?? "").toUpperCase() === "ARS";
+    const curr: "USD" | "ARS" = isArs ? "ARS" : "USD";
+    setSourceCurrency(curr);
+
+    let baseVal = "";
+    if (b.precio_base !== null && b.precio_base !== undefined && Number(b.precio_base) > 0) {
+      baseVal = String(b.precio_base);
+    } else if (curr === "ARS") {
+      const p = toNumber(b.precio);
+      baseVal = p > 0 ? String(Math.round(p / 1.07)) : "";
+    } else {
+      const pUsd = Number(b.precio_usd) || (dolarRate > 0 ? toNumber(b.precio) / dolarRate : 0);
+      baseVal = pUsd > 0 ? String(Math.round((pUsd / 1.07) * 100) / 100) : "";
+    }
+
+    setEditingBanner({
+      id: b.id,
+      titulo: b.titulo ?? "",
+      subtitulo: b.subtitulo ?? "",
+      imagen_url: b.imagen_url ?? "",
+      precio: String(b.precio ?? ""),
+      precio_base: b.precio_base,
+      moneda_base: b.moneda_base,
+      precio_usd: b.precio_usd,
+      activo: b.activo ?? "SI",
+    });
+    setComboTitle(b.titulo ?? "");
+    setComboSubtitle(b.subtitulo ?? "");
+    setComboImage(b.imagen_url ?? "");
+    setBasePrice(baseVal);
+    setCreating(true);
+  }
+
   async function handleSaveCombo() {
-    if (!comboTitle.trim() || !comboPrice.trim()) {
-      toast.error("Ingresá el nombre y el precio de la oferta.");
+    if (!comboTitle.trim()) {
+      toast.error("Ingresá el título de la oferta.");
+      return;
+    }
+    if (numBase <= 0) {
+      toast.error("Ingresá un precio base válido mayor a 0.");
       return;
     }
 
@@ -1905,7 +1976,10 @@ function ComboBuilderPanel({
         titulo: comboTitle,
         subtitulo: comboSubtitle,
         imagen_url: comboImage,
-        precio: comboPrice,
+        precio: String(finalArs),
+        precio_base: numBase,
+        moneda_base: sourceCurrency,
+        precio_usd: finalUsd > 0 ? finalUsd : null,
         activo: "SI",
       };
 
@@ -1949,12 +2023,15 @@ function ComboBuilderPanel({
             <Sparkles className="h-4 w-4 text-primary" /> Combos y Packs en Oferta ({banners.length})
           </h3>
           <p className="text-xs text-muted-foreground">
-            Cargá fácilmente la foto generada por IA, el título (ej: "Combo mayorista bazar") y el precio especial para tus ofertas de la tienda.
+            Cargá fácilmente en USD o ARS: el sistema aplica el 7% de recargo automáticamente, actualiza los precios según la cotización del dólar y muestra el precio con descuento por transferencia.
           </p>
         </div>
         {!creating && (
           <button
-            onClick={() => { resetForm(); setCreating(true); }}
+            onClick={() => {
+              resetForm();
+              setCreating(true);
+            }}
             className="btn-base bg-primary text-primary-foreground text-xs py-2 px-4 hover:opacity-90 flex items-center gap-1.5 shrink-0"
           >
             <Plus className="h-4 w-4" /> Crear Oferta / Combo
@@ -1962,13 +2039,13 @@ function ComboBuilderPanel({
         )}
       </div>
 
-      {/* Formulario Simplificado */}
+      {/* Formulario Completo de Ofertas */}
       {creating && (
         <div className="rounded-2xl border border-primary/30 bg-card p-5 sm:p-6 shadow-md space-y-5 max-w-2xl mx-auto">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <h3 className="font-bold text-lg flex items-center gap-2 text-primary">
               <Flame className="h-5 w-5 fill-primary" />
-              {editingBanner ? "Editar Oferta / Combo" : "Nueva Oferta del Día (Foto + Precio)"}
+              {editingBanner ? "Editar Oferta / Combo" : "Nueva Oferta del Día (Foto + Precios)"}
             </h3>
             <button onClick={resetForm} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
               <X className="h-5 w-5" />
@@ -1987,15 +2064,94 @@ function ComboBuilderPanel({
               />
             </div>
 
-            <div>
-              <label className="label-sm">Precio Especial de Oferta (ARS) *</label>
-              <input
-                type="text"
-                value={comboPrice}
-                onChange={(e) => setComboPrice(e.target.value)}
-                placeholder="Ej: 120000"
-                className="input-base font-bold text-primary text-base"
-              />
+            {/* Selector de Moneda Base */}
+            <div className="rounded-xl border border-border bg-surface/60 p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <Coins className="h-4 w-4 text-primary" />
+                  Moneda Base del Precio de Oferta
+                </label>
+                <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setSourceCurrency("USD")}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                      sourceCurrency === "USD"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Dólares (USD)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSourceCurrency("ARS")}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                      sourceCurrency === "ARS"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Pesos (ARS)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="label-sm">
+                  Precio Base de Oferta ({sourceCurrency === "USD" ? "u$d" : "$"}) *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-semibold">
+                    {sourceCurrency === "USD" ? "u$d" : "$"}
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={basePrice}
+                    onChange={(e) => setBasePrice(e.target.value)}
+                    placeholder={sourceCurrency === "USD" ? "Ej: 100" : "Ej: 120000"}
+                    className="input-base pl-12 font-bold text-base"
+                  />
+                </div>
+              </div>
+
+              {/* Tarjeta de cálculo en vivo */}
+              {numBase > 0 && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs space-y-2">
+                  <div className="flex justify-between items-center text-muted-foreground">
+                    <span>Precio base ingresado:</span>
+                    <span className="font-semibold text-foreground">
+                      {sourceCurrency === "USD" ? `u$d ${numBase}` : money(numBase)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-muted-foreground">
+                    <span>Recargo pasarela (+7%):</span>
+                    <span className="font-semibold text-foreground">
+                      {sourceCurrency === "USD" ? `+u$d ${surchargeAmt}` : `+${money(surchargeAmt)}`}
+                    </span>
+                  </div>
+                  <div className="border-t border-border/60 pt-1.5 flex justify-between items-center">
+                    <span className="font-semibold text-foreground">Precio Lista / Tarjeta / MP (+7%):</span>
+                    <span className="font-bold text-foreground">
+                      {money(finalArs)} {finalUsd > 0 ? `(u$d ${finalUsd})` : ""}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center bg-emerald-500/10 p-2 rounded-md border border-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                    <span className="font-bold flex items-center gap-1">
+                      <Percent className="h-3.5 w-3.5" /> Precio con {discPct}% OFF Transferencia:
+                    </span>
+                    <span className="font-bold text-sm tabular-nums">
+                      {money(tPrice)}
+                    </span>
+                  </div>
+                  {sourceCurrency === "USD" && (
+                    <p className="text-[10px] text-muted-foreground text-right pt-0.5">
+                      Cotización aplicada: ${dolarRate} ARS/USD
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
@@ -2027,7 +2183,7 @@ function ComboBuilderPanel({
             <button
               type="button"
               onClick={() => void handleSaveCombo()}
-              disabled={saving}
+              disabled={saving || numBase <= 0}
               className="btn-base bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
             >
               <Save className="h-4 w-4" />
@@ -2045,7 +2201,10 @@ function ComboBuilderPanel({
           <Sparkles className="h-8 w-8 text-muted-foreground/40 mx-auto" />
           <p className="text-sm font-medium text-muted-foreground">Todavía no tenés ofertas de combos cargadas.</p>
           <button
-            onClick={() => { resetForm(); setCreating(true); }}
+            onClick={() => {
+              resetForm();
+              setCreating(true);
+            }}
             className="btn-base bg-primary text-primary-foreground text-xs py-2 px-4 hover:opacity-90"
           >
             Crear primera oferta
@@ -2053,59 +2212,77 @@ function ComboBuilderPanel({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {banners.map((b, idx) => (
-            <div key={b.id ?? idx} className="flex flex-col sm:flex-row items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all">
-              <img
-                src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
-                alt={b.titulo ?? ""}
-                className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-contain p-1.5 bg-surface border border-border shrink-0"
-                onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
-              />
-              <div className="flex-1 min-w-0 space-y-1">
-                <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                  Oferta del Día
-                </span>
-                <h4 className="font-bold text-base text-foreground truncate">{b.titulo}</h4>
-                <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-line">{b.subtitulo}</p>
-                <p className="text-lg font-bold text-primary pt-1">{money(b.precio)}</p>
-                <div className="flex items-center gap-2 pt-2">
-                  <button
-                    onClick={() => {
-                      setEditingBanner({
-                        id: b.id,
-                        titulo: b.titulo ?? "",
-                        subtitulo: b.subtitulo ?? "",
-                        imagen_url: b.imagen_url ?? "",
-                        precio: String(b.precio ?? ""),
-                        activo: b.activo ?? "SI",
-                      });
-                      setComboTitle(b.titulo ?? "");
-                      setComboSubtitle(b.subtitulo ?? "");
-                      setComboPrice(String(b.precio ?? ""));
-                      setComboImage(b.imagen_url ?? "");
-                      setCreating(true);
-                    }}
-                    className="btn-base bg-muted hover:bg-muted/80 text-foreground text-xs py-1 px-2.5 flex items-center gap-1"
-                  >
-                    <Pencil className="h-3.5 w-3.5" /> Editar
-                  </button>
-                  <button
-                    onClick={() => void handleDeleteCombo(String(b.id ?? idx), b.titulo ?? "Combo")}
-                    className="btn-base bg-destructive/10 text-destructive hover:bg-destructive hover:text-white text-xs py-1 px-2.5 flex items-center gap-1"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                  </button>
-                  <Link
-                    to="/combo/$index"
-                    params={{ index: String(idx) }}
-                    className="btn-base border border-border text-xs py-1 px-2.5 text-muted-foreground hover:text-foreground ml-auto"
-                  >
-                    Ver en tienda →
-                  </Link>
+          {banners.map((b, idx) => {
+            const bPrice = toNumber(b.precio);
+            const bDiscPct = 7;
+            const bTransfer = transferPrice(bPrice, bDiscPct);
+            const isUsd = String(b.moneda_base ?? "").toUpperCase() === "USD";
+
+            return (
+              <div
+                key={b.id ?? idx}
+                className="flex flex-col sm:flex-row items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all"
+              >
+                <img
+                  src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
+                  alt={b.titulo ?? ""}
+                  className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-contain p-1.5 bg-surface border border-border shrink-0"
+                  onError={(e) => {
+                    e.currentTarget.src = FALLBACK_IMAGE;
+                  }}
+                />
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                      Oferta del Día
+                    </span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      {isUsd ? "Base USD" : "Base ARS"}
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-base text-foreground truncate">{b.titulo}</h4>
+                  <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-line">{b.subtitulo}</p>
+
+                  <div className="pt-1 space-y-0.5">
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-lg font-bold text-primary tabular-nums">
+                        {money(bTransfer)}
+                      </span>
+                      <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                        {bDiscPct}% OFF Transf.
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      o <span className="font-semibold text-foreground/80">{money(bPrice)}</span> con tarjeta / MP
+                      {b.precio_usd ? ` (u$d ${b.precio_usd})` : ""}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      onClick={() => handleEditClick(b)}
+                      className="btn-base bg-muted hover:bg-muted/80 text-foreground text-xs py-1 px-2.5 flex items-center gap-1"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Editar
+                    </button>
+                    <button
+                      onClick={() => void handleDeleteCombo(String(b.id ?? idx), b.titulo ?? "Combo")}
+                      className="btn-base bg-destructive/10 text-destructive hover:bg-destructive hover:text-white text-xs py-1 px-2.5 flex items-center gap-1"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                    </button>
+                    <Link
+                      to="/combo/$index"
+                      params={{ index: String(idx) }}
+                      className="btn-base border border-border text-xs py-1 px-2.5 text-muted-foreground hover:text-foreground ml-auto"
+                    >
+                      Ver en tienda →
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -2282,6 +2459,9 @@ function OfertasDelDiaPanel({
             userEmail={userEmail}
             userToken={userToken}
             onRefresh={onRefresh}
+            dolarRate={dolarRate}
+            roundingIncrement={roundingIncrement}
+            markupPercentage={markupPercentage}
           />
         </ComboPanelBoundary>
       ) : subTab === "activas" ? (
