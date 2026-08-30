@@ -50,6 +50,9 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
     .join("");
 
   const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
+  const itemsSubtotal = order.items.reduce((acc, i) => acc + i.qty * i.unitPrice, 0);
+  const discountAmount = Math.max(0, itemsSubtotal - order.total);
+  const hasDiscount = discountAmount > 0;
 
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e8e8e8;border-radius:12px;overflow:hidden;">
@@ -74,7 +77,9 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
             <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:#333;">${metodoPago}</p>
           </div>
           <div style="text-align:right;">
-            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#888;">Total abonado</p>
+            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#888;">
+              ${hasDiscount ? "Total con descuento" : "Total abonado"}
+            </p>
             <p style="margin:4px 0 0;font-size:22px;font-weight:900;color:#e05600;">${money(order.total)}</p>
           </div>
         </div>
@@ -113,10 +118,29 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
           </thead>
           <tbody>${itemsHtml}</tbody>
           <tfoot>
+            ${
+              hasDiscount
+                ? `
+            <tr>
+              <td colspan="3" style="padding:8px 8px;font-size:13px;text-align:right;border-top:1px solid #ddd;color:#666;">Subtotal productos</td>
+              <td style="padding:8px 8px;font-size:13px;text-align:right;border-top:1px solid #ddd;color:#333;">${money(itemsSubtotal)}</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">Descuento aplicado</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">-${money(discountAmount)}</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="padding:10px 8px;font-weight:700;font-size:14px;text-align:right;border-top:2px solid #e05600;">TOTAL CON DESCUENTO</td>
+              <td style="padding:10px 8px;font-weight:900;font-size:16px;text-align:right;border-top:2px solid #e05600;color:#e05600;">${money(order.total)}</td>
+            </tr>
+            `
+                : `
             <tr>
               <td colspan="3" style="padding:10px 8px;font-weight:700;font-size:14px;text-align:right;border-top:2px solid #e05600;">TOTAL</td>
               <td style="padding:10px 8px;font-weight:900;font-size:16px;text-align:right;border-top:2px solid #e05600;color:#e05600;">${money(order.total)}</td>
             </tr>
+            `
+            }
           </tfoot>
         </table>
         
@@ -146,6 +170,15 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
 
   const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
   const isTransfer = order.metodoPago === "transferencia";
+  const itemsSubtotal = order.items.reduce((acc, i) => acc + i.qty * i.unitPrice, 0);
+  const discountAmount = Math.max(0, itemsSubtotal - order.total);
+  const hasDiscount = discountAmount > 0;
+
+  const waLink = `https://wa.me/5493418051515?text=Hola%20Te%20Importamos%2C%20${encodeURIComponent(
+    isTransfer
+      ? `adjunto el comprobante de mi pedido #${order.orderCode}`
+      : `tengo una consulta sobre mi pedido #${order.orderCode}`
+  )}`;
 
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e8e8e8;border-radius:12px;overflow:hidden;">
@@ -167,8 +200,16 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
         </p>
         
         ${isTransfer ? `
-        <div style="background:#fff8e6;border:1px solid #fbd38d;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#7b341e;">
-          ⏳ <strong>Recordatorio de Transferencia:</strong> Tu pedido y stock están reservados por <strong>24 horas</strong>. Por favor enviá el comprobante de pago a nuestro WhatsApp para despachar tu paquete.
+        <div style="background:#fff8e6;border:1px solid #fbd38d;border-radius:8px;padding:16px 18px;margin-bottom:20px;font-size:13px;color:#7b341e;">
+          <p style="margin:0 0 10px;font-weight:700;">
+            ⏳ Recordatorio de Transferencia:
+          </p>
+          <p style="margin:0 0 12px;">
+            Tu pedido y stock están reservados por <strong>24 horas</strong>. Por favor enviá el comprobante de pago a nuestro WhatsApp para despachar tu paquete.
+          </p>
+          <a href="${waLink}" target="_blank" style="display:inline-block;background:#25d366;color:#ffffff;font-weight:700;padding:10px 16px;border-radius:8px;text-decoration:none;font-size:13px;">
+            📲 Enviar comprobante por WhatsApp
+          </a>
         </div>
         ` : `
         <div style="background:#edfbf3;border:1px solid #9ae6b4;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#22543d;">
@@ -183,7 +224,9 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
             <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:#333;">${metodoPago}</p>
           </div>
           <div style="text-align:right;">
-            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#888;">Total</p>
+            <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#888;">
+              ${hasDiscount ? "Total con descuento aplicado" : "Total"}
+            </p>
             <p style="margin:4px 0 0;font-size:22px;font-weight:900;color:#e05600;">${money(order.total)}</p>
           </div>
         </div>
@@ -216,17 +259,42 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
           </thead>
           <tbody>${itemsHtml}</tbody>
           <tfoot>
+            ${
+              hasDiscount
+                ? `
+            <tr>
+              <td colspan="3" style="padding:8px 8px;font-size:13px;text-align:right;border-top:1px solid #ddd;color:#666;">Subtotal productos</td>
+              <td style="padding:8px 8px;font-size:13px;text-align:right;border-top:1px solid #ddd;color:#333;">${money(itemsSubtotal)}</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">Descuento aplicado ${isTransfer ? "(Transferencia)" : ""}</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">-${money(discountAmount)}</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="padding:10px 8px;font-weight:700;font-size:14px;text-align:right;border-top:2px solid #e05600;">TOTAL CON DESCUENTO</td>
+              <td style="padding:10px 8px;font-weight:900;font-size:16px;text-align:right;border-top:2px solid #e05600;color:#e05600;">${money(order.total)}</td>
+            </tr>
+            `
+                : `
             <tr>
               <td colspan="3" style="padding:10px 8px;font-weight:700;font-size:14px;text-align:right;border-top:2px solid #e05600;">TOTAL</td>
               <td style="padding:10px 8px;font-weight:900;font-size:16px;text-align:right;border-top:2px solid #e05600;color:#e05600;">${money(order.total)}</td>
             </tr>
+            `
+            }
           </tfoot>
         </table>
         
         <!-- Footer -->
-        <div style="background:#fafafa;border:1px solid #eee;border-radius:8px;padding:14px 18px;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#888;">
-            ¿Tenés dudas sobre tu pedido? Escribinos por WhatsApp o respondé directamente a este correo.
+        <div style="background:#fafafa;border:1px solid #eee;border-radius:8px;padding:18px 20px;text-align:center;">
+          <p style="margin:0 0 10px;font-size:13px;font-weight:600;color:#333;">
+            ¿Tenés dudas sobre tu pedido?
+          </p>
+          <a href="${waLink}" target="_blank" style="display:inline-block;background:#25d366;color:#ffffff;font-weight:700;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:13px;margin-bottom:8px;">
+            💬 Escribinos por WhatsApp (+54 9 3418 05-1515)
+          </a>
+          <p style="margin:6px 0 0;font-size:11px;color:#888;">
+            O respondé directamente a este correo.
           </p>
         </div>
       </div>
