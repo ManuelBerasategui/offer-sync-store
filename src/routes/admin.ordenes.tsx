@@ -274,11 +274,11 @@ TOTAL: ${money(order.total)}`;
         </div>
 
         {/* Sub-filtros por método de pago */}
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap">
           <button
             type="button"
             onClick={() => setSubFilter("all")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+            className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
               subFilter === "all"
                 ? "bg-primary text-primary-foreground border-primary shadow-xs"
                 : "bg-surface text-muted-foreground border-border hover:text-foreground hover:bg-muted/50"
@@ -289,7 +289,7 @@ TOTAL: ${money(order.total)}`;
           <button
             type="button"
             onClick={() => setSubFilter("transferencia")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+            className={`whitespace-nowrap flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
               subFilter === "transferencia"
                 ? "bg-primary text-primary-foreground border-primary shadow-xs"
                 : "bg-surface text-muted-foreground border-border hover:text-foreground hover:bg-muted/50"
@@ -301,7 +301,7 @@ TOTAL: ${money(order.total)}`;
           <button
             type="button"
             onClick={() => setSubFilter("tarjeta")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+            className={`whitespace-nowrap flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
               subFilter === "tarjeta"
                 ? "bg-primary text-primary-foreground border-primary shadow-xs"
                 : "bg-surface text-muted-foreground border-border hover:text-foreground hover:bg-muted/50"
@@ -312,7 +312,7 @@ TOTAL: ${money(order.total)}`;
           <button
             type="button"
             onClick={() => setSubFilter("mercadopago")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
+            className={`whitespace-nowrap flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
               subFilter === "mercadopago"
                 ? "bg-primary text-primary-foreground border-primary shadow-xs"
                 : "bg-surface text-muted-foreground border-border hover:text-foreground hover:bg-muted/50"
@@ -324,53 +324,53 @@ TOTAL: ${money(order.total)}`;
 
         {/* Tarjetas de Métricas (KPIs) */}
         <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4">
-          <div className="card-soft flex flex-col sm:flex-row items-center gap-2 sm:gap-4 p-2.5 sm:p-5 text-center sm:text-left">
-            <div className="flex h-8 w-8 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <DollarSign className="h-4 w-4 sm:h-6 sm:w-6" />
+          <div className="card-soft flex flex-col sm:flex-row items-center sm:items-start gap-1.5 sm:gap-4 p-2.5 sm:p-5 text-center sm:text-left">
+            <div className="flex h-7 w-7 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <DollarSign className="h-3.5 w-3.5 sm:h-6 sm:w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">
+              <p className="text-[9px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">
                 {tab === "pagadas" ? "Recaudado" : "Reservado"}
               </p>
               <p className="text-xs sm:text-2xl font-bold tracking-tight text-foreground truncate">{money(stats.totalVentas)}</p>
             </div>
           </div>
 
-          <div className="card-soft flex flex-col sm:flex-row items-center gap-2 sm:gap-4 p-2.5 sm:p-5 text-center sm:text-left">
-            <div className="flex h-8 w-8 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-primary/10 text-primary">
-              <PackageCheck className="h-4 w-4 sm:h-6 sm:w-6" />
+          <div className="card-soft flex flex-col sm:flex-row items-center sm:items-start gap-1.5 sm:gap-4 p-2.5 sm:p-5 text-center sm:text-left">
+            <div className="flex h-7 w-7 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-primary/10 text-primary">
+              <PackageCheck className="h-3.5 w-3.5 sm:h-6 sm:w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">Pedidos</p>
+              <p className="text-[9px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">Pedidos</p>
               <p className="text-xs sm:text-2xl font-bold tracking-tight text-foreground">{stats.count}</p>
             </div>
           </div>
 
-          <div className="card-soft flex flex-col sm:flex-row items-center gap-2 sm:gap-4 p-2.5 sm:p-5 text-center sm:text-left">
-            <div className="flex h-8 w-8 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-amber/10 text-amber">
-              <ShoppingBag className="h-4 w-4 sm:h-6 sm:w-6" />
+          <div className="card-soft flex flex-col sm:flex-row items-center sm:items-start gap-1.5 sm:gap-4 p-2.5 sm:p-5 text-center sm:text-left">
+            <div className="flex h-7 w-7 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <ShoppingBag className="h-3.5 w-3.5 sm:h-6 sm:w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">Promedio</p>
+              <p className="text-[9px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">Promedio</p>
               <p className="text-xs sm:text-2xl font-bold tracking-tight text-foreground truncate">{money(stats.promedio)}</p>
             </div>
           </div>
         </div>
 
         {/* Buscador */}
-        <div className="mt-6 flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 shadow-xs">
-          <Search className="h-5 w-5 text-muted-foreground shrink-0" />
+        <div className="mt-4 sm:mt-6 flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2.5 sm:px-4 sm:py-3 shadow-xs">
+          <Search className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground shrink-0" />
           <input
             type="text"
-            placeholder="Buscar por cliente, DNI, email, ciudad o código de orden (TI-...)"
+            placeholder="Buscar cliente, DNI, email o código TI-..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+            className="w-full bg-transparent text-xs sm:text-sm text-foreground placeholder:text-muted-foreground outline-none"
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="text-xs font-bold text-muted-foreground hover:text-foreground"
+              className="text-xs font-bold text-muted-foreground hover:text-foreground shrink-0"
             >
               Limpiar
             </button>
@@ -379,7 +379,7 @@ TOTAL: ${money(order.total)}`;
 
         {/* Mensajes de Estado */}
         {error && (
-          <div className="mt-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-semibold text-destructive">
+          <div className="mt-4 sm:mt-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-semibold text-destructive">
             {error}
           </div>
         )}
@@ -392,107 +392,114 @@ TOTAL: ${money(order.total)}`;
             </p>
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="mt-8 rounded-xl border border-border bg-surface py-16 text-center">
+          <div className="mt-6 rounded-xl border border-border bg-surface py-12 text-center">
             {tab === "reservadas" ? (
-              <Clock className="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <Clock className="mx-auto h-10 w-10 text-muted-foreground/50" />
             ) : (
-              <PackageCheck className="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <PackageCheck className="mx-auto h-10 w-10 text-muted-foreground/50" />
             )}
-            <h3 className="mt-3 text-lg font-bold text-foreground">
-              {tab === "reservadas" ? "No hay órdenes reservadas" : "No hay órdenes pagadas"}
+            <h3 className="mt-3 text-base font-bold text-foreground">
+              {tab === "reservadas" ? "No hay órdenes pendientes" : "No hay órdenes pagadas"}
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground">
               {search
                 ? "No encontramos ninguna orden que coincida con tu búsqueda."
                 : tab === "reservadas"
-                  ? "No hay transferencias pendientes de confirmación."
+                  ? "No hay órdenes pendientes con el filtro seleccionado."
                   : "Aún no se han registrado pagos completados."}
             </p>
           </div>
         ) : (
-          <div className="mt-6 flex flex-col gap-6">
+          <div className="mt-4 sm:mt-6 flex flex-col gap-4 sm:gap-6">
             {filteredOrders.map((order) => {
               const waClient = getWaClientLink(order);
               return (
-                <div key={order.id} className={`card-soft overflow-hidden p-3.5 sm:p-6 border shadow-sm transition-all hover:border-primary/50 ${
-                  tab === "reservadas" ? "border-amber-500/30" : "border-border"
-                }`}>
+                <div
+                  key={order.id}
+                  className={`card-soft overflow-hidden p-3.5 sm:p-6 border shadow-sm transition-all hover:border-primary/50 ${
+                    order.estado === "pendiente" ? "border-amber-500/30" : "border-border"
+                  }`}
+                >
                   {/* Encabezado de la orden */}
-                  <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                      <span className="font-mono text-base font-bold text-primary bg-primary/10 px-3 py-1 rounded-lg">
+                  <div className="flex flex-col gap-2.5 border-b border-border pb-3 sm:pb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-3">
+                      <span className="font-mono text-sm sm:text-base font-bold text-primary bg-primary/10 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-lg">
                         {order.order_code}
                       </span>
 
                       {order.estado === "pagado" ? (
-                        <span className="rounded-md bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase">
+                        <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] sm:text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase">
                           ✓ Pagado
                         </span>
                       ) : (
-                        <span className="rounded-md bg-amber-500/15 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase">
+                        <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] sm:text-xs font-bold text-amber-700 dark:text-amber-400 uppercase">
                           ⏳ Pendiente
                         </span>
                       )}
 
                       {order.metodo_pago && (
-                        <span className="flex items-center gap-1 rounded-md bg-surface border border-border px-2 py-0.5 text-xs text-muted-foreground capitalize">
+                        <span className="flex items-center gap-1 rounded-md bg-surface border border-border px-2 py-0.5 text-[11px] sm:text-xs text-muted-foreground capitalize">
                           {order.metodo_pago === "transferencia" && <Building2 className="h-3 w-3 text-emerald-600" />}
+                          {order.metodo_pago === "tarjeta" && "💳 "}
+                          {order.metodo_pago === "mercadopago" && "🔵 "}
                           {order.metodo_pago}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3 justify-between sm:justify-end">
-                      <span className="text-xs text-muted-foreground font-medium">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-1 sm:pt-0">
+                      <span className="text-[11px] sm:text-xs text-muted-foreground font-medium">
                         {formatFecha(order.created_at)}
                       </span>
-                      <span className="text-xl font-extrabold text-foreground tabular-nums">
+                      <span className="text-lg sm:text-xl font-extrabold text-foreground tabular-nums">
                         {money(order.total)}
                       </span>
                     </div>
                   </div>
 
                   {/* Cuerpo de la orden */}
-                  <div className="mt-5 grid gap-6 md:grid-cols-2">
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
                     {/* Columna Cliente y Envío */}
-                    <div className="flex flex-col justify-between rounded-lg bg-surface/50 p-4 border border-border/60">
+                    <div className="flex flex-col justify-between rounded-xl bg-surface/50 p-3.5 sm:p-4 border border-border/60">
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                        <h4 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">
                           Datos del Cliente y Envío
                         </h4>
-                        <div className="space-y-1.5 text-sm">
-                          <p className="font-bold text-foreground text-base">{order.nombre}</p>
+                        <div className="space-y-1 text-xs sm:text-sm">
+                          <p className="font-bold text-foreground text-sm sm:text-base">{order.nombre}</p>
                           <p className="text-muted-foreground">
                             <span className="font-semibold text-foreground">DNI:</span> {order.dni || "No especificado"}
                           </p>
-                          <p className="text-muted-foreground">
+                          <p className="text-muted-foreground break-all">
                             <span className="font-semibold text-foreground">Email:</span> {order.email}
                           </p>
                           <p className="text-muted-foreground">
                             <span className="font-semibold text-foreground">Teléfono:</span> {order.telefono}
                           </p>
 
-                          <div className="mt-3 pt-3 border-t border-border/60 text-xs leading-relaxed">
+                          <div className="mt-2.5 pt-2.5 border-t border-border/60 text-xs leading-relaxed">
                             <p className="font-semibold text-foreground">
-                              {order.ciudad}, {order.provincia} (CP: {order.codigo_postal})
+                              {order.ciudad}, {order.provincia} {order.codigo_postal ? `(CP: ${order.codigo_postal})` : ""}
                             </p>
                             <p className="mt-1 text-muted-foreground">
                               <span className="font-bold text-foreground">Transporte:</span> {order.transporte}
                             </p>
-                            <p className="text-muted-foreground">
-                              <span className="font-bold text-foreground">Sucursal:</span> {order.sucursal_correo}
-                            </p>
+                            {order.sucursal_correo && (
+                              <p className="text-muted-foreground">
+                                <span className="font-bold text-foreground">Sucursal:</span> {order.sucursal_correo}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
 
                       {/* Acciones para el Cliente y Estado */}
-                      <div className="mt-4 pt-3 border-t border-border flex flex-wrap gap-2">
+                      <div className="mt-3.5 pt-3 border-t border-border flex flex-col sm:flex-row flex-wrap gap-2">
                         {order.estado === "pendiente" ? (
                           <button
                             type="button"
                             onClick={() => void handleStatusChange(order.order_code, "pagado")}
-                            className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 flex items-center gap-1.5 shadow-sm"
+                            className="btn-base w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 flex items-center gap-1.5 shadow-sm"
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             Marcar como Pagado
@@ -501,7 +508,7 @@ TOTAL: ${money(order.total)}`;
                           <button
                             type="button"
                             onClick={() => void handleStatusChange(order.order_code, "pendiente")}
-                            className="btn-base border border-border bg-background hover:bg-surface text-xs font-semibold py-2 px-3 text-muted-foreground"
+                            className="btn-base w-full sm:w-auto justify-center border border-border bg-background hover:bg-surface text-xs font-semibold py-2 px-3 text-muted-foreground"
                           >
                             Revertir a Pendiente
                           </button>
@@ -512,7 +519,7 @@ TOTAL: ${money(order.total)}`;
                             href={waClient}
                             target="_blank"
                             rel="noreferrer"
-                            className="btn-base bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#128C7E] dark:text-[#25D366] text-xs font-semibold py-2 px-3 flex items-center gap-1.5"
+                            className="btn-base w-full sm:w-auto justify-center bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#128C7E] dark:text-[#25D366] text-xs font-semibold py-2 px-3 flex items-center gap-1.5"
                           >
                             <MessageCircle className="h-3.5 w-3.5" />
                             WhatsApp Cliente
@@ -521,7 +528,7 @@ TOTAL: ${money(order.total)}`;
 
                         <button
                           onClick={() => copyShippingLabel(order)}
-                          className="btn-base border border-border bg-background hover:bg-surface text-xs font-semibold py-2 px-3 flex items-center gap-1.5 text-foreground"
+                          className="btn-base w-full sm:w-auto justify-center border border-border bg-background hover:bg-surface text-xs font-semibold py-2 px-3 flex items-center gap-1.5 text-foreground"
                         >
                           {copiedId === order.id ? (
                             <>
@@ -539,21 +546,21 @@ TOTAL: ${money(order.total)}`;
                     </div>
 
                     {/* Columna Ítems del Pedido */}
-                    <div className="rounded-lg bg-surface/50 p-4 border border-border/60 flex flex-col justify-between">
+                    <div className="rounded-xl bg-surface/50 p-3.5 sm:p-4 border border-border/60 flex flex-col justify-between">
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
-                          Productos Comprados ({order.items.reduce((acc, i) => acc + i.qty, 0)} unidades)
+                        <h4 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">
+                          Productos Comprados ({order.items.reduce((acc, i) => acc + i.qty, 0)} u.)
                         </h4>
                         <div className="divide-y divide-border/60">
                           {order.items.map((item, idx) => (
-                            <div key={idx} className="py-2.5 flex items-center justify-between text-sm">
-                              <div className="pr-3">
-                                <p className="font-semibold text-foreground leading-snug">{item.nombre}</p>
-                                <p className="text-xs text-muted-foreground">
+                            <div key={idx} className="py-2 flex items-center justify-between text-xs sm:text-sm">
+                              <div className="pr-2 min-w-0">
+                                <p className="font-semibold text-foreground leading-snug truncate">{item.nombre}</p>
+                                <p className="text-[11px] text-muted-foreground">
                                   {item.qty} x {money(item.unitPrice)}
                                 </p>
                               </div>
-                              <span className="font-bold text-foreground tabular-nums shrink-0">
+                              <span className="font-bold text-foreground tabular-nums shrink-0 text-xs sm:text-sm">
                                 {money(item.qty * item.unitPrice)}
                               </span>
                             </div>
@@ -561,9 +568,9 @@ TOTAL: ${money(order.total)}`;
                         </div>
                       </div>
 
-                      <div className="mt-4 pt-3 border-t border-border flex justify-between items-center text-sm font-bold">
-                        <span className="text-muted-foreground">Total de la Orden</span>
-                        <span className="text-lg text-primary tabular-nums">{money(order.total)}</span>
+                      <div className="mt-3.5 pt-3 border-t border-border flex justify-between items-center text-xs sm:text-sm font-bold">
+                        <span className="text-muted-foreground">Total</span>
+                        <span className="text-base sm:text-lg text-primary tabular-nums">{money(order.total)}</span>
                       </div>
                     </div>
                   </div>
