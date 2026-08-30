@@ -224,7 +224,7 @@ function GraciasPage() {
               className="btn-base w-full bg-whatsapp text-whatsapp-foreground font-bold shadow-md"
               href={waLink(
                 config,
-                `¡Hola! Adjunto el comprobante de transferencia para el pedido ${code ?? ""} por ${orderState.total ? money(orderState.total) : ""}. (Reserva 24 hs)`
+                `¡Hola! Adjunto el comprobante de transferencia para el pedido ${code ?? ""} por ${orderState.total ? money(orderState.total) : ""}.`
               )}
               target="_blank"
               rel="noreferrer"

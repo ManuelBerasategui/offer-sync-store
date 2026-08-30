@@ -197,9 +197,9 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
       if (res.status === "success" && res.orderCode) {
         cart.clear();
 
-        // Abrir WhatsApp con el comprobante pre-armado y sentido de urgencia
+        // Abrir WhatsApp con el comprobante pre-armado
         const finalAmount = res.total ?? transferTotal;
-        const waMsg = `¡Hola! Acabo de hacer el pedido ${res.orderCode} por ${money(finalAmount)} mediante Transferencia Bancaria. Adjunto el comprobante de pago. (Reserva de stock válida por 24 hs)`;
+        const waMsg = `¡Hola! Acabo de hacer el pedido ${res.orderCode} por ${money(finalAmount)} mediante Transferencia Bancaria. Adjunto el comprobante de pago.`;
         const waUrl = waLink(config ?? {}, waMsg);
         window.open(waUrl, "_blank");
 

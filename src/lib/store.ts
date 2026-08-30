@@ -140,12 +140,21 @@ export function onImageError(raw?: string) {
 export const FALLBACK_IMAGE =
   "https://placehold.co/600x600/f4f4f5/71717a?text=Sin+imagen";
 
-export function waLink(config: SiteConfig, productName?: string) {
+export function waLink(config: SiteConfig, messageOrProduct?: string) {
   const phone = (config['whatsapp_individual'] ?? "").replace(/\D/g, "");
-  const text = encodeURIComponent(
-    productName ? `Hola! Te escribo por: ${productName}` : "Hola! Quiero hacer una consulta.",
-  );
-  return `https://wa.me/${phone}?text=${text}`;
+  let text = "Hola! Quiero hacer una consulta.";
+  if (messageOrProduct) {
+    if (
+      messageOrProduct.startsWith("Hola") ||
+      messageOrProduct.startsWith("¡Hola") ||
+      messageOrProduct.startsWith("Consulta")
+    ) {
+      text = messageOrProduct;
+    } else {
+      text = `Hola! Te escribo por: ${messageOrProduct}`;
+    }
+  }
+  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 }
 
 export function categoriesOf(products: Product[]) {
