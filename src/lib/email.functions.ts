@@ -269,7 +269,9 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
     }
   }
 
-  fromAddress = fromAddress || "Te Importamos <noreply@teimportamosarg.com>";
+  fromAddress = (fromAddress || "Te Importamos <noreply@teimportamosarg.com>")
+    .replace(/@teimportamos\.arg\b/i, "@teimportamosarg.com")
+    .replace(/@teimportamos\.com\b/i, "@teimportamosarg.com");
 
   if (!apiKey) {
     const msg = "[email] RESEND_API_KEY no está configurada ni en env ni en site_config — se omite el email.";
