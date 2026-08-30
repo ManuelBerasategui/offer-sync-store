@@ -228,7 +228,7 @@ TOTAL: ${money(order.total)}`;
             }`}
           >
             <Clock className="h-4 w-4" />
-            Reservadas
+            Pendientes / Reservadas
             {reservedOrders.length > 0 && (
               <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
                 tab === "reservadas" ? "bg-amber-500/20 text-amber-700 dark:text-amber-400" : "bg-muted text-muted-foreground"

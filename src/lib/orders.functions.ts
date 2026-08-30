@@ -712,7 +712,6 @@ export const getAdminReservedOrders = createServerFn({ method: "POST" })
       .from("orders")
       .select("*")
       .eq("estado", "pendiente")
-      .eq("metodo_pago", "transferencia")
       .order("created_at", { ascending: false });
 
     if (error) {
