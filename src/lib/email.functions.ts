@@ -25,9 +25,7 @@ export type NotifyOrderInput = {
 };
 
 const ADMIN_EMAILS = [
-  "teimportamosar@gmail.com",
   "soporte.nolimit@gmail.com",
-  "felipecuffia7@gmail.com",
 ];
 
 const METODO_LABEL: Record<string, string> = {
