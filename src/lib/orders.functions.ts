@@ -405,6 +405,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       orderCode?: string;
       estado: "pagado" | "pendiente" | "rechazado" | "desconocido";
       total?: number;
+      metodoPago?: string;
     }> => {
       if (!data.code) return { estado: "desconocido" };
 
@@ -418,13 +419,18 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       // 1. Buscar la orden en Supabase (puede ser "pendiente" o ya "pagado")
       const { data: order } = await supabaseAdmin
         .from("orders")
-        .select("id, order_code, estado, total, nombre, email, telefono, dni, provincia, ciudad, codigo_postal, transporte, sucursal_correo, items")
+        .select("id, order_code, estado, total, metodo_pago, nombre, email, telefono, dni, provincia, ciudad, codigo_postal, transporte, sucursal_correo, items")
         .eq("order_code", data.code)
         .maybeSingle();
 
       // Si ya está pagada (p.ej. el usuario refresca la página), la devolvemos directamente
       if (order?.estado === "pagado") {
-        return { orderCode: order.order_code, estado: "pagado", total: Number(order.total) };
+        return {
+          orderCode: order.order_code,
+          estado: "pagado",
+          total: Number(order.total),
+          metodoPago: order.metodo_pago ?? undefined,
+        };
       }
 
       // 2. Consultar el estado real del pago en la API de Mercado Pago
@@ -467,19 +473,21 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
           ...(order?.order_code ? { orderCode: order.order_code } : {}),
           estado: "pendiente",
           ...(order?.total ? { total: Number(order.total) } : {}),
+          metodoPago: order?.metodo_pago ?? undefined,
         };
       }
 
       if (mpStatus !== "approved") {
         console.log(`Pago no aprobado, estado final: ${mpStatus}`);
-        return { estado: "rechazado" };
+        return { estado: "rechazado", metodoPago: order?.metodo_pago ?? undefined };
       }
 
       // 3. El pago está aprobado: actualizar la orden pendiente a "pagado"
       if (order) {
+        const finalMetodo = order.metodo_pago === "tarjeta" ? "tarjeta" : "mercadopago";
         const { error: updErr } = await supabaseAdmin
           .from("orders")
-          .update({ estado: "pagado", metodo_pago: "mercadopago" })
+          .update({ estado: "pagado", metodo_pago: finalMetodo })
           .eq("id", order.id);
 
         if (updErr) {
@@ -527,7 +535,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
           await notifyNewOrder({
             orderCode: order.order_code,
             total: Number(order.total),
-            metodoPago: "mercadopago",
+            metodoPago: finalMetodo === "tarjeta" ? "tarjeta" : "mercadopago",
             shipping: {
               nombre: order.nombre ?? "",
               email: order.email ?? "",
@@ -545,7 +553,12 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
           console.error("[email] Error enviando notificación de MP:", e);
         }
 
-        return { orderCode: order.order_code, estado: "pagado", total: Number(order.total) };
+        return {
+          orderCode: order.order_code,
+          estado: "pagado",
+          total: Number(order.total),
+          metodoPago: finalMetodo,
+        };
       }
 
       // La orden no existía (ej: un pedido creado por una versión anterior)

@@ -83,7 +83,7 @@ function GraciasPage() {
           },
         });
         if (!cancelled) {
-          setOrderState({ estado: res.estado, total: res.total });
+          setOrderState({ estado: res.estado, total: res.total, metodo: res.metodoPago });
           if (res.estado === "pagado") {
             cart.clear();
           }
@@ -107,6 +107,7 @@ function GraciasPage() {
   const isLoading = orderState.estado === "cargando";
   const isPending = orderState.estado === "pendiente";
   const isRejected = orderState.estado === "rechazado" || orderState.estado === "desconocido";
+  const isTransfer = orderState.metodo === "transferencia";
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12 text-center">
@@ -133,15 +134,27 @@ function GraciasPage() {
             </p>
           </>
         ) : isPending ? (
-          <>
-            <span className="inline-block rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-2">
-              ⏳ Pedido Reservado
-            </span>
-            <h1 className="text-3xl font-bold">¡Tu pedido fue registrado!</h1>
-            <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-800 dark:text-amber-300 text-left font-medium leading-relaxed">
-              ⚠️ <strong>Regla de reserva:</strong> Tu pedido y stock están reservados por <strong>24 horas</strong>. Por favor enviá el comprobante de transferencia a nuestro WhatsApp antes de que caduque el plazo; de lo contrario, la orden se cancelará automáticamente.
-            </div>
-          </>
+          isTransfer ? (
+            <>
+              <span className="inline-block rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-2">
+                ⏳ Pedido Reservado
+              </span>
+              <h1 className="text-3xl font-bold">¡Tu pedido fue registrado!</h1>
+              <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-800 dark:text-amber-300 text-left font-medium leading-relaxed">
+                ⚠️ <strong>Regla de reserva:</strong> Tu pedido y stock están reservados por <strong>24 horas</strong>. Por favor enviá el comprobante de transferencia a nuestro WhatsApp antes de que caduque el plazo; de lo contrario, la orden se cancelará automáticamente.
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="inline-block rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-2">
+                ⏳ Pago en Proceso
+              </span>
+              <h1 className="text-3xl font-bold">Pago en revisión</h1>
+              <p className="mt-4 text-muted-foreground">
+                Tu pago con tarjeta / Mercado Pago está siendo procesado. En cuanto se acredite te avisaremos y prepararemos tu pedido.
+              </p>
+            </>
+          )
         ) : (
           <>
             <span className="inline-block rounded-full bg-destructive/10 px-3 py-1 text-xs font-bold text-destructive uppercase tracking-wider mb-2">
@@ -163,14 +176,18 @@ function GraciasPage() {
             <p className="mt-1 font-mono text-2xl font-bold tracking-wide text-primary">{code}</p>
             {orderState.total && orderState.total > 0 ? (
               <p className="mt-1 text-sm font-bold text-foreground">
-                Total a abonar: {money(orderState.total)}
+                {isApproved
+                  ? `Total abonado: ${money(orderState.total)}`
+                  : isTransfer
+                    ? `Total a transferir: ${money(orderState.total)}`
+                    : `Total: ${money(orderState.total)}`}
               </p>
             ) : null}
             <p className="mt-1 text-xs text-muted-foreground">
               Guardá este código para hacer el seguimiento.
             </p>
 
-            {isPending && (
+            {isPending && isTransfer && (
               <div className="mt-4 border-t border-border/60 pt-3 text-xs space-y-2">
                 <p className="font-bold text-foreground">Datos para realizar la transferencia:</p>
                 <div className="flex items-center justify-between">
@@ -202,7 +219,7 @@ function GraciasPage() {
         )}
 
         <div className="mt-8 flex flex-col gap-3">
-          {isPending ? (
+          {isPending && isTransfer ? (
             <a
               className="btn-base w-full bg-whatsapp text-whatsapp-foreground font-bold shadow-md"
               href={waLink(
@@ -224,7 +241,7 @@ function GraciasPage() {
             </Link>
           )}
 
-          {!isPending && (
+          {(!isPending || !isTransfer) && (
             <a
               className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
               href={waLink(config, code ? `Consulta sobre pedido ${code}` : undefined)}
