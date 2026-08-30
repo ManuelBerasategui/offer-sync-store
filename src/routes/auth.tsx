@@ -174,12 +174,13 @@ function AuthPage() {
         });
         if (err) throw err;
 
-        navigate({ to: "/auth", search: { mode: "login" }, replace: true });
-        if (!signupData.session) {
-          setMsg("¡Cuenta creada! Te enviamos un email de confirmación. Por favor revisá tu casilla (y Spam) para activarla.");
-        } else {
-          setMsg("¡Cuenta creada con éxito! Ya podés iniciar sesión.");
+        if (signupData.session) {
+          navigate({ to: "/" });
+          return;
         }
+
+        navigate({ to: "/auth", search: { mode: "login" }, replace: true });
+        setMsg("¡Cuenta creada con éxito! Ya podés iniciar sesión con tu email y contraseña.");
         return;
       }
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
