@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { NotifyOrderInput } from "@/lib/email.functions";
 
 export type OrderItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
 
@@ -359,6 +360,21 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
         );
       }
 
+      // Notificar a los admins (fire-and-forget)
+      try {
+        const { notifyNewOrder } = await import("@/lib/email.functions");
+        const cardTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+        await notifyNewOrder({
+          orderCode,
+          total: cardTotal,
+          metodoPago: "tarjeta",
+          shipping: data.shipping,
+          items,
+        } satisfies NotifyOrderInput);
+      } catch (e) {
+        console.error("[email] Error enviando notificación de tarjeta:", e);
+      }
+
       return { status: "approved", orderCode };
     },
   );
@@ -402,7 +418,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       // 1. Buscar la orden en Supabase (puede ser "pendiente" o ya "pagado")
       const { data: order } = await supabaseAdmin
         .from("orders")
-        .select("id, order_code, estado, total")
+        .select("id, order_code, estado, total, nombre, email, telefono, dni, provincia, ciudad, codigo_postal, transporte, sucursal_correo, items")
         .eq("order_code", data.code)
         .maybeSingle();
 
@@ -496,6 +512,37 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
             },
             { onConflict: "id" },
           );
+        }
+
+        // Notificar a los admins (fire-and-forget)
+        try {
+          const { notifyNewOrder } = await import("@/lib/email.functions");
+          const mpItems: NotifyOrderInput["items"] = Array.isArray(order.items)
+            ? (order.items as { nombre: string; qty: number; unitPrice: number }[]).map((i) => ({
+                nombre: i.nombre ?? "",
+                qty: Number(i.qty) || 1,
+                unitPrice: Number(i.unitPrice) || 0,
+              }))
+            : [];
+          await notifyNewOrder({
+            orderCode: order.order_code,
+            total: Number(order.total),
+            metodoPago: "mercadopago",
+            shipping: {
+              nombre: order.nombre ?? "",
+              email: order.email ?? "",
+              telefono: order.telefono ?? "",
+              dni: order.dni ?? undefined,
+              provincia: order.provincia ?? undefined,
+              ciudad: order.ciudad ?? undefined,
+              codigo_postal: order.codigo_postal ?? undefined,
+              transporte: order.transporte ?? undefined,
+              sucursal_correo: order.sucursal_correo ?? undefined,
+            },
+            items: mpItems,
+          } satisfies NotifyOrderInput);
+        } catch (e) {
+          console.error("[email] Error enviando notificación de MP:", e);
         }
 
         return { orderCode: order.order_code, estado: "pagado", total: Number(order.total) };
@@ -879,6 +926,20 @@ export const createTransferOrder = createServerFn({ method: "POST" })
           },
           { onConflict: "id" },
         );
+      }
+
+      // Notificar a los admins (fire-and-forget)
+      try {
+        const { notifyNewOrder } = await import("@/lib/email.functions");
+        await notifyNewOrder({
+          orderCode,
+          total,
+          metodoPago: "transferencia",
+          shipping: data.shipping,
+          items,
+        } satisfies NotifyOrderInput);
+      } catch (e) {
+        console.error("[email] Error enviando notificación de transferencia:", e);
       }
 
       return {
