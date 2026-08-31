@@ -281,12 +281,20 @@ export type CategoryRule = {
 };
 
 /** Normaliza el nombre de una categoría para usarla como clave (remueve acentos y minúsculas) */
-export const normCat = (s: string) =>
-  String(s ?? "")
+export const normCat = (s: string) => {
+  const norm = String(s ?? "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+
+  if (norm === "suplementacion" || norm === "suplemento") return "suplementos";
+  if (norm === "perfume arabe" || norm === "perfume arabes") return "perfumes arabes";
+  if (norm === "perfume disenador" || norm === "perfumes de disenador" || norm === "perfume de disenador") return "perfumes disenador";
+  if (norm === "mate") return "mates";
+  if (norm === "zapatilla") return "zapatillas";
+  return norm;
+};
 
 export function getBaseCategory(rawCat: string): string {
   return String(rawCat ?? "").trim();
@@ -296,56 +304,60 @@ export function getBaseCategory(rawCat: string): string {
 export function parseCategoryRules(config: SiteConfig): Record<string, CategoryRule> {
   const rules: Record<string, CategoryRule> = {};
   const getOrCreate = (cat: string): CategoryRule => {
-    if (!rules[cat]) rules[cat] = { discountTiers: [] };
-    return rules[cat];
+    const key = normCat(cat);
+    if (!rules[key]) rules[key] = { discountTiers: [] };
+    return rules[key];
   };
   for (const [key, val] of Object.entries(config)) {
     const dm = key.match(/^cat_discount_(.+)$/i);
     const um = key.match(/^cat_min_units_(.+)$/i);
     const am = key.match(/^cat_min_amount_(.+)$/i);
     if (dm) {
-      const rule = getOrCreate(normCat(dm[1]!));
+      const rule = getOrCreate(dm[1]!);
       try {
         const parsed = JSON.parse(val);
         if (Array.isArray(parsed)) rule.discountTiers = parsed;
       } catch { /* ignore */ }
     } else if (um) {
-      const rule = getOrCreate(normCat(um[1]!));
+      const rule = getOrCreate(um[1]!);
       const n = Number(val); if (n > 0) rule.minUnits = n;
     } else if (am) {
-      const rule = getOrCreate(normCat(am[1]!));
+      const rule = getOrCreate(am[1]!);
       const n = Number(val); if (n > 0) rule.minAmount = n;
     }
   }
 
   // Perfumes Árabes: descuentos por defecto (5u→5%, 10u→10%, 20u→12%)
-  if (!rules["perfumes arabes"]?.discountTiers?.length && !rules["perfumes arabe"]?.discountTiers?.length) {
-    const arabesDefault: CategoryRule = {
+  if (!rules["perfumes arabes"]?.discountTiers?.length) {
+    rules["perfumes arabes"] = {
       ...rules["perfumes arabes"],
       discountTiers: [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
     };
-    rules["perfumes arabes"] = arabesDefault;
-    rules["perfumes arabe"] = arabesDefault;
   }
 
   // Perfumes Diseñador: descuentos por defecto (3u→5%, 7u→7%, 20u→12%)
-  if (!rules["perfumes de disenador"]?.discountTiers?.length && !rules["perfumes disenador"]?.discountTiers?.length) {
-    const disenadorDefault: CategoryRule = {
-      ...rules["perfumes de disenador"],
+  if (!rules["perfumes disenador"]?.discountTiers?.length) {
+    rules["perfumes disenador"] = {
+      ...rules["perfumes disenador"],
       discountTiers: [{ units: 3, percent: 5 }, { units: 7, percent: 7 }, { units: 20, percent: 12 }],
     };
-    rules["perfumes de disenador"] = disenadorDefault;
-    rules["perfumes disenador"] = disenadorDefault;
   }
 
   // Mates: compra mínima obligatoria de 10 unidades.
-  const matesExisting = rules["mates"] ?? rules["mate"];
+  const matesExisting = rules["mates"];
   const { minAmount: _ignored, ...matesRuleBase } = matesExisting ?? { discountTiers: [] };
   rules["mates"] = {
     ...matesRuleBase,
     minUnits: 10,
     discountTiers: [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
   };
+
+  // Eliminar categorías genéricas obsoletas o duplicadas si existen subcategorías específicas
+  if (rules["perfumes arabes"]?.minUnits || rules["perfumes disenador"]?.minUnits) {
+    delete rules["perfumes"];
+    delete rules["perfume"];
+  }
+  delete rules["suplementacion"];
   delete rules["mate"];
 
   return rules;

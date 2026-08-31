@@ -224,26 +224,40 @@ function Home() {
       {(() => {
         const catRules = parseCategoryRules(config);
 
-        // Mínimos de compra dinámicos
-        const rulesWithMin = Object.entries(catRules)
-          .filter(([, r]) => r.minUnits || r.minAmount)
-          .map(([key, r]) => ({ key, rule: r }));
+        // Mapeo canónico de etiquetas
+        const categoryLabels: Record<string, string> = {
+          "mates": "Mates",
+          "perfumes arabes": "Perfumes Árabes",
+          "perfumes disenador": "Perfumes Diseñador",
+          "suplementos": "Suplementos",
+          "tecnologia": "Tecnología",
+          "zapatillas": "Zapatillas",
+        };
 
-        // Fallback hardcodeado de suplementos si no está en config
-        const hasSupRule = catRules[normCat("Suplementos")]?.minAmount;
         const minItems: { label: string; desc: string; icon: string }[] = [];
+        const seenKeys = new Set<string>();
 
-        for (const { key, rule } of rulesWithMin) {
-          const displayName = key.charAt(0).toUpperCase() + key.slice(1);
+        // Mínimos de compra dinámicos
+        for (const [key, rule] of Object.entries(catRules)) {
+          const norm = normCat(key);
+          if (norm === "perfumes" || norm === "perfume" || norm === "suplementacion") continue;
+          if (seenKeys.has(norm)) continue;
+
           if (rule.minUnits) {
-            minItems.push({ label: displayName, desc: `Mínimo ${rule.minUnits} unidades`, icon: "📦" });
+            seenKeys.add(norm);
+            const label = categoryLabels[norm] ?? (key.charAt(0).toUpperCase() + key.slice(1));
+            minItems.push({ label, desc: `Mínimo ${rule.minUnits} unidades`, icon: "📦" });
           } else if (rule.minAmount) {
-            minItems.push({ label: displayName, desc: `Mínimo ${money(rule.minAmount)}`, icon: "💰" });
+            seenKeys.add(norm);
+            const label = categoryLabels[norm] ?? (key.charAt(0).toUpperCase() + key.slice(1));
+            minItems.push({ label, desc: `Mínimo ${money(rule.minAmount)}`, icon: "💰" });
           }
         }
 
-        if (!hasSupRule) {
+        // Si no tiene regla explícita de suplementos configurada, asegurar el mínimo histórico de suplementos
+        if (!seenKeys.has("suplementos")) {
           minItems.push({ label: "Suplementos", desc: "Mínimo $250.000", icon: "💰" });
+          seenKeys.add("suplementos");
         }
 
         if (minItems.length === 0) return null;

@@ -117,17 +117,35 @@ function AdminConfiguracionPage() {
       const existing = parseCategoryRules(config);
       const rawCats = res.products.map((p) => (p.categoria ?? "").trim()).filter(Boolean);
       const baseCatsFromProds = rawCats.map(getBaseCategory);
-      const existingCats = Object.keys(existing).map((k) => k.charAt(0).toUpperCase() + k.slice(1));
 
-      const cats = [...new Set([...baseCatsFromProds, ...existingCats])].sort();
+      // Mapeo canónico de nombres
+      const canonicalNames: Record<string, string> = {
+        "mates": "Mates",
+        "perfumes arabes": "Perfumes Árabes",
+        "perfumes disenador": "Perfumes Diseñador",
+        "suplementos": "Suplementos",
+        "tecnologia": "Tecnología",
+        "zapatillas": "Zapatillas",
+      };
+
+      const catMap = new Map<string, string>();
+      for (const c of [...baseCatsFromProds, ...Object.keys(existing)]) {
+        const norm = normCat(c);
+        if (norm === "perfumes" || norm === "perfume" || norm === "suplementacion" || norm === "mate") continue;
+        if (!catMap.has(norm)) {
+          const canonical = canonicalNames[norm] ?? (c.charAt(0).toUpperCase() + c.slice(1));
+          catMap.set(norm, canonical);
+        }
+      }
+
+      const cats = Array.from(catMap.values()).sort();
       setCategories(cats);
 
       const formRules: Record<string, CatRuleForm> = {};
-      for (const cat of cats) {
-        const key = normCat(cat);
+      for (const [key, displayName] of catMap.entries()) {
         const ex = existing[key];
         formRules[key] = {
-          displayName: cat,
+          displayName,
           discountTiers: ex?.discountTiers?.length ? [...ex.discountTiers] : [],
           minType: ex?.minUnits ? "units" : ex?.minAmount ? "amount" : "none",
           minValue: String(ex?.minUnits ?? ex?.minAmount ?? ""),
