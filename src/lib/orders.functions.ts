@@ -293,7 +293,7 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
       };
 
       if (data.deviceId) {
-        mpHeaders["x-meli-session-id"] = data.deviceId;
+        mpHeaders["X-Meli-Session-Id"] = data.deviceId;
       }
 
       const res = await fetch("https://api.mercadopago.com/v1/payments", {
@@ -306,7 +306,6 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
           installments: data.installments,
           payment_method_id: data.paymentMethodId,
           ...(data.issuerId ? { issuer_id: data.issuerId } : {}),
-          ...(data.deviceId ? { device_id: data.deviceId } : {}),
           external_reference: orderCode,
           payer: {
             email: data.email,
