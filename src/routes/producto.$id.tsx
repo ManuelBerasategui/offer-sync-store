@@ -268,8 +268,8 @@ function ProductoPage() {
           ← Volver al catálogo
         </Link>
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-2">
-          <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="mt-6 grid gap-8 lg:grid-cols-2 lg:items-start">
+          <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-2xl border border-border bg-surface lg:sticky lg:top-24">
             <img
               src={imageUrl(selectedImage) || FALLBACK_IMAGE}
               alt={product.nombre ?? "Producto"}

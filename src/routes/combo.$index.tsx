@@ -86,8 +86,8 @@ function ComboPage() {
           ← Volver al inicio
         </Link>
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-2">
-          <div className="mx-auto flex aspect-square w-full max-w-[440px] items-center justify-center overflow-hidden rounded-xl border border-border bg-surface p-4">
+        <div className="mt-6 grid gap-8 lg:grid-cols-2 lg:items-start">
+          <div className="mx-auto flex aspect-square w-full max-w-[440px] items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface p-4 lg:sticky lg:top-24">
             <img
               src={imageUrl(banner.imagen_url) || FALLBACK_IMAGE}
               alt={banner.titulo ?? "Combo en oferta"}

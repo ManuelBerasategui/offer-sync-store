@@ -128,9 +128,9 @@ export function onImageError(raw?: string) {
     const step = Number(img.dataset['retry'] ?? "0");
     const variants = id
       ? [
-          `https://drive.google.com/thumbnail?id=${id}&sz=w1200`,
-          `https://lh3.googleusercontent.com/d/${id}=s1200`,
-        ]
+        `https://drive.google.com/thumbnail?id=${id}&sz=w1200`,
+        `https://lh3.googleusercontent.com/d/${id}=s1200`,
+      ]
       : [];
     if (step < variants.length) {
       img.dataset['retry'] = String(step + 1);
