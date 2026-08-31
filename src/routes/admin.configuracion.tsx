@@ -123,7 +123,7 @@ function AdminConfiguracionPage() {
         "mates": "Mates",
         "perfumes arabes": "Perfumes Árabes",
         "perfumes disenador": "Perfumes Diseñador",
-        "suplementos": "Suplementos",
+        "suplementos": "Suplementación",
         "tecnologia": "Tecnología",
         "zapatillas": "Zapatillas",
       };

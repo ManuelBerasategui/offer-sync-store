@@ -229,7 +229,7 @@ function Home() {
           "mates": "Mates",
           "perfumes arabes": "Perfumes Árabes",
           "perfumes disenador": "Perfumes Diseñador",
-          "suplementos": "Suplementos",
+          "suplementos": "Suplementación",
           "tecnologia": "Tecnología",
           "zapatillas": "Zapatillas",
         };
@@ -256,7 +256,7 @@ function Home() {
 
         // Si no tiene regla explícita de suplementos configurada, asegurar el mínimo histórico de suplementos
         if (!seenKeys.has("suplementos")) {
-          minItems.push({ label: "Suplementos", desc: "Mínimo $250.000", icon: "💰" });
+          minItems.push({ label: "Suplementación", desc: "Mínimo $250.000", icon: "💰" });
           seenKeys.add("suplementos");
         }
 
