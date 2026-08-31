@@ -114,6 +114,7 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
       shipping: ShippingInput;
       items: OrderItem[];
       userId?: string | undefined;
+      deviceId?: string | undefined;
     }) => ({
       token: text(data.token, 200),
       paymentMethodId: text(data.paymentMethodId, 40),
@@ -125,6 +126,7 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
       shipping: cleanShipping(data.shipping),
       items: cleanItems(data.items),
       userId: data.userId ? text(data.userId, 60) : undefined,
+      deviceId: data.deviceId ? text(data.deviceId, 128) : undefined,
     }),
   )
   .handler(
@@ -284,13 +286,19 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
         };
       }
 
+      const mpHeaders: Record<string, string> = {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+        "x-idempotency-key": `${orderCode}-card`,
+      };
+
+      if (data.deviceId) {
+        mpHeaders["x-meli-session-id"] = data.deviceId;
+      }
+
       const res = await fetch("https://api.mercadopago.com/v1/payments", {
         method: "POST",
-        headers: {
-          authorization: `Bearer ${token}`,
-          "content-type": "application/json",
-          "x-idempotency-key": `${orderCode}-card`,
-        },
+        headers: mpHeaders,
         body: JSON.stringify({
           transaction_amount: total,
           token: data.token,
@@ -298,6 +306,7 @@ export const payOrderWithCard = createServerFn({ method: "POST" })
           installments: data.installments,
           payment_method_id: data.paymentMethodId,
           ...(data.issuerId ? { issuer_id: data.issuerId } : {}),
+          ...(data.deviceId ? { device_id: data.deviceId } : {}),
           external_reference: orderCode,
           payer: {
             email: data.email,

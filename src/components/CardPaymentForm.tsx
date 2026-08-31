@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Lock, CreditCard } from "lucide-react";
 
 export type CardFormData = {
@@ -9,12 +9,14 @@ export type CardFormData = {
   email: string;
   docType?: string | undefined;
   docNumber?: string | undefined;
+  deviceId?: string | undefined;
 };
 
 const PUBLIC_KEY = (import.meta.env["VITE_MERCADOPAGO_PUBLIC_KEY"] as string | undefined) || "";
 
 declare global {
   interface Window {
+    MP_DEVICE_SESSION_ID?: string;
     MercadoPago?: new (
       key: string,
       opts?: { locale?: string },
@@ -33,6 +35,24 @@ declare global {
       }>;
     };
   }
+}
+
+function loadSecurityScript() {
+  return new Promise<void>((resolve) => {
+    if (typeof window === "undefined") return resolve();
+    if (window.MP_DEVICE_SESSION_ID) return resolve();
+    const existing = document.querySelector<HTMLScriptElement>("script[data-mp-security]");
+    if (existing) return resolve();
+
+    const script = document.createElement("script");
+    script.src = "https://www.mercadopago.com/v2/security.js";
+    script.setAttribute("view", "checkout");
+    script.setAttribute("output", "MP_DEVICE_SESSION_ID");
+    script.dataset["mpSecurity"] = "1";
+    script.onload = () => resolve();
+    script.onerror = () => resolve(); // Evita bloquear la ejecución si el script falla
+    document.head.appendChild(script);
+  });
 }
 
 function loadSdk() {
@@ -87,6 +107,12 @@ export function CardPaymentForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Pre-cargar SDK de Mercado Pago y script de seguridad para device fingerprinting
+  useEffect(() => {
+    void loadSdk();
+    void loadSecurityScript();
+  }, []);
+
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
     const formatted = raw.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
@@ -139,7 +165,7 @@ export function CardPaymentForm({
     setLoading(true);
 
     try {
-      await loadSdk();
+      await Promise.all([loadSdk(), loadSecurityScript()]);
       if (!window.MercadoPago) {
         throw new Error("No pudimos conectar con el servidor de pagos. Intentá nuevamente.");
       }
@@ -175,6 +201,13 @@ export function CardPaymentForm({
         throw new Error("No se pudo procesar la tarjeta. Verificá los datos ingresados.");
       }
 
+      // Capturar deviceId de seguridad antifraude de Mercado Pago
+      const deviceIdInput = document.getElementById("deviceId") as HTMLInputElement | null;
+      const deviceId =
+        window.MP_DEVICE_SESSION_ID?.trim() ||
+        deviceIdInput?.value?.trim() ||
+        undefined;
+
       await onPay({
         token: tokenRes.id,
         paymentMethodId,
@@ -182,6 +215,7 @@ export function CardPaymentForm({
         email: cleanEmail,
         docType: "DNI",
         docNumber: cleanDni,
+        deviceId,
       });
     } catch (err) {
       console.error("Error al procesar tarjeta:", err);
@@ -207,6 +241,7 @@ export function CardPaymentForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+      <input type="hidden" id="deviceId" name="deviceId" />
       <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground border-b border-border pb-2">
         <span className="flex items-center gap-1.5 text-foreground">
           <CreditCard className="h-4 w-4 text-primary" /> Tarjeta de Crédito o Débito
