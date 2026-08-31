@@ -1984,7 +1984,7 @@ function ComboBuilderPanel({
       };
 
       const res = await upsertAdminBanner({ data: { email: userEmail, token: userToken, banner: bannerInput } });
-      if (res.error) {
+      if (res?.error) {
         toast.error(res.error);
       } else {
         toast.success(`¡Oferta "${comboTitle}" guardada correctamente!`);
@@ -1992,8 +1992,8 @@ function ComboBuilderPanel({
         await loadBanners();
         await onRefresh();
       }
-    } catch {
-      toast.error("Error al guardar la oferta.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar la oferta.");
     } finally {
       setSaving(false);
     }

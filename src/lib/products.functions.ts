@@ -951,7 +951,7 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
       const supabaseAdmin = await assertAdmin(data.email, data.token);
       const b = data.banner;
 
-      const row = {
+      const fullRow: Record<string, unknown> = {
         titulo: b.titulo,
         subtitulo: b.subtitulo ?? "",
         imagen_url: b.imagen_url ?? "",
@@ -964,28 +964,58 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
         precio_actualizado_en: new Date().toISOString(),
       };
 
+      const basicRow: Record<string, unknown> = {
+        titulo: b.titulo,
+        subtitulo: b.subtitulo ?? "",
+        imagen_url: b.imagen_url ?? "",
+        link: b.link ?? "",
+        activo: b.activo ?? "SI",
+        precio: String(b.precio ?? "0"),
+      };
+
       if (b.id) {
-        const { error } = await supabaseAdmin.from("banners").update(row).eq("id", b.id);
-        if (error) throw error;
+        let { error } = await supabaseAdmin.from("banners").update(fullRow).eq("id", b.id);
+        if (error) {
+          console.warn("Retrying banner update with basic columns:", error.message);
+          const retry = await supabaseAdmin.from("banners").update(basicRow).eq("id", b.id);
+          if (retry.error) throw retry.error;
+        }
         return { id: b.id };
       } else {
         const newId = crypto.randomUUID();
-        const { data: inserted, error } = await supabaseAdmin
+        // 1. Intento completo con UUID
+        let { data: ins, error } = await supabaseAdmin
           .from("banners")
-          .insert({ id: newId, ...row })
+          .insert({ id: newId, ...fullRow })
           .select("id")
           .single();
+
+        // 2. Si falla por columnas nuevas no migradas, reintentar con basicRow y UUID
         if (error) {
-          // Retry without id if id column is serial/auto
-          const { data: ins2, error: err2 } = await supabaseAdmin
+          console.warn("Retrying banner insert with basic columns:", error.message);
+          const retryBasic = await supabaseAdmin
             .from("banners")
-            .insert(row)
+            .insert({ id: newId, ...basicRow })
             .select("id")
             .single();
-          if (err2) throw err2;
-          return { id: String(ins2?.id ?? "") };
+          ins = retryBasic.data;
+          error = retryBasic.error;
         }
-        return { id: String(inserted?.id ?? newId) };
+
+        // 3. Si falla por ID serial / autogenerado, reintentar sin ID
+        if (error) {
+          console.warn("Retrying banner insert without custom ID:", error.message);
+          const retryNoId = await supabaseAdmin
+            .from("banners")
+            .insert(basicRow)
+            .select("id")
+            .single();
+          ins = retryNoId.data;
+          error = retryNoId.error;
+        }
+
+        if (error) throw error;
+        return { id: String(ins?.id ?? newId) };
       }
     } catch (err) {
       console.error("Error in upsertAdminBanner:", err);
