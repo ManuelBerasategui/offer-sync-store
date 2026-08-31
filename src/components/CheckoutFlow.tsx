@@ -260,10 +260,17 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
         cart.clear();
         void navigate({ to: "/gracias", search: { code: res.orderCode, status: "pending" } });
       } else {
-        setCardMsg(res.message ?? "No pudimos procesar el pago con tarjeta.");
+        const errorMsg = res.message ?? "No pudimos procesar el pago con tarjeta.";
+        setCardMsg(errorMsg);
+        throw new Error(errorMsg);
       }
-    } catch {
-      setCardMsg("No pudimos procesar el pago con tarjeta. Probá con Mercado Pago.");
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : "No pudimos procesar el pago con tarjeta. Probá con Mercado Pago.";
+      setCardMsg(errorMsg);
+      throw err;
     }
   };
 
