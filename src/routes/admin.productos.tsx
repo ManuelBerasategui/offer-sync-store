@@ -2071,35 +2071,55 @@ function ComboBuilderPanel({
                   <Coins className="h-4 w-4 text-primary" />
                   Moneda Base del Precio de Oferta
                 </label>
-                <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setSourceCurrency("USD")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                      sourceCurrency === "USD"
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Dólares (USD)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSourceCurrency("ARS")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                      sourceCurrency === "ARS"
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Pesos (ARS)
-                  </button>
-                </div>
+                <span className="text-[11px] text-muted-foreground">
+                  Cotización: 1 USD = <strong>{money(dolarRate)}</strong>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sourceCurrency !== "USD") {
+                      setSourceCurrency("USD");
+                      if (numBase > 0 && dolarRate > 0) {
+                        setBasePrice(String(Math.round((numBase / dolarRate) * 100) / 100));
+                      }
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${
+                    sourceCurrency === "USD"
+                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                      : "bg-card text-muted-foreground border-border hover:bg-muted"
+                  }`}
+                >
+                  <span>💵 Dólares (USD)</span>
+                  {sourceCurrency === "USD" && <Check className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sourceCurrency !== "ARS") {
+                      setSourceCurrency("ARS");
+                      if (numBase > 0 && dolarRate > 0) {
+                        setBasePrice(String(Math.round(numBase * dolarRate)));
+                      }
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${
+                    sourceCurrency === "ARS"
+                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                      : "bg-card text-muted-foreground border-border hover:bg-muted"
+                  }`}
+                >
+                  <span>🇦🇷 Pesos (ARS)</span>
+                  {sourceCurrency === "ARS" && <Check className="h-3.5 w-3.5" />}
+                </button>
               </div>
 
               <div>
                 <label className="label-sm">
-                  Precio Base de Oferta ({sourceCurrency === "USD" ? "u$d" : "$"}) *
+                  Precio Base de Oferta ({sourceCurrency === "USD" ? "u$d sin recargo" : "$ sin recargo"}) *
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-semibold">
