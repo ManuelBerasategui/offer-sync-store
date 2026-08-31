@@ -423,8 +423,8 @@ export function moqGroupOf(product: Record<string, unknown>): string | null {
  */
 export type MoqInfo = {
   group: string;
-  minUnits?: number;
-  minAmount?: number;
+  minUnits?: number | undefined;
+  minAmount?: number | undefined;
 };
 
 export function hasMoq(
@@ -493,9 +493,9 @@ export type CategoryMinViolation = {
  */
 export function checkCategoryMins(
   items: {
-    categoria?: string;
-    nombre?: string;
-    moq_group?: string | null;
+    categoria?: string | undefined;
+    nombre?: string | undefined;
+    moq_group?: string | null | undefined;
     qty: number;
     unitPrice: number;
   }[],

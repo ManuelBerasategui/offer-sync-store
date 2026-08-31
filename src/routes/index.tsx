@@ -129,39 +129,49 @@ function Home() {
                       key={i}
                       to="/combo/$index"
                       params={{ index: String(i) }}
-                      className="group relative min-w-[280px] snap-start overflow-hidden rounded-xl border border-primary/15 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 sm:min-w-[420px]"
-                      style={{ aspectRatio: "16 / 10" }}
+                      className="group relative flex flex-col min-w-[280px] snap-start overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 sm:min-w-[400px]"
                     >
-                      {/* Fondo difuminado ambiental para que cualquier formato de foto (cuadrada, vertical o apaisada) se vea armónico sin recortarse */}
-                      <div
-                        aria-hidden="true"
-                        className="absolute inset-0 bg-cover bg-center scale-110 blur-md opacity-35 brightness-75 transition-transform duration-300 group-hover:scale-125"
-                        style={{ backgroundImage: `url(${imageUrl(b.imagen_url) || FALLBACK_IMAGE})` }}
-                      />
-                      {/* Imagen completa sin recortes */}
-                      <img
-                        src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
-                        alt={b.titulo ?? ""}
-                        referrerPolicy="no-referrer"
-                        className="relative h-full w-full object-contain p-2 sm:p-3 transition-transform duration-300 group-hover:scale-105"
-                        onError={onImageError(b.imagen_url)}
-                      />
-                      <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/30 to-transparent p-3.5 sm:p-4">
-                        <span className="mb-1.5 inline-flex w-fit items-center gap-1 self-start rounded-full grad-urgente px-2.5 py-0.5 text-[10px] font-bold uppercase text-primary-foreground shadow-xs">
+                      {/* Contenedor de la foto limpio sin textos que tapen el arte */}
+                      <div className="relative aspect-[16/10] w-full overflow-hidden bg-surface flex items-center justify-center">
+                        {/* Fondo difuminado ambiental */}
+                        <div
+                          aria-hidden="true"
+                          className="absolute inset-0 bg-cover bg-center scale-110 blur-md opacity-30 brightness-75 transition-transform duration-300 group-hover:scale-125"
+                          style={{ backgroundImage: `url(${imageUrl(b.imagen_url) || FALLBACK_IMAGE})` }}
+                        />
+                        {/* Imagen completa sin recortes */}
+                        <img
+                          src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
+                          alt={b.titulo ?? ""}
+                          referrerPolicy="no-referrer"
+                          className="relative h-full w-full object-contain p-1.5 sm:p-2 transition-transform duration-300 group-hover:scale-105"
+                          onError={onImageError(b.imagen_url)}
+                        />
+                        {/* Badge sutil superior */}
+                        <span className="absolute left-2.5 top-2.5 z-10 inline-flex items-center gap-1 rounded-md grad-urgente px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground shadow-sm">
                           <Flame className="h-3 w-3" />
                           Combo en oferta
                         </span>
-                        <h3 className="text-base sm:text-lg font-bold text-white leading-snug drop-shadow-xs">{b.titulo}</h3>
+                      </div>
+
+                      {/* Footer con título y precios bien legibles */}
+                      <div className="flex flex-1 flex-col justify-between gap-2 border-t border-border bg-card p-3 sm:p-4">
+                        <h3 className="font-bold text-sm sm:text-base text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-1">
+                          {b.titulo}
+                        </h3>
+
                         {basePrice > 0 && (
-                          <div className="mt-1 flex items-baseline gap-2 flex-wrap">
-                            <span className="tabular-nums rounded-md bg-white px-2 py-0.5 text-sm sm:text-base font-bold text-foreground shadow-xs">
-                              {money(tPrice)}
-                            </span>
-                            <span className="rounded bg-emerald-500/90 px-1.5 py-0.5 text-[10px] sm:text-xs font-bold text-white shadow-xs">
-                              {discPct}% OFF Transf.
-                            </span>
-                            <span className="text-[11px] font-medium text-white/80 drop-shadow-xs hidden sm:inline">
-                              o {money(basePrice)} con tarjeta / MP
+                          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <span className="tabular-nums text-base sm:text-lg font-bold text-primary">
+                                {money(tPrice)}
+                              </span>
+                              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                                {discPct}% OFF Transf.
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground">
+                              o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> tarjeta / MP
                             </span>
                           </div>
                         )}
