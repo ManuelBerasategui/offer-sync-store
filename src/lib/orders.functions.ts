@@ -481,10 +481,12 @@ export const createTransferOrder = createServerFn({ method: "POST" })
       shipping: ShippingInput;
       items: OrderItem[];
       userId?: string | undefined;
+      couponCode?: string | undefined;
     }) => ({
       shipping: cleanShipping(data.shipping),
       items: cleanItems(data.items),
       userId: data.userId ? text(data.userId, 64) : undefined,
+      couponCode: data.couponCode ? text(data.couponCode, 40).toUpperCase().trim() : undefined,
     }),
   )
   .handler(async ({ data }) => {
@@ -493,12 +495,19 @@ export const createTransferOrder = createServerFn({ method: "POST" })
     // 1. Revalidar precios y mínimos de categoría
     let total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
     let items = data.items;
+    let couponDiscountAmount = 0;
+    let validCouponApplied: string | null = null;
 
     try {
       const [{ data: dbProducts }, { data: dbConfig }] = await Promise.all([
         supabaseAdmin.from("products").select("*"),
         supabaseAdmin.from("site_config").select("*"),
       ]);
+
+      const configMap: Record<string, string> = {};
+      for (const row of dbConfig ?? []) {
+        if (row.clave && row.valor) configMap[row.clave] = row.valor;
+      }
 
       if (dbProducts) {
         const {
@@ -513,11 +522,6 @@ export const createTransferOrder = createServerFn({ method: "POST" })
           transferPrice,
           transferDiscountPct,
         } = await import("./store");
-
-        const configMap: Record<string, string> = {};
-        for (const row of dbConfig ?? []) {
-          if (row.clave && row.valor) configMap[row.clave] = row.valor;
-        }
 
         const catRules = parseCategoryRules(configMap);
         const catTotals: Record<string, number> = {};
@@ -573,6 +577,28 @@ export const createTransferOrder = createServerFn({ method: "POST" })
         const discPct = transferDiscountPct(configMap);
         total = transferPrice(listTotal, discPct);
       }
+
+      // Revalidación segura del cupón en el servidor
+      if (data.couponCode && data.userId) {
+        const isCouponActive = (configMap["promo_cupon_activo"] ?? "SI").toUpperCase() === "SI";
+        const promoCode = (configMap["promo_cupon_codigo"] ?? "TEIMPORTAMOS").toUpperCase().trim();
+
+        if (isCouponActive && data.couponCode === promoCode) {
+          const { data: usages } = await supabaseAdmin
+            .from("coupon_usages")
+            .select("id")
+            .eq("coupon_code", promoCode)
+            .or(`user_id.eq.${data.userId}${data.shipping.email ? `,user_email.eq.${data.shipping.email}` : ""}`)
+            .limit(1);
+
+          if (!usages || usages.length === 0) {
+            const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
+            couponDiscountAmount = Math.round(total * (couponPct / 100));
+            total = Math.max(1, total - couponDiscountAmount);
+            validCouponApplied = promoCode;
+          }
+        }
+      }
     } catch (err) {
       console.error("Error revalidando items en transferencia:", err);
     }
@@ -596,6 +622,21 @@ export const createTransferOrder = createServerFn({ method: "POST" })
           status: "error",
           message: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos.",
         };
+      }
+
+      // Registrar uso del cupón si se aplicó
+      if (validCouponApplied) {
+        try {
+          await supabaseAdmin.from("coupon_usages").insert({
+            user_id: data.userId ?? null,
+            user_email: data.shipping.email ?? "",
+            coupon_code: validCouponApplied,
+            order_code: orderCode,
+            discount_amount: couponDiscountAmount,
+          });
+        } catch (couponErr) {
+          console.error("Error registrando uso de cupón:", couponErr);
+        }
       }
 
       if (data.userId) {

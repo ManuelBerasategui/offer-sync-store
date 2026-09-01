@@ -772,6 +772,11 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         apiKey?: string;
         from?: string;
       };
+      couponConfig?: {
+        activo?: boolean;
+        codigo?: string;
+        descuentoPct?: number;
+      };
     }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
@@ -779,6 +784,7 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
       dolarCotizacion: data.dolarCotizacion,
       bankInfo: data.bankInfo,
       resendConfig: data.resendConfig,
+      couponConfig: data.couponConfig,
     }),
   )
   .handler(async ({ data }): Promise<{ error?: string }> => {
@@ -846,6 +852,26 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         }
       }
 
+      if (data.couponConfig) {
+        const couponRows = [
+          {
+            clave: "promo_cupon_activo",
+            valor: data.couponConfig.activo ? "SI" : "NO",
+          },
+          {
+            clave: "promo_cupon_codigo",
+            valor: (data.couponConfig.codigo || "TEIMPORTAMOS").trim().toUpperCase(),
+          },
+          {
+            clave: "promo_cupon_descuento_pct",
+            valor: String(data.couponConfig.descuentoPct ?? 5),
+          },
+        ];
+        for (const cRow of couponRows) {
+          await (supabaseAdmin as any).from("site_config").upsert(cRow, { onConflict: "clave" });
+        }
+      }
+
       if (rows.length > 0) {
         const { error: insErr } = await (supabaseAdmin as any).from("site_config").insert(rows);
         if (insErr) throw insErr;
@@ -855,6 +881,129 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
     } catch (err) {
       console.error("Error in upsertCategoryRules:", err);
       return { error: err instanceof Error ? err.message : "Error al guardar reglas." };
+    }
+  });
+
+/**
+ * Valida si un código promocional es válido, activo y si el usuario aún no lo utilizó.
+ */
+export const validatePromoCoupon = createServerFn({ method: "POST" })
+  .validator(
+    (data: { code: string; userId?: string; email?: string; token?: string }) => ({
+      code: str(data.code, 40).toUpperCase().trim(),
+      userId: data.userId ? str(data.userId, 60) : undefined,
+      email: data.email ? str(data.email, 160).toLowerCase().trim() : undefined,
+      token: data.token ? str(data.token, 4000) : undefined,
+    }),
+  )
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      valid: boolean;
+      discountPct?: number;
+      code?: string;
+      error?: string;
+    }> => {
+      try {
+        if (!data.code) {
+          return { valid: false, error: "Ingresá un código promocional." };
+        }
+
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // 1. Verificar autenticación
+        let verifiedUserId = data.userId;
+        let verifiedEmail = data.email;
+
+        if (data.token) {
+          const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
+          if (userData?.user) {
+            verifiedUserId = userData.user.id;
+            verifiedEmail = userData.user.email ?? verifiedEmail;
+          }
+        }
+
+        if (!verifiedUserId) {
+          return {
+            valid: false,
+            error: "Debés iniciar sesión con tu cuenta para reclamar el cupón.",
+          };
+        }
+
+        // 2. Obtener configuración de cupones desde site_config
+        const { data: configRows } = await supabaseAdmin.from("site_config").select("*");
+        const configMap: Record<string, string> = {};
+        for (const row of configRows ?? []) {
+          if (row.clave && row.valor) configMap[row.clave] = row.valor;
+        }
+
+        const isCouponActive = (configMap["promo_cupon_activo"] ?? "SI").toUpperCase() === "SI";
+        if (!isCouponActive) {
+          return {
+            valid: false,
+            error: "El cupón promocional no está activo o ya finalizó su periodo de vigencia.",
+          };
+        }
+
+        const validCode = (configMap["promo_cupon_codigo"] ?? "TEIMPORTAMOS").toUpperCase().trim();
+        if (data.code !== validCode) {
+          return {
+            valid: false,
+            error: "El código promocional ingresado no es válido.",
+          };
+        }
+
+        const discountPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
+
+        // 3. Verificar si el usuario ya consumió el cupón en coupon_usages
+        const { data: usageRows } = await supabaseAdmin
+          .from("coupon_usages")
+          .select("id")
+          .eq("coupon_code", validCode)
+          .or(`user_id.eq.${verifiedUserId}${verifiedEmail ? `,user_email.eq.${verifiedEmail}` : ""}`)
+          .limit(1);
+
+        if (usageRows && usageRows.length > 0) {
+          return {
+            valid: false,
+            error: "Ya utilizaste este código promocional en una compra anterior (válido 1 sola vez por cuenta).",
+          };
+        }
+
+        return {
+          valid: true,
+          code: validCode,
+          discountPct,
+        };
+      } catch (err) {
+        console.error("Error validando cupón promocional:", err);
+        return {
+          valid: false,
+          error: "Error al validar el cupón. Probá nuevamente.",
+        };
+      }
+    },
+  );
+
+/**
+ * Consulta la cantidad de usos del cupón para el panel de administración.
+ */
+export const getCouponUsagesSummary = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+  }))
+  .handler(async ({ data }): Promise<{ count: number; error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+      const { count, error } = await supabaseAdmin
+        .from("coupon_usages")
+        .select("*", { count: "exact", head: true });
+      if (error) throw error;
+      return { count: count ?? 0 };
+    } catch (err) {
+      return { count: 0, error: err instanceof Error ? err.message : "Error" };
     }
   });
 

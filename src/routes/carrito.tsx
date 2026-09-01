@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { Minus, Plus, Tag, X, Sparkles } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
+import { useAuth } from "@/hooks/useAuth";
+import { validatePromoCoupon } from "@/lib/products.functions";
 import {
   FALLBACK_IMAGE,
   SUPLEMENTOS_MIN,
@@ -120,6 +122,68 @@ function CarritoPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { products, config } = data;
   const cart = useCart();
+  const { user, session } = useAuth();
+
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPct: number } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState("");
+  const [couponSuccess, setCouponSuccess] = useState("");
+
+  const couponPct = appliedCoupon?.discountPct ?? 0;
+  const couponDiscountAmount = couponPct > 0 ? Math.round(cart.total * (couponPct / 100)) : 0;
+  const mpTotalDiscounted = Math.max(1, cart.total - couponDiscountAmount);
+
+  const transferBase = transferPrice(cart.total, transferDiscountPct(config));
+  const transferCouponDiscount = couponPct > 0 ? Math.round(transferBase * (couponPct / 100)) : 0;
+  const transferTotalDiscounted = Math.max(1, transferBase - transferCouponDiscount);
+
+  async function handleApplyCoupon(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const code = couponInput.trim().toUpperCase();
+    if (!code) {
+      setCouponError("Ingresá un código promocional.");
+      return;
+    }
+    if (!user) {
+      setCouponError("Debés iniciar sesión con tu cuenta para reclamar el cupón.");
+      return;
+    }
+    setCouponLoading(true);
+    setCouponError("");
+    setCouponSuccess("");
+    try {
+      const res = await validatePromoCoupon({
+        data: {
+          code,
+          userId: user.id,
+          email: user.email ?? "",
+          token: session?.access_token,
+        },
+      });
+      if (!res.valid || res.error) {
+        setCouponError(res.error || "El código no es válido.");
+        setAppliedCoupon(null);
+      } else {
+        const validCode = res.code || code;
+        const disc = res.discountPct || 5;
+        setAppliedCoupon({ code: validCode, discountPct: disc });
+        setCouponSuccess(`¡Cupón ${validCode} aplicado! (${disc}% OFF adicional)`);
+        setCouponError("");
+      }
+    } catch {
+      setCouponError("Error al validar el cupón.");
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponSuccess("");
+    setCouponError("");
+  }
 
   // Garantizar que la categoría esté resuelta para cada ítem (usando el producto de la DB como fallback si i.categoria viene vacío)
   const cartItemsWithCat = useMemo(() => {
@@ -138,9 +202,6 @@ function CarritoPage() {
   // Mínimos por categoría (dinámicos o estáticos)
   const catRules = parseCategoryRules(config);
   const matesRuleMatch = findRuleForCat(normCat("Mates"), catRules);
-  // FIX: Los Mates tienen categoria="Bazar" en la DB, por eso el match por categoría
-  // siempre fallaba. Ahora usamos isMate(nombre, categoria) como fuente de verdad.
-  // matesUnits: usa moq_group del producto (v2) en lugar de isMate por nombre
   const matesUnits = cartItemsWithCat.reduce((sum, item) => {
     const prod = item.productId ? findProduct(products, item.productId) : undefined;
     const mg = prod ? moqGroupOf(prod as Record<string, unknown>) : null;
@@ -149,7 +210,7 @@ function CarritoPage() {
   const matesDiscountPct = matesRuleMatch
     ? categoryDiscountForUnits(matesRuleMatch.rule.discountTiers, matesUnits)
     : 0;
-  // Violaciones de reglas dinámicas generales (excluyendo suplementos para evitar duplicación)
+
   const dynamicViolations = checkCategoryMins(
     cartItemsWithCat.map((i) => {
       const prod = i.productId ? findProduct(products, i.productId) : undefined;
@@ -168,110 +229,69 @@ function CarritoPage() {
   const suplementosViolation =
     totalSuplementos > 0 && totalSuplementos < minSuplementos
       ? {
-          category: "Suplementos",
+          category: "Suplementación",
           type: "amount" as const,
           min: minSuplementos,
           current: totalSuplementos,
         }
       : null;
 
-  const minViolations = [
-    ...(suplementosViolation ? [suplementosViolation] : []),
-    ...dynamicViolations,
-  ];
+  const minViolations = suplementosViolation
+    ? [suplementosViolation, ...dynamicViolations]
+    : dynamicViolations;
+
   const hasViolations = minViolations.length > 0;
 
   return (
     <div className="min-h-screen">
       <SiteHeader config={config} />
 
-      <main className="mx-auto max-w-[900px] px-4 py-10 sm:px-6">
-        <h1 className="text-[clamp(28px,7vw,40px)]">Tu carrito</h1>
+      <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6 sm:py-12">
+        <h1 className="text-2xl font-bold tracking-tight">Tu carrito</h1>
 
         {cart.items.length === 0 ? (
-          <div className="mt-8 card-soft p-8 text-center">
-            <p className="text-muted-foreground">Todavía no agregaste productos.</p>
-            <Link to="/catalogo" className="btn-base grad-urgente mt-6 text-primary-foreground">
+          <div className="mt-8 rounded-2xl border border-border bg-card p-8 text-center sm:p-12">
+            <p className="text-muted-foreground">Tu carrito está vacío.</p>
+            <Link to="/catalogo" className="btn-base grad-urgente mt-4 inline-block text-primary-foreground">
               Ver catálogo
             </Link>
           </div>
         ) : (
           <>
-            <ul className="mt-6 flex flex-col gap-3">
-              {cart.items.map((i) => {
-                const product = findProduct(products, i.productId || i.id || i.nombre);
-                const basePrice = i.basePrice ?? (product ? priceOf(product) : i.unitPrice);
-                // Muestra el descuento real según precio base vs precio de línea (funciona con descuentos de categoría también)
-                const percent =
-                  basePrice > 0 && i.unitPrice < basePrice
-                    ? Math.round((1 - i.unitPrice / basePrice) * 100)
-                    : 0;
-
-                const validProdId = i.productId || (product?.id ? String(product.id) : undefined);
+            <ul className="mt-6 divide-y divide-border rounded-xl border border-border bg-card">
+              {cartItemsWithCat.map((i) => {
+                const prod = findProduct(products, i.productId || i.id || i.nombre);
+                const isSupp = isSuplemento(i.categoria, i.nombre);
 
                 return (
                   <li
                     key={i.id}
-                    className="card-soft flex flex-col gap-3 p-3 sm:flex-row sm:items-center"
+                    className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4"
                   >
-                    {/* Image + name/price — full width on mobile, flexible on desktop */}
+                    {/* Img + Title + tags */}
                     <div className="flex min-w-0 flex-1 items-center gap-3">
-                      {validProdId ? (
-                        <Link
-                          to="/producto/$id"
-                          params={{ id: validProdId }}
-                          className="shrink-0 transition-opacity hover:opacity-80"
-                        >
-                          <img
-                            src={i.imagen || FALLBACK_IMAGE}
-                            alt={i.nombre}
-                            referrerPolicy="no-referrer"
-                            className="h-16 w-16 rounded-lg object-cover"
-                            onError={(e) => {
-                              e.currentTarget.src = FALLBACK_IMAGE;
-                            }}
-                          />
-                        </Link>
-                      ) : (
-                        <img
-                          src={i.imagen || FALLBACK_IMAGE}
-                          alt={i.nombre}
-                          referrerPolicy="no-referrer"
-                          className="h-16 w-16 rounded-lg object-cover shrink-0"
-                          onError={(e) => {
-                            e.currentTarget.src = FALLBACK_IMAGE;
-                          }}
-                        />
-                      )}
+                      <img
+                        src={prod?.imagen_url || FALLBACK_IMAGE}
+                        alt={i.nombre}
+                        className="h-12 w-12 shrink-0 rounded-lg object-cover sm:h-14 sm:w-14"
+                        referrerPolicy="no-referrer"
+                      />
                       <div className="min-w-0 flex-1">
-                        {validProdId ? (
-                          <Link
-                            to="/producto/$id"
-                            params={{ id: validProdId }}
-                            className="block truncate text-sm font-semibold hover:text-primary transition-colors"
-                          >
-                            {i.nombre}
-                          </Link>
-                        ) : (
-                          <span className="block truncate text-sm font-semibold">
-                            {i.nombre}
-                          </span>
-                        )}
-                        <p className="tabular-nums text-sm text-muted-foreground">
-                          {percent > 0 ? (
-                            <>
-                              <span className="mr-1 text-xs line-through">{money(basePrice)}</span>
-                              <span className="font-semibold text-foreground">{money(i.unitPrice)}</span> c/u{" "}
-                              <span className="text-[11px] font-bold text-primary">(-{percent}%)</span>
-                            </>
-                          ) : (
-                            <>{money(i.unitPrice)} c/u</>
+                        <p className="truncate text-sm font-semibold sm:text-base">{i.nombre}</p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                          {isSupp && (
+                            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                              Suplementación
+                            </span>
                           )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {money(i.unitPrice)} c/u
                         </p>
                       </div>
                     </div>
 
-                    {/* Qty stepper + subtotal + remove — own row on mobile so nothing gets squeezed */}
+                    {/* Qty stepper + subtotal + remove */}
                     <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
                       <CartQtyInput
                         key={i.id}
@@ -282,11 +302,9 @@ function CarritoPage() {
                         onIncrease={() => cart.setQty(i.id, i.qty + 1)}
                         onSetQty={(q) => cart.setQty(i.id, q)}
                       />
-
                       <p className="w-20 shrink-0 text-right tabular-nums text-sm font-bold sm:w-24">
                         {money(i.unitPrice * i.qty)}
                       </p>
-
                       <button
                         onClick={() => cart.remove(i.id)}
                         className="shrink-0 text-xs font-semibold text-muted-foreground hover:text-destructive"
@@ -299,7 +317,79 @@ function CarritoPage() {
               })}
             </ul>
 
-            <div className="mt-6 flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
+            {/* Sección de Cupón Promocional */}
+            <div className="mt-4 rounded-xl border border-primary/20 bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-2 mb-2">
+                <Tag className="h-4 w-4 text-primary" />
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+                  Código de Descuento / Cupón
+                </span>
+              </div>
+
+              {!user ? (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg bg-surface p-3 text-xs">
+                  <span className="text-muted-foreground">
+                    💡 ¿Tenés un cupón como <strong>TEIMPORTAMOS</strong>? Iniciá sesión con tu cuenta para canjearlo.
+                  </span>
+                  <Link
+                    to="/auth"
+                    search={{ mode: "login" }}
+                    className="shrink-0 font-bold text-primary hover:underline"
+                  >
+                    Iniciar sesión →
+                  </Link>
+                </div>
+              ) : appliedCoupon ? (
+                <div className="flex items-center justify-between rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-emerald-600" />
+                    <div>
+                      <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                        ¡Cupón {appliedCoupon.code} aplicado!
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {appliedCoupon.discountPct}% OFF adicional en el total de tu pedido
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" /> Quitar
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleApplyCoupon} className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ingresá tu cupón (ej: TEIMPORTAMOS)"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      className="input-base font-mono uppercase text-xs tracking-wider"
+                    />
+                    <button
+                      type="submit"
+                      disabled={couponLoading || !couponInput.trim()}
+                      className="btn-base bg-primary text-primary-foreground text-xs font-bold px-4 hover:opacity-90 disabled:opacity-50"
+                    >
+                      {couponLoading ? "Validando..." : "Aplicar"}
+                    </button>
+                  </div>
+                  {couponError && (
+                    <p className="text-xs font-semibold text-destructive mt-1">⚠️ {couponError}</p>
+                  )}
+                  {couponSuccess && (
+                    <p className="text-xs font-semibold text-emerald-600 mt-1">✓ {couponSuccess}</p>
+                  )}
+                </form>
+              )}
+            </div>
+
+            {/* Totales */}
+            <div className="mt-4 flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
               {matesUnits > 0 && (
                 <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2 text-xs">
                   <span className="font-semibold text-foreground">
@@ -310,24 +400,57 @@ function CarritoPage() {
                   </span>
                 </div>
               )}
+
+              {appliedCoupon && (
+                <div className="flex items-center justify-between border-b border-border/60 pb-2 text-xs">
+                  <span className="text-muted-foreground font-medium">
+                    Subtotal de lista:
+                  </span>
+                  <span className="tabular-nums font-semibold text-foreground/80">
+                    {money(cart.total)}
+                  </span>
+                </div>
+              )}
+
+              {appliedCoupon && (
+                <div className="flex items-center justify-between border-b border-border/60 pb-2 text-xs text-emerald-600 font-semibold">
+                  <span>
+                    Cupón {appliedCoupon.code} ({appliedCoupon.discountPct}% OFF):
+                  </span>
+                  <span className="tabular-nums">
+                    -{money(couponDiscountAmount)}
+                  </span>
+                </div>
+              )}
+
               <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
-                {/* Label — linea propia en mobile, evita wrap con badge */}
                 <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
                   Total con Transferencia
                 </span>
-                {/* Monto + badge verde — siempre juntos en la misma línea */}
                 <div className="flex items-baseline gap-2">
                   <span className="tabular-nums text-2xl font-bold text-foreground">
-                    {money(transferPrice(cart.total, transferDiscountPct(config)))}
+                    {money(transferTotalDiscounted)}
                   </span>
                   <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                    {transferDiscountPct(config)}% OFF
+                    {appliedCoupon
+                      ? `${transferDiscountPct(config)}% + ${appliedCoupon.discountPct}% OFF`
+                      : `${transferDiscountPct(config)}% OFF`}
                   </span>
                 </div>
               </div>
+
               <div className="flex items-baseline justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
                 <span>Total con Mercado Pago:</span>
-                <span className="font-semibold tabular-nums text-foreground/80">{money(cart.total)}</span>
+                <div className="flex items-baseline gap-1.5">
+                  {appliedCoupon && (
+                    <span className="line-through text-[11px] opacity-75">
+                      {money(cart.total)}
+                    </span>
+                  )}
+                  <span className="font-semibold tabular-nums text-foreground/80">
+                    {money(mpTotalDiscounted)}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -356,7 +479,7 @@ function CarritoPage() {
                   ))}
                 </div>
               ) : (
-                <CheckoutFlow items={items} total={cart.total} />
+                <CheckoutFlow items={items} total={cart.total} appliedCoupon={appliedCoupon} />
               )}
             </div>
 

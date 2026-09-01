@@ -69,7 +69,15 @@ const EMPTY: ShippingForm = {
  * Flujo de pre-pago: 1) datos de envío (autocompletados si hay sesión) 2) pago
  * (Transferencia con descuento o Mercado Pago Checkout Pro).
  */
-export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: number }) {
+export function CheckoutFlow({
+  items,
+  total,
+  appliedCoupon,
+}: {
+  items: CheckoutItem[];
+  total: number;
+  appliedCoupon?: { code: string; discountPct: number } | null;
+}) {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const cart = useCart();
@@ -88,7 +96,21 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
 
   const bankInfo = useMemo(() => getBankInfo(config), [config]);
   const discPct = useMemo(() => transferDiscountPct(config), [config]);
-  const transferTotal = useMemo(() => transferPrice(total, discPct), [total, discPct]);
+
+  const couponDiscountPct = appliedCoupon?.discountPct ?? 0;
+  const couponCode = appliedCoupon?.code;
+
+  // Totales finales con cupón si existe
+  const finalTransferTotal = useMemo(() => {
+    const baseTransfer = transferPrice(total, discPct);
+    if (!couponDiscountPct) return baseTransfer;
+    return Math.max(1, baseTransfer - Math.round(baseTransfer * (couponDiscountPct / 100)));
+  }, [total, discPct, couponDiscountPct]);
+
+  const finalMpTotal = useMemo(() => {
+    if (!couponDiscountPct) return total;
+    return Math.max(1, total - Math.round(total * (couponDiscountPct / 100)));
+  }, [total, couponDiscountPct]);
 
   // Autocompletar con los datos guardados si el usuario inició sesión.
   useEffect(() => {
@@ -133,39 +155,28 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
     [form],
   );
 
-  const copyToClipboard = (val: string, field: string) => {
-    void navigator.clipboard.writeText(val);
+  const copyToClipboard = (textToCopy: string, field: string) => {
+    if (!navigator?.clipboard) return;
+    navigator.clipboard.writeText(textToCopy);
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const submitShipping = (e: React.FormEvent) => {
+  const handleNextStep = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
 
-    if (
-      Object.entries(form).some(
-        ([key, value]) => key !== "email" && value.length > MAX_FIELD_LENGTH,
-      )
-    ) {
-      setError(`Cada dato de envío puede tener hasta ${MAX_FIELD_LENGTH} caracteres.`);
-      return;
-    }
-    if (form.email.length > MAX_EMAIL_LENGTH) {
-      setError("El email es demasiado largo.");
-      return;
-    }
-
     // Validación de DNI
-    const dniClean = form.dni.trim();
-    if (!/^\d{7,8}$/.test(dniClean)) {
-      setError("El DNI debe contener entre 7 y 8 números (sin puntos ni letras).");
+    const dniDigits = form.dni.replace(/\D/g, "");
+    if (dniDigits.length < 7 || dniDigits.length > 9) {
+      setError("El DNI debe tener entre 7 y 9 números.");
       return;
     }
 
-    // Validación de Email
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      setError("Ingresá un correo electrónico válido (ej: nombre@gmail.com).");
+    // Validación de Código Postal
+    const cpDigits = form.codigo_postal.replace(/\D/g, "");
+    if (cpDigits.length < 4) {
+      setError("El Código Postal debe tener al menos 4 dígitos.");
       return;
     }
 
@@ -189,6 +200,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
           items,
           shipping: form,
           userId: user?.id,
+          couponCode: couponCode || undefined,
         },
       });
 
@@ -196,8 +208,9 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
         cart.clear();
 
         // Abrir WhatsApp con el comprobante pre-armado
-        const finalAmount = res.total ?? transferTotal;
-        const waMsg = `¡Hola! Acabo de hacer el pedido ${res.orderCode} por ${money(finalAmount)} mediante Transferencia Bancaria. Adjunto el comprobante de pago.`;
+        const finalAmount = res.total ?? finalTransferTotal;
+        const couponText = couponCode ? ` (con cupón ${couponCode})` : "";
+        const waMsg = `¡Hola! Acabo de hacer el pedido ${res.orderCode} por ${money(finalAmount)} mediante Transferencia Bancaria${couponText}. Adjunto el comprobante de pago.`;
         const waUrl = waLink(config ?? {}, waMsg);
         window.open(waUrl, "_blank");
 
@@ -229,6 +242,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
           shipping: form,
           origin: window.location.origin,
           userId: user?.id,
+          couponCode: couponCode || undefined,
         },
       });
       if (res.url) window.location.href = res.url;
@@ -254,7 +268,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
       </div>
 
       {step === "shipping" ? (
-        <form className="flex flex-col gap-3" onSubmit={submitShipping}>
+        <form className="flex flex-col gap-3" onSubmit={handleNextStep}>
           {user && (
             <p className="rounded-lg bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
               Completamos tus datos automáticamente con tu cuenta.
@@ -385,14 +399,16 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
                 <div className="flex items-baseline justify-between">
                   <span className="text-xs font-bold uppercase tracking-[1px] text-emerald-700 dark:text-emerald-400">
-                    Total con {discPct}% de descuento:
+                    {appliedCoupon
+                      ? `Total (${discPct}% Transf. + ${appliedCoupon.discountPct}% Cupón ${appliedCoupon.code}):`
+                      : `Total con ${discPct}% de descuento:`}
                   </span>
                   <span className="tabular-nums text-2xl font-bold text-foreground">
-                    {money(transferTotal)}
+                    {money(finalTransferTotal)}
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  (Precio regular: <span className="line-through">{money(total)}</span> — ¡Ahorrás {money(total - transferTotal)}!)
+                  (Precio regular: <span className="line-through">{money(total)}</span> — ¡Ahorrás {money(total - finalTransferTotal)}!)
                 </p>
               </div>
 
@@ -486,9 +502,20 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
             <div className="flex flex-col gap-4">
               <div className="flex items-baseline justify-between">
                 <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
-                  Total a pagar
+                  {appliedCoupon
+                    ? `Total con ${appliedCoupon.discountPct}% OFF Cupón ${appliedCoupon.code}:`
+                    : "Total a pagar"}
                 </span>
-                <span className="tabular-nums text-xl font-bold">{money(total)}</span>
+                <div className="flex items-baseline gap-2">
+                  {appliedCoupon && (
+                    <span className="text-xs line-through text-muted-foreground">
+                      {money(total)}
+                    </span>
+                  )}
+                  <span className="tabular-nums text-xl font-bold text-foreground">
+                    {money(finalMpTotal)}
+                  </span>
+                </div>
               </div>
 
               <div className="rounded-xl border border-[#009ee3]/30 bg-[#009ee3]/5 p-4 text-xs space-y-1.5">

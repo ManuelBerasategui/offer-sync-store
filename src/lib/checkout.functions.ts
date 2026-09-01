@@ -143,6 +143,7 @@ export const createCheckout = createServerFn({ method: "POST" })
       origin: string;
       shipping: ShippingInput;
       userId?: string | undefined;
+      couponCode?: string | undefined;
     }) => {
       if (!data || !Array.isArray(data.items) || data.items.length === 0) {
         throw new Error("Carrito vacío");
@@ -151,6 +152,7 @@ export const createCheckout = createServerFn({ method: "POST" })
       return {
         origin: String(data.origin ?? "").slice(0, 200),
         userId: data.userId ? String(data.userId).slice(0, 60) : undefined,
+        couponCode: data.couponCode ? String(data.couponCode).slice(0, 40).toUpperCase().trim() : undefined,
         shipping: {
           nombre: String(s.nombre ?? "").slice(0, 120),
           dni: String(s.dni ?? "").slice(0, 20),
@@ -185,6 +187,8 @@ export const createCheckout = createServerFn({ method: "POST" })
 
     let items = data.items;
     let total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+    let couponDiscountAmount = 0;
+    let validCouponApplied: string | null = null;
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -194,6 +198,40 @@ export const createCheckout = createServerFn({ method: "POST" })
       }
       items = validation.validatedItems;
       total = validation.total;
+
+      // Revalidación segura del cupón en el servidor
+      if (data.couponCode && data.userId) {
+        const { data: dbConfigRows } = await supabaseAdmin.from("site_config").select("*");
+        const configObj: Record<string, string> = {};
+        for (const row of dbConfigRows ?? []) {
+          if (row.clave && row.valor !== undefined) configObj[row.clave] = String(row.valor);
+        }
+
+        const isCouponActive = (configObj["promo_cupon_activo"] ?? "SI").toUpperCase() === "SI";
+        const promoCode = (configObj["promo_cupon_codigo"] ?? "TEIMPORTAMOS").toUpperCase().trim();
+
+        if (isCouponActive && data.couponCode === promoCode) {
+          const { data: usages } = await supabaseAdmin
+            .from("coupon_usages")
+            .select("id")
+            .eq("coupon_code", promoCode)
+            .or(`user_id.eq.${data.userId}${data.shipping.email ? `,user_email.eq.${data.shipping.email}` : ""}`)
+            .limit(1);
+
+          if (!usages || usages.length === 0) {
+            const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
+            validCouponApplied = promoCode;
+            // Aplicar descuento a cada ítem para reflejar el monto en la preferencia de Mercado Pago
+            items = items.map((i) => ({
+              ...i,
+              unitPrice: Math.max(1, Math.round(i.unitPrice * (1 - couponPct / 100))),
+            }));
+            const discountedTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+            couponDiscountAmount = Math.max(0, total - discountedTotal);
+            total = discountedTotal;
+          }
+        }
+      }
     } catch (err) {
       console.error("Error al revalidar la orden:", err);
     }
@@ -219,6 +257,21 @@ export const createCheckout = createServerFn({ method: "POST" })
       if (error) {
         console.error("Error al guardar orden pendiente:", error);
         return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
+      }
+
+      // Registrar uso del cupón si fue aplicado
+      if (validCouponApplied) {
+        try {
+          await supabaseAdmin.from("coupon_usages").insert({
+            user_id: data.userId ?? null,
+            user_email: data.shipping.email ?? "",
+            coupon_code: validCouponApplied,
+            order_code: orderCode,
+            discount_amount: couponDiscountAmount,
+          });
+        } catch (couponErr) {
+          console.error("Error registrando uso de cupón en MP:", couponErr);
+        }
       }
     } catch (err) {
       console.error("Error al guardar orden pendiente:", err);

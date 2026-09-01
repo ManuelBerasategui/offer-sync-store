@@ -11,6 +11,7 @@ import {
   getAdminProducts,
   upsertCategoryRules,
   testAdminResendEmail,
+  getCouponUsagesSummary,
   type CategoryRuleInput,
 } from "@/lib/products.functions";
 import { parseCategoryRules, normCat, getBaseCategory, money } from "@/lib/store";
@@ -70,6 +71,18 @@ function AdminConfiguracionPage() {
   const [testingEmail, setTestingEmail] = useState(false);
   const [testEmailMsg, setTestEmailMsg] = useState<{ success?: boolean; text?: string } | null>(null);
 
+  // Cupón Promocional
+  const [couponActive, setCouponActive] = useState<boolean>(
+    (config["promo_cupon_activo"] ?? "SI").toUpperCase() === "SI",
+  );
+  const [couponCode, setCouponCode] = useState<string>(
+    config["promo_cupon_codigo"] ?? "TEIMPORTAMOS",
+  );
+  const [couponDiscountPct, setCouponDiscountPct] = useState<string>(
+    config["promo_cupon_descuento_pct"] ?? "5",
+  );
+  const [couponUsageCount, setCouponUsageCount] = useState<number | null>(null);
+
   useEffect(() => {
     fetch("https://dolarapi.com/v1/dolares/cripto")
       .then((res) => res.json())
@@ -99,6 +112,13 @@ function AdminConfiguracionPage() {
         return;
       }
       setIsAuthorized(true);
+
+      // Cargar usos registrados del cupón
+      getCouponUsagesSummary({ data: { email, token } })
+        .then((res) => {
+          if (typeof res?.count === "number") setCouponUsageCount(res.count);
+        })
+        .catch(() => {});
 
       // Calcular la cotización implícita ponderada usada actualmente en los productos de la DB
       const prodsWithBoth = res.products.filter((p) => {
@@ -138,64 +158,106 @@ function AdminConfiguracionPage() {
         }
       }
 
-      const cats = Array.from(catMap.values()).sort();
-      setCategories(cats);
+      const catList = Array.from(catMap.values());
+      setCategories(catList);
 
-      const formRules: Record<string, CatRuleForm> = {};
-      for (const [key, displayName] of catMap.entries()) {
-        const ex = existing[key];
-        formRules[key] = {
-          displayName,
-          discountTiers: ex?.discountTiers?.length ? [...ex.discountTiers] : [],
-          minType: ex?.minUnits ? "units" : ex?.minAmount ? "amount" : "none",
-          minValue: String(ex?.minUnits ?? ex?.minAmount ?? ""),
+      const initialRules: Record<string, CatRuleForm> = {};
+      for (const [norm, disp] of catMap.entries()) {
+        const r = existing[norm];
+        initialRules[disp] = {
+          displayName: disp,
+          discountTiers: r?.discountTiers?.length
+            ? r.discountTiers.map((t) => ({ units: t.units, percent: t.percent }))
+            : [],
+          minType: r?.minType ?? "none",
+          minValue: r?.minValue ? String(r.minValue) : "",
         };
       }
-      setRules(formRules);
+      setRules(initialRules);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error al cargar.";
-      if (categories.length === 0) setError(msg);
+      if (categories.length === 0) {
+        setError(err instanceof Error ? err.message : "Error al cargar categorías.");
+      }
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!userId) void navigate({ to: "/", replace: true });
-      else void loadCategories(true);
+    if (!authLoading && user) {
+      void loadCategories(true);
     }
-  }, [authLoading, userId]);
+  }, [authLoading, user]);
 
-  /* ─── Handlers ──────────────────────────────────────── */
-
-  const setRule = (key: string, patch: Partial<CatRuleForm>) =>
-    setRules((prev): Record<string, CatRuleForm> => ({
-      ...prev,
-      [key]: { ...prev[key], ...patch } as CatRuleForm,
-    }));
-
-  const addTier = (key: string) =>
-    setRule(key, { discountTiers: [...(rules[key]?.discountTiers ?? []), { units: 0, percent: 0 }] });
-
-  const removeTier = (key: string, i: number) =>
-    setRule(key, { discountTiers: (rules[key]?.discountTiers ?? []).filter((_, idx) => idx !== i) });
-
-  const updateTier = (key: string, i: number, field: "units" | "percent", value: number) =>
-    setRule(key, {
-      discountTiers: (rules[key]?.discountTiers ?? []).map((t, idx) =>
-        idx === i ? { ...t, [field]: value } : t,
-      ),
+  function handleAddTier(cat: string) {
+    setRules((prev) => {
+      const cur = prev[cat];
+      if (!cur) return prev;
+      return {
+        ...prev,
+        [cat]: {
+          ...cur,
+          discountTiers: [...cur.discountTiers, { units: 1, percent: 5 }],
+        },
+      };
     });
+  }
+
+  function handleRemoveTier(cat: string, idx: number) {
+    setRules((prev) => {
+      const cur = prev[cat];
+      if (!cur) return prev;
+      return {
+        ...prev,
+        [cat]: {
+          ...cur,
+          discountTiers: cur.discountTiers.filter((_, i) => i !== idx),
+        },
+      };
+    });
+  }
+
+  function handleTierChange(
+    cat: string,
+    idx: number,
+    field: keyof TierForm,
+    val: number
+  ) {
+    setRules((prev) => {
+      const cur = prev[cat];
+      if (!cur) return prev;
+      const updated = cur.discountTiers.map((t, i) =>
+        i === idx ? { ...t, [field]: val } : t
+      );
+      return { ...prev, [cat]: { ...cur, discountTiers: updated } };
+    });
+  }
+
+  function handleMinTypeChange(cat: string, minType: CatRuleForm["minType"]) {
+    setRules((prev) => {
+      const cur = prev[cat];
+      if (!cur) return prev;
+      return { ...prev, [cat]: { ...cur, minType } };
+    });
+  }
+
+  function handleMinValueChange(cat: string, minValue: string) {
+    setRules((prev) => {
+      const cur = prev[cat];
+      if (!cur) return prev;
+      return { ...prev, [cat]: { ...cur, minValue } };
+    });
+  }
 
   async function handleSave() {
     setSaving(true);
     setError("");
     setSuccessMsg("");
     try {
-      const ruleInputs: CategoryRuleInput[] = Object.values(rules).map((r) => ({
+      const ruleInputs: CategoryRuleInput[] = Object.entries(rules).map(([_, r]) => ({
         category: r.displayName,
         discountTiers: r.discountTiers
+          .map((t) => ({ units: Number(t.units) || 0, percent: Number(t.percent) || 0 }))
           .filter((t) => t.units > 0 && t.percent > 0)
           .sort((a, b) => a.units - b.units),
         minType: r.minType,
@@ -217,6 +279,11 @@ function AdminConfiguracionPage() {
           resendConfig: {
             apiKey: resendApiKey,
             from: resendFrom,
+          },
+          couponConfig: {
+            activo: couponActive,
+            codigo: couponCode,
+            descuentoPct: Number(couponDiscountPct) || 5,
           },
         },
       });
@@ -297,6 +364,80 @@ function AdminConfiguracionPage() {
             ✓ {successMsg}
           </div>
         )}
+
+        {/* Cupón Promocional de Lanzamiento (Switch ON/OFF) */}
+        <div className="mb-6 rounded-2xl border border-primary/30 bg-card p-3.5 sm:p-5 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🎟️</span>
+              <div>
+                <h2 className="text-base font-bold flex items-center gap-2 text-foreground">
+                  Cupón Promocional de Lanzamiento
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Válido 1 sola vez por cuenta registrada. Podés desactivarlo manualmente en cualquier momento.
+                </p>
+              </div>
+            </div>
+
+            {/* Switch Toggle Button */}
+            <div className="flex items-center gap-3 bg-surface border border-border px-3 py-1.5 rounded-xl">
+              <span className="text-xs font-semibold text-foreground">
+                {couponActive ? "🟢 Cupón ACTIVO" : "⚪ Cupón APAGADO"}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={couponActive}
+                onClick={() => setCouponActive(!couponActive)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  couponActive ? "bg-primary" : "bg-muted"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    couponActive ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3 items-end">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Código del cupón</span>
+              <input
+                type="text"
+                className="input-base font-mono uppercase font-bold tracking-wider text-primary"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                placeholder="TEIMPORTAMOS"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Descuento (%)</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={90}
+                  className="input-base w-24 font-bold text-primary"
+                  value={couponDiscountPct}
+                  onChange={(e) => setCouponDiscountPct(e.target.value)}
+                />
+                <span className="text-xs font-semibold text-muted-foreground">% OFF en el total</span>
+              </div>
+            </label>
+
+            <div className="rounded-xl border border-border/80 bg-surface/50 p-2.5 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Canjes registrados:</span>
+              <span className="text-sm font-bold text-foreground tabular-nums">
+                {couponUsageCount !== null ? `${couponUsageCount} cuenta${couponUsageCount !== 1 ? "s" : ""}` : "—"}
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* Datos Bancarios para Transferencia */}
         <div className="mb-6 rounded-2xl border border-emerald-500/30 bg-card p-3.5 sm:p-5">
