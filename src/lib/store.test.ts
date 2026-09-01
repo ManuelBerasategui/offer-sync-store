@@ -69,6 +69,14 @@ describe("isMate", () => {
     expect(isMate("Auricular Bluetooth Mate", "Tecnología")).toBe(true); // isMate detecta el token
   });
 
+  it("NO matchea kits, combos, sets o packs que incluyan la palabra mate", () => {
+    expect(isMate("Kit Termo y Mate Stanley", "Bazar")).toBe(false);
+    expect(isMate("KIT MATERO COMPLETO", "Bazar")).toBe(false);
+    expect(isMate("Combo Mate + Termo", "Bazar")).toBe(false);
+    expect(isMate("Set Matero Acero", "Bazar")).toBe(false);
+    expect(isMate("Pack Termo y Mate", "Bazar")).toBe(false);
+  });
+
   it("NO matchea kit con MATE en nombre si moq_group='none' (runtime)", () => {
     // En runtime, hasMoq usa moq_group, no isMate → el kit no tiene MOQ
     const rules = makeRules();

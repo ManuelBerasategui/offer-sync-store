@@ -314,15 +314,22 @@ export function isSuplemento(categoria?: string, nombre?: string) {
  * La fuente de verdad en runtime es `moq_group` (campo metadata del producto).
  */
 export function isMate(nombre?: string, categoria?: string): boolean {
+  const nom = String(nombre ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  // Si el nombre contiene 'kit', 'combo', 'set' o 'pack', NO es un mate individual (no aplica MOQ de mates)
+  if (/(?:^|[\s,;/\-_(])(?:kit|combo|set|pack)(?:[\s,;/\-_)s]|$)/i.test(nom)) {
+    return false;
+  }
+
   const cat = String(categoria ?? "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
   if (cat === "mates" || cat === "mate") return true;
-  const nom = String(nombre ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+
   return /(?:^|[\s,;/\-_(])mate(?:[\s,;/\-_)s]|$)/i.test(nom);
 }
 
