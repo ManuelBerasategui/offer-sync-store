@@ -200,6 +200,8 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
   const itemsSubtotal = order.items.reduce((acc, i) => acc + i.qty * i.unitPrice, 0);
   const discountAmount = Math.max(0, itemsSubtotal - order.total);
   const hasDiscount = discountAmount > 0;
+  const couponDiscount = order.couponDiscountAmount ?? 0;
+  const transferDiscount = Math.max(0, discountAmount - couponDiscount);
 
   const waLink = `https://wa.me/5493418051515?text=Hola%20Te%20Importamos%2C%20${encodeURIComponent(
     isTransfer
