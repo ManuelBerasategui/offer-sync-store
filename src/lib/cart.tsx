@@ -110,20 +110,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(() => loadLocalCart());
   const { data } = useQuery(storeQueryOptions);
   const { user, loading: authLoading } = useAuth();
+  const hydratedRef = useRef(false);
 
   // Ref siempre actualizado al usuario más reciente.
-  // Evita que closures capturan user=null durante refreshes de token.
   const userRef = useRef(user);
   useEffect(() => {
     userRef.current = user;
   }, [user]);
 
-  // Cuando el usuario inicia sesión, carga el carrito desde la DB y sincroniza.
-  // Cuando no hay usuario, mantiene el carrito de localStorage.
+  // 1. Hidratación inmediata en el cliente al montar (sin esperar a auth)
+  useEffect(() => {
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      const local = loadLocalCart();
+      if (local.length > 0) {
+        setItems(local);
+      }
+    }
+  }, []);
+
+  // 2. Sincronización con base de datos cuando el usuario está logueado
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      setItems(loadLocalCart());
+      const local = loadLocalCart();
+      setItems(local);
       return;
     }
 
