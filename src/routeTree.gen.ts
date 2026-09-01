@@ -63,14 +63,14 @@ const AdminConfiguracionRoute = AdminConfiguracionRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminOrdenesRoute = AdminOrdenesRouteImport.update({
-  id: '/ordenes',
-  path: '/ordenes',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/ordenes',
+  path: '/admin/ordenes',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminProductosRoute = AdminProductosRouteImport.update({
-  id: '/productos',
-  path: '/productos',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/productos',
+  path: '/admin/productos',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ComboIndexRoute = ComboIndexRouteImport.update({
   id: '/combo/$index',
@@ -179,6 +179,8 @@ export interface RootRouteChildren {
   GraciasRoute: typeof GraciasRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   AdminConfiguracionRoute: typeof AdminConfiguracionRoute
+  AdminOrdenesRoute: typeof AdminOrdenesRoute
+  AdminProductosRoute: typeof AdminProductosRoute
   ComboIndexRoute: typeof ComboIndexRoute
   ProductoIdRoute: typeof ProductoIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -244,17 +246,17 @@ declare module '@tanstack/react-router' {
     }
     '/admin/ordenes': {
       id: '/admin/ordenes'
-      path: '/ordenes'
+      path: '/admin/ordenes'
       fullPath: '/admin/ordenes'
       preLoaderRoute: typeof AdminOrdenesRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/productos': {
       id: '/admin/productos'
-      path: '/productos'
+      path: '/admin/productos'
       fullPath: '/admin/productos'
       preLoaderRoute: typeof AdminProductosRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/combo/$index': {
       id: '/combo/$index'
@@ -281,6 +283,8 @@ const rootRouteChildren: RootRouteChildren = {
   GraciasRoute: GraciasRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   AdminConfiguracionRoute: AdminConfiguracionRoute,
+  AdminOrdenesRoute: AdminOrdenesRoute,
+  AdminProductosRoute: AdminProductosRoute,
   ComboIndexRoute: ComboIndexRoute,
   ProductoIdRoute: ProductoIdRoute,
   AdminIndexRoute: AdminIndexRoute,

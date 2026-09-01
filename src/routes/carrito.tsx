@@ -286,9 +286,17 @@ function CarritoPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {money(i.unitPrice)} c/u
-                          </p>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                            {i.basePrice && i.unitPrice < i.basePrice && (
+                              <span className="line-through text-[11px] opacity-75">{money(i.basePrice)}</span>
+                            )}
+                            <span className="font-semibold text-foreground">{money(i.unitPrice)} c/u</span>
+                            {i.basePrice && i.unitPrice < i.basePrice && (
+                              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                {Math.round(((i.basePrice - i.unitPrice) / i.basePrice) * 100)}% OFF x cantidad
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </Link>
                     ) : (
@@ -308,9 +316,17 @@ function CarritoPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {money(i.unitPrice)} c/u
-                          </p>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                            {i.basePrice && i.unitPrice < i.basePrice && (
+                              <span className="line-through text-[11px] opacity-75">{money(i.basePrice)}</span>
+                            )}
+                            <span className="font-semibold text-foreground">{money(i.unitPrice)} c/u</span>
+                            {i.basePrice && i.unitPrice < i.basePrice && (
+                              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                {Math.round(((i.basePrice - i.unitPrice) / i.basePrice) * 100)}% OFF x cantidad
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
