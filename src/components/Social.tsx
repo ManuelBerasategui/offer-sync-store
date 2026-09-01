@@ -1,71 +1,185 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { ChevronLeft, ChevronRight, Star, CheckCircle2, Quote } from "lucide-react";
 
 const REVIEWS = [
   {
     name: "Martina G.",
+    location: "Rosario, Santa Fe",
+    role: "Revendedora de Bazar & Mates",
     stars: 5,
-    text: "Excelente servicio, me llegó todo perfecto. Sigo trabajando con ellos.",
+    date: "Hace 3 días",
+    text: "Excelente servicio y atención por WhatsApp. Los termos y mates llegaron en perfecto estado y a precio directo de importación. Ya es mi tercer pedido.",
+    avatarBg: "from-orange-500 to-amber-600",
   },
   {
     name: "Nicolás P.",
-    stars: 4.5,
-    text: "Muy buena atención y precios reales de importador. Ya hice tres pedidos.",
+    location: "Córdoba Capital",
+    role: "Emprendedor Tech",
+    stars: 5,
+    date: "Hace 1 semana",
+    text: "Compré un surtido de 10 parlantes y auriculares JBL. El margen de reventa es excelente y la entrega con despacho el mismo día fue rapidísima.",
+    avatarBg: "from-blue-500 to-indigo-600",
   },
   {
     name: "Julieta R.",
-    stars: 4,
-    text: "Compré por mayor para revender y se vendió todo en una semana.",
+    location: "CABA, Buenos Aires",
+    role: "Tienda Online de Perfumes",
+    stars: 5,
+    date: "Hace 2 semanas",
+    text: "Los perfumes árabes son 100% originales con sus sellos. Pude armar surtido de 5 unidades y me hicieron el descuento por cantidad directo en el carrito.",
+    avatarBg: "from-emerald-500 to-teal-600",
   },
   {
     name: "Federico A.",
+    location: "Mendoza",
+    role: "Comprador Mayorista",
     stars: 5,
-    text: "Los productos son originales y el envío llegó antes de lo previsto.",
+    date: "Hace 2 semanas",
+    text: "Muy confiables con el pago por transferencia. Me aplicaron el descuento extra y me mandaron el tracking de Andreani al instante. Súper recomendados.",
+    avatarBg: "from-purple-500 to-pink-600",
+  },
+  {
+    name: "Camila V.",
+    location: "Mar del Plata",
+    role: "Revendedora de Indumentaria",
+    stars: 5,
+    date: "Hace 3 semanas",
+    text: "Empecé con el mínimo de compra para probar y vendí todo a los pocos días entre mis clientas. Ahora ya pido por volumen con mejores precios.",
+    avatarBg: "from-rose-500 to-red-600",
+  },
+  {
+    name: "Gonzalo M.",
+    location: "San Miguel de Tucumán",
+    role: "Local de Accesorios",
+    stars: 4.5,
+    date: "Hace 1 mes",
+    text: "Buena calidad en réplicas premium y originales. La web es muy fácil de usar para armar pedidos con descuentos automáticos.",
+    avatarBg: "from-amber-500 to-orange-600",
   },
 ];
 
 export function Stars({ value }: { value: number }) {
   const full = Math.floor(value);
+  const hasHalf = value % 1 !== 0;
+
   return (
-    <div className="flex items-center gap-1.5">
-      <span aria-hidden className="text-sm tracking-[2px] text-amber">
-        {"★".repeat(full)}
-        {value % 1 !== 0 ? "☆" : ""}
-      </span>
-      <span className="text-xs font-bold text-foreground">{value.toFixed(1)}</span>
+    <div className="flex items-center gap-1" aria-label={`${value} estrellas de 5`}>
+      <div className="flex items-center text-amber-400">
+        {Array.from({ length: 5 }).map((_, idx) => (
+          <Star
+            key={idx}
+            className={`h-4 w-4 ${
+              idx < full
+                ? "fill-amber-400 text-amber-400"
+                : idx === full && hasHalf
+                ? "fill-amber-400/50 text-amber-400"
+                : "fill-muted/30 text-muted-foreground/30"
+            }`}
+          />
+        ))}
+      </div>
+      <span className="ml-1 text-xs font-bold text-foreground">{value.toFixed(1)}</span>
     </div>
   );
 }
 
 export function ReviewsCarousel() {
-  const [i, setI] = useState(0);
+  const [active, setActive] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const next = () => setActive((prev) => (prev + 1) % REVIEWS.length);
+  const prev = () => setActive((prev) => (prev - 1 + REVIEWS.length) % REVIEWS.length);
 
   useEffect(() => {
-    const t = setInterval(() => setI((v) => (v + 1) % REVIEWS.length), 4500);
-    return () => clearInterval(t);
-  }, []);
+    if (isPaused) return;
+    timerRef.current = setInterval(next, 5000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isPaused]);
 
-  const r = REVIEWS[i]!;
+  const current = REVIEWS[active]!;
 
   return (
-    <div className="mx-auto mt-12 max-w-xl">
-      <div className="card-soft min-h-[150px] p-6 text-left">
-        <Stars value={r.stars} />
-        <p className="mt-3 text-[15px] leading-relaxed text-foreground/90">“{r.text}”</p>
-        <p className="mt-3 text-xs font-semibold uppercase tracking-[1px] text-muted-foreground">
-          {r.name} · Cliente verificado
+    <div
+      className="mx-auto mt-12 max-w-2xl px-2"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      {/* Tarjeta principal con animación suave y diseño glass */}
+      <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-card/90 backdrop-blur-sm p-6 sm:p-8 text-left shadow-lg transition-all duration-300">
+        <Quote className="absolute right-6 top-6 h-12 w-12 text-primary/10 -rotate-12 pointer-events-none" />
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {/* Avatar circular con iniciales y gradiente */}
+            <div
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${current.avatarBg} text-sm font-black text-white shadow-sm ring-2 ring-background`}
+            >
+              {current.name.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="font-bold text-sm sm:text-base text-foreground">{current.name}</p>
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3 w-3" /> Verificado
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {current.role} · <span className="opacity-80">{current.location}</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-end gap-0.5">
+            <Stars value={current.stars} />
+            <span className="text-[10px] text-muted-foreground">{current.date}</span>
+          </div>
+        </div>
+
+        {/* Texto de la reseña */}
+        <p className="mt-4 text-sm sm:text-[15px] leading-relaxed text-foreground/90 font-medium min-h-[56px] flex items-center">
+          “{current.text}”
         </p>
-      </div>
-      <div className="mt-4 flex justify-center gap-2">
-        {REVIEWS.map((rev, idx) => (
-          <button
-            key={rev.name}
-            aria-label={`Ver reseña de ${rev.name}`}
-            onClick={() => setI(idx)}
-            className={`h-2 rounded-full transition-all ${
-              idx === i ? "w-6 bg-primary" : "w-2 bg-border"
-            }`}
-          />
-        ))}
+
+        {/* Barra de progreso interactiva del slider */}
+        <div className="mt-6 flex items-center justify-between pt-4 border-t border-border/50">
+          <div className="flex items-center gap-1.5">
+            {REVIEWS.map((r, idx) => (
+              <button
+                key={r.name}
+                aria-label={`Ver opinión de ${r.name}`}
+                onClick={() => setActive(idx)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  idx === active
+                    ? "w-8 bg-primary shadow-xs"
+                    : "w-2 bg-muted-foreground/25 hover:bg-muted-foreground/40"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Flechas prev / next */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={prev}
+              aria-label="Opinión anterior"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all active:scale-95"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={next}
+              aria-label="Siguiente opinión"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all active:scale-95"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
