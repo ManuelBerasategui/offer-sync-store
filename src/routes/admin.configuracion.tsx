@@ -12,7 +12,6 @@ import {
   upsertCategoryRules,
   testAdminResendEmail,
   getCouponUsagesSummary,
-  setPromoCouponActive,
   type CategoryRuleInput,
 } from "@/lib/products.functions";
 import { parseCategoryRules, normCat, getBaseCategory, money } from "@/lib/store";
@@ -84,6 +83,7 @@ function AdminConfiguracionPage() {
     config["promo_cupon_descuento_pct"] ?? "5",
   );
   const [couponUsageCount, setCouponUsageCount] = useState<number | null>(null);
+  const [testEmailTarget, setTestEmailTarget] = useState<string>("");
 
   useEffect(() => {
     fetch("https://dolarapi.com/v1/dolares/cripto")
@@ -91,7 +91,7 @@ function AdminConfiguracionPage() {
       .then((data: { venta?: number }) => {
         if (data?.venta) setLiveUsdt(Math.round(data.venta));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const userId = user?.id;
@@ -120,7 +120,7 @@ function AdminConfiguracionPage() {
         .then((res) => {
           if (typeof res?.count === "number") setCouponUsageCount(res.count);
         })
-        .catch(() => {});
+        .catch(() => { });
 
       // Calcular la cotización implícita ponderada usada actualmente en los productos de la DB
       const prodsWithBoth = res.products.filter((p) => {
@@ -301,42 +301,18 @@ function AdminConfiguracionPage() {
     }
   }
 
-  async function handleToggleCoupon() {
-    const nextState = !couponActive;
-    setCouponActive(nextState);
-    try {
-      const res = await setPromoCouponActive({
-        data: {
-          email: userEmail,
-          token: userToken,
-          active: nextState,
-        },
-      });
-      if (res.error) {
-        setError(res.error);
-        setCouponActive(!nextState);
-        return;
-      }
-      void queryClient.invalidateQueries({ queryKey: ["store"] });
-      setSuccessMsg(nextState ? "¡Cupón activado correctamente!" : "¡Cupón desactivado correctamente!");
-      setTimeout(() => setSuccessMsg(""), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cambiar estado del cupón.");
-      setCouponActive(!nextState);
-    }
-  }
-
   async function handleTestEmail() {
     setTestingEmail(true);
     setTestEmailMsg(null);
     try {
       // Guardar primero para que use la clave más reciente en la DB
       await handleSave();
+      const target = testEmailTarget.trim() || userEmail;
       const res = await testAdminResendEmail({
         data: {
           email: userEmail,
           token: userToken,
-          targetEmail: userEmail,
+          targetEmail: target,
         },
       });
       setTestEmailMsg({ success: res.success, text: res.message });
@@ -418,15 +394,13 @@ function AdminConfiguracionPage() {
                 type="button"
                 role="switch"
                 aria-checked={couponActive}
-                onClick={() => void handleToggleCoupon()}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                  couponActive ? "bg-primary" : "bg-muted"
-                }`}
+                onClick={() => setCouponActive(!couponActive)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${couponActive ? "bg-primary" : "bg-muted"
+                  }`}
               >
                 <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    couponActive ? "translate-x-5" : "translate-x-0"
-                  }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${couponActive ? "translate-x-5" : "translate-x-0"
+                    }`}
                 />
               </button>
             </div>
@@ -547,32 +521,23 @@ function AdminConfiguracionPage() {
             <h2 className="text-base font-bold flex items-center gap-2">
               ✉️ Notificaciones de Compras por Email (Resend)
             </h2>
-            <button
-              type="button"
-              onClick={() => void handleTestEmail()}
-              disabled={testingEmail || saving}
-              className="rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50 transition-colors"
-            >
-              {testingEmail ? "Enviando prueba..." : "Enviar email de prueba"}
-            </button>
           </div>
           <p className="text-xs text-muted-foreground mb-4">
-            Configurá tu API Key de Resend para despachar las notificaciones de ventas a los administradores y al cliente comprador.
+            Configurá tu API Key de Resend para despachar las notificaciones de ventas a los administradores y la confirmación de compra al cliente.
           </p>
 
           {testEmailMsg && (
             <div
-              className={`mb-4 rounded-xl p-3 text-xs font-medium border ${
-                testEmailMsg.success
+              className={`mb-4 rounded-xl p-3 text-xs font-medium border ${testEmailMsg.success
                   ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
                   : "bg-destructive/10 text-destructive border-destructive/20"
-              }`}
+                }`}
             >
               {testEmailMsg.text}
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <label className="flex flex-col gap-1">
               <span className="text-xs font-semibold text-muted-foreground">Resend API Key (re_...)</span>
               <input
@@ -594,6 +559,28 @@ function AdminConfiguracionPage() {
                 placeholder="Te Importamos <noreply@teimportamosarg.com>"
               />
             </label>
+          </div>
+
+          {/* Probador de envío a destinatario */}
+          <div className="flex flex-wrap items-end gap-2 pt-3 border-t border-border/60">
+            <label className="flex flex-col gap-1 flex-1 min-w-[220px]">
+              <span className="text-xs font-semibold text-muted-foreground">Probar envío de confirmación de compra a:</span>
+              <input
+                type="email"
+                className="input-base"
+                value={testEmailTarget}
+                onChange={(e) => setTestEmailTarget(e.target.value)}
+                placeholder={userEmail || "cliente@ejemplo.com"}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => void handleTestEmail()}
+              disabled={testingEmail || saving}
+              className="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50 transition-colors shrink-0"
+            >
+              {testingEmail ? "Enviando prueba..." : "Enviar email de prueba al cliente"}
+            </button>
           </div>
         </div>
 
@@ -712,11 +699,10 @@ function AdminConfiguracionPage() {
                         key={opt}
                         type="button"
                         onClick={() => setRule(key, { minType: opt, minValue: opt === "none" ? "" : rule.minValue })}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
-                          rule.minType === opt
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${rule.minType === opt
                             ? "bg-primary text-primary-foreground border-primary"
                             : "bg-background text-foreground border-border hover:bg-muted"
-                        }`}
+                          }`}
                       >
                         {opt === "none" ? "Sin mínimo" : opt === "units" ? "Mínimo unidades" : "Mínimo monto ($)"}
                       </button>

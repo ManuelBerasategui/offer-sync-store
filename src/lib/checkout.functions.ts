@@ -192,6 +192,19 @@ export const createCheckout = createServerFn({ method: "POST" })
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      // Garantizar que data.shipping tenga el email de la cuenta si el usuario está logueado
+      if (data.userId && (!data.shipping.email || !data.shipping.email.includes("@"))) {
+        try {
+          const { data: userData } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+          if (userData?.user?.email) {
+            data.shipping.email = userData.user.email.trim();
+          }
+        } catch (err) {
+          console.error("Error al obtener email del usuario en checkout:", err);
+        }
+      }
+
       const validation = await revalidateOrderItems(supabaseAdmin, data.items);
       if (validation.error) {
         return { error: validation.error };

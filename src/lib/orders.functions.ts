@@ -510,6 +510,18 @@ export const createTransferOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Garantizar que data.shipping tenga el email de la cuenta si el usuario está logueado
+    if (data.userId && (!data.shipping.email || !data.shipping.email.includes("@"))) {
+      try {
+        const { data: userData } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+        if (userData?.user?.email) {
+          data.shipping.email = userData.user.email.trim();
+        }
+      } catch (err) {
+        console.error("Error al obtener email del usuario en transferencia:", err);
+      }
+    }
+
     // 1. Revalidar precios y mínimos de categoría
     let total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
     let items = data.items;

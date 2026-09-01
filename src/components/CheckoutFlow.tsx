@@ -115,18 +115,27 @@ export function CheckoutFlow({
 
   // Autocompletar con los datos guardados si el usuario inició sesión.
   useEffect(() => {
+    if (user?.email) {
+      setForm((prev) => ({
+        ...prev,
+        email: prev.email || user.email || "",
+      }));
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (user && profile) {
-      setForm({
-        nombre: profile.nombre,
-        dni: profile.dni,
-        telefono: profile.telefono,
-        email: user.email ?? "",
-        provincia: profile.provincia,
-        ciudad: profile.ciudad,
-        codigo_postal: profile.codigo_postal,
-        transporte: (profile.transporte as ShippingForm["transporte"]) || "Correo Argentino",
-        sucursal_correo: profile.sucursal_correo,
-      });
+      setForm((prev) => ({
+        nombre: profile.nombre || prev.nombre,
+        dni: profile.dni || prev.dni,
+        telefono: profile.telefono || prev.telefono,
+        email: user.email || prev.email,
+        provincia: profile.provincia || prev.provincia,
+        ciudad: profile.ciudad || prev.ciudad,
+        codigo_postal: profile.codigo_postal || prev.codigo_postal,
+        transporte: (profile.transporte as ShippingForm["transporte"]) || prev.transporte || "Correo Argentino",
+        sucursal_correo: profile.sucursal_correo || prev.sucursal_correo,
+      }));
     }
   }, [user, profile]);
 
