@@ -12,6 +12,7 @@ import {
   upsertCategoryRules,
   testAdminResendEmail,
   getCouponUsagesSummary,
+  setPromoCouponActive,
   type CategoryRuleInput,
 } from "@/lib/products.functions";
 import { parseCategoryRules, normCat, getBaseCategory, money } from "@/lib/store";
@@ -300,6 +301,31 @@ function AdminConfiguracionPage() {
     }
   }
 
+  async function handleToggleCoupon() {
+    const nextState = !couponActive;
+    setCouponActive(nextState);
+    try {
+      const res = await setPromoCouponActive({
+        data: {
+          email: userEmail,
+          token: userToken,
+          active: nextState,
+        },
+      });
+      if (res.error) {
+        setError(res.error);
+        setCouponActive(!nextState);
+        return;
+      }
+      void queryClient.invalidateQueries({ queryKey: ["store"] });
+      setSuccessMsg(nextState ? "¡Cupón activado correctamente!" : "¡Cupón desactivado correctamente!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cambiar estado del cupón.");
+      setCouponActive(!nextState);
+    }
+  }
+
   async function handleTestEmail() {
     setTestingEmail(true);
     setTestEmailMsg(null);
@@ -392,7 +418,7 @@ function AdminConfiguracionPage() {
                 type="button"
                 role="switch"
                 aria-checked={couponActive}
-                onClick={() => setCouponActive(!couponActive)}
+                onClick={() => void handleToggleCoupon()}
                 className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   couponActive ? "bg-primary" : "bg-muted"
                 }`}

@@ -868,7 +868,10 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
           },
         ];
         for (const cRow of couponRows) {
-          await (supabaseAdmin as any).from("site_config").upsert(cRow, { onConflict: "clave" });
+          const { error: cErr } = await (supabaseAdmin as any)
+            .from("site_config")
+            .upsert(cRow, { onConflict: "clave" });
+          if (cErr) throw cErr;
         }
       }
 
@@ -1057,6 +1060,33 @@ export const testAdminResendEmail = createServerFn({ method: "POST" })
       return {
         success: false,
         message: err instanceof Error ? err.message : "Error de autorización.",
+      };
+    }
+  });
+
+/**
+ * Activa o desactiva instantáneamente el cupón de descuento desde el panel admin.
+ */
+export const setPromoCouponActive = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string; active: boolean }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    active: Boolean(data?.active),
+  }))
+  .handler(async ({ data }): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+      const valor = data.active ? "SI" : "NO";
+      const { error } = await (supabaseAdmin as any)
+        .from("site_config")
+        .upsert({ clave: "promo_cupon_activo", valor }, { onConflict: "clave" });
+      if (error) throw error;
+      return { success: true };
+    } catch (err) {
+      console.error("Error actualizando estado del cupón:", err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Error al actualizar estado del cupón.",
       };
     }
   });
