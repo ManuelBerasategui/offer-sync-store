@@ -2945,35 +2945,18 @@ function AdminProductosPage() {
                                           <Flame className="h-3 w-3 fill-primary" /> Oferta
                                         </span>
                                       )}
-                                      {(() => {
-                                        const r = waOnlyReasonOf(p as unknown as Record<string, unknown>);
-                                        if (!r) return null;
-                                        return (
-                                          <span className="rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 text-[10px] font-bold flex items-center gap-0.5 border border-emerald-500/20 shrink-0">
-                                            💬 WA Only
-                                          </span>
-                                        );
-                                      })()}
                                     </div>
                                     
                                     {/* Precio en Celular */}
                                     <div className="text-xs font-bold text-primary sm:hidden">
-                                      {(() => {
-                                        const r = waOnlyReasonOf(p as unknown as Record<string, unknown>);
-                                        const isHidden = r ? WA_ONLY_CONFIG[r]?.hidePrice : false;
-                                        if (isHidden || !p.precio || toNumber(p.precio) <= 0) {
-                                          return <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">💬 Por WhatsApp</span>;
-                                        }
-                                        if (isOffer && p.precio_oferta) {
-                                          return (
-                                            <span className="flex items-center gap-1">
-                                              <span>{money(p.precio_oferta)}</span>
-                                              <span className="line-through text-[10px] text-muted-foreground font-normal">{money(p.precio)}</span>
-                                            </span>
-                                          );
-                                        }
-                                        return <span>{money(p.precio)}</span>;
-                                      })()}
+                                      {isOffer && p.precio_oferta ? (
+                                        <span className="flex items-center gap-1">
+                                          <span>{money(p.precio_oferta)}</span>
+                                          <span className="line-through text-[10px] text-muted-foreground font-normal">{money(p.precio)}</span>
+                                        </span>
+                                      ) : (
+                                        <span>{money(p.precio)}</span>
+                                      )}
                                     </div>
 
                                     {/* Botón para desplegar variantes de colores */}
@@ -2993,22 +2976,14 @@ function AdminProductosPage() {
                                 </td>
                                 <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
                                 <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
-                                  {(() => {
-                                    const r = waOnlyReasonOf(p as unknown as Record<string, unknown>);
-                                    const isHidden = r ? WA_ONLY_CONFIG[r]?.hidePrice : false;
-                                    if (isHidden || !p.precio || toNumber(p.precio) <= 0) {
-                                      return <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">💬 Por WhatsApp</span>;
-                                    }
-                                    if (isOffer && p.precio_oferta) {
-                                      return (
-                                        <div className="flex flex-col items-end">
-                                          <span className="font-bold text-primary">{money(p.precio_oferta)}</span>
-                                          <span className="line-through text-[11px] text-muted-foreground">{money(p.precio)}</span>
-                                        </div>
-                                      );
-                                    }
-                                    return money(p.precio);
-                                  })()}
+                                  {isOffer && p.precio_oferta ? (
+                                    <div className="flex flex-col items-end">
+                                      <span className="font-bold text-primary">{money(p.precio_oferta)}</span>
+                                      <span className="line-through text-[11px] text-muted-foreground">{money(p.precio)}</span>
+                                    </div>
+                                  ) : (
+                                    money(p.precio)
+                                  )}
                                 </td>
                                 <td className="px-3 py-3 sm:px-4 text-center">
                                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${String(p.stock ?? "").toUpperCase() === "NO" ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>
