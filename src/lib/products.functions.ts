@@ -956,28 +956,38 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
 
         const discountPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
 
-        // 3. Verificar si el usuario ya consumió el cupón en coupon_usages
+        // 3. Verificar si el usuario ya consumió el cupón en site_config
+        const userUsageKey = `coupon_usage_${validCode}_${verifiedUserId}`;
+        const emailUsageKey = verifiedEmail ? `coupon_usage_${validCode}_${verifiedEmail.trim().toLowerCase()}` : "";
+        if (configMap[userUsageKey] || (emailUsageKey && configMap[emailUsageKey])) {
+          return {
+            valid: false,
+            error: "Ya utilizaste este código de descuento en una compra anterior (válido 1 sola vez por cuenta).",
+          };
+        }
+
+        // 4. Verificar si el usuario ya consumió el cupón en coupon_usages
         const filterParts: string[] = [`user_id.eq.${verifiedUserId}`];
         if (verifiedEmail) {
           filterParts.push(`user_email.ilike.${verifiedEmail.trim().toLowerCase()}`);
         }
 
-        const { data: usageRows, error: usageErr } = await supabaseAdmin
-          .from("coupon_usages")
-          .select("id")
-          .eq("coupon_code", validCode)
-          .or(filterParts.join(","))
-          .limit(1);
+        try {
+          const { data: usageRows } = await supabaseAdmin
+            .from("coupon_usages")
+            .select("id")
+            .eq("coupon_code", validCode)
+            .or(filterParts.join(","))
+            .limit(1);
 
-        if (usageErr) {
+          if (usageRows && usageRows.length > 0) {
+            return {
+              valid: false,
+              error: "Ya utilizaste este código de descuento en una compra anterior (válido 1 sola vez por cuenta).",
+            };
+          }
+        } catch (usageErr) {
           console.warn("Error consultando coupon_usages:", usageErr);
-        }
-
-        if (usageRows && usageRows.length > 0) {
-          return {
-            valid: false,
-            error: "Ya utilizaste este cupón en una compra anterior (válido 1 sola vez por cuenta).",
-          };
         }
 
         return {
@@ -1006,11 +1016,27 @@ export const getCouponUsagesSummary = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ count: number; error?: string }> => {
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
-      const { count, error } = await supabaseAdmin
-        .from("coupon_usages")
-        .select("*", { count: "exact", head: true });
-      if (error) throw error;
-      return { count: count ?? 0 };
+      let count = 0;
+      try {
+        const { count: dbCount } = await supabaseAdmin
+          .from("coupon_usages")
+          .select("*", { count: "exact", head: true });
+        if (typeof dbCount === "number") count = dbCount;
+      } catch {
+        // ignore
+      }
+
+      const { data: scRows } = await supabaseAdmin
+        .from("site_config")
+        .select("clave")
+        .like("clave", "coupon_usage_%");
+
+      const distinctUsers = new Set<string>();
+      for (const row of scRows ?? []) {
+        if (row.clave) distinctUsers.add(row.clave);
+      }
+
+      return { count: Math.max(count, Math.ceil(distinctUsers.size / 2)) };
     } catch (err) {
       return { count: 0, error: err instanceof Error ? err.message : "Error" };
     }

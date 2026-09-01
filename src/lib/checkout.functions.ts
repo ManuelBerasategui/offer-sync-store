@@ -211,28 +211,46 @@ export const createCheckout = createServerFn({ method: "POST" })
         const promoCode = (configObj["promo_cupon_codigo"] ?? "TEIMPORTAMOS").toUpperCase().trim();
 
         if (isCouponActive && data.couponCode === promoCode) {
-          const filterParts: string[] = [`user_id.eq.${data.userId}`];
-          if (data.shipping.email) {
-            filterParts.push(`user_email.ilike.${data.shipping.email.trim().toLowerCase()}`);
-          }
-          const { data: usages } = await supabaseAdmin
-            .from("coupon_usages")
-            .select("id")
-            .eq("coupon_code", promoCode)
-            .or(filterParts.join(","))
-            .limit(1);
+          const usedKeyUser = `coupon_usage_${promoCode}_${data.userId}`;
+          const usedKeyEmail = data.shipping.email ? `coupon_usage_${promoCode}_${data.shipping.email.trim().toLowerCase()}` : "";
+          const alreadyUsedInConfig = Boolean(configObj[usedKeyUser] || (usedKeyEmail && configObj[usedKeyEmail]));
 
-          if (!usages || usages.length === 0) {
-            const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
-            validCouponApplied = promoCode;
-            // Aplicar descuento a cada ítem para reflejar el monto en la preferencia de Mercado Pago
-            items = items.map((i) => ({
-              ...i,
-              unitPrice: Math.max(1, Math.round(i.unitPrice * (1 - couponPct / 100))),
-            }));
-            const discountedTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-            couponDiscountAmount = Math.max(0, total - discountedTotal);
-            total = discountedTotal;
+          if (!alreadyUsedInConfig) {
+            const filterParts: string[] = [`user_id.eq.${data.userId}`];
+            if (data.shipping.email) {
+              filterParts.push(`user_email.ilike.${data.shipping.email.trim().toLowerCase()}`);
+            }
+            try {
+              const { data: usages } = await supabaseAdmin
+                .from("coupon_usages")
+                .select("id")
+                .eq("coupon_code", promoCode)
+                .or(filterParts.join(","))
+                .limit(1);
+
+              if (!usages || usages.length === 0) {
+                const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
+                validCouponApplied = promoCode;
+                // Aplicar descuento a cada ítem para reflejar el monto en la preferencia de Mercado Pago
+                items = items.map((i) => ({
+                  ...i,
+                  unitPrice: Math.max(1, Math.round(i.unitPrice * (1 - couponPct / 100))),
+                }));
+                const discountedTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+                couponDiscountAmount = Math.max(0, total - discountedTotal);
+                total = discountedTotal;
+              }
+            } catch {
+              const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
+              validCouponApplied = promoCode;
+              items = items.map((i) => ({
+                ...i,
+                unitPrice: Math.max(1, Math.round(i.unitPrice * (1 - couponPct / 100))),
+              }));
+              const discountedTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+              couponDiscountAmount = Math.max(0, total - discountedTotal);
+              total = discountedTotal;
+            }
           }
         }
       }
@@ -275,6 +293,30 @@ export const createCheckout = createServerFn({ method: "POST" })
           });
         } catch (couponErr) {
           console.error("Error registrando uso de cupón en MP:", couponErr);
+        }
+
+        // Registrar SIEMPRE en site_config para garantizar persistencia y bloqueo inmediato
+        try {
+          const payload = JSON.stringify({
+            orderCode,
+            email: (data.shipping.email ?? "").trim().toLowerCase(),
+            discount: couponDiscountAmount,
+            at: new Date().toISOString(),
+          });
+          if (data.userId) {
+            await (supabaseAdmin as any).from("site_config").upsert({
+              clave: `coupon_usage_${validCouponApplied}_${data.userId}`,
+              valor: payload,
+            }, { onConflict: "clave" });
+          }
+          if (data.shipping.email) {
+            await (supabaseAdmin as any).from("site_config").upsert({
+              clave: `coupon_usage_${validCouponApplied}_${data.shipping.email.trim().toLowerCase()}`,
+              valor: payload,
+            }, { onConflict: "clave" });
+          }
+        } catch (scErr) {
+          console.error("Error registrando uso de cupón en site_config (MP):", scErr);
         }
       }
     } catch (err) {

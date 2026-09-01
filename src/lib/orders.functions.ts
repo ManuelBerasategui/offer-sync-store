@@ -602,22 +602,35 @@ export const createTransferOrder = createServerFn({ method: "POST" })
         const promoCode = (configMap["promo_cupon_codigo"] ?? "TEIMPORTAMOS").toUpperCase().trim();
 
         if (isCouponActive && data.couponCode === promoCode) {
-          const filterParts: string[] = [`user_id.eq.${data.userId}`];
-          if (data.shipping.email) {
-            filterParts.push(`user_email.ilike.${data.shipping.email.trim().toLowerCase()}`);
-          }
-          const { data: usages } = await supabaseAdmin
-            .from("coupon_usages")
-            .select("id")
-            .eq("coupon_code", promoCode)
-            .or(filterParts.join(","))
-            .limit(1);
+          const usedKeyUser = `coupon_usage_${promoCode}_${data.userId}`;
+          const usedKeyEmail = data.shipping.email ? `coupon_usage_${promoCode}_${data.shipping.email.trim().toLowerCase()}` : "";
+          const alreadyUsedInConfig = Boolean(configMap[usedKeyUser] || (usedKeyEmail && configMap[usedKeyEmail]));
 
-          if (!usages || usages.length === 0) {
-            const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
-            couponDiscountAmount = Math.round(total * (couponPct / 100));
-            total = Math.max(1, total - couponDiscountAmount);
-            validCouponApplied = promoCode;
+          if (!alreadyUsedInConfig) {
+            const filterParts: string[] = [`user_id.eq.${data.userId}`];
+            if (data.shipping.email) {
+              filterParts.push(`user_email.ilike.${data.shipping.email.trim().toLowerCase()}`);
+            }
+            try {
+              const { data: usages } = await supabaseAdmin
+                .from("coupon_usages")
+                .select("id")
+                .eq("coupon_code", promoCode)
+                .or(filterParts.join(","))
+                .limit(1);
+
+              if (!usages || usages.length === 0) {
+                const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
+                couponDiscountAmount = Math.round(total * (couponPct / 100));
+                total = Math.max(1, total - couponDiscountAmount);
+                validCouponApplied = promoCode;
+              }
+            } catch {
+              const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
+              couponDiscountAmount = Math.round(total * (couponPct / 100));
+              total = Math.max(1, total - couponDiscountAmount);
+              validCouponApplied = promoCode;
+            }
           }
         }
       }
@@ -657,7 +670,31 @@ export const createTransferOrder = createServerFn({ method: "POST" })
             discount_amount: couponDiscountAmount,
           });
         } catch (couponErr) {
-          console.error("Error registrando uso de cupón:", couponErr);
+          console.error("Error registrando uso de cupón en coupon_usages:", couponErr);
+        }
+
+        // Registrar SIEMPRE en site_config para garantizar persistencia y bloqueo inmediato
+        try {
+          const payload = JSON.stringify({
+            orderCode,
+            email: (data.shipping.email ?? "").trim().toLowerCase(),
+            discount: couponDiscountAmount,
+            at: new Date().toISOString(),
+          });
+          if (data.userId) {
+            await (supabaseAdmin as any).from("site_config").upsert({
+              clave: `coupon_usage_${validCouponApplied}_${data.userId}`,
+              valor: payload,
+            }, { onConflict: "clave" });
+          }
+          if (data.shipping.email) {
+            await (supabaseAdmin as any).from("site_config").upsert({
+              clave: `coupon_usage_${validCouponApplied}_${data.shipping.email.trim().toLowerCase()}`,
+              valor: payload,
+            }, { onConflict: "clave" });
+          }
+        } catch (scErr) {
+          console.error("Error registrando uso de cupón en site_config:", scErr);
         }
       }
 
