@@ -113,14 +113,22 @@ function Home() {
 
           {banners.length > 0 && (
             <div className="relative -mx-4 mb-6 sm:mx-0">
-              <div className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0">
+              <div
+                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
+                  banners.length === 1 ? "justify-center" : ""
+                }`}
+              >
                 {banners.map((b, i) => (
                   <Link
                     key={i}
                     to="/combo/$index"
                     params={{ index: String(i) }}
-                    className="group relative min-w-[280px] snap-start overflow-hidden rounded-xl border border-primary/15 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 sm:min-w-[420px]"
-                    style={{ aspectRatio: "16 / 10" }}
+                    className={`group relative snap-center overflow-hidden rounded-xl border border-primary/15 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${
+                      banners.length === 1
+                        ? "w-full max-w-[440px]"
+                        : "w-[85vw] max-w-[380px] sm:w-[360px] shrink-0"
+                    }`}
+                    style={{ aspectRatio: "1 / 1" }}
                   >
                     <img
                       src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
@@ -145,7 +153,9 @@ function Home() {
                 ))}
               </div>
               {/* Hint that there's more to scroll on wider screens where cards don't peek off-edge */}
-              <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
+              {banners.length > 1 && (
+                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
+              )}
             </div>
           )}
 

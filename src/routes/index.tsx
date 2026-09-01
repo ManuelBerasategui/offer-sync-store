@@ -118,7 +118,11 @@ function Home() {
 
           {banners.length > 0 && (
             <div className="relative -mx-4 mb-6 sm:mx-0">
-              <div className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0">
+              <div
+                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
+                  banners.length === 1 ? "justify-center" : ""
+                }`}
+              >
                 {banners.map((b, i) => {
                   const basePrice = toNumber(b.precio);
                   const discPct = transferDiscountPct(config);
@@ -129,33 +133,30 @@ function Home() {
                       key={i}
                       to="/combo/$index"
                       params={{ index: String(i) }}
-                      className="group relative flex flex-col min-w-[280px] snap-start overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 sm:min-w-[400px]"
+                      className={`group relative flex flex-col snap-center overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${
+                        banners.length === 1
+                          ? "w-full max-w-[440px]"
+                          : "w-[85vw] max-w-[380px] sm:w-[360px] shrink-0"
+                      }`}
                     >
-                      {/* Contenedor de la foto limpio sin textos que tapen el arte */}
-                      <div className="relative aspect-[16/10] w-full overflow-hidden bg-surface flex items-center justify-center">
-                        {/* Fondo difuminado ambiental */}
-                        <div
-                          aria-hidden="true"
-                          className="absolute inset-0 bg-cover bg-center scale-110 blur-md opacity-30 brightness-75 transition-transform duration-300 group-hover:scale-125"
-                          style={{ backgroundImage: `url(${imageUrl(b.imagen_url) || FALLBACK_IMAGE})` }}
-                        />
-                        {/* Imagen completa sin recortes */}
+                      {/* Contenedor de la foto adaptado a la imagen */}
+                      <div className="relative aspect-square w-full overflow-hidden bg-surface flex items-center justify-center">
                         <img
                           src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
                           alt={b.titulo ?? ""}
                           referrerPolicy="no-referrer"
-                          className="relative h-full w-full object-contain p-1.5 sm:p-2 transition-transform duration-300 group-hover:scale-105"
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           onError={onImageError(b.imagen_url)}
                         />
-                        {/* Badge sutil superior */}
-                        <span className="absolute left-2.5 top-2.5 z-10 inline-flex items-center gap-1 rounded-md grad-urgente px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground shadow-sm">
+                        {/* Badge superior */}
+                        <span className="absolute left-2.5 top-2.5 z-10 inline-flex items-center gap-1 rounded-md grad-urgente px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground shadow-md">
                           <Flame className="h-3 w-3" />
                           Combo en oferta
                         </span>
                       </div>
 
                       {/* Footer con título y precios bien legibles */}
-                      <div className="flex flex-1 flex-col justify-between gap-2 border-t border-border bg-card p-3 sm:p-4">
+                      <div className="flex flex-1 flex-col justify-between gap-2 border-t border-border bg-card p-3.5 sm:p-4">
                         <h3 className="font-bold text-sm sm:text-base text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-1">
                           {b.titulo}
                         </h3>
@@ -180,8 +181,10 @@ function Home() {
                   );
                 })}
               </div>
-              {/* Hint that there's more to scroll on wider screens where cards don't peek off-edge */}
-              <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
+              {/* Hint that there's more to scroll on wider screens when multiple banners exist */}
+              {banners.length > 1 && (
+                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
+              )}
             </div>
           )}
 
