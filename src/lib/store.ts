@@ -390,30 +390,61 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     }
   }
 
-  // Perfumes Árabes: descuentos por defecto (5u→5%, 10u→10%, 20u→12%)
-  if (!rules["perfumes arabes"]?.discountTiers?.length) {
-    rules["perfumes arabes"] = {
-      ...rules["perfumes arabes"],
-      discountTiers: [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
+  // 1. Tecnología: mínimo 5 unidades (permite surtido)
+  if (!rules["tecnologia"]?.minUnits) {
+    rules["tecnologia"] = {
+      ...rules["tecnologia"],
+      minUnits: 5,
+      discountTiers: rules["tecnologia"]?.discountTiers?.length
+        ? rules["tecnologia"].discountTiers
+        : [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
     };
   }
 
-  // Perfumes Diseñador: descuentos por defecto (3u→5%, 7u→7%, 20u→12%)
-  if (!rules["perfumes disenador"]?.discountTiers?.length) {
-    rules["perfumes disenador"] = {
-      ...rules["perfumes disenador"],
-      discountTiers: [{ units: 3, percent: 5 }, { units: 7, percent: 7 }, { units: 20, percent: 12 }],
-    };
-  }
+  // 2. Perfumes Árabes: mínimo 5 unidades y descuentos por defecto (5u→5%, 10u→10%, 20u→12%)
+  rules["perfumes arabes"] = {
+    ...rules["perfumes arabes"],
+    minUnits: rules["perfumes arabes"]?.minUnits || 5,
+    discountTiers: rules["perfumes arabes"]?.discountTiers?.length
+      ? rules["perfumes arabes"].discountTiers
+      : [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
+  };
 
-  // Mates: compra mínima obligatoria de 10 unidades.
+  // 3. Perfumes Diseñador: mínimo 3 unidades y descuentos por defecto (3u→5%, 7u→7%, 20u→12%)
+  rules["perfumes disenador"] = {
+    ...rules["perfumes disenador"],
+    minUnits: rules["perfumes disenador"]?.minUnits || 3,
+    discountTiers: rules["perfumes disenador"]?.discountTiers?.length
+      ? rules["perfumes disenador"].discountTiers
+      : [{ units: 3, percent: 5 }, { units: 7, percent: 7 }, { units: 20, percent: 12 }],
+  };
+
+  // 4. Mates: compra mínima obligatoria de 10 unidades
   const matesExisting = rules["mates"];
   const { minAmount: _ignored, ...matesRuleBase } = matesExisting ?? { discountTiers: [] };
   rules["mates"] = {
     ...matesRuleBase,
     minUnits: 10,
-    discountTiers: [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
+    discountTiers: matesExisting?.discountTiers?.length
+      ? matesExisting.discountTiers
+      : [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
   };
+
+  // 5. Suplementación: compra mínima de $250.000
+  if (!rules["suplementos"]?.minAmount) {
+    rules["suplementos"] = {
+      ...rules["suplementos"],
+      minAmount: 250000,
+    };
+  }
+
+  // 6. Zapatillas: mínimo 3 unidades (derivación WhatsApp)
+  if (!rules["zapatillas"]?.minUnits) {
+    rules["zapatillas"] = {
+      ...rules["zapatillas"],
+      minUnits: 3,
+    };
+  }
 
   // Eliminar categorías genéricas obsoletas o duplicadas si existen subcategorías específicas
   if (rules["perfumes arabes"]?.minUnits || rules["perfumes disenador"]?.minUnits) {

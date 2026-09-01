@@ -304,40 +304,47 @@ function Home() {
       {(() => {
         const catRules = parseCategoryRules(config);
 
-        // Mapeo canónico de etiquetas
-        const categoryLabels: Record<string, string> = {
-          "mates": "Mates",
-          "perfumes arabes": "Perfumes Árabes",
-          "perfumes disenador": "Perfumes Diseñador",
-          "suplementos": "Suplementación",
-          "tecnologia": "Tecnología",
-          "zapatillas": "Zapatillas",
-        };
+        // Mapeo canónico ordenado de las categorías con compra mínima
+        const canonicalCategories = [
+          { key: "tecnologia", label: "Tecnología", defaultDesc: "Mínimo 5 unidades", icon: "🎧" },
+          { key: "perfumes arabes", label: "Perfumes Árabes", defaultDesc: "Mínimo 5 unidades", icon: "🧴" },
+          { key: "perfumes disenador", label: "Perfumes Diseñador", defaultDesc: "Mínimo 3 unidades", icon: "💎" },
+          { key: "mates", label: "Mates", defaultDesc: "Mínimo 10 unidades", icon: "🧉" },
+          { key: "suplementos", label: "Suplementación", defaultDesc: "Mínimo $250.000", icon: "⚡" },
+          { key: "zapatillas", label: "Zapatillas", defaultDesc: "Mínimo 3 unidades (vía WhatsApp)", icon: "👟" },
+        ];
 
         const minItems: { label: string; desc: string; icon: string }[] = [];
         const seenKeys = new Set<string>();
 
-        // Mínimos de compra dinámicos
+        for (const cat of canonicalCategories) {
+          const rule = catRules[cat.key];
+          let desc = cat.defaultDesc;
+          if (rule?.minUnits) {
+            desc = `Mínimo ${rule.minUnits} unidades`;
+            if (cat.key === "zapatillas") desc += " (vía WhatsApp)";
+          } else if (rule?.minAmount) {
+            desc = `Mínimo ${money(rule.minAmount)}`;
+          }
+          minItems.push({ label: cat.label, desc, icon: cat.icon });
+          seenKeys.add(cat.key);
+        }
+
+        // Agregar cualquier otra categoría que el admin configure con mínimo
         for (const [key, rule] of Object.entries(catRules)) {
           const norm = normCat(key);
-          if (norm === "perfumes" || norm === "perfume" || norm === "suplementacion") continue;
           if (seenKeys.has(norm)) continue;
+          if (norm === "perfumes" || norm === "perfume") continue;
 
           if (rule.minUnits) {
             seenKeys.add(norm);
-            const label = categoryLabels[norm] ?? (key.charAt(0).toUpperCase() + key.slice(1));
+            const label = key.charAt(0).toUpperCase() + key.slice(1);
             minItems.push({ label, desc: `Mínimo ${rule.minUnits} unidades`, icon: "📦" });
           } else if (rule.minAmount) {
             seenKeys.add(norm);
-            const label = categoryLabels[norm] ?? (key.charAt(0).toUpperCase() + key.slice(1));
+            const label = key.charAt(0).toUpperCase() + key.slice(1);
             minItems.push({ label, desc: `Mínimo ${money(rule.minAmount)}`, icon: "💰" });
           }
-        }
-
-        // Si no tiene regla explícita de suplementos configurada, asegurar el mínimo histórico de suplementos
-        if (!seenKeys.has("suplementos")) {
-          minItems.push({ label: "Suplementación", desc: "Mínimo $250.000", icon: "💰" });
-          seenKeys.add("suplementos");
         }
 
         if (minItems.length === 0) return null;
@@ -355,12 +362,12 @@ function Home() {
                     </p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
                   {minItems.map((it) => (
-                    <div key={it.label} className="flex items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-2.5">
-                      <span className="text-lg shrink-0">{it.icon}</span>
+                    <div key={it.label} className="flex items-center gap-2.5 rounded-xl border border-border bg-card/70 px-3 py-2.5 shadow-2xs">
+                      <span className="text-xl shrink-0">{it.icon}</span>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold truncate">{it.label}</p>
+                        <p className="text-xs font-bold truncate text-foreground">{it.label}</p>
                         <p className="text-[11px] text-muted-foreground truncate">{it.desc}</p>
                       </div>
                     </div>

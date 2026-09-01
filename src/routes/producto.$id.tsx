@@ -706,7 +706,7 @@ function ProductoPage() {
                     </div>
                   )}
 
-                  {/* "Comprar ya": siempre visible, deshabilitado si no cumple mínimo */}
+                  {/* "Comprar ya": requiere cumplir el mínimo completo de la categoría */}
                   {(() => {
                     const moqBlocked = moqInfo != null && !moqMet;
                     const disabled = moqBlocked || bloqueaCompra;
@@ -735,9 +735,9 @@ function ProductoPage() {
                         {hasTalles && !selectedTalle
                           ? "Elegí tu talle para comprar"
                           : moqInfo && !moqMet && moqInfo.minUnits
-                          ? `Mínimo ${moqInfo.minUnits} unidades para comprar`
+                          ? `Mínimo ${moqInfo.minUnits} unidades para comprar ya`
                           : bloqueaCompra
-                          ? `Mínimo requerido — aumentá la cantidad`
+                          ? `Mínimo requerido para compra directa`
                           : "Comprar ya"}
                       </button>
                     );
@@ -749,41 +749,26 @@ function ProductoPage() {
                     </div>
                   )}
 
-                  {/* "Agregar al carrito": también valida el mínimo */}
-                  {(() => {
-                    const moqBlocked = moqInfo != null && !moqMet;
-                    const cartBlocked = moqBlocked || bloqueaCompra;
-                    return (
-                      <button
-                        type="button"
-                        id="btn-agregar-carrito"
-                        disabled={cartBlocked}
-                        onClick={() => {
-                          if (hasTalles && !selectedTalle) {
-                            setTalleError(true);
-                            return;
-                          }
-                          if (bloqueaCompra) {
-                            setShowMin(true);
-                            return;
-                          }
-                          if (existingInCart) {
-                            cart.setQty(existingInCart.id, qty);
-                          } else {
-                            cart.add(cartItem);
-                          }
-                          navigate({ to: "/carrito" });
-                        }}
-                        className={`btn-base w-full transition-colors font-semibold border ${
-                          cartBlocked
-                            ? "opacity-40 cursor-not-allowed border-border text-muted-foreground"
-                            : "border-border text-foreground hover:border-primary hover:text-primary"
-                        }`}
-                      >
-                        {existingInCart ? "Actualizar cantidad en carrito" : "Agregar al carrito"}
-                      </button>
-                    );
-                  })()}
+                  {/* "Agregar al carrito": permite armar el surtido en el carrito */}
+                  <button
+                    type="button"
+                    id="btn-agregar-carrito"
+                    onClick={() => {
+                      if (hasTalles && !selectedTalle) {
+                        setTalleError(true);
+                        return;
+                      }
+                      if (existingInCart) {
+                        cart.setQty(existingInCart.id, qty);
+                      } else {
+                        cart.add(cartItem);
+                      }
+                      navigate({ to: "/carrito" });
+                    }}
+                    className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary transition-colors font-semibold"
+                  >
+                    {existingInCart ? "Actualizar cantidad en carrito" : "Agregar al carrito (armar surtido)"}
+                  </button>
 
                   <p className="text-center text-xs text-muted-foreground">
                     Pagá con transferencia o con Mercado Pago.

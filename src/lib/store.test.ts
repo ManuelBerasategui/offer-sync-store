@@ -143,16 +143,20 @@ describe("hasMoq", () => {
     expect(info!.minUnits).toBe(10);
   });
 
-  it("retorna null para Tecnología sin moq_group (sin regla de categoría)", () => {
-    // 'Smart Watch Pro' no contiene la palabra 'mate' → no matchea isMate → null ✓
+  it("retorna MoqInfo para Tecnología (mínimo por defecto de 5 unidades)", () => {
     const prod = makeProduct("Smart Watch Pro", "Tecnología", "");
-    expect(hasMoq(prod, rules)).toBeNull();
+    const info = hasMoq(prod, rules);
+    expect(info).not.toBeNull();
+    expect(info!.group).toBe("tecnologia");
+    expect(info!.minUnits).toBe(5);
   });
 
-  it("retorna null para Tecnología con moq_group=undefined (no tocado)", () => {
-    // Idem: nombre no contiene 'mate' → null ✓
+  it("retorna MoqInfo para Tecnología con moq_group=undefined (5 unidades)", () => {
     const prod = makeProduct("Smart Watch Pro", "Tecnología");
-    expect(hasMoq(prod, rules)).toBeNull();
+    const info = hasMoq(prod, rules);
+    expect(info).not.toBeNull();
+    expect(info!.group).toBe("tecnologia");
+    expect(info!.minUnits).toBe(5);
   });
 
   it("isMate fallback aplica aunque la categoría sea 'Tecnología' si el nombre contiene 'mate'", () => {
@@ -171,10 +175,9 @@ describe("hasMoq", () => {
     expect(hasMoq(prod, rules)).toBeNull();
   });
 
-  it("retorna MoqInfo para categoría perfumes con regla dinámica", () => {
-    const customRules = makeRules({ cat_min_units_perfumes: "5" });
-    const prod = makeProduct("Perfume Floral", "Perfumes", "");
-    const info = hasMoq(prod, customRules);
+  it("retorna MoqInfo para categoría perfumes arabes con regla", () => {
+    const prod = makeProduct("Asad Lattafa", "Perfumes Árabes", "");
+    const info = hasMoq(prod, rules);
     expect(info).not.toBeNull();
     expect(info!.minUnits).toBe(5);
   });
@@ -276,9 +279,15 @@ describe("checkCategoryMins — moq_group explícito", () => {
     expect(v[0]!.min).toBe(10);
   });
 
-  it("Tecnología (sin moq_group) → sin violación", () => {
-    const items = [item("Smart Watch Pro", "Tecnología", 1, 100, undefined)];
-    expect(checkCategoryMins(items, rules)).toHaveLength(0);
+  it("Tecnología qty=3 → violación (mínimo 5), qty=5 → sin violación", () => {
+    const itemsShort = [item("Smart Watch Pro", "Tecnología", 3, 100, undefined)];
+    expect(checkCategoryMins(itemsShort, rules)).toHaveLength(1);
+
+    const itemsOk = [
+      item("Smart Watch Pro", "Tecnología", 2, 100, undefined),
+      item("Parlante JBL", "Tecnología", 3, 100, undefined),
+    ];
+    expect(checkCategoryMins(itemsOk, rules)).toHaveLength(0);
   });
 
   it("Mate sin moq_group explícito (isMate fallback) qty=9 → violación", () => {
