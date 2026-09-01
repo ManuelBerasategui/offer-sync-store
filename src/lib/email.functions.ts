@@ -337,9 +337,7 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
           <a href="${waLink}" target="_blank" style="display:inline-block;background:#25d366;color:#ffffff;font-weight:700;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:13px;margin-bottom:8px;">
             💬 Escribinos por WhatsApp (+54 9 3418 05-1515)
           </a>
-          <p style="margin:6px 0 0;font-size:11px;color:#888;">
-            O respondé directamente a este correo.
-          </p>
+
         </div>
       </div>
     </div>
