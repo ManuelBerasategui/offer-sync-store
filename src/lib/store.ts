@@ -144,6 +144,23 @@ export function onImageError(raw?: string) {
 export const FALLBACK_IMAGE =
   "https://placehold.co/600x600/f4f4f5/71717a?text=Sin+imagen";
 
+const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
+
+export function sanitizeUrl(url?: string | null): string {
+  if (!url) return "#";
+  const trimmed = url.trim();
+  if (trimmed.startsWith("/") || trimmed.startsWith("#")) return trimmed;
+  try {
+    const parsed = new URL(trimmed, "https://dummy-base.local");
+    if (ALLOWED_PROTOCOLS.has(parsed.protocol)) {
+      return trimmed;
+    }
+  } catch {
+    // invalid URL
+  }
+  return "#";
+}
+
 export function waLink(config: SiteConfig, messageOrProduct?: string) {
   const phone = (config['whatsapp_individual'] ?? "").replace(/\D/g, "");
   let text = "Hola! Quiero hacer una consulta.";
@@ -158,7 +175,7 @@ export function waLink(config: SiteConfig, messageOrProduct?: string) {
       text = `Hola! Te escribo por: ${messageOrProduct}`;
     }
   }
-  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+  return sanitizeUrl(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
 }
 
 export function categoriesOf(products: Product[]) {

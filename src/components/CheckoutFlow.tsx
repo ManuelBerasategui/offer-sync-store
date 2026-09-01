@@ -22,6 +22,7 @@ import {
   transferDiscountPct,
   getBankInfo,
   waLink,
+  sanitizeUrl,
 } from "@/lib/store";
 
 type CheckoutItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
@@ -212,7 +213,7 @@ export function CheckoutFlow({
         const couponText = couponCode ? ` (con cupón ${couponCode})` : "";
         const waMsg = `¡Hola! Acabo de hacer el pedido ${res.orderCode} por ${money(finalAmount)} mediante Transferencia Bancaria${couponText}. Adjunto el comprobante de pago.`;
         const waUrl = waLink(config ?? {}, waMsg);
-        window.open(waUrl, "_blank");
+        window.open(sanitizeUrl(waUrl), "_blank", "noopener,noreferrer");
 
         // Navegar a la página de gracias
         void navigate({
@@ -245,8 +246,16 @@ export function CheckoutFlow({
           couponCode: couponCode || undefined,
         },
       });
-      if (res.url) window.location.href = res.url;
-      else setError(res.error ?? "No pudimos iniciar el pago.");
+      if (res.url) {
+        const safeUrl = sanitizeUrl(res.url);
+        if (safeUrl !== "#") {
+          window.location.href = safeUrl;
+        } else {
+          setError("URL de pago no válida.");
+        }
+      } else {
+        setError(res.error ?? "No pudimos iniciar el pago.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No pudimos iniciar el pago. Probá de nuevo.");
     } finally {

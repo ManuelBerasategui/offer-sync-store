@@ -8,7 +8,7 @@ import { AdminHeader } from "@/components/AdminHeader";
 import { storeQueryOptions } from "@/lib/store-query";
 import { getAdminPaidOrders, getAdminReservedOrders, updateOrderStatus, type AdminOrder } from "@/lib/orders.functions";
 import { useAuth } from "@/hooks/useAuth";
-import { money } from "@/lib/store";
+import { money, sanitizeUrl } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/ordenes")({
   loader: ({ context }) => {
@@ -189,7 +189,7 @@ TOTAL: ${money(order.total)}`;
     const text = encodeURIComponent(
       `Hola ${order.nombre}! Te escribimos de Te importamos sobre tu pedido ${order.order_code}.`,
     );
-    return `https://wa.me/${cleanPhone}?text=${text}`;
+    return sanitizeUrl(`https://wa.me/${cleanPhone}?text=${text}`);
   };
 
   const navigate = useNavigate();
@@ -516,9 +516,9 @@ TOTAL: ${money(order.total)}`;
 
                         {waClient && (
                           <a
-                            href={waClient}
+                            href={sanitizeUrl(waClient)}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className="btn-base w-full sm:w-auto justify-center bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#128C7E] dark:text-[#25D366] text-xs font-semibold py-2 px-3 flex items-center gap-1.5"
                           >
                             <MessageCircle className="h-3.5 w-3.5" />

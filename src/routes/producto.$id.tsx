@@ -37,6 +37,7 @@ import {
   tiersOf,
   unitPriceFor,
   waLink,
+  sanitizeUrl,
   normCat,
   parseCategoryRules,
   findRuleForCat,
@@ -605,10 +606,10 @@ function ProductoPage() {
                 <a
                   className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
                   href={waOnlyReason
-                    ? `https://wa.me/5493418051515?text=${encodeURIComponent(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""))}`
+                    ? sanitizeUrl(`https://wa.me/5493418051515?text=${encodeURIComponent(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""))}`)
                     : waLink(config, product.nombre)}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                 >
                   {waOnlyReason ? WA_ONLY_CONFIG[waOnlyReason].btnText : "Consultar por WhatsApp"}
                 </a>
@@ -623,7 +624,7 @@ function ProductoPage() {
                   {moqInfo && !moqMet && moqInfo.minUnits && (
                     <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs">
                       <p className="font-bold text-amber-700 dark:text-amber-400">
-                        Compra mínima de {moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
+                         Compra mínima de {moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
                       </p>
                       <p className="mt-0.5 text-muted-foreground">
                         Llevás {qty} unidad{qty !== 1 ? "es" : ""}. Te falta{moqMissing !== 1 ? "n" : ""}
@@ -703,7 +704,7 @@ function ProductoPage() {
           className="btn-base mt-10 w-full bg-whatsapp text-whatsapp-foreground sm:w-auto sm:px-10"
           href={waLink(config, product.nombre)}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
         >
           Contactar por WhatsApp
         </a>

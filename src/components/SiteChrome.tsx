@@ -63,7 +63,7 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
             className="btn-base hidden bg-whatsapp px-4 py-2.5 text-xs text-whatsapp-foreground sm:inline-flex"
             href={waLink(config)}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
           >
             WhatsApp
           </a>

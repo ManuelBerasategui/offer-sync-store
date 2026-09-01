@@ -487,7 +487,7 @@ function CarritoPage() {
               className="btn-base mt-3 w-full bg-whatsapp text-whatsapp-foreground"
               href={waLink(config)}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
             >
               Contactar por WhatsApp
             </a>

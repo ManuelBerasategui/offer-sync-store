@@ -227,7 +227,7 @@ function GraciasPage() {
                 `¡Hola! Adjunto el comprobante de transferencia para el pedido ${code ?? ""} por ${orderState.total ? money(orderState.total) : ""}.`
               )}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
             >
               Enviar comprobante por WhatsApp
             </a>
@@ -246,7 +246,7 @@ function GraciasPage() {
               className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
               href={waLink(config, code ? `Consulta sobre pedido ${code}` : undefined)}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
             >
               Escribinos por WhatsApp
             </a>

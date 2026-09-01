@@ -9,7 +9,7 @@ import { HowItWorks, ReviewsCarousel } from "@/components/Social";
 import { storeQueryOptions } from "@/lib/store-query";
 import {
   FALLBACK_IMAGE, imageUrl,
-  onImageError, isYes, money, toNumber, waLink, type SiteConfig,
+  onImageError, isYes, money, toNumber, waLink, sanitizeUrl, type SiteConfig,
   parseCategoryRules, normCat, transferPrice, transferDiscountPct,
 } from "@/lib/store";
 
@@ -343,9 +343,9 @@ function Home() {
               {config['whatsapp_grupo'] && (
                 <a
                   className="btn-base bg-whatsapp text-whatsapp-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-                  href={config['whatsapp_grupo']}
+                  href={sanitizeUrl(config['whatsapp_grupo'])}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                 >
                   Entrar al grupo
                 </a>
@@ -354,7 +354,7 @@ function Home() {
                 className="btn-base border border-primary/30 text-foreground transition-colors duration-200 hover:bg-primary/5"
                 href={waLink(config)}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
               >
                 Escribirnos directo
               </a>
@@ -410,7 +410,7 @@ function ContactForm({ config }: { config: SiteConfig }) {
     const text = encodeURIComponent(
       `Hola! Soy ${nombre}.\nContacto: ${contacto}\n${mensaje}`,
     );
-    window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
+    window.open(sanitizeUrl(`https://wa.me/${phone}?text=${text}`), "_blank", "noopener,noreferrer");
   };
 
   const inputClass =
