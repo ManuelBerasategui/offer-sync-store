@@ -261,13 +261,33 @@ function Home() {
 
         <div className="relative mx-auto max-w-[1180px]">
           <SectionHead title="Más vendidos" sub="Los tres productos que más salen esta semana." />
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-            {masVendidos.map((p, i) => (
-              <div key={p.id ?? i} className={i === 2 ? "col-span-2 lg:col-span-1" : undefined}>
-                <ProductCard p={p} />
+
+          {masVendidos.length > 0 && (
+            <div className="relative -mx-4 sm:mx-0">
+              <div
+                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
+                  masVendidos.length === 1 ? "justify-center" : ""
+                }`}
+              >
+                {masVendidos.map((p, i) => (
+                  <div
+                    key={p.id ?? i}
+                    className={`snap-center shrink-0 ${
+                      masVendidos.length === 1
+                        ? "w-full max-w-[300px]"
+                        : "w-[72vw] max-w-[280px] sm:w-[260px]"
+                    }`}
+                  >
+                    <ProductCard p={p} config={config} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+              {masVendidos.length > 1 && (
+                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-surface to-transparent sm:block" />
+              )}
+            </div>
+          )}
+
           <div className="mt-8 flex justify-center">
             <Link
               to="/catalogo"
