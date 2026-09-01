@@ -156,100 +156,119 @@ function Home() {
           />
 
           {banners.length > 0 && (
-            <div className="relative -mx-4 mb-6 sm:mx-0">
-              <div
-                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
-                  banners.length === 1 ? "justify-center" : ""
-                }`}
-              >
-                {banners.map((b, i) => {
-                  const basePrice = toNumber(b.precio);
-                  const discPct = transferDiscountPct(config);
-                  const tPrice = transferPrice(basePrice, discPct);
+            <div className="mb-8">
+              <div className="mb-3.5 flex items-center gap-2.5">
+                <span className="text-xs font-black uppercase tracking-widest text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20">
+                  Combos
+                </span>
+                <div className="h-px flex-1 bg-gradient-to-r from-primary/30 to-transparent" />
+              </div>
 
-                  return (
-                    <Link
-                      key={i}
-                      to="/combo/$index"
-                      params={{ index: String(i) }}
-                      className={`group relative flex flex-col snap-center overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${
-                        banners.length === 1
-                          ? "w-full max-w-[440px]"
-                          : "w-[85vw] max-w-[380px] sm:w-[360px] shrink-0"
-                      }`}
-                    >
-                      {/* Contenedor de la foto adaptado a la imagen */}
-                      <div className="relative aspect-square w-full overflow-hidden bg-surface flex items-center justify-center">
-                        <img
-                          src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
-                          alt={b.titulo ?? ""}
-                          referrerPolicy="no-referrer"
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          onError={onImageError(b.imagen_url)}
-                        />
-                        {/* Badge superior */}
-                        <span className="absolute left-2.5 top-2.5 z-10 inline-flex items-center gap-1 rounded-md grad-urgente px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground shadow-md">
-                          <Flame className="h-3 w-3" />
-                          Combo en oferta
-                        </span>
-                      </div>
+              <div className="relative -mx-4 sm:mx-0">
+                <div
+                  className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
+                    banners.length === 1 ? "justify-center" : ""
+                  }`}
+                >
+                  {banners.map((b, i) => {
+                    const basePrice = toNumber(b.precio);
+                    const discPct = transferDiscountPct(config);
+                    const tPrice = transferPrice(basePrice, discPct);
 
-                      {/* Footer con título y precios bien legibles */}
-                      <div className="flex flex-1 flex-col justify-between gap-2 border-t border-border bg-card p-3.5 sm:p-4">
-                        <h3 className="font-bold text-sm sm:text-base text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-1">
-                          {b.titulo}
-                        </h3>
+                    return (
+                      <Link
+                        key={i}
+                        to="/combo/$index"
+                        params={{ index: String(i) }}
+                        className={`group relative flex flex-col snap-center overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${
+                          banners.length === 1
+                            ? "w-full max-w-[440px]"
+                            : "w-[85vw] max-w-[380px] sm:w-[360px] shrink-0"
+                        }`}
+                      >
+                        {/* Contenedor de la foto adaptado a la imagen */}
+                        <div className="relative aspect-square w-full overflow-hidden bg-surface flex items-center justify-center">
+                          <img
+                            src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
+                            alt={b.titulo ?? ""}
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            onError={onImageError(b.imagen_url)}
+                          />
+                          {/* Badge superior */}
+                          <span className="absolute left-2.5 top-2.5 z-10 inline-flex items-center gap-1 rounded-md grad-urgente px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground shadow-md">
+                            <Flame className="h-3 w-3" />
+                            Combo en oferta
+                          </span>
+                        </div>
 
-                        {basePrice > 0 && (
-                          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                            <div className="flex items-baseline gap-1.5 flex-wrap">
-                              <span className="tabular-nums text-base sm:text-lg font-bold text-primary">
-                                {money(tPrice)}
-                              </span>
-                              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                                {discPct}% OFF Transf.
+                        {/* Footer con título y precios bien legibles */}
+                        <div className="flex flex-1 flex-col justify-between gap-2 border-t border-border bg-card p-3.5 sm:p-4">
+                          <h3 className="font-bold text-sm sm:text-base text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-1">
+                            {b.titulo}
+                          </h3>
+
+                          {basePrice > 0 && (
+                            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                              <div className="flex items-baseline gap-1.5 flex-wrap">
+                                <span className="tabular-nums text-base sm:text-lg font-bold text-primary">
+                                  {money(tPrice)}
+                                </span>
+                                <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                                  {discPct}% OFF Transf.
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-muted-foreground">
+                                o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con Mercado Pago
                               </span>
                             </div>
-                            <span className="text-[11px] text-muted-foreground">
-                              o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con Mercado Pago
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </Link>
-                  );
-                })}
+                          )}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+                {/* Hint that there's more to scroll on wider screens when multiple banners exist */}
+                {banners.length > 1 && (
+                  <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
+                )}
               </div>
-              {/* Hint that there's more to scroll on wider screens when multiple banners exist */}
-              {banners.length > 1 && (
-                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
-              )}
             </div>
           )}
 
           {ofertasDelDia.length > 0 && (
-            <div className="relative -mx-4 sm:mx-0">
-              <div
-                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
-                  ofertasDelDia.length === 1 ? "justify-center" : ""
-                }`}
-              >
-                {ofertasDelDia.map((p, i) => (
-                  <div
-                    key={p.id ?? i}
-                    className={`snap-center shrink-0 ${
-                      ofertasDelDia.length === 1
-                        ? "w-full max-w-[300px]"
-                        : "w-[72vw] max-w-[280px] sm:w-[260px]"
-                    }`}
-                  >
-                    <ProductCard p={p} config={config} />
-                  </div>
-                ))}
-              </div>
-              {ofertasDelDia.length > 1 && (
-                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
+            <div className="mt-8">
+              {banners.length > 0 && (
+                <div className="mb-3.5 flex items-center gap-2.5">
+                  <span className="text-xs font-black uppercase tracking-widest text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20">
+                    Productos
+                  </span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-primary/30 to-transparent" />
+                </div>
               )}
+              <div className="relative -mx-4 sm:mx-0">
+                <div
+                  className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
+                    ofertasDelDia.length === 1 ? "justify-center" : ""
+                  }`}
+                >
+                  {ofertasDelDia.map((p, i) => (
+                    <div
+                      key={p.id ?? i}
+                      className={`snap-center shrink-0 ${
+                        ofertasDelDia.length === 1
+                          ? "w-full max-w-[300px]"
+                          : "w-[72vw] max-w-[280px] sm:w-[260px]"
+                      }`}
+                    >
+                      <ProductCard p={p} config={config} />
+                    </div>
+                  ))}
+                </div>
+                {ofertasDelDia.length > 1 && (
+                  <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
+                )}
+              </div>
             </div>
           )}
         </div>
