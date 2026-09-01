@@ -41,12 +41,51 @@ function Home() {
   const { products, banners, config } = data;
 
   const ofertasDelDia = products.filter((p) => hasOffer(p));
-  // Más vendidos: productos con ventas reales esta semana, ordenados de mayor a menor.
-  // Fallback a 'destacado' si todavía no hay ventas registradas.
+
+  // Más vendidos: toma hasta 3 productos con ventas reales esta semana (ordenados de mayor a menor).
+  // Si hay menos de 3, rellena los cupos restantes con productos marcados como 'destacado' (sin repetir).
+  // Si aún faltan, completa con los primeros productos del catálogo.
   const conVentas = [...products]
     .filter((p) => (p.ventas_semana ?? 0) > 0)
     .sort((a, b) => (b.ventas_semana ?? 0) - (a.ventas_semana ?? 0));
-  const masVendidos = (conVentas.length >= 1 ? conVentas : products.filter((p) => isYes(p.destacado))).slice(0, 3);
+
+  const masVendidos: typeof products = [];
+  const seenIds = new Set<string>();
+
+  // 1. Agregar los que tienen ventas reales (hasta 3)
+  for (const p of conVentas) {
+    if (masVendidos.length >= 3) break;
+    const id = String(p.id ?? p.nombre ?? "");
+    if (!seenIds.has(id)) {
+      seenIds.add(id);
+      masVendidos.push(p);
+    }
+  }
+
+  // 2. Rellenar con destacados si hay menos de 3
+  if (masVendidos.length < 3) {
+    const destacados = products.filter((p) => isYes(p.destacado));
+    for (const p of destacados) {
+      if (masVendidos.length >= 3) break;
+      const id = String(p.id ?? p.nombre ?? "");
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        masVendidos.push(p);
+      }
+    }
+  }
+
+  // 3. Fallback con catálogo general si aún faltan
+  if (masVendidos.length < 3) {
+    for (const p of products) {
+      if (masVendidos.length >= 3) break;
+      const id = String(p.id ?? p.nombre ?? "");
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        masVendidos.push(p);
+      }
+    }
+  }
 
 
   return (

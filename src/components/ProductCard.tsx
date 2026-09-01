@@ -51,11 +51,6 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
             🔥 {offerPct > 0 ? `-${offerPct}% OFF` : "OFERTA"}
           </span>
         )}
-        {isYes(p.destacado) && (
-          <span className="absolute right-2 top-2 z-10 rounded-md border border-border bg-background px-2 py-1 text-[10px] font-bold text-foreground">
-            Top
-          </span>
-        )}
         <img
           src={imageUrl(p.imagen_url) || FALLBACK_IMAGE}
           alt={p.nombre ?? "Producto"}
