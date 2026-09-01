@@ -705,51 +705,86 @@ function ProductoPage() {
                       </p>
                     </div>
                   )}
-                  {/* "Comprar ya": visible para productos sin MOQ o cuando el MOQ ya se cumple */}
-                  {(!moqInfo || moqMet) && (
-                    <button
-                      type="button"
-                      id="btn-comprar-ya"
-                      onClick={() => {
-                        if (hasTalles && !selectedTalle) {
-                          setTalleError(true);
-                          return;
-                        }
-                        if (bloqueaCompra) setShowMin(true);
-                        else setShowCheckout(true);
-                      }}
-                      className="btn-base w-full grad-urgente text-primary-foreground transition-all hover:shadow-md"
-                    >
-                      {hasTalles && !selectedTalle
-                        ? "Elegí tu talle para comprar"
-                        : "Comprar ya"}
-                    </button>
-                  )}
+
+                  {/* "Comprar ya": siempre visible, deshabilitado si no cumple mínimo */}
+                  {(() => {
+                    const moqBlocked = moqInfo != null && !moqMet;
+                    const disabled = moqBlocked || bloqueaCompra;
+                    return (
+                      <button
+                        type="button"
+                        id="btn-comprar-ya"
+                        disabled={disabled}
+                        onClick={() => {
+                          if (hasTalles && !selectedTalle) {
+                            setTalleError(true);
+                            return;
+                          }
+                          if (bloqueaCompra) {
+                            setShowMin(true);
+                            return;
+                          }
+                          setShowCheckout(true);
+                        }}
+                        className={`btn-base w-full transition-all font-semibold ${
+                          disabled
+                            ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground border border-border"
+                            : "grad-urgente text-primary-foreground hover:shadow-md"
+                        }`}
+                      >
+                        {hasTalles && !selectedTalle
+                          ? "Elegí tu talle para comprar"
+                          : moqInfo && !moqMet && moqInfo.minUnits
+                          ? `Mínimo ${moqInfo.minUnits} unidades para comprar`
+                          : bloqueaCompra
+                          ? `Mínimo requerido — aumentá la cantidad`
+                          : "Comprar ya"}
+                      </button>
+                    );
+                  })()}
+
                   {existingInCart && (
                     <div className="rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-center text-xs font-semibold text-primary">
                       ✓ Ya tenés {existingInCart.qty} {existingInCart.qty === 1 ? "unidad" : "unidades"} en tu carrito
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    id="btn-agregar-carrito"
-                    onClick={() => {
-                      if (hasTalles && !selectedTalle) {
-                        setTalleError(true);
-                        return;
-                      }
-                      if (existingInCart) {
-                        cart.setQty(existingInCart.id, qty);
-                      } else {
-                        cart.add(cartItem);
-                      }
-                      navigate({ to: "/carrito" });
-                    }}
-                    className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary transition-colors font-semibold"
-                  >
-                    {existingInCart ? "Actualizar cantidad en carrito" : "Agregar al carrito"}
-                  </button>
+                  {/* "Agregar al carrito": también valida el mínimo */}
+                  {(() => {
+                    const moqBlocked = moqInfo != null && !moqMet;
+                    const cartBlocked = moqBlocked || bloqueaCompra;
+                    return (
+                      <button
+                        type="button"
+                        id="btn-agregar-carrito"
+                        disabled={cartBlocked}
+                        onClick={() => {
+                          if (hasTalles && !selectedTalle) {
+                            setTalleError(true);
+                            return;
+                          }
+                          if (bloqueaCompra) {
+                            setShowMin(true);
+                            return;
+                          }
+                          if (existingInCart) {
+                            cart.setQty(existingInCart.id, qty);
+                          } else {
+                            cart.add(cartItem);
+                          }
+                          navigate({ to: "/carrito" });
+                        }}
+                        className={`btn-base w-full transition-colors font-semibold border ${
+                          cartBlocked
+                            ? "opacity-40 cursor-not-allowed border-border text-muted-foreground"
+                            : "border-border text-foreground hover:border-primary hover:text-primary"
+                        }`}
+                      >
+                        {existingInCart ? "Actualizar cantidad en carrito" : "Agregar al carrito"}
+                      </button>
+                    );
+                  })()}
+
                   <p className="text-center text-xs text-muted-foreground">
                     Pagá con transferencia o con Mercado Pago.
                   </p>
