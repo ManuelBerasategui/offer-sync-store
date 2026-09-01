@@ -957,17 +957,26 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
         const discountPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
 
         // 3. Verificar si el usuario ya consumió el cupón en coupon_usages
-        const { data: usageRows } = await supabaseAdmin
+        const filterParts: string[] = [`user_id.eq.${verifiedUserId}`];
+        if (verifiedEmail) {
+          filterParts.push(`user_email.ilike.${verifiedEmail.trim().toLowerCase()}`);
+        }
+
+        const { data: usageRows, error: usageErr } = await supabaseAdmin
           .from("coupon_usages")
           .select("id")
           .eq("coupon_code", validCode)
-          .or(`user_id.eq.${verifiedUserId}${verifiedEmail ? `,user_email.eq.${verifiedEmail}` : ""}`)
+          .or(filterParts.join(","))
           .limit(1);
+
+        if (usageErr) {
+          console.warn("Error consultando coupon_usages:", usageErr);
+        }
 
         if (usageRows && usageRows.length > 0) {
           return {
             valid: false,
-            error: "Ya utilizaste este código promocional en una compra anterior (válido 1 sola vez por cuenta).",
+            error: "Ya utilizaste este cupón en una compra anterior (válido 1 sola vez por cuenta).",
           };
         }
 

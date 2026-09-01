@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Plus, X, Save, Settings2 } from "lucide-react";
 
@@ -47,6 +47,7 @@ function AdminConfiguracionPage() {
   const { config } = storeData;
   const { user, session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -288,6 +289,8 @@ function AdminConfiguracionPage() {
         },
       });
       if (res.error) { setError(res.error); return; }
+      // Invalidar la cache para que el próximo F5 lea los nuevos valores
+      void queryClient.invalidateQueries({ queryKey: ["store"] });
       setSuccessMsg("¡Configuración guardada correctamente!");
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err) {

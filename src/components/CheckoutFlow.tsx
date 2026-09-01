@@ -381,6 +381,9 @@ export function CheckoutFlow({
               <span className="mt-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
                 {discPct}% OFF
               </span>
+              <span className="mt-1 tabular-nums text-sm font-bold text-foreground">
+                {money(finalTransferTotal)}
+              </span>
             </button>
 
             <button
@@ -399,6 +402,9 @@ export function CheckoutFlow({
               <span className="mt-1 text-[10px] text-muted-foreground">
                 Precio de lista
               </span>
+              <span className="mt-1 tabular-nums text-sm font-bold text-foreground">
+                {money(finalMpTotal)}
+              </span>
             </button>
           </div>
 
@@ -408,17 +414,12 @@ export function CheckoutFlow({
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
                 <div className="flex items-baseline justify-between">
                   <span className="text-xs font-bold uppercase tracking-[1px] text-emerald-700 dark:text-emerald-400">
-                    {appliedCoupon
-                      ? `Total (${discPct}% Transf. + ${appliedCoupon.discountPct}% Cupón ${appliedCoupon.code}):`
-                      : `Total con ${discPct}% de descuento:`}
+                    Total a pagar (Transferencia)
                   </span>
                   <span className="tabular-nums text-2xl font-bold text-foreground">
                     {money(finalTransferTotal)}
                   </span>
                 </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  (Precio regular: <span className="line-through">{money(total)}</span> — ¡Ahorrás {money(total - finalTransferTotal)}!)
-                </p>
               </div>
 
               {/* Datos Bancarios */}
@@ -511,9 +512,7 @@ export function CheckoutFlow({
             <div className="flex flex-col gap-4">
               <div className="flex items-baseline justify-between">
                 <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
-                  {appliedCoupon
-                    ? `Total con ${appliedCoupon.discountPct}% OFF Cupón ${appliedCoupon.code}:`
-                    : "Total a pagar"}
+                  Total a pagar (Mercado Pago)
                 </span>
                 <div className="flex items-baseline gap-2">
                   {appliedCoupon && (

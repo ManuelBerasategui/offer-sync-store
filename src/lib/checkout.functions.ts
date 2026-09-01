@@ -211,11 +211,15 @@ export const createCheckout = createServerFn({ method: "POST" })
         const promoCode = (configObj["promo_cupon_codigo"] ?? "TEIMPORTAMOS").toUpperCase().trim();
 
         if (isCouponActive && data.couponCode === promoCode) {
+          const filterParts: string[] = [`user_id.eq.${data.userId}`];
+          if (data.shipping.email) {
+            filterParts.push(`user_email.ilike.${data.shipping.email.trim().toLowerCase()}`);
+          }
           const { data: usages } = await supabaseAdmin
             .from("coupon_usages")
             .select("id")
             .eq("coupon_code", promoCode)
-            .or(`user_id.eq.${data.userId}${data.shipping.email ? `,user_email.eq.${data.shipping.email}` : ""}`)
+            .or(filterParts.join(","))
             .limit(1);
 
           if (!usages || usages.length === 0) {
@@ -264,7 +268,7 @@ export const createCheckout = createServerFn({ method: "POST" })
         try {
           await supabaseAdmin.from("coupon_usages").insert({
             user_id: data.userId ?? null,
-            user_email: data.shipping.email ?? "",
+            user_email: (data.shipping.email ?? "").trim().toLowerCase(),
             coupon_code: validCouponApplied,
             order_code: orderCode,
             discount_amount: couponDiscountAmount,

@@ -25,8 +25,6 @@ import {
   checkCategoryMins,
   normCat,
   findRuleForCat,
-  transferPrice,
-  transferDiscountPct,
 } from "@/lib/store";
 
 /**
@@ -133,11 +131,6 @@ function CarritoPage() {
 
   const couponPct = appliedCoupon?.discountPct ?? 0;
   const couponDiscountAmount = couponPct > 0 ? Math.round(cart.total * (couponPct / 100)) : 0;
-  const mpTotalDiscounted = Math.max(1, cart.total - couponDiscountAmount);
-
-  const transferBase = transferPrice(cart.total, transferDiscountPct(config));
-  const transferCouponDiscount = couponPct > 0 ? Math.round(transferBase * (couponPct / 100)) : 0;
-  const transferTotalDiscounted = Math.max(1, transferBase - transferCouponDiscount);
 
   async function handleApplyCoupon(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -169,7 +162,7 @@ function CarritoPage() {
         const validCode = res.code || code;
         const disc = res.discountPct || 5;
         setAppliedCoupon({ code: validCode, discountPct: disc });
-        setCouponSuccess(`¡Cupón ${validCode} aplicado! (${disc}% OFF adicional)`);
+        setCouponSuccess(`¡Descuento aplicado! (${disc}% OFF)`);
         setCouponError("");
       }
     } catch {
@@ -323,14 +316,14 @@ function CarritoPage() {
               <div className="flex items-center gap-2 mb-2">
                 <Tag className="h-4 w-4 text-primary" />
                 <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-                  Código de Descuento / Cupón
+                  Código de descuento
                 </span>
               </div>
 
               {!user ? (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg bg-surface p-3 text-xs">
                   <span className="text-muted-foreground">
-                    💡 ¿Tenés un cupón como <strong>TEIMPORTAMOS</strong>? Iniciá sesión con tu cuenta para canjearlo.
+                    💡 ¿Tenés un cupón de descuento? Iniciá sesión con tu cuenta para canjearlo.
                   </span>
                   <Link
                     to="/auth"
@@ -366,7 +359,7 @@ function CarritoPage() {
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="Ingresá tu cupón (ej: TEIMPORTAMOS)"
+                      placeholder="Ingresá tu código de descuento"
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                       className="input-base font-mono uppercase text-xs tracking-wider"
@@ -389,7 +382,7 @@ function CarritoPage() {
               )}
             </div>
 
-            {/* Totales */}
+            {/* Resumen de totales simplificado — el precio final se muestra al elegir método de pago */}
             <div className="mt-4 flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
               {matesUnits > 0 && (
                 <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2 text-xs">
@@ -402,57 +395,21 @@ function CarritoPage() {
                 </div>
               )}
 
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground font-medium">Subtotal de lista:</span>
+                <span className="tabular-nums font-semibold text-foreground">{money(cart.total)}</span>
+              </div>
+
               {appliedCoupon && (
-                <div className="flex items-center justify-between border-b border-border/60 pb-2 text-xs">
-                  <span className="text-muted-foreground font-medium">
-                    Subtotal de lista:
-                  </span>
-                  <span className="tabular-nums font-semibold text-foreground/80">
-                    {money(cart.total)}
-                  </span>
+                <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold">
+                  <span>Descuento ({appliedCoupon.discountPct}% OFF):</span>
+                  <span className="tabular-nums">-{money(couponDiscountAmount)}</span>
                 </div>
               )}
 
-              {appliedCoupon && (
-                <div className="flex items-center justify-between border-b border-border/60 pb-2 text-xs text-emerald-600 font-semibold">
-                  <span>
-                    Cupón {appliedCoupon.code} ({appliedCoupon.discountPct}% OFF):
-                  </span>
-                  <span className="tabular-nums">
-                    -{money(couponDiscountAmount)}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
-                <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
-                  Total con Transferencia
-                </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="tabular-nums text-2xl font-bold text-foreground">
-                    {money(transferTotalDiscounted)}
-                  </span>
-                  <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                    {appliedCoupon
-                      ? `${transferDiscountPct(config)}% + ${appliedCoupon.discountPct}% OFF`
-                      : `${transferDiscountPct(config)}% OFF`}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-baseline justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
-                <span>Total con Mercado Pago:</span>
-                <div className="flex items-baseline gap-1.5">
-                  {appliedCoupon && (
-                    <span className="line-through text-[11px] opacity-75">
-                      {money(cart.total)}
-                    </span>
-                  )}
-                  <span className="font-semibold tabular-nums text-foreground/80">
-                    {money(mpTotalDiscounted)}
-                  </span>
-                </div>
-              </div>
+              <p className="text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+                El precio final según tu método de pago se muestra en el checkout ↓
+              </p>
             </div>
 
             <div className="mt-4">

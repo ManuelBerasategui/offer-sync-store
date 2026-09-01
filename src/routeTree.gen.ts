@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CarritoRouteImport } from './routes/carrito'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
@@ -24,6 +25,11 @@ import { Route as ProductoIdRouteImport } from './routes/producto.$id'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -52,19 +58,19 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminConfiguracionRoute = AdminConfiguracionRouteImport.update({
-  id: '/admin/configuracion',
-  path: '/admin/configuracion',
-  getParentRoute: () => rootRouteImport,
+  id: '/configuracion',
+  path: '/configuracion',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminOrdenesRoute = AdminOrdenesRouteImport.update({
-  id: '/admin/ordenes',
-  path: '/admin/ordenes',
-  getParentRoute: () => rootRouteImport,
+  id: '/ordenes',
+  path: '/ordenes',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminProductosRoute = AdminProductosRouteImport.update({
-  id: '/admin/productos',
-  path: '/admin/productos',
-  getParentRoute: () => rootRouteImport,
+  id: '/productos',
+  path: '/productos',
+  getParentRoute: () => AdminRoute,
 } as any)
 const ComboIndexRoute = ComboIndexRouteImport.update({
   id: '/combo/$index',
@@ -79,6 +85,7 @@ const ProductoIdRoute = ProductoIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
@@ -92,6 +99,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
@@ -106,6 +114,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/carrito': typeof CarritoRoute
   '/catalogo': typeof CatalogoRoute
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/auth'
     | '/carrito'
     | '/catalogo'
@@ -134,6 +144,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/auth'
     | '/carrito'
     | '/catalogo'
@@ -147,6 +158,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/auth'
     | '/carrito'
     | '/catalogo'
@@ -161,14 +173,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   CarritoRoute: typeof CarritoRoute
   CatalogoRoute: typeof CatalogoRoute
   GraciasRoute: typeof GraciasRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
-  AdminConfiguracionRoute: typeof AdminConfiguracionRoute
-  AdminOrdenesRoute: typeof AdminOrdenesRoute
-  AdminProductosRoute: typeof AdminProductosRoute
   ComboIndexRoute: typeof ComboIndexRoute
   ProductoIdRoute: typeof ProductoIdRoute
 }
@@ -180,6 +190,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -219,24 +236,24 @@ declare module '@tanstack/react-router' {
     }
     '/admin/configuracion': {
       id: '/admin/configuracion'
-      path: '/admin/configuracion'
+      path: '/configuracion'
       fullPath: '/admin/configuracion'
       preLoaderRoute: typeof AdminConfiguracionRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/ordenes': {
       id: '/admin/ordenes'
-      path: '/admin/ordenes'
+      path: '/ordenes'
       fullPath: '/admin/ordenes'
       preLoaderRoute: typeof AdminOrdenesRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/productos': {
       id: '/admin/productos'
-      path: '/admin/productos'
+      path: '/productos'
       fullPath: '/admin/productos'
       preLoaderRoute: typeof AdminProductosRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/combo/$index': {
       id: '/combo/$index'
@@ -255,16 +272,28 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminConfiguracionRoute: typeof AdminConfiguracionRoute
+  AdminOrdenesRoute: typeof AdminOrdenesRoute
+  AdminProductosRoute: typeof AdminProductosRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminConfiguracionRoute: AdminConfiguracionRoute,
+  AdminOrdenesRoute: AdminOrdenesRoute,
+  AdminProductosRoute: AdminProductosRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   CarritoRoute: CarritoRoute,
   CatalogoRoute: CatalogoRoute,
   GraciasRoute: GraciasRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-  AdminConfiguracionRoute: AdminConfiguracionRoute,
-  AdminOrdenesRoute: AdminOrdenesRoute,
-  AdminProductosRoute: AdminProductosRoute,
   ComboIndexRoute: ComboIndexRoute,
   ProductoIdRoute: ProductoIdRoute,
 }
