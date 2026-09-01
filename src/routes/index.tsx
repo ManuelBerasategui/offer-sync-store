@@ -171,7 +171,7 @@ function Home() {
                               </span>
                             </div>
                             <span className="text-[11px] text-muted-foreground">
-                              o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> tarjeta / MP
+                              o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con Mercado Pago
                             </span>
                           </div>
                         )}

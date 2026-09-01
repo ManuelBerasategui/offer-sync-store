@@ -79,7 +79,7 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con tarjeta / MP
+                  o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con Mercado Pago
                 </p>
               </div>
 

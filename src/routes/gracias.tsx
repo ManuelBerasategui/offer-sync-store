@@ -151,7 +151,7 @@ function GraciasPage() {
               </span>
               <h1 className="text-3xl font-bold">Pago en revisión</h1>
               <p className="mt-4 text-muted-foreground">
-                Tu pago con tarjeta / Mercado Pago está siendo procesado. En cuanto se acredite te avisaremos y prepararemos tu pedido.
+                Tu pago con Mercado Pago está siendo procesado. En cuanto se acredite te avisaremos y prepararemos tu pedido.
               </p>
             </>
           )

@@ -122,7 +122,7 @@ function ComboPage() {
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con tarjeta o Mercado Pago
+                    o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con Mercado Pago
                   </p>
                 </div>
               </div>

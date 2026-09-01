@@ -326,7 +326,7 @@ function CarritoPage() {
                 </div>
               </div>
               <div className="flex items-baseline justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
-                <span>Total con tarjeta o Mercado Pago:</span>
+                <span>Total con Mercado Pago:</span>
                 <span className="font-semibold tabular-nums text-foreground/80">{money(cart.total)}</span>
               </div>
             </div>

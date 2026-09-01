@@ -11,8 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CardPaymentForm, type CardFormData } from "@/components/CardPaymentForm";
-import { payOrderWithCard, createTransferOrder } from "@/lib/orders.functions";
+import { createTransferOrder } from "@/lib/orders.functions";
 import { createCheckout } from "@/lib/checkout.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { storeQueryOptions } from "@/lib/store-query";
@@ -68,7 +67,7 @@ const EMPTY: ShippingForm = {
 
 /**
  * Flujo de pre-pago: 1) datos de envío (autocompletados si hay sesión) 2) pago
- * (tarjeta en la propia página o botón directo a Mercado Pago).
+ * (Transferencia con descuento o Mercado Pago Checkout Pro).
  */
 export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: number }) {
   const { user, profile } = useAuth();
@@ -78,13 +77,12 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
   const config = storeData?.config;
 
   const [step, setStep] = useState<"shipping" | "payment">("shipping");
-  const [paymentMethod, setPaymentMethod] = useState<"transfer" | "card">("transfer");
+  const [paymentMethod, setPaymentMethod] = useState<"transfer" | "mercadopago">("transfer");
   const [form, setForm] = useState<ShippingForm>(EMPTY);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [promptShown, setPromptShown] = useState(false);
   const [mpLoading, setMpLoading] = useState(false);
   const [transferLoading, setTransferLoading] = useState(false);
-  const [cardMsg, setCardMsg] = useState("");
   const [error, setError] = useState("");
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -242,38 +240,6 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
     }
   };
 
-  const payWithCard = async (cardData: CardFormData) => {
-    setCardMsg("");
-    try {
-      const res = await payOrderWithCard({
-        data: {
-          ...cardData,
-          shipping: form,
-          items,
-          userId: user?.id,
-        },
-      });
-      if (res.status === "approved" && res.orderCode) {
-        cart.clear();
-        void navigate({ to: "/gracias", search: { code: res.orderCode, status: "approved" } });
-      } else if (res.status === "pending" && res.orderCode) {
-        cart.clear();
-        void navigate({ to: "/gracias", search: { code: res.orderCode, status: "pending" } });
-      } else {
-        const errorMsg = res.message ?? "No pudimos procesar el pago con tarjeta.";
-        setCardMsg(errorMsg);
-        throw new Error(errorMsg);
-      }
-    } catch (err) {
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-          : "No pudimos procesar el pago con tarjeta. Probá con Mercado Pago.";
-      setCardMsg(errorMsg);
-      throw err;
-    }
-  };
-
   return (
     <div className="card-soft p-5">
       {/* Pasos */}
@@ -396,16 +362,16 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
 
             <button
               type="button"
-              onClick={() => setPaymentMethod("card")}
+              onClick={() => setPaymentMethod("mercadopago")}
               className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
-                paymentMethod === "card"
-                  ? "border-primary bg-primary/10 shadow-sm"
+                paymentMethod === "mercadopago"
+                  ? "border-[#009ee3] bg-[#009ee3]/10 shadow-sm"
                   : "border-border bg-card hover:border-border/80"
               }`}
             >
               <div className="flex items-center gap-1.5">
-                <CreditCard className={`h-4 w-4 ${paymentMethod === "card" ? "text-primary" : "text-muted-foreground"}`} />
-                <span className="text-xs font-bold">Tarjeta / MP</span>
+                <CreditCard className={`h-4 w-4 ${paymentMethod === "mercadopago" ? "text-[#009ee3]" : "text-muted-foreground"}`} />
+                <span className="text-xs font-bold">Mercado Pago</span>
               </div>
               <span className="mt-1 text-[10px] text-muted-foreground">
                 Precio de lista
@@ -516,7 +482,7 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
               {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
           ) : (
-            /* OPCIÓN TARJETA / MERCADO PAGO */
+            /* OPCIÓN MERCADO PAGO CHECKOUT PRO */
             <div className="flex flex-col gap-4">
               <div className="flex items-baseline justify-between">
                 <span className="text-sm font-semibold uppercase tracking-[1px] text-muted-foreground">
@@ -525,31 +491,22 @@ export function CheckoutFlow({ items, total }: { items: CheckoutItem[]; total: n
                 <span className="tabular-nums text-xl font-bold">{money(total)}</span>
               </div>
 
-              <div>
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
-                  Pagar con tarjeta
+              <div className="rounded-xl border border-[#009ee3]/30 bg-[#009ee3]/5 p-4 text-xs space-y-1.5">
+                <p className="font-semibold text-foreground">
+                  Pagá de forma 100% segura con Mercado Pago
                 </p>
-                <CardPaymentForm
-                  amount={total}
-                  email={form.email}
-                  documentNumber={form.dni}
-                  onPay={payWithCard}
-                />
-                {cardMsg && <p className="mt-2 text-sm text-destructive">{cardMsg}</p>}
-              </div>
-
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <div className="h-px flex-1 bg-border" />
-                o
-                <div className="h-px flex-1 bg-border" />
+                <p className="text-muted-foreground leading-relaxed">
+                  Serás redirigido al Checkout oficial de Mercado Pago para pagar con tarjeta de crédito, débito, saldo en cuenta o en efectivo.
+                </p>
               </div>
 
               <button
+                type="button"
                 onClick={goMercadoPago}
                 disabled={mpLoading}
-                className="btn-base bg-[#009ee3] text-white disabled:opacity-60"
+                className="btn-base bg-[#009ee3] hover:bg-[#0089c7] text-white disabled:opacity-60 transition-colors"
               >
-                {mpLoading ? "Redirigiendo..." : "Pagar con Mercado Pago"}
+                {mpLoading ? "Redirigiendo a Mercado Pago..." : "Pagar con Mercado Pago"}
               </button>
 
               <button

@@ -311,7 +311,7 @@ function ProductoPage() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    o <span className="font-semibold text-foreground/80">{money(unit)}</span> con tarjeta o Mercado Pago
+                    o <span className="font-semibold text-foreground/80">{money(unit)}</span> con Mercado Pago
                   </p>
                 </div>
 

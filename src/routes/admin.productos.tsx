@@ -2152,7 +2152,7 @@ function ComboBuilderPanel({
                     </span>
                   </div>
                   <div className="border-t border-border/60 pt-1.5 flex justify-between items-center">
-                    <span className="font-semibold text-foreground">Precio Lista / Tarjeta / MP (+7%):</span>
+                    <span className="font-semibold text-foreground">Precio Lista / Mercado Pago (+7%):</span>
                     <span className="font-bold text-foreground">
                       {money(finalArs)} {finalUsd > 0 ? `(u$d ${finalUsd})` : ""}
                     </span>
@@ -2273,7 +2273,7 @@ function ComboBuilderPanel({
                       </span>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      o <span className="font-semibold text-foreground/80">{money(bPrice)}</span> con tarjeta / MP
+                      o <span className="font-semibold text-foreground/80">{money(bPrice)}</span> con Mercado Pago
                       {b.precio_usd ? ` (u$d ${b.precio_usd})` : ""}
                     </p>
                   </div>
