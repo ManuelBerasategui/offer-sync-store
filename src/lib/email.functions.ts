@@ -349,42 +349,51 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
  * Fire-and-forget: no lanza error si falla, solo loguea.
  */
 export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success: boolean; error?: string }> {
-  let apiKey =
-    process.env["RESEND_API_KEY"] ||
-    process.env["VITE_RESEND_API_KEY"] ||
-    (typeof import.meta !== "undefined" && import.meta.env ? (import.meta.env["VITE_RESEND_API_KEY"] as string | undefined) || (import.meta.env["RESEND_API_KEY"] as string | undefined) : undefined);
+  let apiKey: string | undefined;
+  let fromAddress: string | undefined;
 
-  let fromAddress =
-    process.env["RESEND_FROM"] ||
-    process.env["VITE_RESEND_FROM"] ||
-    (typeof import.meta !== "undefined" && import.meta.env ? (import.meta.env["VITE_RESEND_FROM"] as string | undefined) || (import.meta.env["RESEND_FROM"] as string | undefined) : undefined);
+  // 1. Prioridad: leer credenciales directamente de site_config (configuradas por el admin)
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows } = await (supabaseAdmin as any)
+      .from("site_config")
+      .select("clave, valor")
+      .in("clave", ["resend_api_key", "resend_from"]);
 
-  // Fallback: leer de la tabla site_config de Supabase
-  if (!apiKey || !fromAddress) {
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: rows } = await (supabaseAdmin as any)
-        .from("site_config")
-        .select("clave, valor")
-        .in("clave", ["resend_api_key", "resend_from"]);
-
-      if (rows && Array.isArray(rows)) {
-        for (const r of rows) {
-          if (r.clave === "resend_api_key" && r.valor && !apiKey) apiKey = String(r.valor);
-          if (r.clave === "resend_from" && r.valor && !fromAddress) fromAddress = String(r.valor);
-        }
+    if (rows && Array.isArray(rows)) {
+      for (const r of rows) {
+        if (r.clave === "resend_api_key" && r.valor) apiKey = String(r.valor).trim();
+        if (r.clave === "resend_from" && r.valor) fromAddress = String(r.valor).trim();
       }
-    } catch (err) {
-      console.error("[email] Error leyendo site_config para Resend:", err);
     }
+  } catch (err) {
+    console.error("[email] Error leyendo site_config para Resend:", err);
   }
 
-  fromAddress = (fromAddress || "Te Importamos <noreply@teimportamosarg.com>")
-    .replace(/@teimportamos\.arg\b/i, "@teimportamosarg.com")
-    .replace(/@teimportamos\.com\b/i, "@teimportamosarg.com");
+  // 2. Fallback a variables de entorno
+  if (!apiKey) {
+    apiKey =
+      process.env["RESEND_API_KEY"] ||
+      process.env["VITE_RESEND_API_KEY"] ||
+      (typeof import.meta !== "undefined" && import.meta.env
+        ? (import.meta.env["VITE_RESEND_API_KEY"] as string | undefined) ||
+          (import.meta.env["RESEND_API_KEY"] as string | undefined)
+        : undefined);
+  }
+
+  if (!fromAddress) {
+    fromAddress =
+      process.env["RESEND_FROM"] ||
+      process.env["VITE_RESEND_FROM"] ||
+      (typeof import.meta !== "undefined" && import.meta.env
+        ? (import.meta.env["VITE_RESEND_FROM"] as string | undefined) ||
+          (import.meta.env["RESEND_FROM"] as string | undefined)
+        : undefined) ||
+      "Te Importamos <noreply@teimportamosarg.com>";
+  }
 
   if (!apiKey) {
-    const msg = "[email] RESEND_API_KEY no está configurada ni en env ni en site_config — se omite el email.";
+    const msg = "[email] RESEND_API_KEY no está configurada ni en base de datos ni en variables de entorno — se omite el email.";
     console.warn(msg);
     return { success: false, error: msg };
   }
@@ -392,6 +401,8 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
   const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
   let adminSuccess = false;
   let adminError = "";
+  let customerSuccess = false;
+  let customerError = "";
 
   try {
     // 1. Enviar notificación al equipo Administrador
@@ -428,7 +439,7 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
 
     if (!resAdmin.ok) {
       const body = await resAdmin.text().catch(() => "");
-      adminError = `Error ${resAdmin.status}: ${body}`;
+      adminError = `Admin error ${resAdmin.status}: ${body}`;
       console.error("[email] Error al enviar notificación a admins:", resAdmin.status, body);
     } else {
       adminSuccess = true;
@@ -450,18 +461,38 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
           subject: `📦 Confirmación de tu pedido #${order.orderCode} — Te Importamos`,
           reply_to: "teimportamosar@gmail.com",
           html: buildCustomerEmailHtml(order),
+          text: [
+            `¡Hola ${order.shipping.nombre}!`,
+            ``,
+            `Recibimos tu pedido #${order.orderCode} en Te Importamos con éxito.`,
+            `Total a abonar: ${money(order.total)} (${metodoPago})`,
+            ``,
+            `Resumen de tu pedido:`,
+            ...order.items.map((i) => `- ${i.nombre} x${i.qty} = ${money(i.qty * i.unitPrice)}`),
+            ``,
+            order.metodoPago === "transferencia"
+              ? `Recordá enviar tu comprobante de transferencia por WhatsApp (+54 9 3418 05-1515) para reservar tu stock y despachar tu pedido.`
+              : `Tu pago fue aprobado. Ya estamos preparando tu paquete para despacharlo.`,
+            ``,
+            `¡Gracias por confiar en Te Importamos!`,
+          ].join("\n"),
         }),
       });
 
       if (!resCustomer.ok) {
         const body = await resCustomer.text().catch(() => "");
+        customerError = `Cliente error ${resCustomer.status}: ${body}`;
         console.error("[email] Error al enviar confirmación al cliente:", resCustomer.status, body);
       } else {
+        customerSuccess = true;
         console.log(`[email] Confirmación enviada al cliente: ${customerEmail}`);
       }
     }
 
-    return { success: adminSuccess, error: adminError || undefined };
+    const finalSuccess = adminSuccess || customerSuccess;
+    const finalError = [adminError, customerError].filter(Boolean).join(" | ");
+
+    return { success: finalSuccess, error: finalError || undefined };
   } catch (err) {
     const errStr = err instanceof Error ? err.message : String(err);
     console.error("[email] Error inesperado al enviar emails de orden:", err);
