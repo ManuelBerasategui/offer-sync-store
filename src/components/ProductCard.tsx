@@ -2,6 +2,9 @@ import { Link } from "@tanstack/react-router";
 import {
   FALLBACK_IMAGE,
   hasOffer,
+  offerDiscountPct,
+  originalPriceOf,
+  priceOf,
   imageUrl,
   onImageError,
   isWhatsappOnly,
@@ -19,11 +22,13 @@ import type { Product, SiteConfig } from "@/lib/store";
 
 export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) {
   const offer = hasOffer(p);
-  const hasDiscount = isYes(p.descuento) && !offer;
+  const offerPct = offer ? offerDiscountPct(p) : 0;
   const consultar = isWhatsappOnly(p);
   const waOnlyReason = waOnlyReasonOf(p as unknown as Record<string, unknown>);
   const isWaPriceHidden = waOnlyReason ? Boolean(WA_ONLY_CONFIG[waOnlyReason]?.hidePrice) : false;
-  const basePrice = offer ? toNumber(p.precio_oferta) : toNumber(p.precio);
+  const basePrice = priceOf(p);
+  const origPrice = originalPriceOf(p);
+  const isDiscounted = offer && origPrice > basePrice;
   const hidePrice = isWaPriceHidden || basePrice <= 0 || isNaN(basePrice);
   const tiers = tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
@@ -42,13 +47,8 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
         className="relative block aspect-square bg-surface"
       >
         {offer && !consultar && !hidePrice && (
-          <span className="absolute left-2 top-2 z-10 rounded-md bg-primary px-2 py-1 text-[10px] font-bold uppercase text-primary-foreground">
-            Oferta
-          </span>
-        )}
-        {hasDiscount && !consultar && !hidePrice && (
-          <span className="absolute left-2 top-2 z-10 inline-flex items-center gap-0.5 rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-bold uppercase text-white">
-            🎁 Descuento
+          <span className="absolute left-2 top-2 z-10 rounded-md bg-red-600 px-2 py-1 text-[10px] font-extrabold uppercase text-white shadow-sm flex items-center gap-1">
+            🔥 {offerPct > 0 ? `-${offerPct}% OFF` : "OFERTA"}
           </span>
         )}
         {isYes(p.destacado) && (
@@ -88,6 +88,14 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
           ) : (
             <div>
               <div className="flex flex-col">
+                {isDiscounted && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                    <span className="line-through tabular-nums">{money(origPrice)}</span>
+                    <span className="text-[10px] font-bold text-red-600 dark:text-red-400">
+                      -{offerPct}% OFF
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-baseline gap-1.5 flex-wrap">
                   <span className="tabular-nums text-lg font-bold text-foreground">
                     {money(tPrice)}
@@ -121,4 +129,5 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
     </div>
   );
 }
+
 

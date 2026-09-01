@@ -34,6 +34,9 @@ import {
   type MoqInfo,
   money,
   priceOf,
+  hasOffer,
+  originalPriceOf,
+  offerDiscountPct,
   tiersOf,
   unitPriceFor,
   waLink,
@@ -214,8 +217,18 @@ function ProductoPage() {
     : product.nombre ?? "Producto";
   const displayName = selectedVariant ? `${baseName} ${selectedVariant.color}`.trim() : product.nombre ?? "Producto";
 
+  const isOffer = hasOffer(product);
+  const offerPct = isOffer ? offerDiscountPct(product) : 0;
+  const rawBasePrice = selectedVariant ? Number(selectedVariant.precio) : Number(product.precio ?? 0);
+  const basePrice = isOffer
+    ? (selectedVariant && selectedVariant.id !== "default_base"
+        ? Math.round(rawBasePrice * (1 - offerPct / 100))
+        : priceOf(product))
+    : (selectedVariant ? Number(selectedVariant.precio) : priceOf(product));
+  const origPrice = selectedVariant ? Number(selectedVariant.precio) : originalPriceOf(product);
+  const isOfferDiscounted = isOffer && origPrice > basePrice;
+
   const displayNameWithTalle = selectedTalle ? `${displayName} (Talle: ${selectedTalle})` : displayName;
-  const basePrice = selectedVariant ? Number(selectedVariant.precio) : priceOf(product);
   const selectedImage = selectedVariant?.imagen_url || product.imagen_url;
   const catRules = useMemo(() => parseCategoryRules(config), [config]);
   const categoryRuleMatch = useMemo(() => {
@@ -248,25 +261,11 @@ function ProductoPage() {
   const categoryMinViolation = checkCategoryMins(
     [{ nombre: product.nombre, categoria: product.categoria,
        moq_group: moqGroupOf(product as Record<string, unknown>) ?? undefined,
-       qty, unitPrice: basePrice }],
+       qty, unitPrice: unit }],
     catRules,
   )[0];
-  const bloqueaCompra = (suplemento && total < SUPLEMENTOS_MIN) || Boolean(categoryMinViolation);
-  const minDialogTitle = categoryMinViolation
-    ? `Compra mínima de ${categoryMinViolation.category}`
-    : "Compra mínima de suplementos";
-  const minDialogDescription = categoryMinViolation
-    ? `Llevás ${categoryMinViolation.current} unidad${categoryMinViolation.current !== 1 ? "es" : ""}. Te faltan ${categoryMinViolation.min - categoryMinViolation.current} para alcanzar el mínimo de ${categoryMinViolation.min}.`
-    : SUPLEMENTOS_MSG;
 
-  // MOQ: usa el campo moq_group del producto (fuente de verdad v2).
-  // hasMoq retorna MoqInfo|null. meetsMoq compara qty vs minUnits en tiempo real.
-  const moqInfo: MoqInfo | null = hasMoq(product as Record<string, unknown>, catRules);
-  const moqMet = meetsMoq(moqInfo, qty, basePrice);
-  // Cuanto falta para alcanzar el minimo (mensaje reactivo)
-  const moqMissing = moqInfo?.minUnits
-    ? Math.max(0, moqInfo.minUnits - qty)
-    : 0;
+  const isOutOfStock = String(product.stock ?? "SI").trim().toUpperCase() === "NO";
 
   return (
     <div className="min-h-screen">
@@ -306,10 +305,20 @@ function ProductoPage() {
             ) : (
               <>
                 <div className="mt-4 flex flex-col gap-1.5">
+                  {isOfferDiscounted && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="rounded-md bg-red-600 px-2 py-0.5 text-xs font-bold text-white uppercase tracking-wider">
+                        🔥 Oferta del día -{offerPct}% OFF
+                      </span>
+                      <span className="text-sm text-muted-foreground line-through tabular-nums">
+                        Antes {money(origPrice)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-baseline gap-2">
                     {percent > 0 && (
                       <span className="tabular-nums text-base text-muted-foreground line-through">
-                        {money(priceOf(product))}
+                        {money(basePrice)}
                       </span>
                     )}
                     <span className="tabular-nums text-3xl font-bold text-foreground">
@@ -484,11 +493,15 @@ function ProductoPage() {
                   }}
                   className="mt-2 w-full max-w-[320px] rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
                 >
-                  {allVariants.map((variant) => (
-                    <option key={variant.id ?? variant.color} value={String(variant.id)}>
-                      {variant.color} — {money(variant.precio)}
-                    </option>
-                  ))}
+                  {allVariants.map((variant) => {
+                    const vPrice = Number(variant.precio);
+                    const effPrice = isOffer ? Math.round(vPrice * (1 - offerPct / 100)) : vPrice;
+                    return (
+                      <option key={variant.id ?? variant.color} value={String(variant.id)}>
+                        {variant.color} — {money(effPrice)}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             )}

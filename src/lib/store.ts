@@ -68,10 +68,36 @@ export const toNumber = (v?: string) =>
 export const money = (v?: string | number) =>
   "$" + Math.round(typeof v === "number" ? v : toNumber(v)).toLocaleString("es-AR");
 
-export const hasOffer = (p: Product) => isYes(p.oferta) && toNumber(p.precio_oferta) > 0;
+export const hasOffer = (p: Product) => isYes(p.oferta);
 
-export const priceOf = (p: Product) =>
-  hasOffer(p) ? toNumber(p.precio_oferta) : toNumber(p.precio);
+export function originalPriceOf(p: Product): number {
+  return toNumber(p.precio);
+}
+
+export function priceOf(p: Product): number {
+  if (hasOffer(p)) {
+    const offerP = toNumber(p.precio_oferta);
+    const regP = toNumber(p.precio);
+    if (offerP > 0 && (regP <= 0 || offerP < regP)) {
+      return offerP;
+    }
+    if (regP > 0) {
+      return Math.round(regP * 0.9);
+    }
+    return offerP > 0 ? offerP : regP;
+  }
+  return toNumber(p.precio);
+}
+
+export function offerDiscountPct(p: Product): number {
+  if (!hasOffer(p)) return 0;
+  const orig = originalPriceOf(p);
+  const cur = priceOf(p);
+  if (orig > cur && orig > 0) {
+    return Math.round(((orig - cur) / orig) * 100);
+  }
+  return 10;
+}
 
 export const DEFAULT_TRANSFER_DISCOUNT = 7;
 

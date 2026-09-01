@@ -1550,10 +1550,18 @@ function ActiveOfferCard({
   roundingIncrement?: number;
   markupPercentage?: number;
 }) {
-  const [precioOferta, setPrecioOferta] = useState(String(product.precio_oferta ?? ""));
-  const [precioOfertaUsd, setPrecioOfertaUsd] = useState(
-    String((product as Record<string, unknown>)["precio_oferta_usd"] ?? "")
-  );
+  const [precioOferta, setPrecioOferta] = useState(() => {
+    const pOff = String(product.precio_oferta ?? "").trim();
+    if (pOff && toNumber(pOff) > 0) return pOff;
+    const base = toNumber(product.precio);
+    return base > 0 ? String(Math.round(base * 0.9)) : "";
+  });
+  const [precioOfertaUsd, setPrecioOfertaUsd] = useState(() => {
+    const pUsd = String((product as Record<string, unknown>)["precio_oferta_usd"] ?? "").trim();
+    if (pUsd && toNumber(pUsd) > 0) return pUsd;
+    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
+    return baseUsd > 0 ? String(Math.round(baseUsd * 0.9 * 100) / 100) : "";
+  });
   const [saving, setSaving] = useState(false);
 
   const basePrice = toNumber(product.precio);
@@ -1729,8 +1737,14 @@ function CandidateOfferCard({
   roundingIncrement?: number;
   markupPercentage?: number;
 }) {
-  const [precioOferta, setPrecioOferta] = useState("");
-  const [precioOfertaUsd, setPrecioOfertaUsd] = useState("");
+  const [precioOferta, setPrecioOferta] = useState(() => {
+    const baseArs = toNumber(product.precio);
+    return baseArs > 0 ? String(Math.round(baseArs * 0.9)) : "";
+  });
+  const [precioOfertaUsd, setPrecioOfertaUsd] = useState(() => {
+    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
+    return baseUsd > 0 ? String(Math.round(baseUsd * 0.9 * 100) / 100) : "";
+  });
   const [saving, setSaving] = useState(false);
 
   const basePrice = toNumber(product.precio);
@@ -1767,13 +1781,22 @@ function CandidateOfferCard({
     try {
       const input = productToInput(product);
       input.oferta = "SI";
-      if (precioOferta) input.precio_oferta = precioOferta;
-      if (precioOfertaUsd) input.precio_oferta_usd = precioOfertaUsd;
+      const baseArs = toNumber(product.precio);
+      const calculatedArs = precioOferta || (baseArs > 0 ? String(Math.round(baseArs * 0.9)) : "");
+      input.precio_oferta = calculatedArs;
+      if (precioOfertaUsd) {
+        input.precio_oferta_usd = precioOfertaUsd;
+      } else {
+        const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
+        if (baseUsd > 0) {
+          input.precio_oferta_usd = String(Math.round(baseUsd * 0.9 * 100) / 100);
+        }
+      }
       const res = await upsertAdminProduct({ data: { email: userEmail, token: userToken, product: input } });
       if (res.error) {
         toast.error(res.error);
       } else {
-        toast.success(`¡"${product.nombre}" agregado a Ofertas del Día!`);
+        toast.success(`¡"${product.nombre}" agregado a Ofertas del Día con descuento!`);
         await onSaved();
       }
     } catch {

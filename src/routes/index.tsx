@@ -40,8 +40,7 @@ function Home() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { products, banners, config } = data;
 
-  const ofertasDelDia = products.filter((p) => isYes(p.oferta));
-  const conDescuento = products.filter((p) => isYes(p.descuento) && !isYes(p.oferta));
+  const ofertasDelDia = products.filter((p) => hasOffer(p));
   // Más vendidos: productos con ventas reales esta semana, ordenados de mayor a menor.
   // Fallback a 'destacado' si todavía no hay ventas registradas.
   const conVentas = [...products]
@@ -216,49 +215,6 @@ function Home() {
           )}
         </div>
       </section>
-
-      {/* PRODUCTOS CON DESCUENTO */}
-      {conDescuento.length > 0 && (
-        <section id="con-descuento" className="relative overflow-hidden bg-gradient-to-b from-surface to-primary/5 px-4 py-14 sm:px-6">
-          <div aria-hidden className="pointer-events-none absolute -top-16 left-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-
-          <div className="relative mx-auto max-w-[1180px]">
-            <SectionHead
-              title={
-                <>
-                  Con <span className="text-primary">descuento</span>
-                </>
-              }
-              sub="Productos seleccionados con precio especial. Comprá por mayor y ahorrá más."
-              icon={<Tag className="h-4 w-4" />}
-            />
-
-            <div className="relative -mx-4 sm:mx-0">
-              <div
-                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
-                  conDescuento.length === 1 ? "justify-center" : ""
-                }`}
-              >
-                {conDescuento.map((p, i) => (
-                  <div
-                    key={p.id ?? i}
-                    className={`snap-center shrink-0 ${
-                      conDescuento.length === 1
-                        ? "w-full max-w-[300px]"
-                        : "w-[72vw] max-w-[280px] sm:w-[260px]"
-                    }`}
-                  >
-                    <ProductCard p={p} config={config} />
-                  </div>
-                ))}
-              </div>
-              {conDescuento.length > 1 && (
-                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
-              )}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* MÁS VENDIDOS */}
       <section id="mas-vendidos" className="relative overflow-hidden bg-gradient-to-b from-surface via-surface to-primary/5 px-4 py-14 sm:px-6">
