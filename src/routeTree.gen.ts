@@ -58,9 +58,9 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminConfiguracionRoute = AdminConfiguracionRouteImport.update({
-  id: '/configuracion',
-  path: '/configuracion',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/configuracion',
+  path: '/admin/configuracion',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminOrdenesRoute = AdminOrdenesRouteImport.update({
   id: '/ordenes',
@@ -178,6 +178,7 @@ export interface RootRouteChildren {
   CatalogoRoute: typeof CatalogoRoute
   GraciasRoute: typeof GraciasRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  AdminConfiguracionRoute: typeof AdminConfiguracionRoute
   ComboIndexRoute: typeof ComboIndexRoute
   ProductoIdRoute: typeof ProductoIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -236,10 +237,10 @@ declare module '@tanstack/react-router' {
     }
     '/admin/configuracion': {
       id: '/admin/configuracion'
-      path: '/configuracion'
+      path: '/admin/configuracion'
       fullPath: '/admin/configuracion'
       preLoaderRoute: typeof AdminConfiguracionRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/ordenes': {
       id: '/admin/ordenes'
@@ -279,6 +280,7 @@ const rootRouteChildren: RootRouteChildren = {
   CatalogoRoute: CatalogoRoute,
   GraciasRoute: GraciasRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  AdminConfiguracionRoute: AdminConfiguracionRoute,
   ComboIndexRoute: ComboIndexRoute,
   ProductoIdRoute: ProductoIdRoute,
   AdminIndexRoute: AdminIndexRoute,

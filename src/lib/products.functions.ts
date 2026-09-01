@@ -160,7 +160,7 @@ export const getAdminProducts = createServerFn({ method: "POST" })
             const apiData = (await apiRes.json()) as { venta?: number };
             if (apiData?.venta && apiData.venta > 0) dolarRate = Math.round(apiData.venta);
           }
-        } catch {}
+        } catch { }
       }
 
       if (!dolarRate) {
@@ -287,7 +287,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
           if (pSettings.markup_percentage !== undefined) markup = Number(pSettings.markup_percentage) / 100;
           if (Number(pSettings.rounding_increment) > 0) increment = Number(pSettings.rounding_increment);
         }
-      } catch {}
+      } catch { }
 
       if (!rate) {
         try {
@@ -298,7 +298,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
               rate = Math.round(apiData.venta);
             }
           }
-        } catch {}
+        } catch { }
       }
 
       if (!rate) {
@@ -529,11 +529,11 @@ export const updateProductPrice = createServerFn({ method: "POST" })
       offerBasePrice: data?.offerBasePrice !== null && data?.offerBasePrice !== undefined ? Number(data.offerBasePrice) : null,
       variants: Array.isArray(data?.variants)
         ? data.variants.map((v) => ({
-            id: v.id ? str(v.id, 100) : undefined,
-            color: str(v.color, 100),
-            sourceCurrency: v.sourceCurrency === "ARS" ? ("ARS" as const) : ("USD" as const),
-            basePrice: v.basePrice !== null && v.basePrice !== undefined ? Number(v.basePrice) : null,
-          }))
+          id: v.id ? str(v.id, 100) : undefined,
+          color: str(v.color, 100),
+          sourceCurrency: v.sourceCurrency === "ARS" ? ("ARS" as const) : ("USD" as const),
+          basePrice: v.basePrice !== null && v.basePrice !== undefined ? Number(v.basePrice) : null,
+        }))
         : undefined,
     }),
   )
@@ -561,7 +561,7 @@ export const updateProductPrice = createServerFn({ method: "POST" })
           if (pSettings.markup_percentage !== undefined) markup = Number(pSettings.markup_percentage) / 100;
           if (Number(pSettings.rounding_increment) > 0) increment = Number(pSettings.rounding_increment);
         }
-      } catch {}
+      } catch { }
 
       if (!rate) {
         try {
@@ -570,7 +570,7 @@ export const updateProductPrice = createServerFn({ method: "POST" })
             const apiData = (await apiRes.json()) as { venta?: number };
             if (apiData?.venta && apiData.venta > 0) rate = Math.round(apiData.venta);
           }
-        } catch {}
+        } catch { }
       }
 
       if (!rate) {
@@ -733,7 +733,7 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
         if (!buckets?.some((b) => b.name === bucketName)) {
           await supabaseAdmin.storage.createBucket(bucketName, { public: true });
         }
-      } catch {}
+      } catch { }
 
       const { error: uploadErr } = await supabaseAdmin.storage
         .from(bucketName)
@@ -868,10 +868,7 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
           },
         ];
         for (const cRow of couponRows) {
-          const { error: cErr } = await (supabaseAdmin as any)
-            .from("site_config")
-            .upsert(cRow, { onConflict: "clave" });
-          if (cErr) throw cErr;
+          await (supabaseAdmin as any).from("site_config").upsert(cRow, { onConflict: "clave" });
         }
       }
 
@@ -1064,33 +1061,6 @@ export const testAdminResendEmail = createServerFn({ method: "POST" })
     }
   });
 
-/**
- * Activa o desactiva instantáneamente el cupón de descuento desde el panel admin.
- */
-export const setPromoCouponActive = createServerFn({ method: "POST" })
-  .validator((data: { email?: string; token?: string; active: boolean }) => ({
-    email: str(data?.email, 160).toLowerCase(),
-    token: str(data?.token, 2000),
-    active: Boolean(data?.active),
-  }))
-  .handler(async ({ data }): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const supabaseAdmin = await assertAdmin(data.email, data.token);
-      const valor = data.active ? "SI" : "NO";
-      const { error } = await (supabaseAdmin as any)
-        .from("site_config")
-        .upsert({ clave: "promo_cupon_activo", valor }, { onConflict: "clave" });
-      if (error) throw error;
-      return { success: true };
-    } catch (err) {
-      console.error("Error actualizando estado del cupón:", err);
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : "Error al actualizar estado del cupón.",
-      };
-    }
-  });
-
 /* ─── Tipos e Integración para Combos / Banners en Oferta ─── */
 
 export type BannerInput = {
@@ -1138,7 +1108,7 @@ export const getAdminBanners = createServerFn({ method: "POST" })
             const apiData = (await apiRes.json()) as { venta?: number };
             if (apiData?.venta && apiData.venta > 0) dolarRate = Math.round(apiData.venta);
           }
-        } catch {}
+        } catch { }
       }
 
       return {

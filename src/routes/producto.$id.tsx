@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
@@ -257,6 +257,29 @@ function ProductoPage() {
     categoria: product.categoria ?? "",
   };
 
+  // Buscar si este producto ya está en el carrito para inicializar y recordar la cantidad elegida
+  const existingInCart = useMemo(() => {
+    return cart.items.find(
+      (i) =>
+        i.id === cartItem.id ||
+        (i.productId && String(i.productId) === String(product.id) && (!i.variantId || i.variantId === selectedVariant?.id)) ||
+        i.nombre === displayNameWithTalle ||
+        i.nombre === displayName,
+    );
+  }, [cart.items, cartItem.id, product.id, selectedVariant?.id, displayNameWithTalle, displayName]);
+
+  const hasSyncedCartQty = useRef(false);
+  useEffect(() => {
+    if (existingInCart && existingInCart.qty > 0 && !hasSyncedCartQty.current) {
+      hasSyncedCartQty.current = true;
+      setQty(existingInCart.qty);
+      setQtyStr(String(existingInCart.qty));
+      if (![1, 3, 5, 10].includes(existingInCart.qty)) {
+        setCustom(true);
+      }
+    }
+  }, [existingInCart]);
+
   const suplemento = isSuplemento(product.categoria);
   const categoryMinViolation = checkCategoryMins(
     [{ nombre: product.nombre, categoria: product.categoria,
@@ -288,12 +311,22 @@ function ProductoPage() {
       <SiteHeader config={config} />
 
       <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6 sm:py-12">
-        <Link
-          to="/catalogo"
-          className="text-sm font-semibold text-muted-foreground hover:text-primary"
-        >
-          ← Volver al catálogo
-        </Link>
+        <div className="flex items-center justify-between gap-4">
+          <Link
+            to="/catalogo"
+            className="text-sm font-semibold text-muted-foreground hover:text-primary transition-colors"
+          >
+            ← Volver al catálogo
+          </Link>
+          {cart.count > 0 && (
+            <Link
+              to="/carrito"
+              className="text-sm font-semibold text-primary hover:underline flex items-center gap-1.5 bg-primary/10 px-3 py-1 rounded-full border border-primary/20"
+            >
+              🛒 Volver al carrito ({cart.count} u.) →
+            </Link>
+          )}
+        </div>
 
         <div className="mt-6 grid gap-8 lg:grid-cols-2 lg:items-start">
           <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-2xl border border-border bg-surface lg:sticky lg:top-24">
@@ -692,6 +725,12 @@ function ProductoPage() {
                         : "Comprar ya"}
                     </button>
                   )}
+                  {existingInCart && (
+                    <div className="rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-center text-xs font-semibold text-primary">
+                      ✓ Ya tenés {existingInCart.qty} {existingInCart.qty === 1 ? "unidad" : "unidades"} en tu carrito
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     id="btn-agregar-carrito"
@@ -700,12 +739,16 @@ function ProductoPage() {
                         setTalleError(true);
                         return;
                       }
-                      cart.add(cartItem);
+                      if (existingInCart) {
+                        cart.setQty(existingInCart.id, qty);
+                      } else {
+                        cart.add(cartItem);
+                      }
                       navigate({ to: "/carrito" });
                     }}
-                    className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary transition-colors"
+                    className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary transition-colors font-semibold"
                   >
-                    Agregar al carrito
+                    {existingInCart ? "Actualizar cantidad en carrito" : "Agregar al carrito"}
                   </button>
                   <p className="text-center text-xs text-muted-foreground">
                     Pagá con transferencia o con Mercado Pago.
