@@ -35,7 +35,7 @@ const REVIEWS = [
     role: "Comprador Mayorista",
     stars: 5,
     date: "Hace 2 semanas",
-    text: "Ya es la cuarta vez que les compro y siempre cumplen al pie de la letra con los tiempos. Te pasan el código de seguimiento de Andreani al toque.",
+    text: "Ya es la cuarta vez que les compro y siempre cumplen al pie de la letra con los tiempos. Te pasan el código de seguimiento de Correo Argentino al toque.",
     avatarBg: "from-purple-500 to-pink-600",
   },
   {
@@ -68,13 +68,12 @@ export function Stars({ value }: { value: number }) {
         {Array.from({ length: 5 }).map((_, idx) => (
           <Star
             key={idx}
-            className={`h-4 w-4 ${
-              idx < full
+            className={`h-4 w-4 ${idx < full
                 ? "fill-amber-400 text-amber-400"
                 : idx === full && hasHalf
-                ? "fill-amber-400/50 text-amber-400"
-                : "fill-muted/30 text-muted-foreground/30"
-            }`}
+                  ? "fill-amber-400/50 text-amber-400"
+                  : "fill-muted/30 text-muted-foreground/30"
+              }`}
           />
         ))}
       </div>
@@ -151,11 +150,10 @@ export function ReviewsCarousel() {
                 key={r.name}
                 aria-label={`Ver opinión de ${r.name}`}
                 onClick={() => setActive(idx)}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  idx === active
+                className={`h-2 rounded-full transition-all duration-300 ${idx === active
                     ? "w-8 bg-primary shadow-xs"
                     : "w-2 bg-muted-foreground/25 hover:bg-muted-foreground/40"
-                }`}
+                  }`}
               />
             ))}
           </div>
