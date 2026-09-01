@@ -262,28 +262,58 @@ function CarritoPage() {
                     key={i.id}
                     className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4"
                   >
-                    {/* Img + Title + tags */}
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <img
-                        src={imageUrl(prod?.imagen_url) || FALLBACK_IMAGE}
-                        alt={i.nombre}
-                        className="h-12 w-12 shrink-0 rounded-lg object-cover sm:h-14 sm:w-14"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold sm:text-base">{i.nombre}</p>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                          {isSupp && (
-                            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-                              Suplementación
-                            </span>
-                          )}
+                    {/* Img + Title + tags - Clickeable para ir al detalle del producto */}
+                    {prod?.id ? (
+                      <Link
+                        to="/producto/$id"
+                        params={{ id: String(prod.id) }}
+                        className="flex min-w-0 flex-1 items-center gap-3 group cursor-pointer"
+                      >
+                        <img
+                          src={imageUrl(prod.imagen_url) || FALLBACK_IMAGE}
+                          alt={i.nombre}
+                          className="h-12 w-12 shrink-0 rounded-lg object-contain bg-surface p-1 border border-border/50 sm:h-14 sm:w-14 transition-transform group-hover:scale-105"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold sm:text-base text-foreground group-hover:text-primary transition-colors">
+                            {i.nombre}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                            {isSupp && (
+                              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                Suplementación
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {money(i.unitPrice)} c/u
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {money(i.unitPrice)} c/u
-                        </p>
+                      </Link>
+                    ) : (
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <img
+                          src={imageUrl(prod?.imagen_url) || FALLBACK_IMAGE}
+                          alt={i.nombre}
+                          className="h-12 w-12 shrink-0 rounded-lg object-contain bg-surface p-1 border border-border/50 sm:h-14 sm:w-14"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold sm:text-base">{i.nombre}</p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                            {isSupp && (
+                              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                Suplementación
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {money(i.unitPrice)} c/u
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Qty stepper + subtotal + remove */}
                     <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
