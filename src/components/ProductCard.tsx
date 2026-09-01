@@ -19,6 +19,7 @@ import type { Product, SiteConfig } from "@/lib/store";
 
 export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) {
   const offer = hasOffer(p);
+  const hasDiscount = isYes(p.descuento) && !offer;
   const consultar = isWhatsappOnly(p);
   const waOnlyReason = waOnlyReasonOf(p as unknown as Record<string, unknown>);
   const isWaPriceHidden = waOnlyReason ? Boolean(WA_ONLY_CONFIG[waOnlyReason]?.hidePrice) : false;
@@ -43,6 +44,11 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
         {offer && !consultar && !hidePrice && (
           <span className="absolute left-2 top-2 z-10 rounded-md bg-primary px-2 py-1 text-[10px] font-bold uppercase text-primary-foreground">
             Oferta
+          </span>
+        )}
+        {hasDiscount && !consultar && !hidePrice && (
+          <span className="absolute left-2 top-2 z-10 inline-flex items-center gap-0.5 rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-bold uppercase text-white">
+            🎁 Descuento
           </span>
         )}
         {isYes(p.destacado) && (
@@ -115,3 +121,4 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
     </div>
   );
 }
+

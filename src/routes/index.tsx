@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Flame, Truck, ShieldCheck, ArrowRight, MessageCircle, Mail, Instagram } from "lucide-react";
+import { Flame, Truck, ShieldCheck, ArrowRight, MessageCircle, Mail, Instagram, Tag } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -41,6 +41,7 @@ function Home() {
   const { products, banners, config } = data;
 
   const ofertasDelDia = products.filter((p) => isYes(p.oferta));
+  const conDescuento = products.filter((p) => isYes(p.descuento) && !isYes(p.oferta));
   // Más vendidos: productos con ventas reales esta semana, ordenados de mayor a menor.
   // Fallback a 'destacado' si todavía no hay ventas registradas.
   const conVentas = [...products]
@@ -188,15 +189,76 @@ function Home() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-            {ofertasDelDia.map((p, i) => (
-              <div key={p.id ?? i} className={i === 2 ? "col-span-2 lg:col-span-1" : undefined}>
-                <ProductCard p={p} />
+          {ofertasDelDia.length > 0 && (
+            <div className="relative -mx-4 sm:mx-0">
+              <div
+                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
+                  ofertasDelDia.length === 1 ? "justify-center" : ""
+                }`}
+              >
+                {ofertasDelDia.map((p, i) => (
+                  <div
+                    key={p.id ?? i}
+                    className={`snap-center shrink-0 ${
+                      ofertasDelDia.length === 1
+                        ? "w-full max-w-[300px]"
+                        : "w-[72vw] max-w-[280px] sm:w-[260px]"
+                    }`}
+                  >
+                    <ProductCard p={p} config={config} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+              {ofertasDelDia.length > 1 && (
+                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
+              )}
+            </div>
+          )}
         </div>
       </section>
+
+      {/* PRODUCTOS CON DESCUENTO */}
+      {conDescuento.length > 0 && (
+        <section id="con-descuento" className="relative overflow-hidden bg-gradient-to-b from-surface to-primary/5 px-4 py-14 sm:px-6">
+          <div aria-hidden className="pointer-events-none absolute -top-16 left-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+
+          <div className="relative mx-auto max-w-[1180px]">
+            <SectionHead
+              title={
+                <>
+                  Con <span className="text-primary">descuento</span>
+                </>
+              }
+              sub="Productos seleccionados con precio especial. Comprá por mayor y ahorrá más."
+              icon={<Tag className="h-4 w-4" />}
+            />
+
+            <div className="relative -mx-4 sm:mx-0">
+              <div
+                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
+                  conDescuento.length === 1 ? "justify-center" : ""
+                }`}
+              >
+                {conDescuento.map((p, i) => (
+                  <div
+                    key={p.id ?? i}
+                    className={`snap-center shrink-0 ${
+                      conDescuento.length === 1
+                        ? "w-full max-w-[300px]"
+                        : "w-[72vw] max-w-[280px] sm:w-[260px]"
+                    }`}
+                  >
+                    <ProductCard p={p} config={config} />
+                  </div>
+                ))}
+              </div>
+              {conDescuento.length > 1 && (
+                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* MÁS VENDIDOS */}
       <section id="mas-vendidos" className="relative overflow-hidden bg-gradient-to-b from-surface via-surface to-primary/5 px-4 py-14 sm:px-6">
@@ -388,10 +450,13 @@ function Home() {
   );
 }
 
-function SectionHead({ title, sub }: { title: React.ReactNode; sub?: string }) {
+function SectionHead({ title, sub, icon }: { title: React.ReactNode; sub?: string; icon?: React.ReactNode }) {
   return (
     <div className="mb-7">
-      <div className="mb-3 h-1 w-10 rounded-full bg-primary" />
+      <div className="mb-3 flex items-center gap-2">
+        <div className="h-1 w-10 rounded-full bg-primary" />
+        {icon && <span className="text-primary">{icon}</span>}
+      </div>
       <h2 className="text-[clamp(24px,7vw,40px)]">{title}</h2>
       {sub && <p className="mt-2 max-w-md text-sm text-muted-foreground">{sub}</p>}
     </div>
