@@ -118,9 +118,7 @@ function productToInput(p: Product): ProductInput {
     stock: String(p.stock ?? "SI"),
     descuento: String(p.descuento ?? "NO"),
     // Fuente única: whatsapp_only_reason. Retrocompat: si es_zapatilla=true y no hay reason, usar "zapatillas"
-    whatsapp_only_reason: typeof pRec["whatsapp_only_reason"] === "string" && pRec["whatsapp_only_reason"]
-      ? pRec["whatsapp_only_reason"]
-      : (pRec["es_zapatilla"] === true || String(pRec["es_zapatilla"] ?? "").toLowerCase() === "true" ? "zapatillas" : ""),
+    whatsapp_only_reason: waOnlyReasonOf(pRec) ?? "",
     moq_group: typeof pRec["moq_group"] === "string" ? pRec["moq_group"] : "",
     color_predeterminado: p.color_predeterminado ?? "",
     imagen_url: p.imagen_url ?? "",
@@ -1027,6 +1025,49 @@ function ProductModal({
               </div>
             )}
 
+            {/* Banner y Toggle WhatsApp Only */}
+            <div className="col-span-1 sm:col-span-2">
+              <div
+                onClick={() => {
+                  const isCurrentlyWa = Boolean(form.whatsapp_only_reason);
+                  setForm((prev) => ({
+                    ...prev,
+                    whatsapp_only_reason: isCurrentlyWa ? "" : "china",
+                  }));
+                }}
+                className={`flex items-center justify-between rounded-xl border p-3 cursor-pointer transition-all ${
+                  form.whatsapp_only_reason === "china" || form.whatsapp_only_reason === "whatsapp_only"
+                    ? "border-emerald-500/50 bg-emerald-500/10 shadow-xs"
+                    : form.whatsapp_only_reason
+                    ? "border-primary/40 bg-primary/5"
+                    : "border-border bg-surface/50 hover:bg-surface"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">💬</span>
+                  <div>
+                    <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      Venta exclusiva por WhatsApp (China / WhatsApp Only)
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Oculta la compra directa en la tienda y redirige al cliente a consultar por WhatsApp. El precio es opcional.
+                    </p>
+                  </div>
+                </div>
+                <div
+                  className={`h-5 w-9 rounded-full p-0.5 transition-colors shrink-0 ${
+                    Boolean(form.whatsapp_only_reason) ? "bg-emerald-600" : "bg-muted-foreground/30"
+                  }`}
+                >
+                  <div
+                    className={`h-4 w-4 rounded-full bg-white transition-transform ${
+                      Boolean(form.whatsapp_only_reason) ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* SECCIÓN DE PRECIOS:
                 - Si es edición (form.id): muestra tarjeta informativa con botón dedicado "Editar precio"
                 - Si es alta nueva (!form.id): muestra los inputs de carga inicial */}
@@ -1040,7 +1081,9 @@ function ProductModal({
                     <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
                       <div>
                         <span className="text-xs text-muted-foreground">Precio ARS:</span>{" "}
-                        <strong className="text-foreground">{money(form.precio)}</strong>
+                        <strong className="text-foreground">
+                          {form.precio && Number(form.precio) > 0 ? money(form.precio) : "Sin precio fijo (Por WhatsApp)"}
+                        </strong>
                       </div>
                       {form.precio_usd && (
                         <div>
@@ -1083,9 +1126,14 @@ function ProductModal({
               </div>
             ) : (
               <>
+                {Boolean(form.whatsapp_only_reason) && (
+                  <div className="col-span-1 sm:col-span-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-2.5 text-xs text-emerald-700 dark:text-emerald-400 font-medium">
+                    💬 <strong>Modo WhatsApp Only activado:</strong> Los precios son opcionales. Podés dejarlos vacíos y en la tienda se mostrará <em>"Consultar precio y disponibilidad al WhatsApp"</em>.
+                  </div>
+                )}
                 <div>
-                  <label className="label-sm">Precio Base USD (u$d)</label>
-                  <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => handlePriceUsdChange(e.target.value)} placeholder="Ej: 50" />
+                  <label className="label-sm">Precio Base USD (u$d {form.whatsapp_only_reason ? "- opcional" : ""})</label>
+                  <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => handlePriceUsdChange(e.target.value)} placeholder={form.whatsapp_only_reason ? "Opcional (Ej: 50)" : "Ej: 50"} />
                   {(() => { const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
                     <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                       <Sparkles className="h-3 w-3 shrink-0" />
@@ -1100,8 +1148,8 @@ function ProductModal({
                   )}
                 </div>
                 <div>
-                  <label className="label-sm">Precio Base ARS ($)</label>
-                  <input className="input-base" value={form.precio} onChange={(e) => handlePriceArsChange(e.target.value)} placeholder="Ej: 80000" />
+                  <label className="label-sm">Precio Base ARS ($ {form.whatsapp_only_reason ? "- opcional" : ""})</label>
+                  <input className="input-base" value={form.precio} onChange={(e) => handlePriceArsChange(e.target.value)} placeholder={form.whatsapp_only_reason ? "Opcional (Ej: 80000)" : "Ej: 80000"} />
                   {(() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && !form.precio_usd?.trim() ? (
                     <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                       <Sparkles className="h-3 w-3 shrink-0" />
@@ -1150,9 +1198,10 @@ function ProductModal({
                 }}
                 className="input-base text-sm py-1.5"
               >
-                <option value="">Compra normal</option>
-                <option value="zapatillas">Zapatillas — solo por WhatsApp</option>
+                <option value="">Compra normal (carrito y checkout)</option>
+                <option value="china">China / WhatsApp Only — Consultar precio y disponibilidad</option>
                 <option value="vapers">Vapers — solo por WhatsApp</option>
+                <option value="zapatillas">Zapatillas — solo por WhatsApp</option>
                 <option value="remeras">Remeras — solo por WhatsApp</option>
               </select>
             </div>
@@ -2896,18 +2945,35 @@ function AdminProductosPage() {
                                           <Flame className="h-3 w-3 fill-primary" /> Oferta
                                         </span>
                                       )}
+                                      {(() => {
+                                        const r = waOnlyReasonOf(p as unknown as Record<string, unknown>);
+                                        if (!r) return null;
+                                        return (
+                                          <span className="rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 text-[10px] font-bold flex items-center gap-0.5 border border-emerald-500/20 shrink-0">
+                                            💬 WA Only
+                                          </span>
+                                        );
+                                      })()}
                                     </div>
                                     
                                     {/* Precio en Celular */}
                                     <div className="text-xs font-bold text-primary sm:hidden">
-                                      {isOffer && p.precio_oferta ? (
-                                        <span className="flex items-center gap-1">
-                                          <span>{money(p.precio_oferta)}</span>
-                                          <span className="line-through text-[10px] text-muted-foreground font-normal">{money(p.precio)}</span>
-                                        </span>
-                                      ) : (
-                                        <span>{money(p.precio)}</span>
-                                      )}
+                                      {(() => {
+                                        const r = waOnlyReasonOf(p as unknown as Record<string, unknown>);
+                                        const isHidden = r ? WA_ONLY_CONFIG[r]?.hidePrice : false;
+                                        if (isHidden || !p.precio || toNumber(p.precio) <= 0) {
+                                          return <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">💬 Por WhatsApp</span>;
+                                        }
+                                        if (isOffer && p.precio_oferta) {
+                                          return (
+                                            <span className="flex items-center gap-1">
+                                              <span>{money(p.precio_oferta)}</span>
+                                              <span className="line-through text-[10px] text-muted-foreground font-normal">{money(p.precio)}</span>
+                                            </span>
+                                          );
+                                        }
+                                        return <span>{money(p.precio)}</span>;
+                                      })()}
                                     </div>
 
                                     {/* Botón para desplegar variantes de colores */}
@@ -2927,14 +2993,22 @@ function AdminProductosPage() {
                                 </td>
                                 <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
                                 <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
-                                  {isOffer && p.precio_oferta ? (
-                                    <div className="flex flex-col items-end">
-                                      <span className="font-bold text-primary">{money(p.precio_oferta)}</span>
-                                      <span className="line-through text-[11px] text-muted-foreground">{money(p.precio)}</span>
-                                    </div>
-                                  ) : (
-                                    money(p.precio)
-                                  )}
+                                  {(() => {
+                                    const r = waOnlyReasonOf(p as unknown as Record<string, unknown>);
+                                    const isHidden = r ? WA_ONLY_CONFIG[r]?.hidePrice : false;
+                                    if (isHidden || !p.precio || toNumber(p.precio) <= 0) {
+                                      return <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">💬 Por WhatsApp</span>;
+                                    }
+                                    if (isOffer && p.precio_oferta) {
+                                      return (
+                                        <div className="flex flex-col items-end">
+                                          <span className="font-bold text-primary">{money(p.precio_oferta)}</span>
+                                          <span className="line-through text-[11px] text-muted-foreground">{money(p.precio)}</span>
+                                        </div>
+                                      );
+                                    }
+                                    return money(p.precio);
+                                  })()}
                                 </td>
                                 <td className="px-3 py-3 sm:px-4 text-center">
                                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${String(p.stock ?? "").toUpperCase() === "NO" ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>

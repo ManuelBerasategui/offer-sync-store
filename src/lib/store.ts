@@ -586,7 +586,7 @@ export function checkCategoryMins(
 
 /* ---------- Productos WA-Only (zapatillas, vapers, remeras, etc.) ---------- */
 
-export type WaOnlyReason = "zapatillas" | "vapers" | "remeras";
+export type WaOnlyReason = "zapatillas" | "vapers" | "remeras" | "china" | "whatsapp_only";
 
 /**
  * Configuración centralizada por tipo de producto WA-only.
@@ -594,19 +594,32 @@ export type WaOnlyReason = "zapatillas" | "vapers" | "remeras";
  */
 export const WA_ONLY_CONFIG: Record<
   WaOnlyReason,
-  { btnText: string; waMsg: (nombre: string) => string }
+  { btnText: string; waMsg: (nombre: string) => string; hidePrice?: boolean }
 > = {
   zapatillas: {
     btnText: "Consultar talle y colores por WhatsApp",
     waMsg: (n) => `Hola, quiero consultar por el modelo ${n} de zapatillas.`,
+    hidePrice: false,
   },
   vapers: {
     btnText: "Consultar precio y colores por WhatsApp",
     waMsg: (n) => `Hola, quiero consultar por el vaper ${n}.`,
+    hidePrice: true,
   },
   remeras: {
     btnText: "Consultar talle y colores por WhatsApp",
     waMsg: (n) => `Hola, quiero consultar por la remera ${n}.`,
+    hidePrice: false,
+  },
+  china: {
+    btnText: "Consultar precio y disponibilidad al WhatsApp",
+    waMsg: (n) => `Hola, quiero consultar precio y disponibilidad por el producto ${n}.`,
+    hidePrice: true,
+  },
+  whatsapp_only: {
+    btnText: "Consultar precio y disponibilidad al WhatsApp",
+    waMsg: (n) => `Hola, quiero consultar precio y disponibilidad por el producto ${n}.`,
+    hidePrice: true,
   },
 };
 
@@ -616,31 +629,49 @@ export const WA_ONLY_CONFIG: Record<
  */
 export function waOnlyReasonOf(product: Record<string, unknown>): WaOnlyReason | null {
   // 1. Campo nuevo: whatsapp_only_reason — puede estar en metadata (raw) o en top-level
-  //    (getStoreData y getAdminProducts expanden metadata al nivel raíz, eliminando el objeto)
   const checkReason = (val: unknown): WaOnlyReason | null => {
-    if (typeof val === "string" && val in WA_ONLY_CONFIG) return val as WaOnlyReason;
+    if (typeof val === "string") {
+      const clean = val.trim().toLowerCase();
+      if (clean in WA_ONLY_CONFIG) return clean as WaOnlyReason;
+      if (clean === "true" || clean === "si" || clean === "whatsapp" || clean === "china") {
+        return "whatsapp_only";
+      }
+    }
+    if (val === true) return "whatsapp_only";
     return null;
   };
+
   // Top-level (metadata expandido) — caso más común en runtime
   const topReason = checkReason(product["whatsapp_only_reason"]);
   if (topReason) return topReason;
+
+  if (product["whatsapp_only"] === true || String(product["whatsapp_only"] ?? "").toLowerCase() === "true") {
+    return "whatsapp_only";
+  }
+
   // Dentro de metadata (raw, por si acaso)
   const meta = product["metadata"];
   if (meta && typeof meta === "object" && !Array.isArray(meta)) {
     const m = meta as Record<string, unknown>;
     const metaReason = checkReason(m["whatsapp_only_reason"]);
     if (metaReason) return metaReason;
+    if (m["whatsapp_only"] === true || String(m["whatsapp_only"] ?? "").toLowerCase() === "true") {
+      return "whatsapp_only";
+    }
     if (m["es_zapatilla"] === true || String(m["es_zapatilla"] ?? "").toLowerCase() === "true") {
       return "zapatillas";
     }
   }
+
   // Legacy: es_zapatilla top-level (retrocompatibilidad)
   if (product["es_zapatilla"] === true || String(product["es_zapatilla"] ?? "").toLowerCase() === "true") {
     return "zapatillas";
   }
+
   // Fallback por categoría: productos existentes sin whatsapp_only_reason en metadata
-  // Se detecta por la categoría del producto para retrocompatibilidad
   const catRaw = String(product["categoria"] ?? "").toLowerCase().trim();
   if (catRaw === "vapers" || catRaw === "vaper") return "vapers";
+  if (catRaw === "china" || catRaw === "productos china" || catRaw === "importacion china") return "china";
+
   return null;
 }

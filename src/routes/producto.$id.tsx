@@ -287,7 +287,7 @@ function ProductoPage() {
               {displayName}
             </h1>
 
-            {(waOnlyReason === "vapers") ? (
+            {(consultar || (waOnlyReason && (WA_ONLY_CONFIG[waOnlyReason]?.hidePrice || unit <= 0)) || unit <= 0) ? (
               <p className="mt-4 text-sm font-semibold text-muted-foreground">
                 Consultá el precio y disponibilidad por WhatsApp.
               </p>
@@ -667,7 +667,7 @@ function ProductoPage() {
                     Agregar al carrito
                   </button>
                   <p className="text-center text-xs text-muted-foreground">
-                    Pagá con tarjeta, débito o dinero en cuenta vía MercadoPago.
+                    Pagá con transferencia o con Mercado Pago.
                   </p>
                 </>
               )}

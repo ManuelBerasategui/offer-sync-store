@@ -6,6 +6,7 @@ import {
   onImageError,
   isWhatsappOnly,
   waOnlyReasonOf,
+  WA_ONLY_CONFIG,
   isYes,
   money,
   tiersOf,
@@ -20,15 +21,15 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
   const offer = hasOffer(p);
   const consultar = isWhatsappOnly(p);
   const waOnlyReason = waOnlyReasonOf(p as unknown as Record<string, unknown>);
-  // Vapers no tienen precio — ocultar. Zapatillas/remeras sí tienen precio — mostrar.
-  const hidePrice = waOnlyReason === "vapers";
+  const isWaPriceHidden = waOnlyReason ? Boolean(WA_ONLY_CONFIG[waOnlyReason]?.hidePrice) : false;
+  const basePrice = offer ? toNumber(p.precio_oferta) : toNumber(p.precio);
+  const hidePrice = isWaPriceHidden || basePrice <= 0 || isNaN(basePrice);
   const tiers = tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
   // El tercer tramo global (20+ u → 12%) aplica a TODOS los productos con precio.
   // maxPercent es 12 como mínimo universal; más si hay tiers propios por encima de 12%.
   const maxPercent = (!hidePrice && !consultar) ? Math.max(maxTier?.percent ?? 12, 12) : null;
 
-  const basePrice = offer ? toNumber(p.precio_oferta) : toNumber(p.precio);
   const discPct = transferDiscountPct(config);
   const tPrice = transferPrice(basePrice, discPct);
 
@@ -39,7 +40,7 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
         params={{ id: String(p.id ?? p.nombre ?? "") }}
         className="relative block aspect-square bg-surface"
       >
-        {offer && !consultar && (
+        {offer && !consultar && !hidePrice && (
           <span className="absolute left-2 top-2 z-10 rounded-md bg-primary px-2 py-1 text-[10px] font-bold uppercase text-primary-foreground">
             Oferta
           </span>
@@ -73,7 +74,11 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
 
         <div className="mt-auto pt-2">
           {(hidePrice || consultar) ? (
-            <span className="text-sm font-semibold text-muted-foreground">Consultá el precio</span>
+            <span className="text-sm font-semibold text-muted-foreground">
+              {waOnlyReason === "china" || waOnlyReason === "whatsapp_only"
+                ? "Consultar por WhatsApp"
+                : "Consultá el precio"}
+            </span>
           ) : (
             <div>
               <div className="flex flex-col">
