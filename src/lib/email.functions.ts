@@ -22,6 +22,8 @@ export type NotifyOrderInput = {
     sucursal_correo?: string;
   };
   items: { nombre: string; qty: number; unitPrice: number }[];
+  couponCode?: string;
+  couponDiscountAmount?: number;
 };
 
 const ADMIN_EMAILS = [
@@ -51,6 +53,8 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
   const itemsSubtotal = order.items.reduce((acc, i) => acc + i.qty * i.unitPrice, 0);
   const discountAmount = Math.max(0, itemsSubtotal - order.total);
   const hasDiscount = discountAmount > 0;
+  const couponDiscount = order.couponDiscountAmount ?? 0;
+  const transferDiscount = Math.max(0, discountAmount - couponDiscount);
 
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e8e8e8;border-radius:12px;overflow:hidden;">
@@ -81,6 +85,16 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
             <p style="margin:4px 0 0;font-size:22px;font-weight:900;color:#e05600;">${money(order.total)}</p>
           </div>
         </div>
+
+        <!-- Alerta de Cupón si fue utilizado -->
+        ${order.couponCode ? `
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin-bottom:20px;">
+          <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#15803d;">🎟️ Cupón de Descuento Utilizado</p>
+          <p style="margin:3px 0 0;font-size:15px;font-weight:800;color:#166534;font-family:monospace;">
+            ${order.couponCode} ${couponDiscount > 0 ? `<span style="font-size:13px;font-weight:600;color:#15803d;">(-${money(couponDiscount)})</span>` : ""}
+          </p>
+        </div>
+        ` : ""}
         
         <!-- Datos del cliente -->
         <h2 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#888;margin:0 0 12px;">Cliente y envío</h2>
@@ -116,29 +130,44 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
           </thead>
           <tbody>${itemsHtml}</tbody>
           <tfoot>
-            ${
-              hasDiscount
-                ? `
             <tr>
-              <td colspan="3" style="padding:8px 8px;font-size:13px;text-align:right;border-top:1px solid #ddd;color:#666;">Subtotal productos</td>
+              <td colspan="3" style="padding:8px 8px;font-size:13px;text-align:right;border-top:1px solid #ddd;color:#666;">Subtotal de lista</td>
               <td style="padding:8px 8px;font-size:13px;text-align:right;border-top:1px solid #ddd;color:#333;">${money(itemsSubtotal)}</td>
             </tr>
+            ${
+              order.couponCode
+                ? `
+            <tr>
+              <td colspan="3" style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">🎟️ Cupón de descuento (${order.couponCode})</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">-${money(couponDiscount > 0 ? couponDiscount : discountAmount)}</td>
+            </tr>
+            `
+                : ""
+            }
+            ${
+              order.metodoPago === "transferencia" && transferDiscount > 0
+                ? `
+            <tr>
+              <td colspan="3" style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">🏦 Descuento Transferencia</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">-${money(transferDiscount)}</td>
+            </tr>
+            `
+                : ""
+            }
+            ${
+              !order.couponCode && order.metodoPago !== "transferencia" && hasDiscount
+                ? `
             <tr>
               <td colspan="3" style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">Descuento aplicado</td>
               <td style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">-${money(discountAmount)}</td>
             </tr>
-            <tr>
-              <td colspan="3" style="padding:10px 8px;font-weight:700;font-size:14px;text-align:right;border-top:2px solid #e05600;">TOTAL CON DESCUENTO</td>
-              <td style="padding:10px 8px;font-weight:900;font-size:16px;text-align:right;border-top:2px solid #e05600;color:#e05600;">${money(order.total)}</td>
-            </tr>
             `
-                : `
-            <tr>
-              <td colspan="3" style="padding:10px 8px;font-weight:700;font-size:14px;text-align:right;border-top:2px solid #e05600;">TOTAL</td>
-              <td style="padding:10px 8px;font-weight:900;font-size:16px;text-align:right;border-top:2px solid #e05600;color:#e05600;">${money(order.total)}</td>
-            </tr>
-            `
+                : ""
             }
+            <tr>
+              <td colspan="3" style="padding:10px 8px;font-weight:700;font-size:14px;text-align:right;border-top:2px solid #e05600;">TOTAL FINAL</td>
+              <td style="padding:10px 8px;font-weight:900;font-size:16px;text-align:right;border-top:2px solid #e05600;color:#e05600;">${money(order.total)}</td>
+            </tr>
           </tfoot>
         </table>
         
@@ -257,29 +286,44 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
           </thead>
           <tbody>${itemsHtml}</tbody>
           <tfoot>
-            ${
-              hasDiscount
-                ? `
             <tr>
-              <td colspan="3" style="padding:8px 8px;font-size:13px;text-align:right;border-top:1px solid #ddd;color:#666;">Subtotal productos</td>
+              <td colspan="3" style="padding:8px 8px;font-size:13px;text-align:right;border-top:1px solid #ddd;color:#666;">Subtotal de lista</td>
               <td style="padding:8px 8px;font-size:13px;text-align:right;border-top:1px solid #ddd;color:#333;">${money(itemsSubtotal)}</td>
             </tr>
+            ${
+              order.couponCode
+                ? `
             <tr>
-              <td colspan="3" style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">Descuento aplicado ${isTransfer ? "(Transferencia)" : ""}</td>
+              <td colspan="3" style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">🎟️ Cupón de descuento (${order.couponCode})</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">-${money(couponDiscount > 0 ? couponDiscount : discountAmount)}</td>
+            </tr>
+            `
+                : ""
+            }
+            ${
+              isTransfer && transferDiscount > 0
+                ? `
+            <tr>
+              <td colspan="3" style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">🏦 Descuento por Transferencia</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">-${money(transferDiscount)}</td>
+            </tr>
+            `
+                : ""
+            }
+            ${
+              !order.couponCode && !isTransfer && hasDiscount
+                ? `
+            <tr>
+              <td colspan="3" style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">Descuento aplicado</td>
               <td style="padding:6px 8px;font-size:13px;text-align:right;color:#16a34a;font-weight:600;">-${money(discountAmount)}</td>
             </tr>
-            <tr>
-              <td colspan="3" style="padding:10px 8px;font-weight:700;font-size:14px;text-align:right;border-top:2px solid #e05600;">TOTAL CON DESCUENTO</td>
-              <td style="padding:10px 8px;font-weight:900;font-size:16px;text-align:right;border-top:2px solid #e05600;color:#e05600;">${money(order.total)}</td>
-            </tr>
             `
-                : `
-            <tr>
-              <td colspan="3" style="padding:10px 8px;font-weight:700;font-size:14px;text-align:right;border-top:2px solid #e05600;">TOTAL</td>
-              <td style="padding:10px 8px;font-weight:900;font-size:16px;text-align:right;border-top:2px solid #e05600;color:#e05600;">${money(order.total)}</td>
-            </tr>
-            `
+                : ""
             }
+            <tr>
+              <td colspan="3" style="padding:10px 8px;font-weight:700;font-size:14px;text-align:right;border-top:2px solid #e05600;">TOTAL FINAL</td>
+              <td style="padding:10px 8px;font-weight:900;font-size:16px;text-align:right;border-top:2px solid #e05600;color:#e05600;">${money(order.total)}</td>
+            </tr>
           </tfoot>
         </table>
         

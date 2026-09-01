@@ -199,6 +199,22 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
 
         // Notificar a los admins (fire-and-forget)
         try {
+          let mpCouponCode: string | undefined;
+          let mpCouponDiscount: number | undefined;
+          try {
+            const { data: usage } = await supabaseAdmin
+              .from("coupon_usages")
+              .select("coupon_code, discount_amount")
+              .eq("order_code", order.order_code)
+              .maybeSingle();
+            if (usage) {
+              mpCouponCode = usage.coupon_code;
+              mpCouponDiscount = Number(usage.discount_amount) || undefined;
+            }
+          } catch {
+            // ignore
+          }
+
           const { notifyNewOrder } = await import("@/lib/email.functions");
           const mpItems: NotifyOrderInput["items"] = Array.isArray(order.items)
             ? (order.items as { nombre: string; qty: number; unitPrice: number }[]).map((i) => ({
@@ -223,6 +239,8 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
               sucursal_correo: order.sucursal_correo ?? undefined,
             },
             items: mpItems,
+            couponCode: mpCouponCode,
+            couponDiscountAmount: mpCouponDiscount,
           } satisfies NotifyOrderInput);
         } catch (e) {
           console.error("[email] Error enviando notificación de MP:", e);
@@ -669,6 +687,8 @@ export const createTransferOrder = createServerFn({ method: "POST" })
           metodoPago: "transferencia",
           shipping: data.shipping,
           items,
+          couponCode: validCouponApplied || undefined,
+          couponDiscountAmount: couponDiscountAmount || undefined,
         } satisfies NotifyOrderInput);
       } catch (e) {
         console.error("[email] Error enviando notificación de transferencia:", e);
