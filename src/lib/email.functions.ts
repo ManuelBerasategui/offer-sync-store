@@ -483,9 +483,33 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
         const body = await resCustomer.text().catch(() => "");
         customerError = `Cliente error ${resCustomer.status}: ${body}`;
         console.error("[email] Error al enviar confirmación al cliente:", resCustomer.status, body);
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          await (supabaseAdmin as any).from("site_config").upsert(
+            {
+              clave: "last_email_error",
+              valor: `[${new Date().toLocaleTimeString("es-AR")}] Error enviando a ${customerEmail} (HTTP ${resCustomer.status}): ${body}`,
+            },
+            { onConflict: "clave" },
+          );
+        } catch {
+          // ignore
+        }
       } else {
         customerSuccess = true;
         console.log(`[email] Confirmación enviada al cliente: ${customerEmail}`);
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          await (supabaseAdmin as any).from("site_config").upsert(
+            {
+              clave: "last_email_success",
+              valor: `[${new Date().toLocaleTimeString("es-AR")}] Enviado con éxito a ${customerEmail} (Orden ${order.orderCode})`,
+            },
+            { onConflict: "clave" },
+          );
+        } catch {
+          // ignore
+        }
       }
     }
 

@@ -582,6 +582,22 @@ function AdminConfiguracionPage() {
               {testingEmail ? "Enviando prueba..." : "Enviar email de prueba al cliente"}
             </button>
           </div>
+
+          {/* Registro del último envío */}
+          {(config["last_email_error"] || config["last_email_success"]) && (
+            <div className="mt-3 space-y-1.5 pt-2 border-t border-border/40 text-[11px]">
+              {config["last_email_success"] && (
+                <p className="text-emerald-600 dark:text-emerald-400 font-medium">
+                  ✓ Último envío exitoso: {config["last_email_success"]}
+                </p>
+              )}
+              {config["last_email_error"] && (
+                <p className="text-destructive font-mono bg-destructive/10 p-2 rounded-lg break-all">
+                  ⚠️ Último error de Resend: {config["last_email_error"]}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Cotización Dólar para valor inicial */}
