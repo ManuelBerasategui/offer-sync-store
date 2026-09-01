@@ -279,14 +279,7 @@ function CarritoPage() {
                           <p className="truncate text-sm font-semibold sm:text-base text-foreground group-hover:text-primary transition-colors">
                             {i.nombre}
                           </p>
-                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                            {isSupp && (
-                              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-                                Suplementación
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
                             {i.basePrice && i.unitPrice < i.basePrice && (
                               <span className="line-through text-[11px] opacity-75">{money(i.basePrice)}</span>
                             )}
@@ -309,14 +302,7 @@ function CarritoPage() {
                         />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold sm:text-base">{i.nombre}</p>
-                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                            {isSupp && (
-                              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-                                Suplementación
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
                             {i.basePrice && i.unitPrice < i.basePrice && (
                               <span className="line-through text-[11px] opacity-75">{money(i.basePrice)}</span>
                             )}
