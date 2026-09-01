@@ -105,7 +105,20 @@ const REVIEWS = [
   },
 ];
 
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function stripTrailingColor(name: string, color: string): string {
+  const trimmedName = name.trim();
+  const trimmedColor = color.trim();
+  if (!trimmedColor) return trimmedName;
+
+  if (trimmedName.toLowerCase().endsWith(trimmedColor.toLowerCase())) {
+    let withoutColor = trimmedName.slice(0, trimmedName.length - trimmedColor.length).trimEnd();
+    if (withoutColor.endsWith("-") || withoutColor.endsWith("—")) {
+      withoutColor = withoutColor.slice(0, -1).trimEnd();
+    }
+    return withoutColor;
+  }
+  return trimmedName;
+}
 
 function ProductoPage() {
   const { id } = Route.useParams();
@@ -197,9 +210,7 @@ function ProductoPage() {
     : productTalles;
 
   const baseName = defaultColor
-    ? (product.nombre ?? "Producto")
-        .replace(new RegExp(`(?:\\s*[-—]?\\s*)${escapeRegExp(defaultColor)}\\s*$`, "i"), "")
-        .trim()
+    ? stripTrailingColor(product.nombre ?? "Producto", defaultColor)
     : product.nombre ?? "Producto";
   const displayName = selectedVariant ? `${baseName} ${selectedVariant.color}`.trim() : product.nombre ?? "Producto";
 
