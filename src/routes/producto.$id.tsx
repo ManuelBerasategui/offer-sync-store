@@ -264,6 +264,22 @@ function ProductoPage() {
        qty, unitPrice: unit }],
     catRules,
   )[0];
+  const bloqueaCompra = (suplemento && total < SUPLEMENTOS_MIN) || Boolean(categoryMinViolation);
+  const minDialogTitle = categoryMinViolation
+    ? `Compra mínima de ${categoryMinViolation.category}`
+    : "Compra mínima de suplementos";
+  const minDialogDescription = categoryMinViolation
+    ? `Llevás ${categoryMinViolation.current} unidad${categoryMinViolation.current !== 1 ? "es" : ""}. Te faltan ${categoryMinViolation.min - categoryMinViolation.current} para alcanzar el mínimo de ${categoryMinViolation.min}.`
+    : SUPLEMENTOS_MSG;
+
+  // MOQ: usa el campo moq_group del producto (fuente de verdad v2).
+  // hasMoq retorna MoqInfo|null. meetsMoq compara qty vs minUnits en tiempo real.
+  const moqInfo: MoqInfo | null = hasMoq(product as Record<string, unknown>, catRules);
+  const moqMet = meetsMoq(moqInfo, qty, basePrice);
+  // Cuanto falta para alcanzar el minimo (mensaje reactivo)
+  const moqMissing = moqInfo?.minUnits
+    ? Math.max(0, moqInfo.minUnits - qty)
+    : 0;
 
   const isOutOfStock = String(product.stock ?? "SI").trim().toUpperCase() === "NO";
 

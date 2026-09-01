@@ -8,7 +8,7 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { HowItWorks, ReviewsCarousel } from "@/components/Social";
 import { storeQueryOptions } from "@/lib/store-query";
 import {
-  FALLBACK_IMAGE, imageUrl,
+  FALLBACK_IMAGE, imageUrl, hasOffer,
   onImageError, isYes, money, toNumber, waLink, sanitizeUrl, type SiteConfig,
   parseCategoryRules, normCat, transferPrice, transferDiscountPct,
 } from "@/lib/store";
