@@ -1,5 +1,6 @@
 {
     "recommendations": [
+        "Semgrep.semgrep",
         "snyk-security.snyk-vulnerability-scanner"
     ]
 }

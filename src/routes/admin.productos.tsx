@@ -30,7 +30,7 @@ import {
   type BannerInput,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/productos")({
   loader: ({ context }) => {
@@ -1629,10 +1629,10 @@ function ActiveOfferCard({
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-card p-4 sm:p-5 shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <img
-          src={product.imagen_url || FALLBACK_IMAGE}
+          src={encodeURI(imageUrl(product.imagen_url) || FALLBACK_IMAGE)}
           alt={product.nombre ?? ""}
           className="h-16 w-16 rounded-xl object-cover border border-border shrink-0"
-          onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+          onError={onImageError(product.imagen_url)}
         />
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -1787,10 +1787,10 @@ function CandidateOfferCard({
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <img
-          src={product.imagen_url || FALLBACK_IMAGE}
+          src={encodeURI(imageUrl(product.imagen_url) || FALLBACK_IMAGE)}
           alt={product.nombre ?? ""}
           className="h-14 w-14 rounded-xl object-cover border border-border shrink-0"
-          onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+          onError={onImageError(product.imagen_url)}
         />
         <div className="min-w-0">
           <span className="text-xs text-muted-foreground font-medium">{product.categoria}</span>
@@ -2293,12 +2293,10 @@ function ComboBuilderPanel({
                 className="flex flex-col sm:flex-row items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all"
               >
                 <img
-                  src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
+                  src={encodeURI(imageUrl(b.imagen_url) || FALLBACK_IMAGE)}
                   alt={b.titulo ?? ""}
                   className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-contain p-1.5 bg-surface border border-border shrink-0"
-                  onError={(e) => {
-                    e.currentTarget.src = FALLBACK_IMAGE;
-                  }}
+                  onError={onImageError(b.imagen_url)}
                 />
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -2930,10 +2928,10 @@ function AdminProductosPage() {
                                   onClick={() => setModal(productToInput(p))}
                                 >
                                   <img
-                                    src={p.imagen_url || FALLBACK_IMAGE}
+                                    src={encodeURI(imageUrl(p.imagen_url) || FALLBACK_IMAGE)}
                                     alt={p.nombre}
                                     className="h-10 w-10 rounded-lg object-cover hover:opacity-80 transition-opacity"
-                                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                                    onError={onImageError(p.imagen_url)}
                                   />
                                 </td>
                                 <td className="px-3 py-3 sm:px-4 font-medium max-w-[180px] sm:max-w-none">
@@ -3037,10 +3035,10 @@ function AdminProductosPage() {
                                               <div className="flex items-center gap-2 min-w-0">
                                                 {v.imagen_url && (
                                                   <img
-                                                    src={v.imagen_url}
+                                                    src={encodeURI(imageUrl(v.imagen_url) || FALLBACK_IMAGE)}
                                                     alt={v.color}
                                                     className="h-7 w-7 rounded-lg object-cover border border-border shrink-0"
-                                                    onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+                                                    onError={onImageError(v.imagen_url)}
                                                   />
                                                 )}
                                                 <div className="min-w-0">

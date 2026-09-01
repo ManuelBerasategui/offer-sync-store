@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { validatePromoCoupon } from "@/lib/products.functions";
 import {
   FALLBACK_IMAGE,
+  imageUrl,
   SUPLEMENTOS_MIN,
   isSuplemento,
   isMate,
@@ -271,7 +272,7 @@ function CarritoPage() {
                     {/* Img + Title + tags */}
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                       <img
-                        src={prod?.imagen_url || FALLBACK_IMAGE}
+                        src={imageUrl(prod?.imagen_url) || FALLBACK_IMAGE}
                         alt={i.nombre}
                         className="h-12 w-12 shrink-0 rounded-lg object-cover sm:h-14 sm:w-14"
                         referrerPolicy="no-referrer"

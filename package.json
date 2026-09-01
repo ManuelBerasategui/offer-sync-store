@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "security:scan": "semgrep scan --config auto --config .semgrep.yml",
+    "security:ci": "semgrep scan --config auto --config p/security-audit --config p/owasp-top-ten --config p/secrets --config p/react --config p/typescript --config .semgrep.yml --error"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

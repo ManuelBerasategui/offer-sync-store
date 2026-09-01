@@ -1,0 +1,52 @@
+rules:
+  - id: react-dangerously-set-inner-html
+    patterns:
+      - pattern: '<$TAG ... dangerouslySetInnerHTML={{ __html: $HTML }} ... />'
+    message: "Detected use of 'dangerouslySetInnerHTML'. Ensure HTML content is sanitized with DOMPurify to prevent Cross-Site Scripting (XSS)."
+    languages: [typescript, javascript]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')"
+      technology:
+        - react
+
+  - id: target-blank-missing-rel
+    patterns:
+      - pattern: '<a ... target="_blank" ... />'
+      - pattern-not: '<a ... rel=$REL ... target="_blank" ... />'
+    message: "Links with target='_blank' should include rel='noopener noreferrer' to prevent reverse tabnabbing and performance issues."
+    languages: [typescript, javascript]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-200: Exposure of Sensitive Information to an Unauthorized Actor"
+      technology:
+        - react
+
+  - id: no-eval-or-function-constructor
+    patterns:
+      - pattern-either:
+          - pattern: 'eval(...)'
+          - pattern: 'window.eval(...)'
+          - pattern: 'new Function(...)'
+    message: "Avoid using 'eval()' or 'Function' constructor as it can lead to arbitrary code execution."
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')"
+
+  - id: no-hardcoded-supabase-service-key
+    patterns:
+      - pattern-regex: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'
+    message: "Potential hardcoded JWT / Supabase service role key detected. Store credentials securely in environment variables."
+    languages: [generic]
+    severity: ERROR
+    paths:
+      exclude:
+        - "*.lock"
+        - "*.md"
+    metadata:
+      category: security
+      cwe: "CWE-798: Use of Hard-coded Credentials"

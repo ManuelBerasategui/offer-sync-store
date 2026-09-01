@@ -385,7 +385,7 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
     if (!resAdmin.ok) {
       const body = await resAdmin.text().catch(() => "");
       adminError = `Error ${resAdmin.status}: ${body}`;
-      console.error(`[email] Error al enviar notificación a admins: ${resAdmin.status}`, body);
+      console.error("[email] Error al enviar notificación a admins:", resAdmin.status, body);
     } else {
       adminSuccess = true;
       console.log(`[email] Notificación a admins enviada para orden: ${order.orderCode}`);
@@ -411,7 +411,7 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
 
       if (!resCustomer.ok) {
         const body = await resCustomer.text().catch(() => "");
-        console.error(`[email] Error al enviar confirmación al cliente: ${resCustomer.status}`, body);
+        console.error("[email] Error al enviar confirmación al cliente:", resCustomer.status, body);
       } else {
         console.log(`[email] Confirmación enviada al cliente: ${customerEmail}`);
       }

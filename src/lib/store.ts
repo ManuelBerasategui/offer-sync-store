@@ -95,8 +95,10 @@ export function getBankInfo(config?: SiteConfig) {
   };
 }
 
-/** Convierte links de Google Drive a una URL de imagen directa. */
-export function imageUrl(raw?: string) {
+const ALLOWED_IMAGE_PROTOCOLS = new Set(["http:", "https:", "data:", "blob:"]);
+
+/** Convierte links de Google Drive a una URL de imagen directa y valida protocolos seguros contra XSS. */
+export function imageUrl(raw?: string | null): string {
   const url = (raw ?? "").trim();
   if (!url) return "";
   const m =
@@ -106,7 +108,18 @@ export function imageUrl(raw?: string) {
   if (url.includes("drive.google.com") && m) {
     return `https://lh3.googleusercontent.com/d/${m[1]}=w1200`;
   }
-  return url;
+  if (url.startsWith("/") && !url.startsWith("//")) {
+    return url;
+  }
+  try {
+    const parsed = new URL(url, "https://dummy-base.local");
+    if (ALLOWED_IMAGE_PROTOCOLS.has(parsed.protocol)) {
+      return url;
+    }
+  } catch {
+    // invalid URL
+  }
+  return "";
 }
 
 /** Extrae el id de un archivo de Google Drive, si el link es de Drive. */

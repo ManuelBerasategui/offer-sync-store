@@ -1,0 +1,29 @@
+# Dependency directories
+node_modules/
+bun.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build and output artifacts
+dist/
+dist-ssr/
+.output/
+.vinxi/
+.tanstack/
+.nitro/
+.wrangler/
+build/
+out/
+
+# Environment files
+.env
+.env.*
+.dev.vars
+
+# Git & Editor files
+.git/
+.vscode/
+.idea/
+.agents/
+.lovable/

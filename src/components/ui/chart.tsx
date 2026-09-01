@@ -68,6 +68,7 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null;
   }
 
+  // nosemgrep: react-dangerously-set-inner-html
   return (
     <style
       dangerouslySetInnerHTML={{
