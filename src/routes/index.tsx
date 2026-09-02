@@ -23,7 +23,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Importamos de todo para que revendas: tecnología, bazar e indumentaria con precio de importador. Comprá online con envíos a todo el país.",
+          "Importamos de todo para que revendas: tecnología, bazar y perfumes con precio de importador. Comprá online con envíos a todo el país.",
       },
       { property: "og:title", content: "Te importamos — Precio de importador" },
       {
@@ -412,7 +412,7 @@ function Home() {
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-[15px] text-muted-foreground sm:text-base">
             Somos un equipo dedicado a traer productos importados de tecnología, bazar,
-            indumentaria y mucho más
+            perfumes y mucho más
           </p>
           <a href="#contacto" className="btn-base grad-urgente group mt-8 inline-flex items-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg">
             Emprendé hoy

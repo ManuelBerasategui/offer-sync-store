@@ -20,7 +20,7 @@ export const Route = createFileRoute("/catalogo")({
       {
         name: "description",
         content:
-          "Buscá y filtrá todo el catálogo de productos importados: tecnología, bazar, indumentaria y más. Ordená por precio o por más vendidos.",
+          "Buscá y filtrá todo el catálogo de productos importados: tecnología, bazar, perfumes y más. Ordená por precio o por más vendidos.",
       },
       { property: "og:title", content: "Catálogo completo — Te importamos" },
       {
