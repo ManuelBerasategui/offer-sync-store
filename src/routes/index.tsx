@@ -93,10 +93,10 @@ function Home() {
       <SiteHeader config={config} />
 
       {/* HERO */}
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-muted/40 via-surface to-surface px-4 py-24 text-center sm:px-6 sm:py-36">
-        {/* Decorative blobs — muy sutiles, sin naranja */}
-        <div aria-hidden className="pointer-events-none absolute -top-32 -left-24 h-80 w-80 rounded-full bg-foreground/[0.03] blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-28 -right-16 h-80 w-80 rounded-full bg-foreground/[0.03] blur-3xl" />
+      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 py-24 text-center sm:px-6 sm:py-36">
+        {/* Decorative color wash & difuminados suaves */}
+        <div aria-hidden className="pointer-events-none absolute -top-28 -left-20 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-10 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
 
         {/* Badge superior: oscuro/neutro, NO naranja */}
         <span className="relative mb-8 inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/[0.06] px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-foreground/60">
