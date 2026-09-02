@@ -192,7 +192,7 @@ const STEPS = [
   {
     n: "02",
     title: "Comprás online",
-    text: "Pagás con tarjeta, débito o dinero en cuenta a través de MercadoPago.",
+    text: "Pagás a través de MercadoPago (Checkout Pro) o por transferencia bancaria.",
   },
   {
     n: "03",
