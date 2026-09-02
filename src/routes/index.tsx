@@ -168,9 +168,8 @@ function Home() {
 
               <div className="relative -mx-4 sm:mx-0">
                 <div
-                  className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
-                    banners.length === 1 ? "justify-center" : ""
-                  }`}
+                  className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${banners.length === 1 ? "justify-center" : ""
+                    }`}
                 >
                   {banners.map((b, i) => {
                     const basePrice = toNumber(b.precio);
@@ -182,11 +181,10 @@ function Home() {
                         key={i}
                         to="/combo/$index"
                         params={{ index: String(i) }}
-                        className={`group relative flex flex-col snap-center overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${
-                          banners.length === 1
+                        className={`group relative flex flex-col snap-center overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${banners.length === 1
                             ? "w-full max-w-[440px]"
                             : "w-[85vw] max-w-[380px] sm:w-[360px] shrink-0"
-                        }`}
+                          }`}
                       >
                         {/* Contenedor de la foto adaptado a la imagen */}
                         <div className="relative aspect-square w-full overflow-hidden bg-surface flex items-center justify-center">
@@ -245,18 +243,16 @@ function Home() {
               )}
               <div className="relative -mx-4 sm:mx-0">
                 <div
-                  className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
-                    ofertasDelDia.length === 1 ? "justify-center" : ""
-                  }`}
+                  className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${ofertasDelDia.length === 1 ? "justify-center" : ""
+                    }`}
                 >
                   {ofertasDelDia.map((p, i) => (
                     <div
                       key={p.id ?? i}
-                      className={`snap-center shrink-0 ${
-                        ofertasDelDia.length === 1
+                      className={`snap-center shrink-0 ${ofertasDelDia.length === 1
                           ? "w-full max-w-[300px]"
                           : "w-[72vw] max-w-[280px] sm:w-[260px]"
-                      }`}
+                        }`}
                     >
                       <ProductCard p={p} config={config} />
                     </div>
@@ -281,18 +277,16 @@ function Home() {
           {masVendidos.length > 0 && (
             <div className="relative -mx-4 sm:mx-0">
               <div
-                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${
-                  masVendidos.length === 1 ? "justify-center" : ""
-                }`}
+                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${masVendidos.length === 1 ? "justify-center" : ""
+                  }`}
               >
                 {masVendidos.map((p, i) => (
                   <div
                     key={p.id ?? i}
-                    className={`snap-center shrink-0 ${
-                      masVendidos.length === 1
+                    className={`snap-center shrink-0 ${masVendidos.length === 1
                         ? "w-full max-w-[300px]"
                         : "w-[72vw] max-w-[280px] sm:w-[260px]"
-                    }`}
+                      }`}
                   >
                     <ProductCard p={p} config={config} />
                   </div>
@@ -327,7 +321,7 @@ function Home() {
           { key: "perfumes disenador", label: "Perfumes Diseñador", defaultDesc: "Mínimo 3 unidades", icon: "💎" },
           { key: "mates", label: "Mates", defaultDesc: "Mínimo 10 unidades", icon: "🧉" },
           { key: "suplementos", label: "Suplementación", defaultDesc: "Mínimo $250.000", icon: "⚡" },
-          { key: "zapatillas", label: "Zapatillas", defaultDesc: "Mínimo 3 unidades (vía WhatsApp)", icon: "👟" },
+          { key: "zapatillas", label: "Zapatillas", defaultDesc: "Mínimo 3 unidades", icon: "👟" },
         ];
 
         const minItems: { label: string; desc: string; icon: string }[] = [];
