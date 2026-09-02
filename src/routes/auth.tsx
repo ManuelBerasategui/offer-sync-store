@@ -10,7 +10,17 @@ import { EMPTY_SHIPPING, useAuth, type ShippingData } from "@/hooks/useAuth";
 
 const authSearchSchema = z.object({
   mode: z.enum(["login", "register", "forgot"]).optional(),
+  redirect: z.string().optional(),
 });
+
+function getSafeRedirect(target?: string): string {
+  if (!target) return "/";
+  const trimmed = target.trim();
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//") && !trimmed.startsWith("/\\")) {
+    return trimmed;
+  }
+  return "/";
+}
 
 export const Route = createFileRoute("/auth")({
   validateSearch: authSearchSchema,
@@ -75,11 +85,6 @@ function AuthPage() {
   const navigate = useNavigate();
   const { user, profile, signOut, refreshProfile, isAdmin } = useAuth();
 
-  // The URL is now the single source of truth for `mode` instead of a
-  // useState that only read `search.mode` on first mount. That's what made
-  // /auth?mode=forgot show the login screen: a client-side search-param
-  // change doesn't remount this component, so a plain useState never
-  // noticed the URL had changed.
   const mode: Mode = search.mode ?? "login";
 
   const [email, setEmail] = useState("");
@@ -94,14 +99,6 @@ function AuthPage() {
   const [profileMsg, setProfileMsg] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // --- Password recovery ---------------------------------------------
-  // When someone clicks the "reset password" link from their email,
-  // Supabase redirects them back here with a valid session already
-  // attached and fires a PASSWORD_RECOVERY event. Previously that meant
-  // `user` became truthy and they'd land straight on the "Mi cuenta"
-  // panel below, without ever being asked to set a new password — so the
-  // reset flow never actually completed. This listener catches that case
-  // and shows a dedicated "set new password" screen instead.
   const [recovering, setRecovering] = useState(false);
   const [recoveryDone, setRecoveryDone] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -114,9 +111,6 @@ function AuthPage() {
       }
     });
 
-    // En el flujo implícito, Supabase agrega `type=recovery` al fragmento
-    // de la URL. Lo detectamos también por si el evento ocurre antes de que
-    // el listener termine de inicializarse.
     const hashParams = new URLSearchParams(window.location.hash.slice(1));
     if (hashParams.get("type") === "recovery") {
       setRecovering(true);
@@ -132,7 +126,11 @@ function AuthPage() {
   const goToMode = (next: Mode) => {
     setError("");
     setMsg("");
-    navigate({ to: "/auth", search: { mode: next }, replace: true });
+    navigate({
+      to: "/auth",
+      search: { mode: next, redirect: search.redirect },
+      replace: true,
+    });
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -152,7 +150,12 @@ function AuthPage() {
           }
           throw err;
         }
-        navigate({ to: "/" });
+        const target = getSafeRedirect(search.redirect);
+        if (target !== "/") {
+          window.location.assign(target);
+        } else {
+          navigate({ to: "/" });
+        }
         return;
       }
       if (mode === "register") {
@@ -175,11 +178,16 @@ function AuthPage() {
         if (err) throw err;
 
         if (signupData.session) {
-          navigate({ to: "/" });
+          const target = getSafeRedirect(search.redirect);
+          if (target !== "/") {
+            window.location.assign(target);
+          } else {
+            navigate({ to: "/" });
+          }
           return;
         }
 
-        navigate({ to: "/auth", search: { mode: "login" }, replace: true });
+        navigate({ to: "/auth", search: { mode: "login", redirect: search.redirect }, replace: true });
         setMsg("¡Cuenta creada con éxito! Ya podés iniciar sesión con tu email y contraseña.");
         return;
       }
@@ -438,6 +446,14 @@ function AuthPage() {
               </>
             )}
             <div className="mt-6 flex flex-col gap-3">
+              {search.redirect && search.redirect !== "/" && (
+                <a
+                  href={getSafeRedirect(search.redirect)}
+                  className="btn-base grad-urgente text-center text-primary-foreground font-bold shadow-md hover:opacity-95"
+                >
+                  ← Volver a mi compra
+                </a>
+              )}
               {isAdmin && (
                 <Link
                   to="/admin/ordenes"
@@ -446,7 +462,7 @@ function AuthPage() {
                   📦 Panel de Órdenes Pagadas
                 </Link>
               )}
-              <Link to="/catalogo" className="btn-base grad-urgente text-primary-foreground">
+              <Link to="/catalogo" className="btn-base border border-border text-foreground text-center">
                 Seguir comprando
               </Link>
               <button

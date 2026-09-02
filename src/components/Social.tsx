@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { ChevronLeft, ChevronRight, Star, CheckCircle2, Quote } from "lucide-react";
 
-const REVIEWS = [
+export const REVIEWS = [
   {
     name: "Martina G.",
     location: "Rosario, Santa Fe",

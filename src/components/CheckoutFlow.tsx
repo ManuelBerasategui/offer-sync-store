@@ -595,7 +595,13 @@ export function CheckoutFlow({
             </button>
             <Link
               to="/auth"
-              search={{ mode: "login" }}
+              search={{
+                mode: "login",
+                redirect:
+                  typeof window !== "undefined"
+                    ? window.location.pathname + window.location.search
+                    : undefined,
+              }}
               className="btn-base grad-urgente text-primary-foreground"
             >
               Iniciar sesión

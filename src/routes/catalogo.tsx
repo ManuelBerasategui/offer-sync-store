@@ -69,7 +69,12 @@ function Catalogo() {
     const q = search.trim().toLowerCase();
     const filtered = products.filter((p) => {
       if (cat !== "todas" && (p.categoria ?? "").trim() !== cat) return false;
-      if (q && !(p.nombre ?? "").toLowerCase().includes(q)) return false;
+      if (q) {
+        const nom = (p.nombre ?? "").toLowerCase();
+        const cate = (p.categoria ?? "").toLowerCase();
+        const desc = (p.descripcion ?? "").toLowerCase();
+        if (!nom.includes(q) && !cate.includes(q) && !desc.includes(q)) return false;
+      }
       if (onlyTop && (p.ventas_semana ?? 0) <= 0 && !isYes(p.destacado)) return false;
       if (onlyOffers && !isYes(p.oferta)) return false;
       return true;
@@ -138,7 +143,7 @@ function Catalogo() {
           </p>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight">Catálogo completo</h1>
           <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
-            Buscá, filtrá por categoría y ordená por precio o más vendidos.
+            Buscá por producto o categoría, filtrá y ordená según tu conveniencia.
           </p>
         </div>
 
@@ -153,7 +158,7 @@ function Catalogo() {
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar producto..."
+                  placeholder="Buscar por producto o categoría..."
                   className="h-8.5 sm:h-9.5 w-full rounded-lg border border-input bg-card pl-8 pr-7 text-xs sm:text-sm outline-none focus:border-primary transition-colors"
                 />
                 {search && (
@@ -239,8 +244,47 @@ function Catalogo() {
             )}
           </>
         ) : (
-          <div className="py-16 text-center text-sm text-muted-foreground">
-            No encontramos productos con esos filtros. Probá otra búsqueda o cambiá de categoría.
+          <div className="my-10 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/60 p-8 text-center sm:p-12">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Search className="h-6 w-6" />
+            </div>
+            <h3 className="text-base font-bold text-foreground">No encontramos productos</h3>
+            <p className="mt-1 max-w-md text-xs sm:text-sm text-muted-foreground">
+              {search && cat !== "todas" ? (
+                <>
+                  No hay resultados para <span className="font-semibold text-foreground">"{search}"</span> dentro de <span className="font-semibold text-foreground">"{cat}"</span>.
+                </>
+              ) : search ? (
+                <>
+                  No hay productos que coincidan con <span className="font-semibold text-foreground">"{search}"</span>.
+                </>
+              ) : (
+                "No hay productos disponibles con los filtros seleccionados."
+              )}
+            </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              {search && cat !== "todas" && (
+                <button
+                  type="button"
+                  onClick={() => setCat("todas")}
+                  className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-xs transition hover:opacity-90 active:scale-95"
+                >
+                  Buscar "{search}" en todas las categorías
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setCat("todas");
+                  setOnlyOffers(false);
+                  setOnlyTop(false);
+                }}
+                className="rounded-lg border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted active:scale-95"
+              >
+                Limpiar filtros
+              </button>
+            </div>
           </div>
         )}
 

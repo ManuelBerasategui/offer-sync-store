@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState, useEffect, useRef } from "react";
+import { CheckCircle2 } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
+import { REVIEWS } from "@/components/Social";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
 import {
@@ -89,24 +91,6 @@ export const Route = createFileRoute("/producto/$id")({
   },
   component: ProductoPage,
 });
-
-const REVIEWS = [
-  {
-    name: "Martina G.",
-    stars: 5,
-    text: "Excelente servicio, me llegó todo perfecto. Sigo trabajando con ellos.",
-  },
-  {
-    name: "Nicolás P.",
-    stars: 4.5,
-    text: "Muy buena calidad y respondieron todas mis dudas al toque.",
-  },
-  {
-    name: "Julieta R.",
-    stars: 5,
-    text: "Compré por mayor para revender y se vendió todo en una semana.",
-  },
-];
 
 function stripTrailingColor(name: string, color: string): string {
   const trimmedName = name.trim();
@@ -789,16 +773,43 @@ function ProductoPage() {
         </section>
 
         {/* Reseñas */}
-        <section className="mt-10 max-w-3xl">
-          <h2 className="font-sans text-xl font-bold normal-case tracking-tight">
-            Reseñas de compradores
-          </h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <section className="mt-12 max-w-4xl">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 className="font-sans text-xl sm:text-2xl font-bold normal-case tracking-tight">
+                Reseñas de compradores mayoristas
+              </h2>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                Experiencias reales de revendedores que compran en nuestro catálogo.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Clientes verificados
+            </span>
+          </div>
+
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
             {REVIEWS.map((r) => (
-              <div key={r.name} className="card-soft p-4">
-                <Stars value={r.stars} />
-                <p className="mt-2 text-sm text-muted-foreground">{r.text}</p>
-                <p className="mt-2 text-xs font-semibold">{r.name}</p>
+              <div key={r.name} className="card-soft p-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${r.avatarBg} text-xs font-bold text-white shadow-xs`}>
+                        {r.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-foreground leading-none">{r.name}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{r.location}</p>
+                      </div>
+                    </div>
+                    <Stars value={r.stars} />
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">“{r.text}”</p>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground/80">
+                  <span className="font-medium truncate max-w-[160px]">{r.role}</span>
+                  <span className="shrink-0">{r.date}</span>
+                </div>
               </div>
             ))}
           </div>

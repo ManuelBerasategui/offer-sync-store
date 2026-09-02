@@ -133,7 +133,13 @@ export function HeaderAuth() {
         <div className="mt-3 flex flex-col items-start gap-1.5 text-[11px]">
           <Link
             to="/auth"
-            search={{ mode: "register" }}
+            search={{
+              mode: "register",
+              redirect:
+                typeof window !== "undefined"
+                  ? window.location.pathname + window.location.search
+                  : undefined,
+            }}
             onClick={() => setOpen(false)}
             className="text-muted-foreground underline hover:text-primary"
           >
@@ -141,7 +147,13 @@ export function HeaderAuth() {
           </Link>
           <Link
             to="/auth"
-            search={{ mode: "forgot" }}
+            search={{
+              mode: "forgot",
+              redirect:
+                typeof window !== "undefined"
+                  ? window.location.pathname + window.location.search
+                  : undefined,
+            }}
             onClick={() => setOpen(false)}
             className="text-muted-foreground underline hover:text-primary"
           >

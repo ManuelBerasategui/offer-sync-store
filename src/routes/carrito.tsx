@@ -359,7 +359,7 @@ function CarritoPage() {
                   </span>
                   <Link
                     to="/auth"
-                    search={{ mode: "login" }}
+                    search={{ mode: "login", redirect: "/carrito" }}
                     className="shrink-0 font-bold text-primary hover:underline"
                   >
                     Iniciar sesión →

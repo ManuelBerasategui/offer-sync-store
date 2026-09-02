@@ -93,13 +93,13 @@ function Home() {
       <SiteHeader config={config} />
 
       {/* HERO */}
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 py-24 text-center sm:px-6 sm:py-36">
+      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 pt-10 pb-8 text-center sm:px-6 sm:pt-20 sm:pb-16">
         {/* Decorative color wash & difuminados suaves */}
         <div aria-hidden className="pointer-events-none absolute -top-28 -left-20 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-10 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
 
         {/* Badge superior: oscuro/neutro, NO naranja */}
-        <span className="relative mb-8 inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/[0.06] px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-foreground/60">
+        <span className="relative mb-4 sm:mb-6 inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/[0.06] px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-foreground/60">
           <Flame className="h-3 w-3 opacity-70" />
           Precios de Importador
         </span>
@@ -112,7 +112,7 @@ function Home() {
         </h1>
 
         {/* Beneficios — iconos neutros, sin naranja */}
-        <div className="relative mx-auto mt-12 flex items-center justify-center gap-10 text-sm font-medium text-muted-foreground/90">
+        <div className="relative mx-auto mt-6 sm:mt-10 flex items-center justify-center gap-6 sm:gap-10 text-sm font-medium text-muted-foreground/90">
           <span className="inline-flex items-center gap-2">
             <Truck className="h-4 w-4 opacity-50" />
             Envíos a todo el país
@@ -124,7 +124,7 @@ function Home() {
         </div>
 
         {/* CTA — naranja exclusivo aquí, máxima jerarquía */}
-        <div className="relative mt-10 flex flex-col items-center gap-4">
+        <div className="relative mt-6 sm:mt-8 flex flex-col items-center gap-2.5 sm:gap-3">
           <a
             href="/catalogo"
             className="btn-base grad-urgente inline-flex items-center justify-center gap-2 px-10 py-3.5 text-base font-black uppercase tracking-wide text-primary-foreground shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-95"
@@ -144,7 +144,7 @@ function Home() {
 
 
       {/* OFERTAS DEL DÍA */}
-      <section id="ofertas" className="relative overflow-hidden px-4 py-14 sm:px-6">
+      <section id="ofertas" className="relative overflow-hidden px-4 pt-6 pb-12 sm:px-6 sm:pt-12 sm:pb-16">
         <div aria-hidden className="pointer-events-none absolute -top-16 right-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
 
         <div className="relative mx-auto max-w-[1180px]">
