@@ -93,53 +93,57 @@ function Home() {
       <SiteHeader config={config} />
 
       {/* HERO */}
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 py-16 text-center sm:px-6 sm:py-24">
-        {/* decorative color wash — reemplaza el fondo plano */}
-        <div aria-hidden className="pointer-events-none absolute -top-28 -left-20 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-10 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
+      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-muted/40 via-surface to-surface px-4 py-24 text-center sm:px-6 sm:py-36">
+        {/* Decorative blobs — muy sutiles, sin naranja */}
+        <div aria-hidden className="pointer-events-none absolute -top-32 -left-24 h-80 w-80 rounded-full bg-foreground/[0.03] blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-28 -right-16 h-80 w-80 rounded-full bg-foreground/[0.03] blur-3xl" />
 
-        <span className="relative mb-5 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary ring-1 ring-primary/20">
-          <Flame className="h-3.5 w-3.5" />
-          Precio de importador, todos los días
+        {/* Badge superior: oscuro/neutro, NO naranja */}
+        <span className="relative mb-8 inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/[0.06] px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-foreground/60">
+          <Flame className="h-3 w-3 opacity-70" />
+          Precios de Importador
         </span>
 
+        {/* Título — intacto en tamaño y estructura */}
         <h1 className="relative mx-auto max-w-4xl text-[clamp(40px,12vw,84px)] leading-[0.95]">
           Importamos de todo
           <br />
           <span className="text-primary">para que revendas</span>
         </h1>
 
-        {/* 2 íconos centrados side-by-side */}
-        <div className="relative mx-auto mt-9 flex items-center justify-center gap-8 text-sm font-medium text-muted-foreground">
+        {/* Beneficios — iconos neutros, sin naranja */}
+        <div className="relative mx-auto mt-12 flex items-center justify-center gap-10 text-sm font-medium text-muted-foreground/70">
           <span className="inline-flex items-center gap-2">
-            <Truck className="h-4 w-4 text-primary" />
+            <Truck className="h-4 w-4 opacity-50" />
             Envíos a todo el país
           </span>
           <span className="inline-flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-primary" />
+            <ShieldCheck className="h-4 w-4 opacity-50" />
             Productos originales
           </span>
         </div>
 
-        {/* CTA principal sólido naranja + pill de mínimos debajo */}
-        <div className="relative mt-7 flex flex-col items-center gap-3">
+        {/* CTA — naranja exclusivo aquí, máxima jerarquía */}
+        <div className="relative mt-10 flex flex-col items-center gap-4">
           <a
             href="/catalogo"
-            className="btn-base grad-urgente inline-flex items-center justify-center gap-2 px-8 py-3 text-base font-bold text-primary-foreground shadow-md transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
+            className="btn-base grad-urgente inline-flex items-center justify-center gap-2 px-10 py-3.5 text-base font-black uppercase tracking-wide text-primary-foreground shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-95"
           >
             Ver Catálogo Mayorista
           </a>
-          {/* Pill ámbar de mínimos — siempre visible */}
+
+          {/* Aviso mínimos — gris puro, sin ámbar */}
           <a
             href="#minimos"
-            className="inline-flex max-w-full items-center justify-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-amber-700 dark:text-amber-300 transition-all hover:bg-amber-500/20 active:scale-95 text-center leading-snug"
+            className="inline-flex max-w-full items-center justify-center gap-1.5 rounded-full border border-border/60 bg-transparent px-4 py-1.5 text-[11px] font-medium text-muted-foreground/60 transition-colors hover:text-muted-foreground active:scale-95"
           >
-            <span className="shrink-0 text-xs">ℹ️</span>
+            <span className="shrink-0 opacity-60">ℹ️</span>
             <span>Aplican mínimos de compra según categoría.</span>
-            <span className="shrink-0 font-extrabold underline">Ver ↓</span>
+            <span className="shrink-0 font-bold">Ver ↓</span>
           </a>
         </div>
       </section>
+
 
       {/* OFERTAS DEL DÍA */}
       <section id="ofertas" className="relative overflow-hidden px-4 py-14 sm:px-6">
