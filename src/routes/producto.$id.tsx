@@ -5,7 +5,7 @@ import { CheckCircle2 } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
-import { REVIEWS } from "@/components/Social";
+import { REVIEWS, Stars } from "@/components/Social";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
 import {
@@ -849,18 +849,6 @@ function ProductoPage() {
       </Dialog>
 
       <SiteFooter config={config} />
-    </div>
-  );
-}
-
-export function Stars({ value }: { value: number }) {
-  return (
-    <div className="flex items-center gap-1 text-amber">
-      <span aria-hidden className="text-sm">
-        {"★".repeat(Math.floor(value))}
-        {value % 1 !== 0 ? "☆" : ""}
-      </span>
-      <span className="text-xs font-bold text-foreground">{value.toFixed(1)}</span>
     </div>
   );
 }
