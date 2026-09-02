@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Flame, Truck, ShieldCheck, ArrowRight, MessageCircle, Mail, Instagram, Tag } from "lucide-react";
+import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -104,23 +104,21 @@ function Home() {
           Precios de Importador
         </span>
 
-        {/* Título — intacto en tamaño y estructura */}
+        {/* Título */}
         <h1 className="relative mx-auto max-w-4xl text-[clamp(40px,12vw,84px)] leading-[0.95]">
-          Importamos de todo
+          Importamos
           <br />
           <span className="text-primary">para que revendas</span>
         </h1>
 
-        {/* Beneficios — iconos neutros, sin naranja */}
-        <div className="relative mx-auto mt-6 sm:mt-10 flex items-center justify-center gap-6 sm:gap-10 text-sm font-medium text-muted-foreground/90">
-          <span className="inline-flex items-center gap-2">
-            <Truck className="h-4 w-4 opacity-50" />
-            Envíos a todo el país
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 opacity-50" />
-            Productos originales
-          </span>
+        {/* Línea horizontal divisoria tipo hr */}
+        <hr className="relative mx-auto mt-5 sm:mt-7 w-28 sm:w-40 border-t border-border/70" />
+
+        {/* Beneficios sin iconos, centrados con espacio */}
+        <div className="relative mx-auto mt-4 sm:mt-5 flex items-center justify-center gap-4 sm:gap-8 text-xs sm:text-sm font-medium text-muted-foreground/90">
+          <span>Envíos a todo el país</span>
+          <span aria-hidden className="text-muted-foreground/40">•</span>
+          <span>Productos originales</span>
         </div>
 
         {/* CTA — naranja exclusivo aquí, máxima jerarquía */}
