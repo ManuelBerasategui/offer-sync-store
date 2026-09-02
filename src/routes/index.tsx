@@ -332,7 +332,6 @@ function Home() {
           let desc = cat.defaultDesc;
           if (rule?.minUnits) {
             desc = `Mínimo ${rule.minUnits} unidades`;
-            if (cat.key === "zapatillas") desc += " (vía WhatsApp)";
           } else if (rule?.minAmount) {
             desc = `Mínimo ${money(rule.minAmount)}`;
           }
