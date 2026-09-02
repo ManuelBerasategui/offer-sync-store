@@ -197,11 +197,6 @@ function Home() {
                             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                             onError={onImageError(b.imagen_url)}
                           />
-                          {/* Badge superior */}
-                          <span className="absolute left-2.5 top-2.5 z-10 inline-flex items-center gap-1 rounded-md grad-urgente px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground shadow-md">
-                            <Flame className="h-3 w-3" />
-                            Combo en oferta
-                          </span>
                         </div>
 
                         {/* Footer con título y precios bien legibles */}
