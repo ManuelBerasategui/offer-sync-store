@@ -690,6 +690,7 @@ function ProductoPage() {
                 <CheckoutFlow
                   items={[{ nombre: cartItem.nombre, qty, unitPrice: cartItem.unitPrice }]}
                   total={total}
+                  onBack={() => setShowCheckout(false)}
                 />
               ) : (
                 <>

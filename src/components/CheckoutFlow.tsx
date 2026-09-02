@@ -74,10 +74,12 @@ export function CheckoutFlow({
   items,
   total,
   appliedCoupon,
+  onBack,
 }: {
   items: CheckoutItem[];
   total: number;
   appliedCoupon?: { code: string; discountPct: number } | null;
+  onBack?: () => void;
 }) {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -368,6 +370,15 @@ export function CheckoutFlow({
           >
             Continuar al pago
           </button>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mt-1 w-full rounded-xl border border-border bg-surface py-2.5 text-sm font-semibold text-foreground transition-all hover:bg-surface-hover hover:border-primary/50 active:scale-95"
+            >
+              ← Volver al producto
+            </button>
+          )}
           {error && <p className="text-sm text-destructive">{error}</p>}
         </form>
       ) : (
