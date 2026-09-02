@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, ArrowDownUp, Flame, Star, X, Loader2 } from "lucide-react";
+import { Search, ArrowDownUp, X, Loader2 } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -178,10 +178,10 @@ function Catalogo() {
                   onChange={(e) => setSort(e.target.value as Sort)}
                   className="h-8.5 sm:h-9.5 rounded-lg border border-input bg-card pl-2.5 pr-6 text-[11px] sm:text-xs font-semibold outline-none focus:border-primary appearance-none cursor-pointer"
                 >
-                  <option value="destacado">⭐ Más vendidos</option>
-                  <option value="precio_asc">💵 Menor precio</option>
-                  <option value="precio_desc">💰 Mayor precio</option>
-                  <option value="nombre">🔤 Nombre A-Z</option>
+                  <option value="destacado">Más vendidos</option>
+                  <option value="precio_asc">Menor precio</option>
+                  <option value="precio_desc">Mayor precio</option>
+                  <option value="nombre">Nombre A-Z</option>
                 </select>
                 <ArrowDownUp className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
               </div>
@@ -193,11 +193,9 @@ function Catalogo() {
                 Todas
               </button>
               <button className={chip(onlyOffers)} onClick={() => setOnlyOffers((v) => !v)}>
-                <Flame className={`h-3 w-3 ${onlyOffers ? "text-primary-foreground" : "text-red-500"}`} />
                 Ofertas
               </button>
               <button className={chip(onlyTop)} onClick={() => setOnlyTop((v) => !v)}>
-                <Star className={`h-3 w-3 ${onlyTop ? "text-primary-foreground" : "text-amber-500"}`} />
                 Más vendidos
               </button>
               {cats.map((c) => (
