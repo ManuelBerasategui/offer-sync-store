@@ -112,7 +112,7 @@ function Home() {
         </h1>
 
         {/* Beneficios — iconos neutros, sin naranja */}
-        <div className="relative mx-auto mt-12 flex items-center justify-center gap-10 text-sm font-medium text-muted-foreground/70">
+        <div className="relative mx-auto mt-12 flex items-center justify-center gap-10 text-sm font-medium text-muted-foreground/90">
           <span className="inline-flex items-center gap-2">
             <Truck className="h-4 w-4 opacity-50" />
             Envíos a todo el país
@@ -135,11 +135,9 @@ function Home() {
           {/* Aviso mínimos — gris puro, sin ámbar */}
           <a
             href="#minimos"
-            className="inline-flex max-w-full items-center justify-center gap-1.5 rounded-full border border-border/60 bg-transparent px-4 py-1.5 text-[11px] font-medium text-muted-foreground/60 transition-colors hover:text-muted-foreground active:scale-95"
+            className="text-[11px] font-medium text-muted-foreground/80 transition-colors hover:text-muted-foreground active:scale-95"
           >
-            <span className="shrink-0 opacity-60">ℹ️</span>
-            <span>Aplican mínimos de compra según categoría.</span>
-            <span className="shrink-0 font-bold">Ver ↓</span>
+            Aplican mínimos de compra según categoría. <span className="font-bold">Ver ↓</span>
           </a>
         </div>
       </section>
