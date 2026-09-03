@@ -322,6 +322,7 @@ function ProductoPage() {
             <img
               src={imageUrl(selectedImage) || FALLBACK_IMAGE}
               alt={product.nombre ?? "Producto"}
+              decoding="async"
               referrerPolicy="no-referrer"
               className="aspect-square w-full bg-surface object-contain p-3"
               onError={onImageError(selectedImage)}

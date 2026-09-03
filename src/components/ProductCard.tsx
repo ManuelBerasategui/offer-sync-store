@@ -55,6 +55,7 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
           src={imageUrl(p.imagen_url) || FALLBACK_IMAGE}
           alt={p.nombre ?? "Producto"}
           loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
           className="h-full w-full object-contain p-2"
           onError={onImageError(p.imagen_url)}

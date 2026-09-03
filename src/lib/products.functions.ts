@@ -710,12 +710,13 @@ export const deleteAdminProduct = createServerFn({ method: "POST" })
 
 export const uploadAdminProductImage = createServerFn({ method: "POST" })
   .validator(
-    (data: { email?: string; token?: string; filename: string; base64: string; bucket?: string }) => ({
+    (data: { email?: string; token?: string; filename: string; base64: string; bucket?: string; contentType?: string }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
       filename: str(data?.filename, 200),
       base64: data?.base64 ?? "",
       bucket: str(data?.bucket, 60) || "storage-images",
+      contentType: str(data?.contentType, 60),
     }),
   )
   .handler(async ({ data }): Promise<{ publicUrl?: string; error?: string }> => {
@@ -726,6 +727,15 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
       const base64Data = data.base64.replace(/^data:image\/\w+;base64,/, "");
       const buffer = Buffer.from(base64Data, "base64");
       const bucketName = data.bucket || "storage-images";
+
+      // Determinar contentType adecuado
+      let cType = data.contentType;
+      if (!cType) {
+        if (data.filename.endsWith(".webp")) cType = "image/webp";
+        else if (data.filename.endsWith(".png")) cType = "image/png";
+        else if (data.filename.endsWith(".gif")) cType = "image/gif";
+        else cType = "image/jpeg";
+      }
 
       // Crear bucket si no existe
       try {
@@ -738,7 +748,8 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
       const { error: uploadErr } = await supabaseAdmin.storage
         .from(bucketName)
         .upload(data.filename, buffer, {
-          contentType: "image/jpeg",
+          contentType: cType,
+          cacheControl: "31536000",
           upsert: true,
         });
 

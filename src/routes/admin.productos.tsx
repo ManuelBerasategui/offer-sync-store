@@ -31,6 +31,7 @@ import {
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
 import { money, toNumber, FALLBACK_IMAGE, imageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
+import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 
 export const Route = createFileRoute("/admin/productos")({
   loader: ({ context }) => {
@@ -163,6 +164,7 @@ function ImageDropzone({
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [optimizedStats, setOptimizedStats] = useState<{ orig: number; comp: number; pct: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function uploadFile(file: File) {
@@ -172,12 +174,26 @@ function ImageDropzone({
     }
     setUploading(true);
     setErrorMsg("");
-    try {
-      const ext = file.name.split(".").pop() ?? "jpg";
-      const filename = `${folder}/${crypto.randomUUID()}.${ext}`;
+    setOptimizedStats(null);
 
-      // Intentar primero subida por cliente
-      const { error: clientErr } = await supabase.storage.from(bucket).upload(filename, file, { upsert: true });
+    try {
+      // 1. Compresión automática a WebP (máx 1200px, 82% calidad)
+      const compressed = await compressImageFile(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.82 });
+      setOptimizedStats({
+        orig: compressed.originalSize,
+        comp: compressed.compressedSize,
+        pct: compressed.savingsPct,
+      });
+
+      const filename = `${folder}/${crypto.randomUUID()}.webp`;
+
+      // 2. Intentar primero subida directa por cliente
+      const { error: clientErr } = await supabase.storage.from(bucket).upload(filename, compressed.file, {
+        contentType: "image/webp",
+        cacheControl: "31536000",
+        upsert: true,
+      });
+
       if (!clientErr) {
         const { data } = supabase.storage.from(bucket).getPublicUrl(filename);
         onChange(data.publicUrl);
@@ -185,34 +201,27 @@ function ImageDropzone({
         return;
       }
 
-      // Si falla por políticas de Supabase RLS, usar la función admin del servidor (base64)
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        const res = await uploadAdminProductImage({
-          data: {
-            email: user?.email ?? "",
-            token: session?.access_token ?? "",
-            filename,
-            base64,
-            bucket,
-          },
-        });
-        if (res.publicUrl) {
-          onChange(res.publicUrl);
-        } else {
-          setErrorMsg(res.error ?? "No se pudo guardar la imagen.");
-        }
-        setUploading(false);
-      };
-      reader.onerror = () => {
-        setErrorMsg("Error al leer el archivo.");
-        setUploading(false);
-      };
-      reader.readAsDataURL(file);
+      // 3. Si falla por RLS, usar función admin del servidor (base64)
+      const res = await uploadAdminProductImage({
+        data: {
+          email: user?.email ?? "",
+          token: session?.access_token ?? "",
+          filename,
+          base64: compressed.base64,
+          bucket,
+          contentType: "image/webp",
+        },
+      });
+
+      if (res.publicUrl) {
+        onChange(res.publicUrl);
+      } else {
+        setErrorMsg(res.error ?? "No se pudo guardar la imagen.");
+      }
+      setUploading(false);
     } catch (err) {
       console.error("Error al subir imagen:", err);
-      setErrorMsg("No se pudo subir la imagen.");
+      setErrorMsg(err instanceof Error ? err.message : "No se pudo subir la imagen.");
       setUploading(false);
     }
   }
@@ -285,6 +294,11 @@ function ImageDropzone({
             <span className="text-[11px] text-muted-foreground group-hover:text-primary transition-colors">
               Hacé clic o arrastrá para cambiar la imagen
             </span>
+            {optimizedStats && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                ✨ WebP: {formatBytes(optimizedStats.orig)} ➔ {formatBytes(optimizedStats.comp)} (-{optimizedStats.pct}%)
+              </span>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
