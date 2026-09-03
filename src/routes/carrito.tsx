@@ -115,6 +115,8 @@ export const Route = createFileRoute("/carrito")({
       { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
       { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
       { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { property: "og:url", content: "https://teimportamosarg.com/carrito" },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: CarritoPage,

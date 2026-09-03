@@ -31,6 +31,10 @@ export const Route = createFileRoute("/catalogo")({
       { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
       { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
       { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { property: "og:url", content: "https://teimportamosarg.com/catalogo" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://teimportamosarg.com/catalogo" },
     ],
   }),
   component: Catalogo,

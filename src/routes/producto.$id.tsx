@@ -69,6 +69,29 @@ export const Route = createFileRoute("/producto/$id")({
         : rawDesc
       : "Comprá online productos importados originales con descuentos por cantidad y envíos a todo el país.";
     const image = product?.imagen_url ? imageUrl(product.imagen_url) : undefined;
+    const canonicalUrl = product?.id
+      ? `https://teimportamosarg.com/producto/${product.id}`
+      : "https://teimportamosarg.com/catalogo";
+
+    // JSON-LD Product schema for Google Rich Results
+    const price = product ? String(product.precio ?? "") : "";
+    const jsonLd = product
+      ? JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: product.nombre,
+          ...(image ? { image } : {}),
+          ...(description ? { description } : {}),
+          offers: {
+            "@type": "Offer",
+            priceCurrency: "ARS",
+            ...(price ? { price } : {}),
+            availability: "https://schema.org/InStock",
+            url: canonicalUrl,
+            seller: { "@type": "Organization", name: "Te importamos" },
+          },
+        })
+      : null;
 
     return {
       meta: [
@@ -77,6 +100,7 @@ export const Route = createFileRoute("/producto/$id")({
         { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:type", content: "product" },
+        { property: "og:url", content: canonicalUrl },
         { name: "twitter:card", content: image ? "summary_large_image" : "summary" },
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
@@ -92,6 +116,17 @@ export const Route = createFileRoute("/producto/$id")({
               { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
             ]),
       ],
+      links: [
+        { rel: "canonical", href: canonicalUrl },
+      ],
+      scripts: jsonLd
+        ? [
+            {
+              type: "application/ld+json",
+              children: jsonLd,
+            },
+          ]
+        : [],
     };
   },
   component: ProductoPage,

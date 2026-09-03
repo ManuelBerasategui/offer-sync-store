@@ -41,6 +41,7 @@ export const Route = createFileRoute("/gracias")({
       { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
       { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
       { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: GraciasPage,
