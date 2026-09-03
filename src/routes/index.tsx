@@ -314,12 +314,12 @@ function Home() {
 
         // Mapeo canónico ordenado de las categorías con compra mínima
         const canonicalCategories = [
-          { key: "tecnologia", label: "Tecnología", defaultDesc: "Mínimo 5 unidades", icon: "🎧" },
-          { key: "perfumes arabes", label: "Perfumes Árabes", defaultDesc: "Mínimo 5 unidades", icon: "🧴" },
-          { key: "perfumes disenador", label: "Perfumes Diseñador", defaultDesc: "Mínimo 3 unidades", icon: "💎" },
-          { key: "mates", label: "Mates", defaultDesc: "Mínimo 10 unidades", icon: "🧉" },
-          { key: "suplementos", label: "Suplementación", defaultDesc: "Mínimo $250.000", icon: "⚡" },
-          { key: "zapatillas", label: "Zapatillas", defaultDesc: "Mínimo 3 unidades", icon: "👟" },
+          { key: "tecnologia", label: "Tecnología", defaultDesc: "5 unidades", icon: "🎧" },
+          { key: "perfumes arabes", label: "Perfumes Árabes", defaultDesc: "5 unidades", icon: "🧴" },
+          { key: "perfumes disenador", label: "Perfumes Diseñador", defaultDesc: "3 unidades", icon: "💎" },
+          { key: "mates", label: "Mates", defaultDesc: "10 unidades", icon: "🧉" },
+          { key: "suplementos", label: "Suplementación", defaultDesc: "$250.000", icon: "⚡" },
+          { key: "zapatillas", label: "Zapatillas", defaultDesc: "3 unidades", icon: "👟" },
         ];
 
         const minItems: { label: string; desc: string; icon: string }[] = [];
@@ -329,9 +329,9 @@ function Home() {
           const rule = catRules[cat.key];
           let desc = cat.defaultDesc;
           if (rule?.minUnits) {
-            desc = `Mínimo ${rule.minUnits} unidades`;
+            desc = `${rule.minUnits} unidades`;
           } else if (rule?.minAmount) {
-            desc = `Mínimo ${money(rule.minAmount)}`;
+            desc = `${money(rule.minAmount)}`;
           }
           minItems.push({ label: cat.label, desc, icon: cat.icon });
           seenKeys.add(cat.key);
@@ -346,11 +346,11 @@ function Home() {
           if (rule.minUnits) {
             seenKeys.add(norm);
             const label = key.charAt(0).toUpperCase() + key.slice(1);
-            minItems.push({ label, desc: `Mínimo ${rule.minUnits} unidades`, icon: "📦" });
+            minItems.push({ label, desc: `${rule.minUnits} unidades`, icon: "📦" });
           } else if (rule.minAmount) {
             seenKeys.add(norm);
             const label = key.charAt(0).toUpperCase() + key.slice(1);
-            minItems.push({ label, desc: `Mínimo ${money(rule.minAmount)}`, icon: "💰" });
+            minItems.push({ label, desc: `${money(rule.minAmount)}`, icon: "💰" });
           }
         }
 
@@ -360,14 +360,11 @@ function Home() {
           <section id="minimos" className="px-4 py-10 sm:px-6">
             <div className="mx-auto max-w-[1180px]">
               <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/5 via-amber-500/[0.03] to-transparent p-5 sm:p-7">
-                <div className="flex items-start gap-3 mb-4">
-                  <span className="text-2xl">ℹ️</span>
-                  <div>
-                    <h2 className="font-sans text-base font-bold tracking-tight">Mínimos de compra por categoría</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Para ciertas categorías aplicamos un mínimo de compra. Podés combinar productos de la misma categoría para llegar al mínimo.
-                    </p>
-                  </div>
+                <div className="mb-4">
+                  <h2 className="font-sans text-base sm:text-lg font-bold tracking-tight">Mínimos de compra por categoría</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Para ciertas categorías aplicamos un mínimo de compra. Podés combinar productos de la misma categoría para llegar al mínimo.
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
                   {minItems.map((it) => (
