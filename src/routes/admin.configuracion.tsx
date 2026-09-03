@@ -14,6 +14,12 @@ import {
   getCouponUsagesSummary,
   type CategoryRuleInput,
 } from "@/lib/products.functions";
+import {
+  getCampaignsSummary,
+  createNewsletterCampaign,
+  sendNextCampaignBatch,
+  type CampaignSummary,
+} from "@/lib/newsletter.functions";
 import { parseCategoryRules, normCat, getBaseCategory, money } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/configuracion")({
@@ -85,6 +91,31 @@ function AdminConfiguracionPage() {
   const [couponUsageCount, setCouponUsageCount] = useState<number | null>(null);
   const [testEmailTarget, setTestEmailTarget] = useState<string>("");
 
+  // Estado para Campañas de Email por Tandas
+  const [newsletterSummary, setNewsletterSummary] = useState<CampaignSummary | null>(null);
+  const [batchSize, setBatchSize] = useState<number>(50);
+  const [sendingBatch, setSendingBatch] = useState<boolean>(false);
+  const [batchMsg, setBatchMsg] = useState<{ success: boolean; text: string } | null>(null);
+  const [showNewCampaignModal, setShowNewCampaignModal] = useState<boolean>(false);
+  const [creatingCampaign, setCreatingCampaign] = useState<boolean>(false);
+  const [campaignForm, setCampaignForm] = useState({
+    subject: "",
+    headline: "",
+    content: "",
+    cta_text: "Ver Ofertas en la Tienda",
+    cta_url: "https://teimportamosarg.com/catalogo",
+    coupon_code: "",
+  });
+
+  async function loadNewsletterData() {
+    try {
+      const summary = await getCampaignsSummary();
+      setNewsletterSummary(summary);
+    } catch {
+      // ignore
+    }
+  }
+
   useEffect(() => {
     fetch("https://dolarapi.com/v1/dolares/cripto")
       .then((res) => res.json())
@@ -92,6 +123,8 @@ function AdminConfiguracionPage() {
         if (data?.venta) setLiveUsdt(Math.round(data.venta));
       })
       .catch(() => { });
+    
+    void loadNewsletterData();
   }, []);
 
   const userId = user?.id;
@@ -115,12 +148,14 @@ function AdminConfiguracionPage() {
       }
       setIsAuthorized(true);
 
-      // Cargar usos registrados del cupón
+      // Cargar usos registrados del cupón y newsletter
       getCouponUsagesSummary({ data: { email, token } })
         .then((res) => {
           if (typeof res?.count === "number") setCouponUsageCount(res.count);
         })
         .catch(() => { });
+
+      void loadNewsletterData();
 
       // Calcular la cotización implícita ponderada usada actualmente en los productos de la DB
       const prodsWithBoth = res.products.filter((p) => {
@@ -323,6 +358,62 @@ function AdminConfiguracionPage() {
       });
     } finally {
       setTestingEmail(false);
+    }
+  }
+
+  async function handleCreateCampaign(e: React.FormEvent) {
+    e.preventDefault();
+    setCreatingCampaign(true);
+    setError("");
+    try {
+      const res = await createNewsletterCampaign({ data: campaignForm });
+      if (res.success) {
+        setShowNewCampaignModal(false);
+        setCampaignForm({
+          subject: "",
+          headline: "",
+          content: "",
+          cta_text: "Ver Ofertas en la Tienda",
+          cta_url: "https://teimportamosarg.com/catalogo",
+          coupon_code: "",
+        });
+        setBatchMsg({
+          success: true,
+          text: "¡Campaña creada con éxito! Ya podés enviar la primera tanda.",
+        });
+        await loadNewsletterData();
+      } else {
+        setError(res.error || "Error al crear la campaña.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Error al crear la campaña.");
+    } finally {
+      setCreatingCampaign(false);
+    }
+  }
+
+  async function handleSendBatch(campaignId: string) {
+    setSendingBatch(true);
+    setBatchMsg(null);
+    try {
+      const res = await sendNextCampaignBatch({
+        data: {
+          campaignId,
+          batchSize,
+        },
+      });
+      setBatchMsg({
+        success: res.success,
+        text: res.message || (res.success ? "Tanda enviada correctamente." : res.error || "Error al enviar tanda."),
+      });
+      await loadNewsletterData();
+    } catch (err: any) {
+      setBatchMsg({
+        success: false,
+        text: err?.message || "Error al procesar la tanda.",
+      });
+    } finally {
+      setSendingBatch(false);
     }
   }
 
@@ -596,6 +687,254 @@ function AdminConfiguracionPage() {
                   ⚠️ Último error de Resend: {config["last_email_error"]}
                 </p>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Campañas de Email por Tandas y Desuscripción ── */}
+        <div className="mb-6 rounded-2xl border border-primary/30 bg-card p-3.5 sm:p-5 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📧</span>
+              <div>
+                <h2 className="text-base font-bold flex items-center gap-2 text-foreground">
+                  Campañas de Email Promocionales (Envíos por Tandas)
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Enviá ofertas a tus clientes registrados respetando el límite diario de Resend (100/día) con tracking anti-duplicados y desuscripción obligatoria.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 bg-surface border border-border px-3 py-1.5 rounded-xl text-xs">
+              <span className="text-muted-foreground">Suscriptores:</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                {newsletterSummary?.activeSubscribersCount ?? "—"} activos
+              </span>
+              {newsletterSummary && newsletterSummary.unsubscribedCount > 0 && (
+                <span className="text-muted-foreground">
+                  ({newsletterSummary.unsubscribedCount} desuscritos)
+                </span>
+              )}
+            </div>
+          </div>
+
+          {batchMsg && (
+            <div
+              className={`my-3 rounded-xl p-3 text-xs font-medium border ${
+                batchMsg.success
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+                  : "bg-destructive/10 text-destructive border-destructive/20"
+              }`}
+            >
+              {batchMsg.text}
+            </div>
+          )}
+
+          {/* Campaña Activa */}
+          {newsletterSummary?.activeCampaign ? (
+            <div className="mt-4 rounded-xl border border-border/80 bg-surface/50 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    Campaña Activa en Curso
+                  </span>
+                  <h3 className="text-sm font-bold text-foreground mt-1">
+                    {newsletterSummary.activeCampaign.subject}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Título: &quot;{newsletterSummary.activeCampaign.headline}&quot;
+                    {newsletterSummary.activeCampaign.coupon_code ? ` • Cupón: ${newsletterSummary.activeCampaign.coupon_code}` : ""}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowNewCampaignModal(true)}
+                  className="text-xs font-semibold text-muted-foreground hover:text-foreground underline"
+                >
+                  + Reemplazar con nueva campaña
+                </button>
+              </div>
+
+              {/* Barra de Progreso de Tandas */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-muted-foreground">Progreso de entrega:</span>
+                  <span className="text-foreground">
+                    {newsletterSummary.activeCampaign.sent_count} / {newsletterSummary.activeCampaign.total_target} enviados
+                    ({Math.round((newsletterSummary.activeCampaign.sent_count / Math.max(1, newsletterSummary.activeCampaign.total_target)) * 100)}%)
+                  </span>
+                </div>
+                <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500 rounded-full"
+                    style={{
+                      width: `${Math.min(100, Math.round((newsletterSummary.activeCampaign.sent_count / Math.max(1, newsletterSummary.activeCampaign.total_target)) * 100))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Controles de Envío por Tanda */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/60">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground">Tamaño de tanda:</span>
+                  <div className="flex gap-1">
+                    {[30, 50, 80].map((sz) => (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => setBatchSize(sz)}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition ${
+                          batchSize === sz
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-muted-foreground border-border hover:bg-muted"
+                        }`}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">correos por día</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleSendBatch(newsletterSummary.activeCampaign!.id)}
+                  disabled={sendingBatch || newsletterSummary.pendingInActiveCampaign <= 0}
+                  className="btn-base bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 text-xs font-bold px-4 py-2 disabled:opacity-50"
+                >
+                  <span>
+                    {sendingBatch
+                      ? "Enviando tanda..."
+                      : newsletterSummary.pendingInActiveCampaign <= 0
+                        ? "✅ Todos los clientes alcanzados"
+                        : `🚀 Enviar tanda de hoy (${Math.min(batchSize, newsletterSummary.pendingInActiveCampaign)} correos)`}
+                  </span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-border p-6 text-center space-y-3">
+              <p className="text-xs text-muted-foreground">
+                No hay ninguna campaña activa en este momento. Podés crear una para promocionar nuevos productos o descuentos.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowNewCampaignModal(true)}
+                className="btn-base bg-primary text-primary-foreground hover:opacity-90 text-xs font-bold px-4 py-2 inline-flex items-center gap-2"
+              >
+                + Crear Nueva Campaña Promocional
+              </button>
+            </div>
+          )}
+
+          {/* Formulario / Modal para Crear Campaña */}
+          {showNewCampaignModal && (
+            <div className="mt-4 rounded-xl border border-primary/40 bg-card p-4 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <h3 className="text-sm font-bold text-foreground">Redactar Nueva Campaña de Email</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowNewCampaignModal(false)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  ✕ Cerrar
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateCampaign} className="space-y-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="font-semibold text-muted-foreground">Asunto del Email *</span>
+                    <input
+                      type="text"
+                      required
+                      className="input-base"
+                      value={campaignForm.subject}
+                      onChange={(e) => setCampaignForm({ ...campaignForm, subject: e.target.value })}
+                      placeholder="ej: 🔥 ¡Llegaron novedades a Te Importamos! 20% OFF"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className="font-semibold text-muted-foreground">Título Principal (dentro del correo) *</span>
+                    <input
+                      type="text"
+                      required
+                      className="input-base"
+                      value={campaignForm.headline}
+                      onChange={(e) => setCampaignForm({ ...campaignForm, headline: e.target.value })}
+                      placeholder="ej: Nuevos ingresos de electrónica y perfumería"
+                    />
+                  </label>
+                </div>
+
+                <label className="flex flex-col gap-1">
+                  <span className="font-semibold text-muted-foreground">Mensaje / Oferta *</span>
+                  <textarea
+                    required
+                    rows={4}
+                    className="input-base resize-y"
+                    value={campaignForm.content}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, content: e.target.value })}
+                    placeholder="Escribí el cuerpo del correo. Podés usar párrafos separados para que se vea limpio."
+                  />
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="font-semibold text-muted-foreground">Cupón opcional</span>
+                    <input
+                      type="text"
+                      className="input-base font-mono uppercase font-bold text-primary"
+                      value={campaignForm.coupon_code}
+                      onChange={(e) => setCampaignForm({ ...campaignForm, coupon_code: e.target.value.toUpperCase() })}
+                      placeholder="ej: PROMO10"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className="font-semibold text-muted-foreground">Texto del Botón CTA</span>
+                    <input
+                      type="text"
+                      className="input-base"
+                      value={campaignForm.cta_text}
+                      onChange={(e) => setCampaignForm({ ...campaignForm, cta_text: e.target.value })}
+                      placeholder="Ver Ofertas en la Tienda"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className="font-semibold text-muted-foreground">Enlace del Botón (URL)</span>
+                    <input
+                      type="url"
+                      className="input-base"
+                      value={campaignForm.cta_url}
+                      onChange={(e) => setCampaignForm({ ...campaignForm, cta_url: e.target.value })}
+                      placeholder="https://teimportamosarg.com/catalogo"
+                    />
+                  </label>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewCampaignModal(false)}
+                    className="px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted font-semibold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingCampaign}
+                    className="btn-base bg-primary text-primary-foreground font-bold hover:opacity-90 disabled:opacity-50"
+                  >
+                    {creatingCampaign ? "Guardando..." : "Activar Campaña"}
+                  </button>
+                </div>
+              </form>
             </div>
           )}
         </div>
