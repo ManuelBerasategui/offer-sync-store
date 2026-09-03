@@ -200,9 +200,14 @@ TOTAL: ${money(order.total)}`;
     }
   }, [authLoading, user, navigate]);
 
-  if (authLoading || !user || isAuthorized === false) return null;
+  if (!authLoading && (!user || isAuthorized === false)) {
+    if (typeof window !== "undefined") {
+      window.location.replace("/");
+    }
+    return null;
+  }
 
-  if (isAuthorized === null) {
+  if (authLoading || isAuthorized === null) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
