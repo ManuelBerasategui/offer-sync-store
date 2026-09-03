@@ -73,15 +73,18 @@ export const Route = createFileRoute("/producto/$id")({
       ? `https://teimportamosarg.com/producto/${product.id}`
       : "https://teimportamosarg.com/catalogo";
 
-    // JSON-LD Product schema for Google Rich Results
+    // JSON-LD Product & Breadcrumb schema for Google Rich Results
     const price = product ? String(product.precio ?? "") : "";
-    const jsonLd = product
-      ? JSON.stringify({
+    const category = product?.categoria?.trim();
+    
+    const productSchema = product
+      ? {
           "@context": "https://schema.org",
           "@type": "Product",
           name: product.nombre,
           ...(image ? { image } : {}),
           ...(description ? { description } : {}),
+          ...(category ? { category } : {}),
           offers: {
             "@type": "Offer",
             priceCurrency: "ARS",
@@ -90,7 +93,51 @@ export const Route = createFileRoute("/producto/$id")({
             url: canonicalUrl,
             seller: { "@type": "Organization", name: "Te importamos" },
           },
-        })
+        }
+      : null;
+
+    const breadcrumbSchema = product
+      ? {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            {
+              "@type": "ListItem",
+              position: 1,
+              name: "Inicio",
+              item: "https://teimportamosarg.com/",
+            },
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: "Catálogo",
+              item: "https://teimportamosarg.com/catalogo",
+            },
+            ...(category
+              ? [
+                  {
+                    "@type": "ListItem",
+                    position: 3,
+                    name: category,
+                    item: `https://teimportamosarg.com/catalogo?categoria=${encodeURIComponent(category)}`,
+                  },
+                  {
+                    "@type": "ListItem",
+                    position: 4,
+                    name: product.nombre,
+                    item: canonicalUrl,
+                  },
+                ]
+              : [
+                  {
+                    "@type": "ListItem",
+                    position: 3,
+                    name: product.nombre,
+                    item: canonicalUrl,
+                  },
+                ]),
+          ],
+        }
       : null;
 
     return {
@@ -119,14 +166,24 @@ export const Route = createFileRoute("/producto/$id")({
       links: [
         { rel: "canonical", href: canonicalUrl },
       ],
-      scripts: jsonLd
-        ? [
-            {
-              type: "application/ld+json",
-              children: jsonLd,
-            },
-          ]
-        : [],
+      scripts: [
+        ...(productSchema
+          ? [
+              {
+                type: "application/ld+json",
+                children: JSON.stringify(productSchema),
+              },
+            ]
+          : []),
+        ...(breadcrumbSchema
+          ? [
+              {
+                type: "application/ld+json",
+                children: JSON.stringify(breadcrumbSchema),
+              },
+            ]
+          : []),
+      ],
     };
   },
   component: ProductoPage,
