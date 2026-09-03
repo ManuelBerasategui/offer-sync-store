@@ -9,7 +9,7 @@ As a Senior Application Security Engineer, adhere strictly to these 4 principles
    - Seguridad en cadena de suministro (ej. `minimumReleaseAge = 604800` en `bunfig.toml`).
 
 2. **Auto-Validación Continua**:
-   - Ejecuta de forma autónoma `semgrep scan --config auto --config .semgrep.yml` antes de finalizar cualquier tarea o antes de preparar commits.
+   - Ejecuta de forma autónoma `semgrep scan --config auto --config .semgrep.yml` y `npx snyk test` / `npx snyk code test` antes de finalizar cualquier tarea o antes de preparar commits.
 
 3. **Resolución Proactiva de Findings**:
    - Cero tolerancia a advertencias/vulnerabilidades reportadas por Semgrep y Snyk.
