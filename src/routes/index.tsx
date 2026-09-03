@@ -31,6 +31,9 @@ export const Route = createFileRoute("/")({
         content:
           "Ofertas del día en productos importados originales. Comprá online, ideal para revender.",
       },
+      { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
     ],
   }),
   component: Home,

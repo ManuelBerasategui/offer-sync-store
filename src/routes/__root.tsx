@@ -80,8 +80,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Tienda mayorista y minorista de productos importados. Ofertas del día, envíos a todo el país.",
       },
+      { property: "og:site_name", content: "Te importamos" },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { property: "og:image:type", content: "image/jpeg" },
+      { property: "og:image:width", content: "1000" },
+      { property: "og:image:height", content: "1000" },
+      { property: "og:image:alt", content: "Te importamos" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
       { name: "theme-color", content: "#ffffff" },
     ],
     links: [

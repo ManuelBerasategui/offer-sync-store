@@ -83,9 +83,14 @@ export const Route = createFileRoute("/producto/$id")({
         ...(image
           ? [
               { property: "og:image", content: image },
+              { property: "og:image:secure_url", content: image },
               { name: "twitter:image", content: image },
             ]
-          : []),
+          : [
+              { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+              { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
+              { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+            ]),
       ],
     };
   },
