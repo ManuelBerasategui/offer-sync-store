@@ -13,37 +13,7 @@
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/127</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/6</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/e3bcb722-a540-4f67-b4ca-5139e8847a41</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/72</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/ebd60e45-1342-49be-b606-2f271fe1e9a0</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/b77ebefa-d8d1-439a-918a-95fb70d50965</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -55,7 +25,25 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/cc469520-a4d3-4563-a404-0526b4c4af29</loc>
+    <loc>https://teimportamosarg.com/producto/6</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/127</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/e3bcb722-a540-4f67-b4ca-5139e8847a41</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/37</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -67,13 +55,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/141</loc>
+    <loc>https://teimportamosarg.com/producto/b77ebefa-d8d1-439a-918a-95fb70d50965</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/37</loc>
+    <loc>https://teimportamosarg.com/producto/cc469520-a4d3-4563-a404-0526b4c4af29</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -97,24 +85,6 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/20d20fdd-4016-456b-990c-03c3127b4a37</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/81</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/5</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/5216590d-a98b-4568-92ab-f5bdc83bde9c</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
@@ -127,7 +97,37 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/81</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/20d20fdd-4016-456b-990c-03c3127b4a37</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/72</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/5</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/790d8c94-5f0c-4fa6-b910-de701218d117</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/141</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -157,18 +157,6 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/a8444e02-736d-499e-94ca-2af0f421f141</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/36</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/25</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
@@ -181,13 +169,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/17</loc>
+    <loc>https://teimportamosarg.com/producto/36</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/106</loc>
+    <loc>https://teimportamosarg.com/producto/17</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -199,31 +187,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/74</loc>
+    <loc>https://teimportamosarg.com/producto/106</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/f66719fb-6593-453c-8e02-e0fab560176f</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/16</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/109</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/70</loc>
+    <loc>https://teimportamosarg.com/producto/a8444e02-736d-499e-94ca-2af0f421f141</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -235,7 +205,31 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/48</loc>
+    <loc>https://teimportamosarg.com/producto/70</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/f66719fb-6593-453c-8e02-e0fab560176f</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/109</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/74</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/16</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -253,6 +247,18 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/48</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/52</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/07513091-2e93-45f8-8f22-6c888193a243</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
@@ -265,37 +271,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/52</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/13</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/44</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/38</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/20</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/151</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -307,13 +283,31 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/125</loc>
+    <loc>https://teimportamosarg.com/producto/13</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/38</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/151</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://teimportamosarg.com/producto/68ad85bd-b0d1-40c5-bfb8-32680d887922</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/125</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -331,31 +325,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/11</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/29</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/18f35cf7-e102-4cf3-b0be-aa1f1533fb92</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/134</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/33</loc>
+    <loc>https://teimportamosarg.com/producto/146</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -367,13 +337,43 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/146</loc>
+    <loc>https://teimportamosarg.com/producto/11</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/33</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/134</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/16788abe-34da-4b84-b2a9-be42e1755393</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/29</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://teimportamosarg.com/producto/4</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/41</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -397,25 +397,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/41</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/16788abe-34da-4b84-b2a9-be42e1755393</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/80</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/21</loc>
+    <loc>https://teimportamosarg.com/producto/18f35cf7-e102-4cf3-b0be-aa1f1533fb92</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -427,7 +409,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/115</loc>
+    <loc>https://teimportamosarg.com/producto/21</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -439,19 +421,19 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/133</loc>
+    <loc>https://teimportamosarg.com/producto/115</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/2ba785a5-6a8f-4622-a46e-57be645d7965</loc>
+    <loc>https://teimportamosarg.com/producto/80</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/144</loc>
+    <loc>https://teimportamosarg.com/producto/20</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -463,19 +445,25 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/133</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/144</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/2ba785a5-6a8f-4622-a46e-57be645d7965</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/de6dd7cb-c576-4207-bcd2-0bef550bf2a6</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/43</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/86</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -493,6 +481,18 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/86</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/43</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/7</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
@@ -505,25 +505,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/18</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/138</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/71</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/90</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -535,7 +517,25 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/46</loc>
+    <loc>https://teimportamosarg.com/producto/138</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/90</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/18</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/45</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -547,13 +547,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/61</loc>
+    <loc>https://teimportamosarg.com/producto/46</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/45</loc>
+    <loc>https://teimportamosarg.com/producto/61</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -571,25 +571,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/145</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/63</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/52e83cb1-89c1-47dc-a21a-1e00dc5780ad</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/85</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -607,7 +589,31 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/85</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/52e83cb1-89c1-47dc-a21a-1e00dc5780ad</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/145</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/27</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/22</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -631,25 +637,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/22</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/28</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/30</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/93</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -661,7 +649,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/140</loc>
+    <loc>https://teimportamosarg.com/producto/28</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -673,13 +661,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/fa8478a4-87c7-4ab3-bb09-388a3c828bad</loc>
+    <loc>https://teimportamosarg.com/producto/140</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/142</loc>
+    <loc>https://teimportamosarg.com/producto/93</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -691,7 +679,19 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/142</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/50</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/fa8478a4-87c7-4ab3-bb09-388a3c828bad</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -739,12 +739,6 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/91</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/8d7148c4-331b-4d2f-9032-d9aeb0f64639</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
@@ -763,19 +757,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/64</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/66</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/120</loc>
+    <loc>https://teimportamosarg.com/producto/91</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -787,13 +769,31 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/64</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/136</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/73</loc>
+    <loc>https://teimportamosarg.com/producto/120</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/66</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/3b2931ca-eb52-4f06-a8ae-b93d8fb5366b</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -805,13 +805,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/68</loc>
+    <loc>https://teimportamosarg.com/producto/73</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/3b2931ca-eb52-4f06-a8ae-b93d8fb5366b</loc>
+    <loc>https://teimportamosarg.com/producto/68</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -835,13 +835,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/755f2c51-63d4-4ea2-bfca-4a8966f5e84b</loc>
+    <loc>https://teimportamosarg.com/producto/7850fc4b-6a55-4b1b-a227-f7ae04fd03fe</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/7850fc4b-6a55-4b1b-a227-f7ae04fd03fe</loc>
+    <loc>https://teimportamosarg.com/producto/755f2c51-63d4-4ea2-bfca-4a8966f5e84b</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -859,13 +859,25 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/83</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/41ca72d3-ee5d-488c-bc34-9f216094c14e</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/83</loc>
+    <loc>https://teimportamosarg.com/producto/3e124874-d1b3-4367-9559-f28294bcc695</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/42</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -883,24 +895,6 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/42</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/3e124874-d1b3-4367-9559-f28294bcc695</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/acffd981-a66f-486f-9aa2-a54fd31121c4</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/99</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
@@ -913,7 +907,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/0b2a10a4-858f-4e10-aa97-77f448dd2d40</loc>
+    <loc>https://teimportamosarg.com/producto/acffd981-a66f-486f-9aa2-a54fd31121c4</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -925,19 +919,13 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/0b2a10a4-858f-4e10-aa97-77f448dd2d40</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/57</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/86d1c45d-6d2d-4cb9-a3fd-a0490eb64f51</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/130</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -949,19 +937,19 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/130</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/86d1c45d-6d2d-4cb9-a3fd-a0490eb64f51</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/113</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/47</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/34</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -973,13 +961,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/39</loc>
+    <loc>https://teimportamosarg.com/producto/34</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/6c4637b7-eba1-449c-ab76-e522a4b90186</loc>
+    <loc>https://teimportamosarg.com/producto/47</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -991,7 +979,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/126</loc>
+    <loc>https://teimportamosarg.com/producto/6c4637b7-eba1-449c-ab76-e522a4b90186</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/39</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -1003,25 +997,13 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/126</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/f30da743-8c6c-47ae-9534-ac38fd3bd0c3</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/148</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/65ab13fa-da75-482d-9fdd-29651e82d34b</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/7bf1fd06-4331-461d-acda-32042cb1d2fe</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -1033,7 +1015,25 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/65ab13fa-da75-482d-9fdd-29651e82d34b</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/6697bcf8-8aba-4a68-a0f1-6ae45e12332b</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/148</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/7bf1fd06-4331-461d-acda-32042cb1d2fe</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -1075,12 +1075,6 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/69</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/12</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
@@ -1088,6 +1082,12 @@
   </url>
   <url>
     <loc>https://teimportamosarg.com/producto/117</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/69</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -1117,13 +1117,19 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/75855ec2-8f16-4df5-9cb1-d486eeb4e94b</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/3d809260-ba62-41ec-9c6d-609523f80278</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/75855ec2-8f16-4df5-9cb1-d486eeb4e94b</loc>
+    <loc>https://teimportamosarg.com/producto/116</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -1135,7 +1141,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/116</loc>
+    <loc>https://teimportamosarg.com/producto/f487bd8b-a9eb-49d5-b9a2-e8971602a848</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/8ae3fd00-de99-45d2-bb45-34da19c606cd</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -1153,31 +1165,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/8ae3fd00-de99-45d2-bb45-34da19c606cd</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/f487bd8b-a9eb-49d5-b9a2-e8971602a848</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/15c5ec8e-65f8-43b1-9368-9276c0b51291</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/85e8ae98-c889-4fda-829d-0f0a150008cd</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/2113f42a-30de-419c-9864-4cec44e3c5cb</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -1189,7 +1177,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/51</loc>
+    <loc>https://teimportamosarg.com/producto/15c5ec8e-65f8-43b1-9368-9276c0b51291</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/2113f42a-30de-419c-9864-4cec44e3c5cb</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -1207,7 +1201,19 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/51</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/101</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://teimportamosarg.com/producto/15</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -1225,19 +1231,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/15</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://teimportamosarg.com/producto/f4e3c9e8-bb1a-4cdc-9c97-d3f8cfb11582</loc>
-    <lastmod>2026-09-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://teimportamosarg.com/producto/a0e6c2b2-aa42-4c75-9181-67f6eca350e6</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -1255,6 +1249,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://teimportamosarg.com/producto/a0e6c2b2-aa42-4c75-9181-67f6eca350e6</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://teimportamosarg.com/producto/77ebae7d-9c72-405b-9bcd-ab09dfa4bcf2</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
@@ -1267,13 +1267,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/135</loc>
+    <loc>https://teimportamosarg.com/producto/149</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://teimportamosarg.com/producto/149</loc>
+    <loc>https://teimportamosarg.com/producto/135</loc>
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Plus, X, Save, Settings2 } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -220,11 +220,16 @@ function AdminConfiguracionPage() {
     }
   }
 
+  const initialLoadedRef = useRef(false);
+
   useEffect(() => {
-    if (!authLoading && user) {
-      void loadCategories(true);
+    if (!authLoading && userId) {
+      if (!initialLoadedRef.current) {
+        initialLoadedRef.current = true;
+        void loadCategories(true);
+      }
     }
-  }, [authLoading, user]);
+  }, [authLoading, userId]);
 
   function handleAddTier(cat: string) {
     setRules((prev) => {
