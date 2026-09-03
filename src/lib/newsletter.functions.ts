@@ -360,11 +360,12 @@ export const sendNextCampaignBatch = createServerFn({ method: "POST" })
               });
             } else {
               failedCount++;
-              console.error(`[newsletter] Falló envío a ${subscriber.email}:`, await res.text());
+              const errBody = await res.text().catch(() => "");
+              console.error("[newsletter] Fallo envio a suscriptor:", subscriber.email, errBody);
             }
           } catch (e) {
             failedCount++;
-            console.error(`[newsletter] Error en fetch a Resend para ${subscriber.email}:`, e);
+            console.error("[newsletter] Error en fetch a Resend:", subscriber.email, e);
           }
         } else {
           // Si no hay API key en local/dev, simulamos el log
