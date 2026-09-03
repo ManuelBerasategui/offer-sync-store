@@ -7,6 +7,7 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import { supabase } from "@/integrations/supabase/client";
 import { EMPTY_SHIPPING, useAuth, type ShippingData } from "@/hooks/useAuth";
+import { syncNewUserSubscriber } from "@/lib/newsletter.functions";
 
 const authSearchSchema = z.object({
   mode: z.enum(["login", "register", "forgot"]).optional(),
@@ -104,6 +105,7 @@ function AuthPage() {
   const [profileMsg, setProfileMsg] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
 
+  const [acceptMarketing, setAcceptMarketing] = useState(true);
   const [recovering, setRecovering] = useState(false);
   const [recoveryDone, setRecoveryDone] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -181,6 +183,15 @@ function AuthPage() {
           options: { emailRedirectTo: `${window.location.origin}/auth`, data: { ...form } },
         });
         if (err) throw err;
+
+        // Sincronizar preferencia de newsletter
+        void syncNewUserSubscriber({
+          data: {
+            email: email.trim(),
+            nombre: form.nombre,
+            acceptMarketing,
+          },
+        });
 
         if (signupData.session) {
           const target = getSafeRedirect(search.redirect);
@@ -588,6 +599,18 @@ function AuthPage() {
                       value={form.sucursal_correo}
                       onChange={(e) => setForm({ ...form, sucursal_correo: e.target.value })}
                     />
+                  </label>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer pt-1 pb-1 select-none">
+                    <input
+                      type="checkbox"
+                      checked={acceptMarketing}
+                      onChange={(e) => setAcceptMarketing(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-input text-primary focus:ring-primary accent-primary cursor-pointer"
+                    />
+                    <span className="text-xs text-muted-foreground leading-snug">
+                      Deseo recibir ofertas exclusivas, cupones de descuento y novedades de importación por email
+                    </span>
                   </label>
                 </>
               )}

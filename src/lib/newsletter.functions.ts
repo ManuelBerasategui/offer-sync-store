@@ -415,6 +415,117 @@ export const sendNextCampaignBatch = createServerFn({ method: "POST" })
   });
 
 /**
+ * Enviar un email de prueba de una campaña a una dirección específica (ej: para testing)
+ * NO cuenta para las tandas ni registra al usuario en logs de entrega real.
+ */
+export const sendCampaignTestEmail = createServerFn({ method: "POST" })
+  .validator((d: { campaignId: string; targetEmail: string }) => {
+    return z
+      .object({
+        campaignId: z.string().uuid(),
+        targetEmail: z.string().email("Ingresá un correo electrónico válido"),
+      })
+      .parse(d);
+  })
+  .handler(async ({ data }) => {
+    try {
+      const { data: campaign, error: campErr } = await (supabaseAdmin as any)
+        .from("newsletter_campaigns")
+        .select("*")
+        .eq("id", data.campaignId)
+        .single();
+
+      if (campErr || !campaign) {
+        return { success: false, error: "Campaña no encontrada." };
+      }
+
+      let apiKey = process.env["RESEND_API_KEY"] || process.env["VITE_RESEND_API_KEY"];
+      const fromAddress = "Te Importamos <noreply@teimportamosarg.com>";
+
+      const html = buildPromotionalEmailHtml({
+        nombre: "Admin (Prueba)",
+        headline: campaign.headline,
+        content: campaign.content,
+        ctaText: campaign.cta_text,
+        ctaUrl: campaign.cta_url,
+        couponCode: campaign.coupon_code,
+        unsubscribeToken: "test_preview_token_123",
+      });
+
+      if (!apiKey) {
+        return {
+          success: false,
+          error: "RESEND_API_KEY no configurada. Verificá tus variables de entorno.",
+        };
+      }
+
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: [data.targetEmail.trim().toLowerCase()],
+          subject: `[PRUEBA] ${campaign.subject}`,
+          reply_to: "teimportamosar@gmail.com",
+          html,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        return { success: false, error: `Error de Resend (${res.status}): ${body}` };
+      }
+
+      return {
+        success: true,
+        message: `¡Email de prueba enviado exitosamente a ${data.targetEmail}! Revisá tu bandeja de entrada o Spam.`,
+      };
+    } catch (err: any) {
+      console.error("[newsletter] Error en test email:", err);
+      return { success: false, error: err.message || "Error al enviar email de prueba." };
+    }
+  });
+
+/**
+ * Sincronizar nuevo suscriptor al registrar cuenta
+ */
+export const syncNewUserSubscriber = createServerFn({ method: "POST" })
+  .validator((d: { email: string; nombre?: string; acceptMarketing: boolean }) => {
+    return z
+      .object({
+        email: z.string().email(),
+        nombre: z.string().optional(),
+        acceptMarketing: z.boolean(),
+      })
+      .parse(d);
+  })
+  .handler(async ({ data }) => {
+    try {
+      const crypto = await import("crypto");
+      const token = crypto.randomBytes(16).toString("hex");
+
+      await (supabaseAdmin as any).from("newsletter_subscribers").upsert(
+        {
+          email: data.email.trim().toLowerCase(),
+          nombre: data.nombre?.trim() || null,
+          is_active: data.acceptMarketing,
+          unsubscribe_token: token,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "email" }
+      );
+
+      return { success: true };
+    } catch (err: any) {
+      console.error("[newsletter] Error al registrar suscriptor:", err);
+      return { success: false, error: err.message };
+    }
+  });
+
+/**
  * Desuscribir usuario por token seguro (1-click)
  */
 export const unsubscribeByToken = createServerFn({ method: "POST" })

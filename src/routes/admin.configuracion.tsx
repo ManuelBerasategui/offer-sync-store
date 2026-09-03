@@ -18,6 +18,7 @@ import {
   getCampaignsSummary,
   createNewsletterCampaign,
   sendNextCampaignBatch,
+  sendCampaignTestEmail,
   type CampaignSummary,
 } from "@/lib/newsletter.functions";
 import { parseCategoryRules, normCat, getBaseCategory, money } from "@/lib/store";
@@ -95,6 +96,8 @@ function AdminConfiguracionPage() {
   const [newsletterSummary, setNewsletterSummary] = useState<CampaignSummary | null>(null);
   const [batchSize, setBatchSize] = useState<number>(50);
   const [sendingBatch, setSendingBatch] = useState<boolean>(false);
+  const [testCampaignEmail, setTestCampaignEmail] = useState<string>("manuelberasategui1@gmail.com");
+  const [sendingCampaignTest, setSendingCampaignTest] = useState<boolean>(false);
   const [batchMsg, setBatchMsg] = useState<{ success: boolean; text: string } | null>(null);
   const [showNewCampaignModal, setShowNewCampaignModal] = useState<boolean>(false);
   const [creatingCampaign, setCreatingCampaign] = useState<boolean>(false);
@@ -223,13 +226,15 @@ function AdminConfiguracionPage() {
   const initialLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (!authLoading && userId) {
-      if (!initialLoadedRef.current) {
+    if (!authLoading) {
+      if (!userId) {
+        void navigate({ to: "/", replace: true });
+      } else if (!initialLoadedRef.current) {
         initialLoadedRef.current = true;
         void loadCategories(true);
       }
     }
-  }, [authLoading, userId]);
+  }, [authLoading, userId, navigate]);
 
   function handleAddTier(cat: string) {
     setRules((prev) => {
@@ -419,6 +424,34 @@ function AdminConfiguracionPage() {
       });
     } finally {
       setSendingBatch(false);
+    }
+  }
+
+  async function handleSendCampaignTest(campaignId: string) {
+    if (!testCampaignEmail.trim()) {
+      setBatchMsg({ success: false, text: "Ingresá un correo de prueba válido." });
+      return;
+    }
+    setSendingCampaignTest(true);
+    setBatchMsg(null);
+    try {
+      const res = await sendCampaignTestEmail({
+        data: {
+          campaignId,
+          targetEmail: testCampaignEmail.trim(),
+        },
+      });
+      setBatchMsg({
+        success: res.success,
+        text: res.message || res.error || "Email de prueba enviado.",
+      });
+    } catch (err: any) {
+      setBatchMsg({
+        success: false,
+        text: err?.message || "Error al enviar email de prueba.",
+      });
+    } finally {
+      setSendingCampaignTest(false);
     }
   }
 
@@ -817,6 +850,30 @@ function AdminConfiguracionPage() {
                         ? "✅ Todos los clientes alcanzados"
                         : `🚀 Enviar tanda de hoy (${Math.min(batchSize, newsletterSummary.pendingInActiveCampaign)} correos)`}
                   </span>
+                </button>
+              </div>
+
+              {/* Sección de Prueba a Email Específico */}
+              <div className="flex flex-wrap items-end gap-2 pt-3 border-t border-border/60 bg-muted/30 -mx-4 -mb-3 p-3.5 rounded-b-xl">
+                <label className="flex flex-col gap-1 flex-1 min-w-[220px]">
+                  <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                    🧪 Probar campaña antes de enviar (sin afectar a clientes):
+                  </span>
+                  <input
+                    type="email"
+                    className="input-base text-xs"
+                    value={testCampaignEmail}
+                    onChange={(e) => setTestCampaignEmail(e.target.value)}
+                    placeholder="manuelberasategui1@gmail.com"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void handleSendCampaignTest(newsletterSummary.activeCampaign!.id)}
+                  disabled={sendingCampaignTest}
+                  className="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50 transition-colors shrink-0"
+                >
+                  {sendingCampaignTest ? "Enviando prueba..." : "Enviar prueba a mi correo"}
                 </button>
               </div>
             </div>
