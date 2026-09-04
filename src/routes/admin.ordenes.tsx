@@ -558,14 +558,14 @@ TOTAL: ${money(order.total)}`;
                         </h4>
                         <div className="divide-y divide-border/60">
                           {order.items.map((item, idx) => (
-                            <div key={idx} className="py-2 flex items-center justify-between text-xs sm:text-sm">
-                              <div className="pr-2 min-w-0">
-                                <p className="font-semibold text-foreground leading-snug truncate">{item.nombre}</p>
+                            <div key={idx} className="py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-0 text-xs sm:text-sm">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-foreground leading-snug break-words">{item.nombre}</p>
                                 <p className="text-[11px] text-muted-foreground">
                                   {item.qty} x {money(item.unitPrice)}
                                 </p>
                               </div>
-                              <span className="font-bold text-foreground tabular-nums shrink-0 text-xs sm:text-sm">
+                              <span className="font-bold text-foreground tabular-nums shrink-0 text-xs sm:text-sm sm:pl-2">
                                 {money(item.qty * item.unitPrice)}
                               </span>
                             </div>
