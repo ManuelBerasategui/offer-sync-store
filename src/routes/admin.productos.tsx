@@ -177,8 +177,8 @@ function ImageDropzone({
     setOptimizedStats(null);
 
     try {
-      // 1. Compresión automática a WebP (máx 1200px, 82% calidad)
-      const compressed = await compressImageFile(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.82 });
+      // 1. Compresión automática a WebP (máx 900px, 80% calidad - optimizado para CDN y ahorro de egress)
+      const compressed = await compressImageFile(file, { maxWidth: 900, maxHeight: 900, quality: 0.80 });
       setOptimizedStats({
         orig: compressed.originalSize,
         comp: compressed.compressedSize,
