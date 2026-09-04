@@ -30,6 +30,10 @@ const imageProxyMiddleware = createMiddleware().server(async ({ next, request })
   return await next();
 });
 
+const csrfMiddleware = createCsrfMiddleware({
+  filter: (ctx) => ctx.handlerType === 'serverFn',
+});
+
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
   requestMiddleware: [imageProxyMiddleware, errorMiddleware, csrfMiddleware],
