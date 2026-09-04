@@ -1,6 +1,6 @@
 /**
  * Utilidad de compresión y redimensionado de imágenes en el navegador.
- * Convierte cualquier imagen a WebP optimizado (máx 1200x1200px, calidad 82%)
+ * Convierte cualquier imagen a WebP optimizado (máx 900x900px, calidad 80%)
  * reduciendo el peso en más del 90% antes de subirla a Supabase Storage.
  */
 
@@ -31,9 +31,9 @@ export function formatBytes(bytes: number, decimals = 1): string {
 
 export async function compressImageFile(
   file: File,
-  options: CompressOptions = {}
+  options: CompressOptions = {},
 ): Promise<CompressedResult> {
-  const { maxWidth = 1200, maxHeight = 1200, quality = 0.82 } = options;
+  const { maxWidth = 900, maxHeight = 900, quality = 0.8 } = options;
   const originalSize = file.size;
 
   return new Promise((resolve, reject) => {
@@ -101,7 +101,7 @@ export async function compressImageFile(
             });
           },
           "image/webp",
-          quality
+          quality,
         );
       };
 

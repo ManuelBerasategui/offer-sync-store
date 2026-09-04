@@ -35,7 +35,8 @@ export type Product = {
   es_zapatilla?: boolean | string | null;
   ventas_semana?: number;
   variants?: ProductVariant[];
-  [key: string]: string | number | boolean | ProductVariant[] | undefined | null | Record<string, unknown>;
+  [key: string]:
+    string | number | boolean | ProductVariant[] | undefined | null | Record<string, unknown>;
 };
 
 export type Banner = {
@@ -60,10 +61,12 @@ export type StoreData = {
   config: SiteConfig;
 };
 
-export const isYes = (v?: string) => String(v ?? "").trim().toUpperCase() === "SI";
+export const isYes = (v?: string) =>
+  String(v ?? "")
+    .trim()
+    .toUpperCase() === "SI";
 
-export const toNumber = (v?: string) =>
-  Number(String(v ?? "").replace(/[^\d.-]/g, "")) || 0;
+export const toNumber = (v?: string) => Number(String(v ?? "").replace(/[^\d.-]/g, "")) || 0;
 
 export const money = (v?: string | number) =>
   "$" + Math.round(typeof v === "number" ? v : toNumber(v)).toLocaleString("es-AR");
@@ -103,7 +106,9 @@ export const DEFAULT_TRANSFER_DISCOUNT = 7;
 
 export function transferDiscountPct(config?: SiteConfig): number {
   const custom = Number(config?.["transferencia_descuento_pct"]);
-  return Number.isFinite(custom) && custom >= 0 && custom <= 50 ? custom : DEFAULT_TRANSFER_DISCOUNT;
+  return Number.isFinite(custom) && custom >= 0 && custom <= 50
+    ? custom
+    : DEFAULT_TRANSFER_DISCOUNT;
 }
 
 export function transferPrice(price: number, discountPct = DEFAULT_TRANSFER_DISCOUNT): number {
@@ -123,14 +128,15 @@ export function getBankInfo(config?: SiteConfig) {
 
 const ALLOWED_IMAGE_PROTOCOLS = new Set(["http:", "https:", "data:", "blob:"]);
 
-/** Convierte links de Google Drive a una URL de imagen directa y valida protocolos seguros contra XSS. */
+/** Convierte links de Google Drive a una URL directa y enruta Supabase Storage por el proxy de caché de Vercel CDN. */
 export function imageUrl(raw?: string | null): string {
   const url = (raw ?? "").trim();
   if (!url) return "";
+  if (url.startsWith("/api/img?")) {
+    return url;
+  }
   const m =
-    url.match(/\/file\/d\/([\w-]+)/) ||
-    url.match(/[?&]id=([\w-]+)/) ||
-    url.match(/\/d\/([\w-]+)/);
+    url.match(/\/file\/d\/([\w-]+)/) || url.match(/[?&]id=([\w-]+)/) || url.match(/\/d\/([\w-]+)/);
   if (url.includes("drive.google.com") && m) {
     return `https://lh3.googleusercontent.com/d/${m[1]}=w1200`;
   }
@@ -140,6 +146,13 @@ export function imageUrl(raw?: string | null): string {
   try {
     const parsed = new URL(url, "https://dummy-base.local");
     if (ALLOWED_IMAGE_PROTOCOLS.has(parsed.protocol)) {
+      // Si la imagen proviene de Supabase Storage, se sirve a través del proxy de Edge Cache
+      if (
+        parsed.hostname.toLowerCase().endsWith(".supabase.co") &&
+        parsed.pathname.startsWith("/storage/v1/object/public/")
+      ) {
+        return `/api/img?url=${encodeURIComponent(url)}`;
+      }
       return url;
     }
   } catch {
@@ -153,9 +166,7 @@ export function driveId(raw?: string) {
   const url = (raw ?? "").trim();
   if (!url.includes("drive.google.com") && !url.includes("googleusercontent.com")) return "";
   const m =
-    url.match(/\/file\/d\/([\w-]+)/) ||
-    url.match(/[?&]id=([\w-]+)/) ||
-    url.match(/\/d\/([\w-]+)/);
+    url.match(/\/file\/d\/([\w-]+)/) || url.match(/[?&]id=([\w-]+)/) || url.match(/\/d\/([\w-]+)/);
   return m ? m[1]! : "";
 }
 
@@ -164,15 +175,15 @@ export function onImageError(raw?: string) {
   return (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     const id = driveId(raw);
-    const step = Number(img.dataset['retry'] ?? "0");
+    const step = Number(img.dataset["retry"] ?? "0");
     const variants = id
       ? [
-        `https://drive.google.com/thumbnail?id=${id}&sz=w1200`,
-        `https://lh3.googleusercontent.com/d/${id}=s1200`,
-      ]
+          `https://drive.google.com/thumbnail?id=${id}&sz=w1200`,
+          `https://lh3.googleusercontent.com/d/${id}=s1200`,
+        ]
       : [];
     if (step < variants.length) {
-      img.dataset['retry'] = String(step + 1);
+      img.dataset["retry"] = String(step + 1);
       img.src = variants[step]!;
       return;
     }
@@ -180,8 +191,7 @@ export function onImageError(raw?: string) {
   };
 }
 
-export const FALLBACK_IMAGE =
-  "https://placehold.co/600x600/f4f4f5/71717a?text=Sin+imagen";
+export const FALLBACK_IMAGE = "https://placehold.co/600x600/f4f4f5/71717a?text=Sin+imagen";
 
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
 
@@ -201,7 +211,7 @@ export function sanitizeUrl(url?: string | null): string {
 }
 
 export function waLink(config: SiteConfig, messageOrProduct?: string) {
-  const phone = (config['whatsapp_individual'] ?? "").replace(/\D/g, "");
+  const phone = (config["whatsapp_individual"] ?? "").replace(/\D/g, "");
   let text = "Hola! Quiero hacer una consulta.";
   if (messageOrProduct) {
     if (
@@ -225,7 +235,8 @@ export function categoriesOf(products: Product[]) {
 export function isWhatsappOnly(p: Product) {
   if (priceOf(p) > 0) return false;
   for (const [key, value] of Object.entries(p)) {
-    if (key.trim().toLowerCase().replace(/\s+/g, "") === "whatsapp") return isYes(typeof value === "string" ? value : undefined);
+    if (key.trim().toLowerCase().replace(/\s+/g, "") === "whatsapp")
+      return isYes(typeof value === "string" ? value : undefined);
   }
   return false;
 }
@@ -254,7 +265,6 @@ export function findProduct(products: Product[], key: string) {
   );
 }
 
-
 /* ---------- Descuentos por cantidad ---------- */
 
 export type Tier = { units: number; percent: number };
@@ -265,7 +275,12 @@ export function tiersOf(p: Product): Tier[] {
   for (const [key, value] of Object.entries(p)) {
     const m = key.match(/^(\d+)\s*unidad/i);
     if (!m) continue;
-    const percent = Number(String(value ?? "").replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+    const percent =
+      Number(
+        String(value ?? "")
+          .replace(/[^\d.,]/g, "")
+          .replace(",", "."),
+      ) || 0;
     const units = Number(m[1]);
     if (units > 0 && percent > 0) tiers.push({ units, percent });
   }
@@ -292,13 +307,29 @@ export const SUPLEMENTOS_MSG =
   "La compra mínima para suplementos es de $250.000. Agregá más productos al carrito y llevate todo junto!";
 
 export function isSuplemento(categoria?: string, nombre?: string) {
-  const cat = String(categoria ?? "").toLowerCase().normalize("NFC");
-  const nom = String(nombre ?? "").toLowerCase().normalize("NFC");
+  const cat = String(categoria ?? "")
+    .toLowerCase()
+    .normalize("NFC");
+  const nom = String(nombre ?? "")
+    .toLowerCase()
+    .normalize("NFC");
   const catKeywords = ["suplement", "nutricion", "proteina", "creatina"];
   const nameKeywords = [
-    "suplemento", "creatina", "proteina", "protein", "whey",
-    "bcaa", "glutamin", "colageno", "collagen", "pre entren",
-    "pre-workout", "preworkout", "gainer", "multivitaminico", "star nutrition",
+    "suplemento",
+    "creatina",
+    "proteina",
+    "protein",
+    "whey",
+    "bcaa",
+    "glutamin",
+    "colageno",
+    "collagen",
+    "pre entren",
+    "pre-workout",
+    "preworkout",
+    "gainer",
+    "multivitaminico",
+    "star nutrition",
   ];
   if (catKeywords.some((kw) => cat.includes(kw))) return true;
   if (nameKeywords.some((kw) => nom.includes(kw))) return true;
@@ -353,7 +384,12 @@ export const normCat = (s: string) => {
 
   if (norm === "suplementacion" || norm === "suplemento") return "suplementos";
   if (norm === "perfume arabe" || norm === "perfume arabes") return "perfumes arabes";
-  if (norm === "perfume disenador" || norm === "perfumes de disenador" || norm === "perfume de disenador") return "perfumes disenador";
+  if (
+    norm === "perfume disenador" ||
+    norm === "perfumes de disenador" ||
+    norm === "perfume de disenador"
+  )
+    return "perfumes disenador";
   if (norm === "mate") return "mates";
   if (norm === "zapatilla") return "zapatillas";
   return norm;
@@ -380,13 +416,17 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
       try {
         const parsed = JSON.parse(val);
         if (Array.isArray(parsed)) rule.discountTiers = parsed;
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     } else if (um) {
       const rule = getOrCreate(um[1]!);
-      const n = Number(val); if (n > 0) rule.minUnits = n;
+      const n = Number(val);
+      if (n > 0) rule.minUnits = n;
     } else if (am) {
       const rule = getOrCreate(am[1]!);
-      const n = Number(val); if (n > 0) rule.minAmount = n;
+      const n = Number(val);
+      if (n > 0) rule.minAmount = n;
     }
   }
 
@@ -397,7 +437,11 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
       minUnits: 5,
       discountTiers: rules["tecnologia"]?.discountTiers?.length
         ? rules["tecnologia"].discountTiers
-        : [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
+        : [
+            { units: 5, percent: 5 },
+            { units: 10, percent: 10 },
+            { units: 20, percent: 12 },
+          ],
     };
   }
 
@@ -407,7 +451,11 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     minUnits: rules["perfumes arabes"]?.minUnits || 5,
     discountTiers: rules["perfumes arabes"]?.discountTiers?.length
       ? rules["perfumes arabes"].discountTiers
-      : [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
+      : [
+          { units: 5, percent: 5 },
+          { units: 10, percent: 10 },
+          { units: 20, percent: 12 },
+        ],
   };
 
   // 3. Perfumes Diseñador: mínimo 3 unidades y descuentos por defecto (3u→5%, 7u→7%, 20u→12%)
@@ -416,7 +464,11 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     minUnits: rules["perfumes disenador"]?.minUnits || 3,
     discountTiers: rules["perfumes disenador"]?.discountTiers?.length
       ? rules["perfumes disenador"].discountTiers
-      : [{ units: 3, percent: 5 }, { units: 7, percent: 7 }, { units: 20, percent: 12 }],
+      : [
+          { units: 3, percent: 5 },
+          { units: 7, percent: 7 },
+          { units: 20, percent: 12 },
+        ],
   };
 
   // 4. Mates: compra mínima obligatoria de 10 unidades
@@ -427,7 +479,11 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     minUnits: 10,
     discountTiers: matesExisting?.discountTiers?.length
       ? matesExisting.discountTiers
-      : [{ units: 5, percent: 5 }, { units: 10, percent: 10 }, { units: 20, percent: 12 }],
+      : [
+          { units: 5, percent: 5 },
+          { units: 10, percent: 10 },
+          { units: 20, percent: 12 },
+        ],
   };
 
   // 5. Suplementación: compra mínima de $250.000
@@ -474,7 +530,10 @@ export function findRuleForCat(
   if (!catNorm) return undefined;
   if (rules[catNorm]) return { key: catNorm, rule: rules[catNorm] };
 
-  const catWithoutDe = catNorm.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
+  const catWithoutDe = catNorm
+    .replace(/\bde\b\s*/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (rules[catWithoutDe]) return { key: catWithoutDe, rule: rules[catWithoutDe] };
 
   const catPlural = catNorm.endsWith("s") ? catNorm : catNorm + "s";
@@ -484,7 +543,10 @@ export function findRuleForCat(
 
   let best: { key: string; rule: CategoryRule } | undefined;
   for (const [ruleKey, rule] of Object.entries(rules)) {
-    const cleanRuleKey = ruleKey.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
+    const cleanRuleKey = ruleKey
+      .replace(/\bde\b\s*/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (
       (catNorm.startsWith(ruleKey) || (cleanRuleKey && catWithoutDe.startsWith(cleanRuleKey))) &&
       (!best || ruleKey.length > best.key.length)
@@ -571,11 +633,7 @@ export function hasMoq(
  * ¿La cantidad `qty` del producto cumple su MOQ?
  * Retorna true si no tiene MOQ o si qty >= minUnits (y precio * qty >= minAmount).
  */
-export function meetsMoq(
-  moqInfo: MoqInfo | null,
-  qty: number,
-  unitPrice = 0,
-): boolean {
+export function meetsMoq(moqInfo: MoqInfo | null, qty: number, unitPrice = 0): boolean {
   if (!moqInfo) return true;
   if (moqInfo.minUnits && qty < moqInfo.minUnits) return false;
   if (moqInfo.minAmount && qty * unitPrice < moqInfo.minAmount) return false;
@@ -628,12 +686,18 @@ export function checkCategoryMins(
       // Sin asignación manual → match por categoría
       const raw = (item.categoria ?? "").trim();
       const catNorm = normCat(raw);
-      const catWithoutDe = catNorm.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
+      const catWithoutDe = catNorm
+        .replace(/\bde\b\s*/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
 
       let minRuleKeyLen = -1;
       for (const [ruleKey, rule] of Object.entries(rules)) {
         if (!rule.minUnits && !rule.minAmount) continue;
-        const cleanRuleKey = ruleKey.replace(/\bde\b\s*/gi, "").replace(/\s+/g, " ").trim();
+        const cleanRuleKey = ruleKey
+          .replace(/\bde\b\s*/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
         const matches =
           catNorm === ruleKey ||
           catWithoutDe === ruleKey ||
@@ -739,7 +803,10 @@ export function waOnlyReasonOf(product: Record<string, unknown>): WaOnlyReason |
   const topReason = checkReason(product["whatsapp_only_reason"]);
   if (topReason) return topReason;
 
-  if (product["whatsapp_only"] === true || String(product["whatsapp_only"] ?? "").toLowerCase() === "true") {
+  if (
+    product["whatsapp_only"] === true ||
+    String(product["whatsapp_only"] ?? "").toLowerCase() === "true"
+  ) {
     return "whatsapp_only";
   }
 
@@ -758,14 +825,20 @@ export function waOnlyReasonOf(product: Record<string, unknown>): WaOnlyReason |
   }
 
   // Legacy: es_zapatilla top-level (retrocompatibilidad)
-  if (product["es_zapatilla"] === true || String(product["es_zapatilla"] ?? "").toLowerCase() === "true") {
+  if (
+    product["es_zapatilla"] === true ||
+    String(product["es_zapatilla"] ?? "").toLowerCase() === "true"
+  ) {
     return "zapatillas";
   }
 
   // Fallback por categoría: productos existentes sin whatsapp_only_reason en metadata
-  const catRaw = String(product["categoria"] ?? "").toLowerCase().trim();
+  const catRaw = String(product["categoria"] ?? "")
+    .toLowerCase()
+    .trim();
   if (catRaw === "vapers" || catRaw === "vaper") return "vapers";
-  if (catRaw === "china" || catRaw === "productos china" || catRaw === "importacion china") return "china";
+  if (catRaw === "china" || catRaw === "productos china" || catRaw === "importacion china")
+    return "china";
 
   return null;
 }

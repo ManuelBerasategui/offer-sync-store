@@ -18,14 +18,19 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
-// Start installs this automatically when src/start.ts is absent; defining the
-// file opts out, so re-add it explicitly to keep server functions protected
-// from cross-site requests.
-const csrfMiddleware = createCsrfMiddleware({
-  filter: (ctx) => ctx.handlerType === "serverFn",
+import { handleImageProxy } from "./lib/image-proxy";
+
+const imageProxyMiddleware = createMiddleware().server(async ({ next, request }) => {
+  if (request) {
+    const url = new URL(request.url);
+    if (url.pathname === "/api/img") {
+      return await handleImageProxy(request);
+    }
+  }
+  return await next();
 });
 
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
-  requestMiddleware: [errorMiddleware, csrfMiddleware],
+  requestMiddleware: [imageProxyMiddleware, errorMiddleware, csrfMiddleware],
 }));
