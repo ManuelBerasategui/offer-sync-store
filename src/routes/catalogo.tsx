@@ -28,9 +28,9 @@ export const Route = createFileRoute("/catalogo")({
         content:
           "Todo el stock de productos importados con búsqueda, filtros por categoría y orden por precio.",
       },
-      { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { property: "og:image", content: "https://teimportamosarg.com/og-preview.jpg" },
+      { property: "og:image:secure_url", content: "https://teimportamosarg.com/og-preview.jpg" },
+      { name: "twitter:image", content: "https://teimportamosarg.com/og-preview.jpg" },
       { property: "og:url", content: "https://teimportamosarg.com/catalogo" },
     ],
     links: [
