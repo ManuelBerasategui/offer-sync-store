@@ -81,7 +81,7 @@ function ComboPage() {
     qty: 1,
     unitPrice: Math.round(basePrice),
     basePrice: Math.round(basePrice),
-    imagen: imageUrl(banner.imagen_url),
+    imagen: banner.imagen_url || imageUrl(banner.imagen_url),
   };
 
   return (

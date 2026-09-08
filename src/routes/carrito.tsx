@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Minus, Plus, Tag, X, Sparkles } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -12,6 +12,7 @@ import { validatePromoCoupon } from "@/lib/products.functions";
 import {
   FALLBACK_IMAGE,
   imageUrl,
+  onImageError,
   SUPLEMENTOS_MIN,
   isSuplemento,
   isMate,
@@ -45,53 +46,59 @@ function CartQtyInput({
   nombre: string;
   onDecrease: () => void;
   onIncrease: () => void;
-  onSetQty: (q: number) => void;
+  onSetQty: (qty: number) => void;
 }) {
-  const [display, setDisplay] = useState(String(qty));
+  const [buffer, setBuffer] = useState(String(qty));
+
+  useEffect(() => {
+    setBuffer(String(qty));
+  }, [qty]);
+
+  const commit = (val: string) => {
+    const parsed = parseInt(val.trim(), 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      onSetQty(parsed);
+      setBuffer(String(parsed));
+    } else {
+      setBuffer(String(qty));
+    }
+  };
 
   return (
-    <div className="flex shrink-0 items-center rounded-md border border-input bg-background">
+    <div className="flex items-center rounded-lg border border-border bg-surface">
       <button
         type="button"
-        onClick={() => {
-          onDecrease();
-          setDisplay(String(Math.max(1, qty - 1)));
-        }}
-        disabled={qty <= 1}
-        className="flex h-8 w-7 items-center justify-center text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-        aria-label={`Quitar una unidad de ${nombre}`}
+        aria-label={`Restar una unidad de ${nombre}`}
+        onClick={onDecrease}
+        className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 transition-all rounded-l-md"
       >
         <Minus className="h-3 w-3" />
       </button>
+
       <input
         type="text"
         inputMode="numeric"
         pattern="[0-9]*"
-        value={display}
+        aria-label={`Cantidad de ${nombre}`}
+        value={buffer}
         onChange={(e) => {
           const raw = e.target.value.replace(/\D/g, "");
-          setDisplay(raw);
-          const parsed = parseInt(raw, 10);
-          if (!isNaN(parsed) && parsed >= 1) onSetQty(parsed);
+          setBuffer(raw);
         }}
-        onBlur={() => {
-          const parsed = parseInt(display, 10);
-          const clamped = isNaN(parsed) || parsed < 1 ? 1 : parsed;
-          setDisplay(String(clamped));
-          onSetQty(clamped);
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+          }
         }}
-        onFocus={(e) => e.target.select()}
-        className="h-8 w-10 border-x border-input bg-background text-center text-xs outline-none focus:border-primary"
-        aria-label={`Cantidad de ${nombre}`}
+        className="h-7 w-11 bg-transparent text-center text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 select-all"
       />
+
       <button
         type="button"
-        onClick={() => {
-          onIncrease();
-          setDisplay(String(qty + 1));
-        }}
-        className="flex h-8 w-7 items-center justify-center text-muted-foreground hover:text-foreground"
-        aria-label={`Agregar una unidad de ${nombre}`}
+        aria-label={`Sumar una unidad de ${nombre}`}
+        onClick={onIncrease}
+        className="flex h-7 w-7 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 transition-all rounded-r-md"
       >
         <Plus className="h-3 w-3" />
       </button>
@@ -100,20 +107,13 @@ function CartQtyInput({
 }
 
 export const Route = createFileRoute("/carrito")({
-  loader: ({ context }) => {
-    context.queryClient.ensureQueryData(storeQueryOptions);
-  },
   head: () => ({
     meta: [
-      { title: "Tu carrito — Te importamos" },
+      { title: "Carrito de compras — Te importamos" },
       {
         name: "description",
-        content: "Revisá tu pedido y pagá online con MercadoPago. Envíos a todo el país.",
+        content: "Revisá tu pedido mayorista antes de finalizar la compra.",
       },
-      { property: "og:title", content: "Tu carrito — Te importamos" },
-      { property: "og:description", content: "Finalizá tu compra de productos importados." },
-      { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
       { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
       { property: "og:url", content: "https://teimportamosarg.com/carrito" },
       { name: "robots", content: "noindex, nofollow" },
@@ -124,7 +124,7 @@ export const Route = createFileRoute("/carrito")({
 
 function CarritoPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
-  const { products, config } = data;
+  const { products, config, banners = [] } = data;
   const cart = useCart();
   const { user, session } = useAuth();
 
@@ -157,7 +157,7 @@ function CarritoPage() {
           code,
           userId: user.id,
           email: user.email ?? "",
-          token: session?.access_token,
+          ...(session?.access_token ? { token: session.access_token } : {}),
         },
       });
       if (!res.valid || res.error) {
@@ -184,17 +184,25 @@ function CarritoPage() {
     setCouponError("");
   }
 
-  // Garantizar que la categoría esté resuelta para cada ítem (usando el producto de la DB como fallback si i.categoria viene vacío)
+  // Garantizar que la categoría y la imagen estén resueltas para cada ítem (usando el producto o banner como fallback)
   const cartItemsWithCat = useMemo(() => {
     return cart.items.map((i) => {
       const prod = findProduct(products, i.productId || i.id || i.nombre);
       const cat = i.categoria || prod?.categoria || "";
+      const isCombo = i.id.startsWith("combo-");
+      const rawComboIdx = isCombo ? i.id.replace("combo-", "") : null;
+      const comboBanner =
+        rawComboIdx !== null && !isNaN(Number(rawComboIdx))
+          ? banners[Number(rawComboIdx)]
+          : banners.find((b) => b.titulo?.trim().toLowerCase() === i.nombre.trim().toLowerCase());
+      const resolvedImg = i.imagen || comboBanner?.imagen_url || prod?.imagen_url || undefined;
       return {
         ...i,
         categoria: cat,
+        imagen: resolvedImg,
       };
     });
-  }, [cart.items, products]);
+  }, [cart.items, products, banners]);
 
   const items = cartItemsWithCat.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice, productId: i.productId }));
 
@@ -261,13 +269,27 @@ function CarritoPage() {
               {cartItemsWithCat.map((i) => {
                 const prod = findProduct(products, i.productId || i.id || i.nombre);
                 const isSupp = isSuplemento(i.categoria, i.nombre);
+                const isCombo = i.id.startsWith("combo-");
+                const rawComboIndex = isCombo ? i.id.replace("combo-", "") : null;
+                const comboBanner =
+                  rawComboIndex !== null && !isNaN(Number(rawComboIndex))
+                    ? banners[Number(rawComboIndex)]
+                    : banners.find((b) => b.titulo?.trim().toLowerCase() === i.nombre.trim().toLowerCase());
+                const comboIndex =
+                  rawComboIndex !== null && !isNaN(Number(rawComboIndex)) && banners[Number(rawComboIndex)]
+                    ? rawComboIndex
+                    : comboBanner
+                    ? String(banners.indexOf(comboBanner))
+                    : null;
+                const rawImg = i.imagen || comboBanner?.imagen_url || prod?.imagen_url;
+                const itemImage = imageUrl(rawImg) || FALLBACK_IMAGE;
 
                 return (
                   <li
                     key={i.id}
                     className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4"
                   >
-                    {/* Img + Title + tags - Clickeable para ir al detalle del producto */}
+                    {/* Img + Title + tags - Clickeable para ir al detalle del producto o combo */}
                     {prod?.id ? (
                       <Link
                         to="/producto/$id"
@@ -275,10 +297,11 @@ function CarritoPage() {
                         className="flex min-w-0 flex-1 items-center gap-3 group cursor-pointer"
                       >
                         <img
-                          src={imageUrl(prod.imagen_url) || FALLBACK_IMAGE}
+                          src={itemImage}
                           alt={i.nombre}
                           className="h-12 w-12 shrink-0 rounded-lg object-contain bg-surface p-1 border border-border/50 sm:h-14 sm:w-14 transition-transform group-hover:scale-105"
                           referrerPolicy="no-referrer"
+                          onError={onImageError(rawImg)}
                         />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold sm:text-base text-foreground group-hover:text-primary transition-colors">
@@ -297,13 +320,49 @@ function CarritoPage() {
                           </div>
                         </div>
                       </Link>
+                    ) : isCombo && comboIndex !== null ? (
+                      <Link
+                        to="/combo/$index"
+                        params={{ index: comboIndex }}
+                        className="flex min-w-0 flex-1 items-center gap-3 group cursor-pointer"
+                      >
+                        <img
+                          src={itemImage}
+                          alt={i.nombre}
+                          className="h-12 w-12 shrink-0 rounded-lg object-contain bg-surface p-1 border border-border/50 sm:h-14 sm:w-14 transition-transform group-hover:scale-105"
+                          referrerPolicy="no-referrer"
+                          onError={onImageError(rawImg)}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary border border-primary/20 uppercase shrink-0">
+                              Combo
+                            </span>
+                            <p className="truncate text-sm font-semibold sm:text-base text-foreground group-hover:text-primary transition-colors">
+                              {i.nombre}
+                            </p>
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
+                            {i.basePrice && i.unitPrice < i.basePrice && (
+                              <span className="line-through text-[11px] opacity-75">{money(i.basePrice)}</span>
+                            )}
+                            <span className="font-semibold text-foreground">{money(i.unitPrice)} c/u</span>
+                            {i.basePrice && i.unitPrice < i.basePrice && (
+                              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                {Math.round(((i.basePrice - i.unitPrice) / i.basePrice) * 100)}% OFF x cantidad
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
                     ) : (
                       <div className="flex min-w-0 flex-1 items-center gap-3">
                         <img
-                          src={imageUrl(prod?.imagen_url) || FALLBACK_IMAGE}
+                          src={itemImage}
                           alt={i.nombre}
                           className="h-12 w-12 shrink-0 rounded-lg object-contain bg-surface p-1 border border-border/50 sm:h-14 sm:w-14"
                           referrerPolicy="no-referrer"
+                          onError={onImageError(rawImg)}
                         />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold sm:text-base">{i.nombre}</p>
