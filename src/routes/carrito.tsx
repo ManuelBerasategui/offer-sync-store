@@ -20,6 +20,9 @@ import {
   findProduct,
   money,
   priceOf,
+  hasOffer,
+  originalPriceOf,
+  offerDiscountPct,
   waLink,
   parseCategoryRules,
   categoryDiscountForUnits,
@@ -284,6 +287,23 @@ function CarritoPage() {
                 const rawImg = i.imagen || comboBanner?.imagen_url || prod?.imagen_url;
                 const itemImage = imageUrl(rawImg) || FALLBACK_IMAGE;
 
+                // Precios de oferta: si el producto tiene oferta individual, mostrar el precio original tachado
+                const prodHasOffer = prod ? hasOffer(prod) : false;
+                const prodOrigPrice = prod && prodHasOffer ? originalPriceOf(prod) : 0;
+                const prodOfferPct = prod && prodHasOffer ? offerDiscountPct(prod) : 0;
+                // Precio "original" para mostrar: si hay descuento por cantidad O oferta individual
+                const displayOrigPrice =
+                  (i.basePrice && i.unitPrice < i.basePrice)
+                    ? i.basePrice
+                    : (prodHasOffer && prodOrigPrice > i.unitPrice)
+                    ? prodOrigPrice
+                    : 0;
+                const displayDiscountPct =
+                  displayOrigPrice > 0
+                    ? Math.round(((displayOrigPrice - i.unitPrice) / displayOrigPrice) * 100)
+                    : 0;
+                const isOfferDiscount = prodHasOffer && prodOrigPrice > i.unitPrice && !(i.basePrice && i.unitPrice < i.basePrice);
+
                 return (
                   <li
                     key={i.id}
@@ -308,13 +328,17 @@ function CarritoPage() {
                             {i.nombre}
                           </p>
                           <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
-                            {i.basePrice && i.unitPrice < i.basePrice && (
-                              <span className="line-through text-[11px] opacity-75">{money(i.basePrice)}</span>
+                            {displayOrigPrice > 0 && (
+                              <span className="line-through text-[11px] opacity-75">{money(displayOrigPrice)}</span>
                             )}
                             <span className="font-semibold text-foreground">{money(i.unitPrice)} c/u</span>
-                            {i.basePrice && i.unitPrice < i.basePrice && (
-                              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                {Math.round(((i.basePrice - i.unitPrice) / i.basePrice) * 100)}% OFF x cantidad
+                            {displayDiscountPct > 0 && (
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                isOfferDiscount
+                                  ? "text-red-600 dark:text-red-400 bg-red-500/10"
+                                  : "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                              }`}>
+                                {isOfferDiscount ? `🔥 -${displayDiscountPct}% OFF` : `${displayDiscountPct}% OFF x cantidad`}
                               </span>
                             )}
                           </div>
