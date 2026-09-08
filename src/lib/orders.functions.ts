@@ -648,6 +648,13 @@ export const createTransferOrder = createServerFn({ method: "POST" })
       }
     } catch (err) {
       console.error("Error revalidando items en transferencia:", err);
+      // Fallback seguro: aunque falle la revalidación, aplicar el descuento de transferencia
+      // por defecto para que el total guardado nunca sea el precio de lista.
+      const { transferPrice: tP, DEFAULT_TRANSFER_DISCOUNT } = await import("./store").catch(() => ({
+        transferPrice: (p: number, d: number) => Math.round(p * (1 - d / 100)),
+        DEFAULT_TRANSFER_DISCOUNT: 7,
+      }));
+      total = tP(total, DEFAULT_TRANSFER_DISCOUNT);
     }
 
     const orderCode = makeCode();

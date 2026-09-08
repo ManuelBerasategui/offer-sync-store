@@ -121,10 +121,17 @@ function AdminOrdenesPage() {
 
   // Métricas del tab activo
   const stats = useMemo(() => {
+    // order.total = precio final cobrado (con todos los descuentos ya aplicados)
     const totalVentas = filteredOrders.reduce((sum, o) => sum + o.total, 0);
+    // itemsSubtotal = suma de los items a precio de lista (sin descuento de transferencia)
+    const totalListPrice = filteredOrders.reduce(
+      (sum, o) => sum + o.items.reduce((s, i) => s + i.qty * i.unitPrice, 0),
+      0,
+    );
+    const totalDescuentos = Math.max(0, totalListPrice - totalVentas);
     const count = filteredOrders.length;
     const promedio = count > 0 ? Math.round(totalVentas / count) : 0;
-    return { totalVentas, count, promedio };
+    return { totalVentas, totalListPrice, totalDescuentos, count, promedio };
   }, [filteredOrders]);
 
   const handleStatusChange = async (orderCode: string, newStatus: string) => {
@@ -335,9 +342,14 @@ TOTAL: ${money(order.total)}`;
             </div>
             <div className="min-w-0">
               <p className="text-[9px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">
-                {tab === "pagadas" ? "Recaudado" : "Reservado"}
+                {tab === "pagadas" ? "Recaudado (neto)" : "Reservado (neto)"}
               </p>
               <p className="text-xs sm:text-2xl font-bold tracking-tight text-foreground truncate">{money(stats.totalVentas)}</p>
+              {stats.totalDescuentos > 0 && (
+                <p className="hidden sm:block text-[11px] font-medium text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  -{money(stats.totalDescuentos)} en descuentos
+                </p>
+              )}
             </div>
           </div>
 
@@ -356,7 +368,7 @@ TOTAL: ${money(order.total)}`;
               <ShoppingBag className="h-3.5 w-3.5 sm:h-6 sm:w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[9px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">Promedio</p>
+              <p className="text-[9px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">Promedio (neto)</p>
               <p className="text-xs sm:text-2xl font-bold tracking-tight text-foreground truncate">{money(stats.promedio)}</p>
             </div>
           </div>
@@ -551,33 +563,56 @@ TOTAL: ${money(order.total)}`;
                     </div>
 
                     {/* Columna Ítems del Pedido */}
-                    <div className="rounded-xl bg-surface/50 p-3.5 sm:p-4 border border-border/60 flex flex-col justify-between">
-                      <div>
-                        <h4 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">
-                          Productos Comprados ({order.items.reduce((acc, i) => acc + i.qty, 0)} u.)
-                        </h4>
-                        <div className="divide-y divide-border/60">
-                          {order.items.map((item, idx) => (
-                            <div key={idx} className="py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-0 text-xs sm:text-sm">
-                              <div className="min-w-0">
-                                <p className="font-semibold text-foreground leading-snug break-words">{item.nombre}</p>
-                                <p className="text-[11px] text-muted-foreground">
-                                  {item.qty} x {money(item.unitPrice)}
-                                </p>
-                              </div>
-                              <span className="font-bold text-foreground tabular-nums shrink-0 text-xs sm:text-sm sm:pl-2">
-                                {money(item.qty * item.unitPrice)}
+                    {(() => {
+                      const itemsSubtotal = order.items.reduce((acc, i) => acc + i.qty * i.unitPrice, 0);
+                      const descuento = Math.max(0, itemsSubtotal - order.total);
+                      const hasDiscount = descuento > 0;
+                      return (
+                        <div className="rounded-xl bg-surface/50 p-3.5 sm:p-4 border border-border/60 flex flex-col justify-between">
+                          <div>
+                            <h4 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">
+                              Productos Comprados ({order.items.reduce((acc, i) => acc + i.qty, 0)} u.)
+                            </h4>
+                            <div className="divide-y divide-border/60">
+                              {order.items.map((item, idx) => (
+                                <div key={idx} className="py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-0 text-xs sm:text-sm">
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-foreground leading-snug break-words">{item.nombre}</p>
+                                    <p className="text-[11px] text-muted-foreground">
+                                      {item.qty} x {money(item.unitPrice)}
+                                    </p>
+                                  </div>
+                                  <span className="font-bold text-foreground tabular-nums shrink-0 text-xs sm:text-sm sm:pl-2">
+                                    {money(item.qty * item.unitPrice)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="mt-3.5 pt-3 border-t border-border space-y-1.5">
+                            {hasDiscount && (
+                              <>
+                                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                  <span>Subtotal de lista</span>
+                                  <span className="tabular-nums line-through">{money(itemsSubtotal)}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                  <span>Descuento aplicado</span>
+                                  <span className="tabular-nums">-{money(descuento)}</span>
+                                </div>
+                              </>
+                            )}
+                            <div className="flex justify-between items-center text-xs sm:text-sm font-bold pt-1 border-t border-border/60">
+                              <span className="text-muted-foreground">Total cobrado</span>
+                              <span className={`text-base sm:text-lg tabular-nums ${hasDiscount ? "text-emerald-600 dark:text-emerald-400" : "text-primary"}`}>
+                                {money(order.total)}
                               </span>
                             </div>
-                          ))}
+                          </div>
                         </div>
-                      </div>
-
-                      <div className="mt-3.5 pt-3 border-t border-border flex justify-between items-center text-xs sm:text-sm font-bold">
-                        <span className="text-muted-foreground">Total</span>
-                        <span className="text-base sm:text-lg text-primary tabular-nums">{money(order.total)}</span>
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );
