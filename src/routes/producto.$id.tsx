@@ -198,9 +198,9 @@ export const Route = createFileRoute("/producto/$id")({
               { name: "twitter:image", content: image },
             ]
           : [
-              { property: "og:image", content: "https://teimportamosarg.com/og-card.jpg" },
-              { property: "og:image:secure_url", content: "https://teimportamosarg.com/og-card.jpg" },
-              { name: "twitter:image", content: "https://teimportamosarg.com/og-card.jpg" },
+              { property: "og:image", content: "https://teimportamosarg.com/wa-preview.jpg" },
+              { property: "og:image:secure_url", content: "https://teimportamosarg.com/wa-preview.jpg" },
+              { name: "twitter:image", content: "https://teimportamosarg.com/wa-preview.jpg" },
             ]),
       ],
       links: [

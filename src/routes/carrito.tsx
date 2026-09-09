@@ -117,7 +117,7 @@ export const Route = createFileRoute("/carrito")({
         name: "description",
         content: "Revisá tu pedido mayorista antes de finalizar la compra.",
       },
-      { name: "twitter:image", content: "https://teimportamosarg.com/og-card.jpg" },
+      { name: "twitter:image", content: "https://teimportamosarg.com/wa-preview.jpg" },
       { property: "og:url", content: "https://teimportamosarg.com/carrito" },
       { name: "robots", content: "noindex, nofollow" },
     ],
