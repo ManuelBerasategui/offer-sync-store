@@ -127,10 +127,7 @@ export const Route = createFileRoute("/producto/$id")({
             hasMerchantReturnPolicy: {
               "@type": "MerchantReturnPolicy",
               applicableCountry: "AR",
-              returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-              merchantReturnDays: 10,
-              returnMethod: "https://schema.org/ReturnByMail",
-              returnFees: "https://schema.org/FreeReturn",
+              returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted",
             },
           },
         }
