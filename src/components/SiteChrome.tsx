@@ -17,7 +17,7 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
           className="flex shrink-0 items-center min-w-0"
         >
           <img
-            src="/businessicon-header.jpg"
+            src="/businessicon-header.jpg?v=3"
             alt="Te Importamos"
             className="h-8 w-auto max-w-[150px] object-contain object-left xs:max-w-[170px] sm:h-10 sm:max-w-none"
           />
