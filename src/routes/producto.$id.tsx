@@ -85,13 +85,53 @@ export const Route = createFileRoute("/producto/$id")({
           ...(image ? { image } : {}),
           ...(description ? { description } : {}),
           ...(category ? { category } : {}),
+          brand: {
+            "@type": "Brand",
+            name: "Te importamos",
+          },
           offers: {
             "@type": "Offer",
             priceCurrency: "ARS",
             ...(price ? { price } : {}),
             availability: "https://schema.org/InStock",
+            itemCondition: "https://schema.org/NewCondition",
             url: canonicalUrl,
             seller: { "@type": "Organization", name: "Te importamos" },
+            shippingDetails: {
+              "@type": "OfferShippingDetails",
+              shippingRate: {
+                "@type": "MonetaryAmount",
+                value: "0",
+                currency: "ARS",
+              },
+              shippingDestination: {
+                "@type": "DefinedRegion",
+                addressCountry: "AR",
+              },
+              deliveryTime: {
+                "@type": "ShippingDeliveryTime",
+                handlingTime: {
+                  "@type": "QuantitativeValue",
+                  minValue: 1,
+                  maxValue: 2,
+                  unitCode: "DAY",
+                },
+                transitTime: {
+                  "@type": "QuantitativeValue",
+                  minValue: 2,
+                  maxValue: 6,
+                  unitCode: "DAY",
+                },
+              },
+            },
+            hasMerchantReturnPolicy: {
+              "@type": "MerchantReturnPolicy",
+              applicableCountry: "AR",
+              returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+              merchantReturnDays: 10,
+              returnMethod: "https://schema.org/ReturnByMail",
+              returnFees: "https://schema.org/FreeReturn",
+            },
           },
         }
       : null;
