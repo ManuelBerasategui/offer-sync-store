@@ -34,9 +34,9 @@ export const Route = createFileRoute("/combo/$index")({
         property: "og:description",
         content: "Pack completo para revender, con pago online por MercadoPago.",
       },
-      { property: "og:image", content: "https://teimportamosarg.com/wa-preview.jpg" },
-      { property: "og:image:secure_url", content: "https://teimportamosarg.com/wa-preview.jpg" },
-      { name: "twitter:image", content: "https://teimportamosarg.com/wa-preview.jpg" },
+      { property: "og:image", content: "https://www.teimportamosarg.com/og-image.jpg" },
+      { property: "og:image:secure_url", content: "https://www.teimportamosarg.com/og-image.jpg" },
+      { name: "twitter:image", content: "https://www.teimportamosarg.com/og-image.jpg" },
       { property: "og:url", content: "https://teimportamosarg.com/" },
     ],
     links: [

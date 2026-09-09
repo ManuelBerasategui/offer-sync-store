@@ -97,33 +97,6 @@ export const Route = createFileRoute("/producto/$id")({
             itemCondition: "https://schema.org/NewCondition",
             url: canonicalUrl,
             seller: { "@type": "Organization", name: "Te importamos" },
-            shippingDetails: {
-              "@type": "OfferShippingDetails",
-              shippingRate: {
-                "@type": "MonetaryAmount",
-                value: "0",
-                currency: "ARS",
-              },
-              shippingDestination: {
-                "@type": "DefinedRegion",
-                addressCountry: "AR",
-              },
-              deliveryTime: {
-                "@type": "ShippingDeliveryTime",
-                handlingTime: {
-                  "@type": "QuantitativeValue",
-                  minValue: 1,
-                  maxValue: 2,
-                  unitCode: "DAY",
-                },
-                transitTime: {
-                  "@type": "QuantitativeValue",
-                  minValue: 2,
-                  maxValue: 6,
-                  unitCode: "DAY",
-                },
-              },
-            },
             hasMerchantReturnPolicy: {
               "@type": "MerchantReturnPolicy",
               applicableCountry: "AR",
@@ -195,9 +168,9 @@ export const Route = createFileRoute("/producto/$id")({
               { name: "twitter:image", content: image },
             ]
           : [
-              { property: "og:image", content: "https://teimportamosarg.com/wa-preview.jpg" },
-              { property: "og:image:secure_url", content: "https://teimportamosarg.com/wa-preview.jpg" },
-              { name: "twitter:image", content: "https://teimportamosarg.com/wa-preview.jpg" },
+              { property: "og:image", content: "https://www.teimportamosarg.com/og-image.jpg" },
+              { property: "og:image:secure_url", content: "https://www.teimportamosarg.com/og-image.jpg" },
+              { name: "twitter:image", content: "https://www.teimportamosarg.com/og-image.jpg" },
             ]),
       ],
       links: [
