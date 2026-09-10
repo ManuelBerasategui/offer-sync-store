@@ -2637,7 +2637,11 @@ function isSafeHttpUrl(url?: string | null): boolean {
 
 function cleanImageUrl(url?: string | null): string {
   if (!url || typeof url !== "string" || !isSafeHttpUrl(url)) return "";
-  return encodeURI(url.trim());
+  try {
+    return encodeURI(url.trim());
+  } catch {
+    return "";
+  }
 }
 
 type ImportStatus = "idle" | "pending" | "ok" | "error";
@@ -3015,6 +3019,10 @@ function AdminProductosPage() {
   const [roundingIncrement, setRoundingIncrement] = useState<number>(10);
   const [markupPercentage, setMarkupPercentage] = useState<number>(0);
 
+  const existingCategories = useMemo(() => {
+    return Array.from(new Set(products.map((p) => String(p.categoria ?? "").trim()).filter(Boolean))).sort();
+  }, [products]);
+
   const userEmail = user?.email ?? "";
   const userToken = session?.access_token ?? "";
   const userId = user?.id;
@@ -3176,10 +3184,6 @@ function AdminProductosPage() {
       </div>
     );
   }
-
-  const existingCategories = useMemo(() => {
-    return Array.from(new Set(products.map((p) => String(p.categoria ?? "").trim()).filter(Boolean))).sort();
-  }, [products]);
 
   return (
     <div className="min-h-screen bg-background">
