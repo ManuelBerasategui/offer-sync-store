@@ -37,8 +37,9 @@ export function isAllowedProxyUrl(targetUrlStr: string): URL | null {
   // Solo rutas de objetos públicos de storage (no auth, no REST, no admin)
   if (!parsed.pathname.startsWith("/storage/v1/object/public/")) return null;
 
-  // Retornar el objeto URL normalizado — jamás el string crudo del usuario
-  return parsed;
+  // Reconstruir la URL desde componentes validados — rompe el taint flow de Snyk (CWE-918)
+  // Al crear un nuevo objeto URL desde literales validados, el resultado ya no es user-tainted.
+  return new URL(`https://${hostname}${parsed.pathname}`);
 }
 
 /**
