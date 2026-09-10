@@ -33,7 +33,7 @@ import {
   type YupooAlbumPreview,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 
 export const Route = createFileRoute("/admin/productos")({
@@ -2628,22 +2628,6 @@ function OfertasDelDiaPanel({
 /*  Importador Yupoo                                         */
 /* ───────────────────────────────────────────────────────── */
 
-/** Sanitización estricta contra DOM-based XSS (CWE-79) para URLs externas de imágenes. */
-function isSafeHttpUrl(url?: string | null): boolean {
-  if (!url || typeof url !== "string") return false;
-  const trimmed = url.trim().toLowerCase();
-  return (trimmed.startsWith("https://") || trimmed.startsWith("http://")) && !trimmed.startsWith("javascript:");
-}
-
-function cleanImageUrl(url?: string | null): string {
-  if (!url || typeof url !== "string" || !isSafeHttpUrl(url)) return "";
-  try {
-    return encodeURI(url.trim());
-  } catch {
-    return "";
-  }
-}
-
 type ImportStatus = "idle" | "pending" | "ok" | "error";
 type AlbumRow = YupooAlbumPreview & { selected: boolean; status: ImportStatus; statusMsg: string };
 
@@ -2690,7 +2674,7 @@ function YupooImporter({
         setAlbums(
           (res.albums ?? []).map((a) => ({
             ...a,
-            thumbnail: cleanImageUrl(a.thumbnail),
+            thumbnail: sanitizeImageUrl(a.thumbnail),
             selected: true,
             status: "idle" as ImportStatus,
             statusMsg: "",
@@ -2924,9 +2908,9 @@ function YupooImporter({
                       }
                       className="h-4 w-4 rounded accent-primary shrink-0"
                     />
-                    {isSafeHttpUrl(album.thumbnail) ? (
+                    {sanitizeImageUrl(album.thumbnail) ? (
                       <img
-                        src={cleanImageUrl(album.thumbnail)}
+                        src={sanitizeImageUrl(album.thumbnail)}
                         alt=""
                         referrerPolicy="no-referrer"
                         className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border bg-muted"
