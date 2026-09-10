@@ -230,7 +230,7 @@ export const createNewsletterCampaign = createServerFn({ method: "POST" })
           headline: data.headline.trim(),
           content: data.content.trim(),
           cta_text: data.cta_text?.trim() || "Ver Ofertas en la Tienda",
-          cta_url: data.cta_url?.trim() || `${BASE_URL}/catalogo`,
+          cta_url: data.cta_url?.trim() || `${BASE_URL}/catalogo?ref=wa`,
           coupon_code: data.coupon_code?.trim() || null,
           status: "active",
           total_target: activeCount ?? 0,
