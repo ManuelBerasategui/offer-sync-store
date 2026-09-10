@@ -1,4 +1,25 @@
 import { createServerFn } from "@tanstack/react-start";
+
+/**
+ * Orígenes permitidos para back_urls de MercadoPago (CWE-601 — Open Redirect).
+ * data.origin viene del cliente y NO se puede confiar en él sin validación.
+ */
+const ALLOWED_ORIGINS = new Set([
+  "https://www.teimportamosarg.com",
+  "https://teimportamosarg.com",
+]);
+const FALLBACK_ORIGIN = "https://www.teimportamosarg.com";
+
+function safeOrigin(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    // Normalizar: solo scheme + host (sin path, sin query, sin credenciales)
+    const normalized = `${parsed.protocol}//${parsed.host}`;
+    return ALLOWED_ORIGINS.has(normalized) ? normalized : FALLBACK_ORIGIN;
+  } catch {
+    return FALLBACK_ORIGIN;
+  }
+}
 import {
   findProduct,
   priceOf,
@@ -337,7 +358,9 @@ export const createCheckout = createServerFn({ method: "POST" })
       return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
     }
 
-    const successUrl = `${data.origin}/gracias?code=${encodeURIComponent(orderCode)}`;
+    // safeOrigin() valida data.origin contra el allowlist — previene Open Redirect (CWE-601)
+    const origin = safeOrigin(data.origin);
+    const successUrl = `${origin}/gracias?code=${encodeURIComponent(orderCode)}`;
 
     const res = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
@@ -356,7 +379,7 @@ export const createCheckout = createServerFn({ method: "POST" })
         back_urls: {
           success: successUrl,
           pending: successUrl,
-          failure: `${data.origin}/carrito`,
+          failure: `${origin}/carrito`,
         },
         auto_return: "approved",
         payer: {
