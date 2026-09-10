@@ -14,23 +14,25 @@ const ALLOWED_CONTENT_TYPES = new Set([
 ]);
 
 /**
- * Allowlist estricta de hostnames de Supabase Storage permitidos (anti-SSRF / CWE-918).
+ * Allowlist estricta de dominios de Supabase Storage permitidos (anti-SSRF / CWE-918).
  * Solo se permiten peticiones a la instancia oficial del proyecto y entornos autorizados.
  */
-const ALLOWED_SUPABASE_HOSTS = new Set<string>([
+export const ALLOWED_DOMAINS: string[] = [
   "dybzgnmghisqapdzgknv.supabase.co",
   "xyzcompany.supabase.co",
   "app-12345.supabase.co",
   "test.supabase.co",
   "myproj.supabase.co",
-]);
+];
 
 // Si hay una URL en variables de entorno, incorporar su hostname al allowlist
 try {
   const envUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   if (envUrl) {
     const envHost = new URL(envUrl).hostname.toLowerCase();
-    if (envHost) ALLOWED_SUPABASE_HOSTS.add(envHost);
+    if (envHost && !ALLOWED_DOMAINS.includes(envHost)) {
+      ALLOWED_DOMAINS.push(envHost);
+    }
   }
 } catch {
   // ignore
@@ -39,7 +41,6 @@ try {
 /**
  * Valida estrictamente que la URL pertenezca a Supabase Storage público (anti-SSRF / CWE-918).
  * Retorna un objeto URL ya parseado y normalizado si es válido, o null si no lo es.
- * Usar el objeto URL retornado (nunca el string original) elimina el taint flow.
  */
 export function isAllowedProxyUrl(targetUrlStr: string): URL | null {
   if (!targetUrlStr || typeof targetUrlStr !== "string") return null;
@@ -50,18 +51,14 @@ export function isAllowedProxyUrl(targetUrlStr: string): URL | null {
     return null;
   }
 
-  // Protocolo estrictamente HTTPS
+  // 1. Protocolo estrictamente HTTPS
   if (parsed.protocol !== "https:") return null;
 
-  // Validación de hostname contra allowlist estricta y formato regex seguro (anti-SSRF / CWE-918)
+  // 2. Hostname estrictamente en allowlist (anti-SSRF / CWE-918)
   const hostname = parsed.hostname.toLowerCase();
-  const isAllowedHost =
-    ALLOWED_SUPABASE_HOSTS.has(hostname) ||
-    (hostname.endsWith(".supabase.co") && /^[a-z0-9-]{3,63}\.supabase\.co$/.test(hostname));
+  if (!ALLOWED_DOMAINS.includes(hostname)) return null;
 
-  if (!isAllowedHost) return null;
-
-  // Solo rutas de objetos públicos de storage (no auth, no REST, no admin) y prevención de path traversal
+  // 3. Solo rutas de objetos públicos de storage (no auth, no REST, no admin) y prevención de path traversal
   const pathname = parsed.pathname;
   if (
     !pathname.startsWith("/storage/v1/object/public/") ||
@@ -97,21 +94,22 @@ export async function handleImageProxy(request: Request): Promise<Response> {
     return new Response("Missing url parameter", { status: 400 });
   }
 
-  // safeUrl es un objeto URL ya validado y normalizado — corta el taint flow del input del usuario
+  // safeUrl es un objeto URL ya validado y normalizado contra allowlist
   const safeUrl = isAllowedProxyUrl(targetUrlStr);
   if (!safeUrl) {
     return new Response("Forbidden target URL", { status: 403 });
   }
 
-  // Sanitización de seguridad adicional antes del fetch para eliminar taint flow (CWE-918)
+  // 1. Validar protocolo seguro HTTPS (patrón Snyk CWE-918)
   if (safeUrl.protocol !== "https:") {
     return new Response("Forbidden protocol", { status: 403 });
   }
-  const safeHost = safeUrl.hostname.toLowerCase();
-  if (!ALLOWED_SUPABASE_HOSTS.has(safeHost) && !/^[a-z0-9-]{3,63}\.supabase\.co$/.test(safeHost)) {
-    return new Response("Forbidden target host", { status: 403 });
+
+  // 2. Validar hostname contra allowlist estricta (patrón Snyk CWE-918)
+  const targetHost = safeUrl.hostname.toLowerCase();
+  if (!ALLOWED_DOMAINS.includes(targetHost)) {
+    return new Response("Untrusted host", { status: 403 });
   }
-  const safeTargetUrl = `https://${safeHost}${safeUrl.pathname}`;
 
   try {
     const upstreamHeaders = new Headers();
@@ -122,8 +120,8 @@ export async function handleImageProxy(request: Request): Promise<Response> {
     const ifModifiedSince = request.headers.get("if-modified-since");
     if (ifModifiedSince) upstreamHeaders.set("if-modified-since", ifModifiedSince);
 
-    // Usar safeTargetUrl validado y comprobado contra allowlist (anti-SSRF / CWE-918)
-    const upstreamRes = await fetch(safeTargetUrl, {
+    // 3. Ejecutar fetch utilizando safeUrl.href verificado contra allowlist (anti-SSRF / CWE-918)
+    const upstreamRes = await fetch(safeUrl.href, {
       method: request.method,
       headers: upstreamHeaders,
       signal: AbortSignal.timeout(10000),

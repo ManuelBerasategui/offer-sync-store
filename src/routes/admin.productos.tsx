@@ -33,7 +33,7 @@ import {
   type YupooAlbumPreview,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct, sanitizeImageUrl } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 
 export const Route = createFileRoute("/admin/productos")({
@@ -2628,6 +2628,18 @@ function OfertasDelDiaPanel({
 /*  Importador Yupoo                                         */
 /* ───────────────────────────────────────────────────────── */
 
+/** Sanitización estricta contra DOM-based XSS (CWE-79) para URLs externas de imágenes. */
+function isSafeHttpUrl(url?: string | null): boolean {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim().toLowerCase();
+  return (trimmed.startsWith("https://") || trimmed.startsWith("http://")) && !trimmed.startsWith("javascript:");
+}
+
+function cleanImageUrl(url?: string | null): string {
+  if (!url || typeof url !== "string" || !isSafeHttpUrl(url)) return "";
+  return encodeURI(url.trim());
+}
+
 type ImportStatus = "idle" | "pending" | "ok" | "error";
 type AlbumRow = YupooAlbumPreview & { selected: boolean; status: ImportStatus; statusMsg: string };
 
@@ -2674,6 +2686,7 @@ function YupooImporter({
         setAlbums(
           (res.albums ?? []).map((a) => ({
             ...a,
+            thumbnail: cleanImageUrl(a.thumbnail),
             selected: true,
             status: "idle" as ImportStatus,
             statusMsg: "",
@@ -2907,20 +2920,17 @@ function YupooImporter({
                       }
                       className="h-4 w-4 rounded accent-primary shrink-0"
                     />
-                    {(() => {
-                      const safeThumb = sanitizeImageUrl(album.thumbnail);
-                      return safeThumb ? (
-                        <img
-                          src={safeThumb}
-                          alt=""
-                          referrerPolicy="no-referrer"
-                          className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border bg-muted"
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                        />
-                      ) : (
-                        <div className="h-12 w-12 rounded-lg bg-muted shrink-0" />
-                      );
-                    })()}
+                    {isSafeHttpUrl(album.thumbnail) ? (
+                      <img
+                        src={cleanImageUrl(album.thumbnail)}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border bg-muted"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg bg-muted shrink-0" />
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-foreground truncate">{album.title}</p>
                       <p className="text-[10px] text-muted-foreground truncate">{album.albumUrl}</p>
