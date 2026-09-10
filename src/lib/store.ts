@@ -200,18 +200,23 @@ export const FALLBACK_IMAGE = "https://placehold.co/600x600/f4f4f5/71717a?text=S
  */
 export function galleryImages(product: Product): string[] {
   const main = product.imagen_url ? [product.imagen_url] : [];
-  const extra = (product as Record<string, unknown>)["extra_images"];
+  const meta = (product as Record<string, unknown>)["metadata"] as Record<string, unknown> | undefined;
+  const extra =
+    (product as Record<string, unknown>)["extra_images"] ??
+    meta?.["extra_images"];
+
   if (Array.isArray(extra)) {
     const extraUrls = (extra as unknown[])
       .map((u) => String(u ?? "").trim())
       .filter(Boolean);
-    return [...main, ...extraUrls];
+    return Array.from(new Set([...main, ...extraUrls]));
   }
   return main;
 }
 
 
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
+const STRICT_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
 
 export function sanitizeUrl(url?: string | null): string {
   if (!url) return "#";
@@ -226,6 +231,22 @@ export function sanitizeUrl(url?: string | null): string {
     // invalid URL
   }
   return "#";
+}
+
+/** Sanitiza URLs para elementos <img> contra XSS / inyecciones de esquemas maliciosos (CWE-79). */
+export function sanitizeImageUrl(url?: string | null): string {
+  if (!url || typeof url !== "string") return "";
+  const trimmed = url.trim();
+  if (trimmed.startsWith("/")) return trimmed;
+  try {
+    const parsed = new URL(trimmed);
+    if (STRICT_IMAGE_PROTOCOLS.has(parsed.protocol)) {
+      return parsed.href;
+    }
+  } catch {
+    // URL inválida
+  }
+  return "";
 }
 
 export function waLink(config: SiteConfig, messageOrProduct?: string) {

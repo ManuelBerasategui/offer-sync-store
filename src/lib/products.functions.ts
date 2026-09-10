@@ -1456,7 +1456,21 @@ function extractAlbumLinks(html: string, baseOrigin: string): { albumUrl: string
     const thumbMatch =
       block.match(/data-origin-src="([^"]+)"/) ||
       block.match(/src="(https?:\/\/photo\.yupoo\.com[^"]+)"/);
-    const thumbnail = thumbMatch ? thumbMatch[1] : "";
+    let thumbnail = "";
+    if (thumbMatch && thumbMatch[1]) {
+      try {
+        const raw = thumbMatch[1].trim();
+        const u = new URL(raw.startsWith("//") ? `https:${raw}` : raw);
+        if (
+          (u.protocol === "https:" || u.protocol === "http:") &&
+          (u.hostname === "photo.yupoo.com" || u.hostname.endsWith(".yupoo.com"))
+        ) {
+          thumbnail = u.href;
+        }
+      } catch {
+        thumbnail = "";
+      }
+    }
 
     results.push({ albumUrl, thumbnail });
   }

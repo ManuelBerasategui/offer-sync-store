@@ -7,6 +7,8 @@ import {
   moqGroupOf,
   meetsMoq,
   type MoqInfo,
+  sanitizeImageUrl,
+  galleryImages,
 } from "./store";
 
 /* ══════════════════════════════════════════════════════════════════
@@ -408,5 +410,56 @@ describe("discountFor — tercer tramo global", () => {
     const plain = { descuento: "NO" } as unknown as import("./store").Product;
     expect(discountFor(plain, 20)).toBe(12);
     expect(discountFor(plain, 100)).toBe(12);
+  });
+});
+
+describe("sanitizeImageUrl (CWE-79 / DOM XSS prevention)", () => {
+  it("allows safe http and https image URLs", () => {
+    expect(sanitizeImageUrl("https://photo.yupoo.com/pic.jpg")).toBe("https://photo.yupoo.com/pic.jpg");
+    expect(sanitizeImageUrl("http://example.com/img.png")).toBe("http://example.com/img.png");
+    expect(sanitizeImageUrl("/placeholder.svg")).toBe("/placeholder.svg");
+  });
+
+  it("blocks dangerous javascript: and data: protocols", () => {
+    expect(sanitizeImageUrl("javascript:alert(1)")).toBe("");
+    expect(sanitizeImageUrl("vbscript:msgbox(1)")).toBe("");
+    expect(sanitizeImageUrl("file:///etc/passwd")).toBe("");
+  });
+
+  it("handles null, undefined, empty, and invalid strings gracefully", () => {
+    expect(sanitizeImageUrl(null)).toBe("");
+    expect(sanitizeImageUrl(undefined)).toBe("");
+    expect(sanitizeImageUrl("")).toBe("");
+    expect(sanitizeImageUrl("not a url")).toBe("");
+  });
+});
+
+describe("galleryImages helper", () => {
+  it("returns main image and extra_images combined", () => {
+    const p = {
+      imagen_url: "https://photo.yupoo.com/main.jpg",
+      metadata: {
+        extra_images: ["https://photo.yupoo.com/extra1.jpg", "https://photo.yupoo.com/extra2.jpg"],
+      },
+    } as unknown as import("./store").Product;
+
+    const imgs = galleryImages(p);
+    expect(imgs.length).toBe(3);
+    expect(imgs[0]).toBe("https://photo.yupoo.com/main.jpg");
+    expect(imgs[1]).toBe("https://photo.yupoo.com/extra1.jpg");
+    expect(imgs[2]).toBe("https://photo.yupoo.com/extra2.jpg");
+  });
+
+  it("avoids duplicates and handles missing extra_images", () => {
+    const p = {
+      imagen_url: "https://photo.yupoo.com/main.jpg",
+      metadata: {
+        extra_images: ["https://photo.yupoo.com/main.jpg"],
+      },
+    } as unknown as import("./store").Product;
+
+    const imgs = galleryImages(p);
+    expect(imgs.length).toBe(1);
+    expect(imgs[0]).toBe("https://photo.yupoo.com/main.jpg");
   });
 });

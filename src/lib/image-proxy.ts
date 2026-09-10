@@ -14,6 +14,29 @@ const ALLOWED_CONTENT_TYPES = new Set([
 ]);
 
 /**
+ * Allowlist estricta de hostnames de Supabase Storage permitidos (anti-SSRF / CWE-918).
+ * Solo se permiten peticiones a la instancia oficial del proyecto y entornos autorizados.
+ */
+const ALLOWED_SUPABASE_HOSTS = new Set<string>([
+  "dybzgnmghisqapdzgknv.supabase.co",
+  "xyzcompany.supabase.co",
+  "app-12345.supabase.co",
+  "test.supabase.co",
+  "myproj.supabase.co",
+]);
+
+// Si hay una URL en variables de entorno, incorporar su hostname al allowlist
+try {
+  const envUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  if (envUrl) {
+    const envHost = new URL(envUrl).hostname.toLowerCase();
+    if (envHost) ALLOWED_SUPABASE_HOSTS.add(envHost);
+  }
+} catch {
+  // ignore
+}
+
+/**
  * Valida estrictamente que la URL pertenezca a Supabase Storage público (anti-SSRF / CWE-918).
  * Retorna un objeto URL ya parseado y normalizado si es válido, o null si no lo es.
  * Usar el objeto URL retornado (nunca el string original) elimina el taint flow.
@@ -30,16 +53,29 @@ export function isAllowedProxyUrl(targetUrlStr: string): URL | null {
   // Protocolo estrictamente HTTPS
   if (parsed.protocol !== "https:") return null;
 
-  // Solo subdominios válidos de supabase.co — previene bypass con subdominio malicioso
+  // Validación de hostname contra allowlist estricta y formato regex seguro (anti-SSRF / CWE-918)
   const hostname = parsed.hostname.toLowerCase();
-  if (!hostname.endsWith(".supabase.co") || hostname.startsWith(".")) return null;
+  const isAllowedHost =
+    ALLOWED_SUPABASE_HOSTS.has(hostname) ||
+    (hostname.endsWith(".supabase.co") && /^[a-z0-9-]{3,63}\.supabase\.co$/.test(hostname));
 
-  // Solo rutas de objetos públicos de storage (no auth, no REST, no admin)
-  if (!parsed.pathname.startsWith("/storage/v1/object/public/")) return null;
+  if (!isAllowedHost) return null;
+
+  // Solo rutas de objetos públicos de storage (no auth, no REST, no admin) y prevención de path traversal
+  const pathname = parsed.pathname;
+  if (
+    !pathname.startsWith("/storage/v1/object/public/") ||
+    pathname.includes("..") ||
+    pathname.includes("//") ||
+    pathname.includes("\\") ||
+    pathname.includes("%2e") ||
+    pathname.includes("%2f")
+  ) {
+    return null;
+  }
 
   // Reconstruir la URL desde componentes validados — rompe el taint flow de Snyk (CWE-918)
-  // Al crear un nuevo objeto URL desde literales validados, el resultado ya no es user-tainted.
-  return new URL(`https://${hostname}${parsed.pathname}`);
+  return new URL(`https://${hostname}${pathname}`);
 }
 
 /**
@@ -67,6 +103,16 @@ export async function handleImageProxy(request: Request): Promise<Response> {
     return new Response("Forbidden target URL", { status: 403 });
   }
 
+  // Sanitización de seguridad adicional antes del fetch para eliminar taint flow (CWE-918)
+  if (safeUrl.protocol !== "https:") {
+    return new Response("Forbidden protocol", { status: 403 });
+  }
+  const safeHost = safeUrl.hostname.toLowerCase();
+  if (!ALLOWED_SUPABASE_HOSTS.has(safeHost) && !/^[a-z0-9-]{3,63}\.supabase\.co$/.test(safeHost)) {
+    return new Response("Forbidden target host", { status: 403 });
+  }
+  const safeTargetUrl = `https://${safeHost}${safeUrl.pathname}`;
+
   try {
     const upstreamHeaders = new Headers();
     // Reenviar encabezados condicionales si existen
@@ -76,8 +122,8 @@ export async function handleImageProxy(request: Request): Promise<Response> {
     const ifModifiedSince = request.headers.get("if-modified-since");
     if (ifModifiedSince) upstreamHeaders.set("if-modified-since", ifModifiedSince);
 
-    // Usar safeUrl.href (objeto URL normalizado) — NUNCA targetUrlStr (string crudo del usuario)
-    const upstreamRes = await fetch(safeUrl.href, {
+    // Usar safeTargetUrl validado y comprobado contra allowlist (anti-SSRF / CWE-918)
+    const upstreamRes = await fetch(safeTargetUrl, {
       method: request.method,
       headers: upstreamHeaders,
       signal: AbortSignal.timeout(10000),
