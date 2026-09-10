@@ -106,7 +106,7 @@ function AdminConfiguracionPage() {
     headline: "",
     content: "",
     cta_text: "Ver Ofertas en la Tienda",
-    cta_url: "https://teimportamosarg.com/catalogo?ref=wa",
+    cta_url: "https://teimportamosarg.com/catalogo",
     coupon_code: "",
   });
 
@@ -384,7 +384,7 @@ function AdminConfiguracionPage() {
           headline: "",
           content: "",
           cta_text: "Ver Ofertas en la Tienda",
-          cta_url: "https://teimportamosarg.com/catalogo?ref=wa",
+          cta_url: "https://teimportamosarg.com/catalogo",
           coupon_code: "",
         });
         setBatchMsg({
