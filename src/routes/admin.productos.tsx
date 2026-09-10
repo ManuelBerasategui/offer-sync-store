@@ -262,8 +262,8 @@ function ImageDropzone({
         }}
         onClick={() => inputRef.current?.click()}
         className={`relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 transition-colors ${dragging
-            ? "border-primary bg-primary/5"
-            : "border-border hover:border-primary/50 hover:bg-muted/30"
+          ? "border-primary bg-primary/5"
+          : "border-border hover:border-primary/50 hover:bg-muted/30"
           }`}
         style={{ minHeight: 120 }}
       >
@@ -536,8 +536,8 @@ function PriceModal({
                   }
                 }}
                 className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${sourceCurrency === "USD"
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-card text-muted-foreground border-border hover:bg-muted"
                   }`}
               >
                 <span>💵 Dólares (USDT)</span>
@@ -555,8 +555,8 @@ function PriceModal({
                   }
                 }}
                 className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${sourceCurrency === "ARS"
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-card text-muted-foreground border-border hover:bg-muted"
                   }`}
               >
                 <span>🇦🇷 Pesos (ARS)</span>
@@ -632,8 +632,8 @@ function PriceModal({
                     type="button"
                     onClick={() => setOfferSourceCurrency("USD")}
                     className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${offerSourceCurrency === "USD"
-                        ? "bg-primary/20 text-primary border-primary"
-                        : "bg-card text-muted-foreground border-border"
+                      ? "bg-primary/20 text-primary border-primary"
+                      : "bg-card text-muted-foreground border-border"
                       }`}
                   >
                     Oferta en USD
@@ -642,8 +642,8 @@ function PriceModal({
                     type="button"
                     onClick={() => setOfferSourceCurrency("ARS")}
                     className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${offerSourceCurrency === "ARS"
-                        ? "bg-primary/20 text-primary border-primary"
-                        : "bg-card text-muted-foreground border-border"
+                      ? "bg-primary/20 text-primary border-primary"
+                      : "bg-card text-muted-foreground border-border"
                       }`}
                   >
                     Oferta en ARS
@@ -1048,10 +1048,10 @@ function ProductModal({
                   }));
                 }}
                 className={`flex items-center justify-between rounded-xl border p-3 cursor-pointer transition-all ${form.whatsapp_only_reason === "china" || form.whatsapp_only_reason === "whatsapp_only"
-                    ? "border-emerald-500/50 bg-emerald-500/10 shadow-xs"
-                    : form.whatsapp_only_reason
-                      ? "border-primary/40 bg-primary/5"
-                      : "border-border bg-surface/50 hover:bg-surface"
+                  ? "border-emerald-500/50 bg-emerald-500/10 shadow-xs"
+                  : form.whatsapp_only_reason
+                    ? "border-primary/40 bg-primary/5"
+                    : "border-border bg-surface/50 hover:bg-surface"
                   }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -1333,8 +1333,8 @@ function ProductModal({
                       }
                     }}
                     className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all border ${form.tipo_talles === tipo
-                        ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                      : "bg-card text-muted-foreground border-border hover:bg-muted"
                       }`}
                   >
                     {tipo === "NINGUNO" ? "Sin talles" : tipo === "ZAPATILLAS" ? "👟 Zapatillas (35-45)" : "👕 Ropa (XS-XXXL)"}
@@ -1366,8 +1366,8 @@ function ProductModal({
                           set("talles_disponibles", next);
                         }}
                         className={`h-8 min-w-9 rounded-lg px-2 text-xs font-bold transition-all border ${active
-                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
-                            : "bg-card text-muted-foreground border-border hover:bg-muted"
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
+                          : "bg-card text-muted-foreground border-border hover:bg-muted"
                           }`}
                       >
                         {talle} {active ? "✓" : ""}
@@ -1462,8 +1462,8 @@ function ProductModal({
                                 updateVariant(i, "talles_disponibles", next);
                               }}
                               className={`h-7 min-w-8 rounded-md px-1.5 text-[10px] font-bold transition-all border ${active
-                                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
-                                  : "bg-muted/40 text-muted-foreground/60 border-border opacity-60 hover:opacity-100"
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
+                                : "bg-muted/40 text-muted-foreground/60 border-border opacity-60 hover:opacity-100"
                                 }`}
                             >
                               {talle} {active ? "✓" : ""}
@@ -2172,8 +2172,8 @@ function ComboBuilderPanel({
                     }
                   }}
                   className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${sourceCurrency === "USD"
-                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                      : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                    : "bg-card text-muted-foreground border-border hover:bg-muted"
                     }`}
                 >
                   <span>💵 Dólares (USD)</span>
@@ -2190,8 +2190,8 @@ function ComboBuilderPanel({
                     }
                   }}
                   className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${sourceCurrency === "ARS"
-                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                      : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                    : "bg-card text-muted-foreground border-border hover:bg-muted"
                     }`}
                 >
                   <span>🇦🇷 Pesos (ARS)</span>
@@ -2498,8 +2498,8 @@ function OfertasDelDiaPanel({
           <button
             onClick={() => { setSubTab("activas"); setSearch(""); }}
             className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${subTab === "activas"
-                ? "bg-card text-foreground shadow-xs border border-border"
-                : "text-muted-foreground hover:text-foreground"
+              ? "bg-card text-foreground shadow-xs border border-border"
+              : "text-muted-foreground hover:text-foreground"
               }`}
           >
             <Flame className="h-3.5 w-3.5 text-primary fill-primary/20" />
@@ -2511,8 +2511,8 @@ function OfertasDelDiaPanel({
           <button
             onClick={() => { setSubTab("combos"); setSearch(""); }}
             className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${subTab === "combos"
-                ? "bg-card text-foreground shadow-xs border border-border"
-                : "text-muted-foreground hover:text-foreground"
+              ? "bg-card text-foreground shadow-xs border border-border"
+              : "text-muted-foreground hover:text-foreground"
               }`}
           >
             <Sparkles className="h-3.5 w-3.5 text-primary" />
@@ -2521,8 +2521,8 @@ function OfertasDelDiaPanel({
           <button
             onClick={() => { setSubTab("agregar"); setSearch(""); }}
             className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${subTab === "agregar"
-                ? "bg-card text-foreground shadow-xs border border-border"
-                : "text-muted-foreground hover:text-foreground"
+              ? "bg-card text-foreground shadow-xs border border-border"
+              : "text-muted-foreground hover:text-foreground"
               }`}
           >
             <Plus className="h-3.5 w-3.5 text-primary" />
@@ -2754,6 +2754,68 @@ function YupooImporter({
     onImported();
   }
 
+  async function handleRetryFailed() {
+    const failedAlbums = albums.filter((a) => a.status === "error");
+    if (failedAlbums.length === 0) return;
+
+    // Resetear fallidos a "idle" + seleccionados
+    setAlbums((prev) =>
+      prev.map((a) =>
+        a.status === "error" ? { ...a, status: "idle", statusMsg: "", selected: true } : a
+      )
+    );
+    setImportDone(false);
+    setImporting(true);
+
+    for (const album of failedAlbums) {
+      setAlbums((prev) =>
+        prev.map((a) =>
+          a.albumUrl === album.albumUrl ? { ...a, status: "pending", statusMsg: "Reintentando…" } : a
+        )
+      );
+      try {
+        const res = await importYupooAlbum({
+          data: {
+            email: userEmail,
+            token: userToken,
+            albumUrl: album.albumUrl,
+            password: password.trim(),
+            maxImages: Number(maxImages) || 8,
+            category: category.trim() || "China",
+          },
+        });
+        if (res.error) {
+          setAlbums((prev) =>
+            prev.map((a) =>
+              a.albumUrl === album.albumUrl
+                ? { ...a, status: "error", statusMsg: res.error ?? "Error" }
+                : a
+            )
+          );
+        } else {
+          setAlbums((prev) =>
+            prev.map((a) =>
+              a.albumUrl === album.albumUrl
+                ? { ...a, status: "ok", statusMsg: `✅ ${res.imageCount} foto${res.imageCount !== 1 ? "s" : ""}` }
+                : a
+            )
+          );
+        }
+      } catch (e) {
+        setAlbums((prev) =>
+          prev.map((a) =>
+            a.albumUrl === album.albumUrl
+              ? { ...a, status: "error", statusMsg: e instanceof Error ? e.message : "Error" }
+              : a
+          )
+        );
+      }
+    }
+    setImporting(false);
+    setImportDone(true);
+    onImported();
+  }
+
   const statusIcon = (s: ImportStatus) => {
     if (s === "pending") return <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />;
     if (s === "ok") return <span className="text-emerald-500">✅</span>;
@@ -2897,7 +2959,7 @@ function YupooImporter({
                   <div
                     key={album.albumUrl}
                     className={`flex items-center gap-3 px-3 py-2 transition-colors ${album.status === "ok" ? "bg-emerald-50/50 dark:bg-emerald-950/20" :
-                        album.status === "error" ? "bg-red-50/50 dark:bg-red-950/20" : ""
+                      album.status === "error" ? "bg-red-50/50 dark:bg-red-950/20" : ""
                       }`}
                   >
                     <input
@@ -2932,7 +2994,7 @@ function YupooImporter({
                       {statusIcon(album.status)}
                       {album.statusMsg && (
                         <span className={`text-[10px] font-semibold ${album.status === "error" ? "text-red-500" :
-                            album.status === "ok" ? "text-emerald-600" : "text-muted-foreground"
+                          album.status === "ok" ? "text-emerald-600" : "text-muted-foreground"
                           }`}>
                           {album.statusMsg}
                         </span>
@@ -2957,11 +3019,32 @@ function YupooImporter({
                 </div>
               )}
 
-              {importDone && (
-                <p className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400 font-semibold">
-                  ✅ Importación completa: {importedCount} producto{importedCount !== 1 ? "s" : ""} importado{importedCount !== 1 ? "s" : ""} con éxito.
-                </p>
-              )}
+              {importDone && (() => {
+                const failedCount = albums.filter((a) => a.status === "error").length;
+                return failedCount > 0 ? (
+                  <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 px-3 py-2 flex items-center justify-between gap-3">
+                    <p className="text-xs text-red-700 dark:text-red-400 font-semibold">
+                      ❌ {failedCount} producto{failedCount !== 1 ? "s" : ""} no se pudo importar.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={importing}
+                      onClick={() => void handleRetryFailed()}
+                      className="shrink-0 rounded-lg bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {importing ? (
+                        <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />Reintentando…</>
+                      ) : (
+                        <>🔁 Reintentar {failedCount === 1 ? "ese" : `los ${failedCount}`}</>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400 font-semibold">
+                    ✅ Importación completa: {importedCount} producto{importedCount !== 1 ? "s" : ""} importado{importedCount !== 1 ? "s" : ""} con éxito.
+                  </p>
+                );
+              })()}
 
               <button
                 id="yupoo-import-btn"
@@ -3209,8 +3292,8 @@ function AdminProductosPage() {
           <button
             onClick={() => setActiveTab("todos")}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm ${activeTab === "todos"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
           >
             <PackagePlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -3222,16 +3305,16 @@ function AdminProductosPage() {
           <button
             onClick={() => setActiveTab("ofertas")}
             className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm ${activeTab === "ofertas"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
           >
             <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary fill-primary/20" />
             <span>Ofertas del Día</span>
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] sm:text-xs font-bold ${activeOffersCount > 0
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground"
                 }`}
             >
               {activeOffersCount}
@@ -3467,8 +3550,8 @@ function AdminProductosPage() {
                                                   type="button"
                                                   onClick={() => void handleToggleVariantStock(v.id, String(v.stock ?? "SI"))}
                                                   className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all shrink-0 ${isVarNoStock
-                                                      ? "bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20"
-                                                      : "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20"
+                                                    ? "bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20"
+                                                    : "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20"
                                                     }`}
                                                 >
                                                   {isVarNoStock ? "Sin stock" : "Con stock"}
@@ -3512,8 +3595,8 @@ function AdminProductosPage() {
                                   key={item}
                                   onClick={() => setAdminPage(item as number)}
                                   className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${adminPage === item
-                                      ? "border-primary bg-primary text-primary-foreground"
-                                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
                                     }`}
                                 >
                                   {item}
