@@ -1478,48 +1478,6 @@ function extractAlbumLinks(html: string, baseOrigin: string): { albumUrl: string
   return results;
 }
 
-/**
- * Extrae un mapa { albumId → título } del HTML de una página de búsqueda/galería Yupoo.
- * Busca patrones típicos de los bloques de álbum: el nombre aparece en clases como
- * "album__main", "album__name", o links href="/albums/{id}" con texto visible adyacente.
- */
-function extractAlbumTitlesFromList(html: string): Record<string, string> {
-  const titles: Record<string, string> = {};
-
-  // Patrón 1: el título en el mismo bloque que el link (texto inmediatamente después del href)
-  // Ejemplo: <a href="/albums/12345">Camiseta Boca</a>
-  const linkWithTitle = /href="\/albums\/(\d+)[^"]*"[^>]*>([^<]{2,120})</g;
-  let m: RegExpExecArray | null;
-  while ((m = linkWithTitle.exec(html)) !== null) {
-    const id = m[1];
-    const raw = m[2].trim().replace(/\s+/g, " ");
-    if (raw && !titles[id]) {
-      titles[id] = raw;
-    }
-  }
-
-  // Patrón 2: JSON incrustado en scripts (Yupoo a veces expone metadata en window.__INITIAL_STATE__)
-  const jsonMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*(\{.+?\});/s);
-  if (jsonMatch) {
-    try {
-      const state = JSON.parse(jsonMatch[1]) as Record<string, unknown>;
-      // Recorrer recursivamente buscando objetos con id + name que parezcan álbumes
-      function walkForAlbums(obj: unknown): void {
-        if (!obj || typeof obj !== "object") return;
-        if (Array.isArray(obj)) { for (const item of obj) walkForAlbums(item); return; }
-        const rec = obj as Record<string, unknown>;
-        if (typeof rec["id"] === "number" && typeof rec["name"] === "string" && (rec["name"] as string).length > 1) {
-          titles[String(rec["id"])] = (rec["name"] as string).trim();
-        }
-        for (const val of Object.values(rec)) walkForAlbums(val);
-      }
-      walkForAlbums(state);
-    } catch { /* JSON inválido, ignorar */ }
-  }
-
-  return titles;
-}
-
 export const parseYupooPage = createServerFn({ method: "POST" })
   .validator(
     (data: { email?: string; token?: string; url: string; password?: string }) => ({
@@ -1582,19 +1540,28 @@ export const parseYupooPage = createServerFn({ method: "POST" })
           return { error: "No se encontraron álbumes en la página. Verificá la URL y la contraseña." };
         }
 
-        // Retornar todos los álbumes usando el thumbnail ya extraído del HTML de la lista.
-        // Los títulos se obtienen del propio HTML de la lista (más rápido) o del path de la URL,
-        // evitando el cuello de botella de hacer un fetch individual por cada álbum.
-        const albumTitles = extractAlbumTitlesFromList(html);
-        const albums: YupooAlbumPreview[] = rawAlbums.map(({ albumUrl, thumbnail }) => {
-          // Intentar obtener el título del mapa extraído del HTML de la lista
-          const idMatch = albumUrl.match(/\/albums\/(\d+)/);
-          const albumId = idMatch ? idMatch[1] : "";
-          const title = (albumId && albumTitles[albumId])
-            ? albumTitles[albumId]
-            : (albumUrl.split("/").pop()?.split("?")[0] ?? "Producto");
-          return { albumUrl, title, thumbnail };
-        });
+        // Enriquecer con título (fetch en paralelo, hasta 5 simultáneos para no saturar)
+        const MAX_TITLE_FETCH = 30; // límite para no exceder tiempo de worker
+        const toFetch = rawAlbums.slice(0, MAX_TITLE_FETCH);
+
+        const albums: YupooAlbumPreview[] = await Promise.all(
+          toFetch.map(async ({ albumUrl, thumbnail }) => {
+            try {
+              const aRes = await fetch(albumUrl, { headers, signal: AbortSignal.timeout(8000) });
+              const aHtml = await aRes.text();
+              const title = extractAlbumTitle(aHtml) || albumUrl.split("/").pop() || "Producto";
+              // Si no tenemos thumbnail, intentar desde el HTML del álbum
+              const images = extractAlbumImages(aHtml);
+              return {
+                albumUrl,
+                title,
+                thumbnail: thumbnail || images[0] || "",
+              };
+            } catch {
+              return { albumUrl, title: albumUrl.split("/").pop() ?? "Producto", thumbnail };
+            }
+          }),
+        );
 
         return { albums };
       } catch (err) {

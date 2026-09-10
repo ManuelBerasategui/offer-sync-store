@@ -33,7 +33,7 @@ import {
   type YupooAlbumPreview,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 
 export const Route = createFileRoute("/admin/productos")({
@@ -261,11 +261,10 @@ function ImageDropzone({
           }
         }}
         onClick={() => inputRef.current?.click()}
-        className={`relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 transition-colors ${
-          dragging
+        className={`relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 transition-colors ${dragging
             ? "border-primary bg-primary/5"
             : "border-border hover:border-primary/50 hover:bg-muted/30"
-        }`}
+          }`}
         style={{ minHeight: 120 }}
       >
         <input
@@ -403,7 +402,7 @@ function PriceModal({
   // Cálculos en vivo para el precio principal
   const numBase = Number(basePrice.replace(/[^\d.-]/g, "")) || 0;
   const surchargeAmt = numBase > 0 ? (sourceCurrency === "USD" ? Math.round(numBase * 0.07 * 100) / 100 : Math.round(numBase * 0.07)) : 0;
-  
+
   let finalUsd = 0;
   let finalArs = 0;
 
@@ -536,11 +535,10 @@ function PriceModal({
                     }
                   }
                 }}
-                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${
-                  sourceCurrency === "USD"
+                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${sourceCurrency === "USD"
                     ? "bg-primary text-primary-foreground border-primary shadow-sm"
                     : "bg-card text-muted-foreground border-border hover:bg-muted"
-                }`}
+                  }`}
               >
                 <span>💵 Dólares (USDT)</span>
                 {sourceCurrency === "USD" && <Check className="h-3.5 w-3.5" />}
@@ -556,11 +554,10 @@ function PriceModal({
                     }
                   }
                 }}
-                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${
-                  sourceCurrency === "ARS"
+                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${sourceCurrency === "ARS"
                     ? "bg-primary text-primary-foreground border-primary shadow-sm"
                     : "bg-card text-muted-foreground border-border hover:bg-muted"
-                }`}
+                  }`}
               >
                 <span>🇦🇷 Pesos (ARS)</span>
                 {sourceCurrency === "ARS" && <Check className="h-3.5 w-3.5" />}
@@ -634,22 +631,20 @@ function PriceModal({
                   <button
                     type="button"
                     onClick={() => setOfferSourceCurrency("USD")}
-                    className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${
-                      offerSourceCurrency === "USD"
+                    className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${offerSourceCurrency === "USD"
                         ? "bg-primary/20 text-primary border-primary"
                         : "bg-card text-muted-foreground border-border"
-                    }`}
+                      }`}
                   >
                     Oferta en USD
                   </button>
                   <button
                     type="button"
                     onClick={() => setOfferSourceCurrency("ARS")}
-                    className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${
-                      offerSourceCurrency === "ARS"
+                    className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${offerSourceCurrency === "ARS"
                         ? "bg-primary/20 text-primary border-primary"
                         : "bg-card text-muted-foreground border-border"
-                    }`}
+                      }`}
                   >
                     Oferta en ARS
                   </button>
@@ -897,12 +892,12 @@ function ProductModal({
       variants: (prev.variants ?? []).map((v, idx) =>
         idx === i
           ? {
-              ...v,
-              precio_usd: val,
-              precio_base: val,
-              moneda_base: "USD",
-              ...(calculatedArs ? { precio: String(calculatedArs) } : {}),
-            }
+            ...v,
+            precio_usd: val,
+            precio_base: val,
+            moneda_base: "USD",
+            ...(calculatedArs ? { precio: String(calculatedArs) } : {}),
+          }
           : v
       ),
     }));
@@ -920,12 +915,12 @@ function ProductModal({
       variants: (prev.variants ?? []).map((v, idx) =>
         idx === i
           ? {
-              ...v,
-              precio: val,
-              precio_base: val,
-              moneda_base: "ARS",
-              ...(calculatedUsd !== "" ? { precio_usd: calculatedUsd } : {}),
-            }
+            ...v,
+            precio: val,
+            precio_base: val,
+            moneda_base: "ARS",
+            ...(calculatedUsd !== "" ? { precio_usd: calculatedUsd } : {}),
+          }
           : v
       ),
     }));
@@ -1052,13 +1047,12 @@ function ProductModal({
                     whatsapp_only_reason: isCurrentlyWa ? "" : "china",
                   }));
                 }}
-                className={`flex items-center justify-between rounded-xl border p-3 cursor-pointer transition-all ${
-                  form.whatsapp_only_reason === "china" || form.whatsapp_only_reason === "whatsapp_only"
+                className={`flex items-center justify-between rounded-xl border p-3 cursor-pointer transition-all ${form.whatsapp_only_reason === "china" || form.whatsapp_only_reason === "whatsapp_only"
                     ? "border-emerald-500/50 bg-emerald-500/10 shadow-xs"
                     : form.whatsapp_only_reason
-                    ? "border-primary/40 bg-primary/5"
-                    : "border-border bg-surface/50 hover:bg-surface"
-                }`}
+                      ? "border-primary/40 bg-primary/5"
+                      : "border-border bg-surface/50 hover:bg-surface"
+                  }`}
               >
                 <div className="flex items-center gap-2.5">
                   <span className="text-xl">💬</span>
@@ -1072,14 +1066,12 @@ function ProductModal({
                   </div>
                 </div>
                 <div
-                  className={`h-5 w-9 rounded-full p-0.5 transition-colors shrink-0 ${
-                    Boolean(form.whatsapp_only_reason) ? "bg-emerald-600" : "bg-muted-foreground/30"
-                  }`}
+                  className={`h-5 w-9 rounded-full p-0.5 transition-colors shrink-0 ${Boolean(form.whatsapp_only_reason) ? "bg-emerald-600" : "bg-muted-foreground/30"
+                    }`}
                 >
                   <div
-                    className={`h-4 w-4 rounded-full bg-white transition-transform ${
-                      Boolean(form.whatsapp_only_reason) ? "translate-x-4" : "translate-x-0"
-                    }`}
+                    className={`h-4 w-4 rounded-full bg-white transition-transform ${Boolean(form.whatsapp_only_reason) ? "translate-x-4" : "translate-x-0"
+                      }`}
                   />
                 </div>
               </div>
@@ -1151,12 +1143,14 @@ function ProductModal({
                 <div>
                   <label className="label-sm">Precio Base USD (u$d {form.whatsapp_only_reason ? "- opcional" : ""})</label>
                   <input className="input-base" value={form.precio_usd ?? ""} onChange={(e) => handlePriceUsdChange(e.target.value)} placeholder={form.whatsapp_only_reason ? "Opcional (Ej: 50)" : "Ej: 50"} />
-                  {(() => { const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                    <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                      <Sparkles className="h-3 w-3 shrink-0" />
-                      <span>Precio final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
-                    </div>
-                  ) : null; })()}
+                  {(() => {
+                    const raw = Number(String(form.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                      <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        <Sparkles className="h-3 w-3 shrink-0" />
+                        <span>Precio final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
+                      </div>
+                    ) : null;
+                  })()}
                   {Boolean(form.precio_usd?.trim()) && dolarRate > 0 && (
                     <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
                       <Zap className="h-3 w-3 shrink-0" />
@@ -1167,12 +1161,14 @@ function ProductModal({
                 <div>
                   <label className="label-sm">Precio Base ARS ($ {form.whatsapp_only_reason ? "- opcional" : ""})</label>
                   <input className="input-base" value={form.precio} onChange={(e) => handlePriceArsChange(e.target.value)} placeholder={form.whatsapp_only_reason ? "Opcional (Ej: 80000)" : "Ej: 80000"} />
-                  {(() => { const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && !form.precio_usd?.trim() ? (
-                    <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                      <Sparkles className="h-3 w-3 shrink-0" />
-                      <span>Precio final ARS (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
-                    </div>
-                  ) : null; })()}
+                  {(() => {
+                    const raw = Number(String(form.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 && !form.precio_usd?.trim() ? (
+                      <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        <Sparkles className="h-3 w-3 shrink-0" />
+                        <span>Precio final ARS (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
                 <div>
                   <label className="label-sm">Precio oferta Base USD (u$d - opcional)</label>
@@ -1204,7 +1200,7 @@ function ProductModal({
                   // Auto-set tipo_talles según el tipo de venta WA-only
                   const autoTalles: "ZAPATILLAS" | "ROPA" | "NINGUNO" =
                     reason === "zapatillas" ? "ZAPATILLAS" :
-                    reason === "remeras"    ? "ROPA"       : "NINGUNO";
+                      reason === "remeras" ? "ROPA" : "NINGUNO";
                   setForm((prev) => ({
                     ...prev,
                     whatsapp_only_reason: reason,
@@ -1247,14 +1243,12 @@ function ProductModal({
               <label key={field} className="flex cursor-pointer items-center gap-2 text-sm font-medium capitalize">
                 <div
                   onClick={() => set(field, form[field] === "SI" ? "NO" : "SI")}
-                  className={`h-5 w-9 rounded-full p-0.5 transition-colors ${
-                    form[field] === "SI" ? "bg-primary" : "bg-muted-foreground/30"
-                  }`}
+                  className={`h-5 w-9 rounded-full p-0.5 transition-colors ${form[field] === "SI" ? "bg-primary" : "bg-muted-foreground/30"
+                    }`}
                 >
                   <div
-                    className={`h-4 w-4 rounded-full bg-white transition-transform ${
-                      form[field] === "SI" ? "translate-x-4" : "translate-x-0"
-                    }`}
+                    className={`h-4 w-4 rounded-full bg-white transition-transform ${form[field] === "SI" ? "translate-x-4" : "translate-x-0"
+                      }`}
                   />
                 </div>
                 <span>{field}</span>
@@ -1338,11 +1332,10 @@ function ProductModal({
                         set("talles_disponibles", []);
                       }
                     }}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all border ${
-                      form.tipo_talles === tipo
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all border ${form.tipo_talles === tipo
                         ? "bg-primary text-primary-foreground border-primary shadow-xs"
                         : "bg-card text-muted-foreground border-border hover:bg-muted"
-                    }`}
+                      }`}
                   >
                     {tipo === "NINGUNO" ? "Sin talles" : tipo === "ZAPATILLAS" ? "👟 Zapatillas (35-45)" : "👕 Ropa (XS-XXXL)"}
                   </button>
@@ -1372,11 +1365,10 @@ function ProductModal({
                             : [...normalizedCurrent, talle];
                           set("talles_disponibles", next);
                         }}
-                        className={`h-8 min-w-9 rounded-lg px-2 text-xs font-bold transition-all border ${
-                          active
+                        className={`h-8 min-w-9 rounded-lg px-2 text-xs font-bold transition-all border ${active
                             ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
                             : "bg-card text-muted-foreground border-border hover:bg-muted"
-                        }`}
+                          }`}
                       >
                         {talle} {active ? "✓" : ""}
                       </button>
@@ -1413,29 +1405,33 @@ function ProductModal({
                       <label className="label-sm">Stock (SI / NO)</label>
                       <input className="input-base" value={String(v.stock ?? "SI")} onChange={(e) => updateVariant(i, "stock", e.target.value)} />
                     </div>
-                    
+
                     {/* Precios de variante solo en alta nueva */}
                     {!form.id ? (
                       <>
                         <div>
                           <label className="label-sm">Precio Base USD (u$d - opcional)</label>
                           <input className="input-base" value={String(v.precio_usd ?? "")} onChange={(e) => updateVariantPriceUsd(i, e.target.value)} placeholder="Ej: 50 (opcional)" />
-                          {(() => { const raw = Number(String(v.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                            <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                              <Sparkles className="h-2.5 w-2.5 shrink-0" />
-                              <span>Final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
-                            </div>
-                          ) : null; })()}
+                          {(() => {
+                            const raw = Number(String(v.precio_usd ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                              <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                <Sparkles className="h-2.5 w-2.5 shrink-0" />
+                                <span>Final (+7%): <strong>u$d {(Math.round(raw * 1.07 * 100) / 100).toFixed(2)}</strong></span>
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                         <div>
                           <label className="label-sm">Precio Base ARS (opcional)</label>
                           <input className="input-base" value={String(v.precio ?? "")} onChange={(e) => updateVariantPriceArs(i, e.target.value)} placeholder="Ej: 80000 (opcional)" />
-                          {!v.precio_usd && (() => { const raw = Number(String(v.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
-                            <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                              <Sparkles className="h-2.5 w-2.5 shrink-0" />
-                              <span>Final (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
-                            </div>
-                          ) : null; })()}
+                          {!v.precio_usd && (() => {
+                            const raw = Number(String(v.precio ?? "").replace(/[^\d.-]/g, "")); return raw > 0 ? (
+                              <div className="mt-1 flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                <Sparkles className="h-2.5 w-2.5 shrink-0" />
+                                <span>Final (+7%): <strong>${Math.round(raw * 1.07).toLocaleString("es-AR")}</strong></span>
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       </>
                     ) : (
@@ -1465,13 +1461,12 @@ function ProductModal({
                                   : [...normalizedCurrent, talle];
                                 updateVariant(i, "talles_disponibles", next);
                               }}
-                              className={`h-7 min-w-8 rounded-md px-1.5 text-[10px] font-bold transition-all border ${
-                                active
+                              className={`h-7 min-w-8 rounded-md px-1.5 text-[10px] font-bold transition-all border ${active
                                   ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
                                   : "bg-muted/40 text-muted-foreground/60 border-border opacity-60 hover:opacity-100"
-                              }`}
+                                }`}
                             >
-                               {talle} {active ? "✓" : ""}
+                              {talle} {active ? "✓" : ""}
                             </button>
                           );
                         })}
@@ -2176,11 +2171,10 @@ function ComboBuilderPanel({
                       }
                     }
                   }}
-                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${
-                    sourceCurrency === "USD"
+                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${sourceCurrency === "USD"
                       ? "bg-primary text-primary-foreground border-primary shadow-xs"
                       : "bg-card text-muted-foreground border-border hover:bg-muted"
-                  }`}
+                    }`}
                 >
                   <span>💵 Dólares (USD)</span>
                   {sourceCurrency === "USD" && <Check className="h-3.5 w-3.5" />}
@@ -2195,11 +2189,10 @@ function ComboBuilderPanel({
                       }
                     }
                   }}
-                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${
-                    sourceCurrency === "ARS"
+                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition-all border ${sourceCurrency === "ARS"
                       ? "bg-primary text-primary-foreground border-primary shadow-xs"
                       : "bg-card text-muted-foreground border-border hover:bg-muted"
-                  }`}
+                    }`}
                 >
                   <span>🇦🇷 Pesos (ARS)</span>
                   {sourceCurrency === "ARS" && <Check className="h-3.5 w-3.5" />}
@@ -2504,11 +2497,10 @@ function OfertasDelDiaPanel({
         <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-xl border border-border flex-wrap">
           <button
             onClick={() => { setSubTab("activas"); setSearch(""); }}
-            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
-              subTab === "activas"
+            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${subTab === "activas"
                 ? "bg-card text-foreground shadow-xs border border-border"
                 : "text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             <Flame className="h-3.5 w-3.5 text-primary fill-primary/20" />
             Ofertas por Producto
@@ -2518,22 +2510,20 @@ function OfertasDelDiaPanel({
           </button>
           <button
             onClick={() => { setSubTab("combos"); setSearch(""); }}
-            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
-              subTab === "combos"
+            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${subTab === "combos"
                 ? "bg-card text-foreground shadow-xs border border-border"
                 : "text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             Armador de Combos & Packs
           </button>
           <button
             onClick={() => { setSubTab("agregar"); setSearch(""); }}
-            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
-              subTab === "agregar"
+            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${subTab === "agregar"
                 ? "bg-card text-foreground shadow-xs border border-border"
                 : "text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             <Plus className="h-3.5 w-3.5 text-primary" />
             Poner Producto en Oferta
@@ -2628,6 +2618,22 @@ function OfertasDelDiaPanel({
 /*  Importador Yupoo                                         */
 /* ───────────────────────────────────────────────────────── */
 
+/** Sanitización estricta contra DOM-based XSS (CWE-79) para URLs externas de imágenes. */
+function isSafeHttpUrl(url?: string | null): boolean {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim().toLowerCase();
+  return (trimmed.startsWith("https://") || trimmed.startsWith("http://")) && !trimmed.startsWith("javascript:");
+}
+
+function cleanImageUrl(url?: string | null): string {
+  if (!url || typeof url !== "string" || !isSafeHttpUrl(url)) return "";
+  try {
+    return encodeURI(url.trim());
+  } catch {
+    return "";
+  }
+}
+
 type ImportStatus = "idle" | "pending" | "ok" | "error";
 type AlbumRow = YupooAlbumPreview & { selected: boolean; status: ImportStatus; statusMsg: string };
 
@@ -2674,7 +2680,7 @@ function YupooImporter({
         setAlbums(
           (res.albums ?? []).map((a) => ({
             ...a,
-            thumbnail: sanitizeImageUrl(a.thumbnail),
+            thumbnail: cleanImageUrl(a.thumbnail),
             selected: true,
             status: "idle" as ImportStatus,
             statusMsg: "",
@@ -2725,10 +2731,10 @@ function YupooImporter({
             prev.map((a) =>
               a.albumUrl === album.albumUrl
                 ? {
-                    ...a,
-                    status: "ok",
-                    statusMsg: `✅ ${res.imageCount} foto${res.imageCount !== 1 ? "s" : ""}`,
-                  }
+                  ...a,
+                  status: "ok",
+                  statusMsg: `✅ ${res.imageCount} foto${res.imageCount !== 1 ? "s" : ""}`,
+                }
                 : a
             )
           );
@@ -2831,7 +2837,7 @@ function YupooImporter({
                 value={maxImages}
                 onChange={(e) => setMaxImages(e.target.value)}
               >
-                {[1,2,3,4,5,6,8,10,12].map((n) => (
+                {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </select>
@@ -2890,10 +2896,9 @@ function YupooImporter({
                 {albums.map((album) => (
                   <div
                     key={album.albumUrl}
-                    className={`flex items-center gap-3 px-3 py-2 transition-colors ${
-                      album.status === "ok" ? "bg-emerald-50/50 dark:bg-emerald-950/20" :
-                      album.status === "error" ? "bg-red-50/50 dark:bg-red-950/20" : ""
-                    }`}
+                    className={`flex items-center gap-3 px-3 py-2 transition-colors ${album.status === "ok" ? "bg-emerald-50/50 dark:bg-emerald-950/20" :
+                        album.status === "error" ? "bg-red-50/50 dark:bg-red-950/20" : ""
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -2908,9 +2913,9 @@ function YupooImporter({
                       }
                       className="h-4 w-4 rounded accent-primary shrink-0"
                     />
-                    {sanitizeImageUrl(album.thumbnail) ? (
+                    {isSafeHttpUrl(album.thumbnail) ? (
                       <img
-                        src={sanitizeImageUrl(album.thumbnail)}
+                        src={cleanImageUrl(album.thumbnail)}
                         alt=""
                         referrerPolicy="no-referrer"
                         className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border bg-muted"
@@ -2926,10 +2931,9 @@ function YupooImporter({
                     <div className="flex items-center gap-1.5 shrink-0">
                       {statusIcon(album.status)}
                       {album.statusMsg && (
-                        <span className={`text-[10px] font-semibold ${
-                          album.status === "error" ? "text-red-500" :
-                          album.status === "ok" ? "text-emerald-600" : "text-muted-foreground"
-                        }`}>
+                        <span className={`text-[10px] font-semibold ${album.status === "error" ? "text-red-500" :
+                            album.status === "ok" ? "text-emerald-600" : "text-muted-foreground"
+                          }`}>
                           {album.statusMsg}
                         </span>
                       )}
@@ -3204,11 +3208,10 @@ function AdminProductosPage() {
         <div className="mt-4 flex border-b border-border">
           <button
             onClick={() => setActiveTab("todos")}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm ${
-              activeTab === "todos"
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm ${activeTab === "todos"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             <PackagePlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             <span>Catálogo General</span>
@@ -3218,20 +3221,18 @@ function AdminProductosPage() {
           </button>
           <button
             onClick={() => setActiveTab("ofertas")}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm ${
-              activeTab === "ofertas"
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm ${activeTab === "ofertas"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary fill-primary/20" />
             <span>Ofertas del Día</span>
             <span
-              className={`rounded-full px-2 py-0.5 text-[10px] sm:text-xs font-bold ${
-                activeOffersCount > 0
+              className={`rounded-full px-2 py-0.5 text-[10px] sm:text-xs font-bold ${activeOffersCount > 0
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground"
-              }`}
+                }`}
             >
               {activeOffersCount}
             </span>
@@ -3300,236 +3301,234 @@ function AdminProductosPage() {
                     </div>
                   ) : (
                     <>
-                    <table className="w-full min-w-[480px] text-sm">
-                      <thead className="border-b border-border bg-muted/50">
-                        <tr>
-                          <th className="px-3 py-3 text-center w-10">
-                            <input
-                              type="checkbox"
-                              checked={paginatedFiltered.length > 0 && paginatedFiltered.every((p) => selectedIds.includes(String(p.id)))}
-                              onChange={toggleSelectAll}
-                              className="h-4 w-4 rounded border-border text-primary accent-primary cursor-pointer"
-                              title="Seleccionar todos en esta página"
-                            />
-                          </th>
-                          <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Imagen</th>
-                          <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Nombre</th>
-                          <th className="hidden px-4 py-3 text-left font-semibold text-muted-foreground sm:table-cell">Categoría</th>
-                          <th className="hidden px-4 py-3 text-right font-semibold text-muted-foreground sm:table-cell">Precio</th>
-                          <th className="px-3 py-3 text-center font-semibold text-muted-foreground sm:px-4">Estado</th>
-                          <th className="px-3 py-3 text-right font-semibold text-muted-foreground sm:px-4">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {paginatedFiltered.map((p) => {
-                          const pid = String(p.id ?? "");
-                          const isOffer = String(p.oferta ?? "").trim().toUpperCase() === "SI";
-                          const isSelected = selectedIds.includes(pid);
-                          const isExpanded = Boolean(expandedVariants[pid]);
-                          const variantsList = p.variants ?? [];
+                      <table className="w-full min-w-[480px] text-sm">
+                        <thead className="border-b border-border bg-muted/50">
+                          <tr>
+                            <th className="px-3 py-3 text-center w-10">
+                              <input
+                                type="checkbox"
+                                checked={paginatedFiltered.length > 0 && paginatedFiltered.every((p) => selectedIds.includes(String(p.id)))}
+                                onChange={toggleSelectAll}
+                                className="h-4 w-4 rounded border-border text-primary accent-primary cursor-pointer"
+                                title="Seleccionar todos en esta página"
+                              />
+                            </th>
+                            <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Imagen</th>
+                            <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Nombre</th>
+                            <th className="hidden px-4 py-3 text-left font-semibold text-muted-foreground sm:table-cell">Categoría</th>
+                            <th className="hidden px-4 py-3 text-right font-semibold text-muted-foreground sm:table-cell">Precio</th>
+                            <th className="px-3 py-3 text-center font-semibold text-muted-foreground sm:px-4">Estado</th>
+                            <th className="px-3 py-3 text-right font-semibold text-muted-foreground sm:px-4">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {paginatedFiltered.map((p) => {
+                            const pid = String(p.id ?? "");
+                            const isOffer = String(p.oferta ?? "").trim().toUpperCase() === "SI";
+                            const isSelected = selectedIds.includes(pid);
+                            const isExpanded = Boolean(expandedVariants[pid]);
+                            const variantsList = p.variants ?? [];
 
-                          return (
-                            <Fragment key={pid}>
-                              <tr className={`hover:bg-muted/20 transition-colors ${isSelected ? "bg-primary/5" : ""}`}>
-                                <td className="px-3 py-3 text-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => toggleSelectOne(pid)}
-                                    className="h-4 w-4 rounded border-border text-primary accent-primary cursor-pointer"
-                                  />
-                                </td>
-                                <td
-                                  className="px-3 py-3 sm:px-4 cursor-pointer"
-                                  onClick={() => setModal(productToInput(p))}
-                                >
-                                  <img
-                                    src={encodeURI(imageUrl(p.imagen_url) || FALLBACK_IMAGE)}
-                                    alt={p.nombre}
-                                    className="h-10 w-10 rounded-lg object-cover hover:opacity-80 transition-opacity"
-                                    onError={onImageError(p.imagen_url)}
-                                  />
-                                </td>
-                                <td className="px-3 py-3 sm:px-4 font-medium max-w-[180px] sm:max-w-none">
-                                  <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-1.5 flex-wrap cursor-pointer hover:text-primary transition-colors" onClick={() => setModal(productToInput(p))}>
-                                      <span>{p.nombre}</span>
-                                      {isOffer && (
-                                        <span className="rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-bold flex items-center gap-0.5 border border-primary/20 shrink-0">
-                                          <Flame className="h-3 w-3 fill-primary" /> Oferta
-                                        </span>
-                                      )}
-                                    </div>
-                                    
-                                    {/* Precio en Celular */}
-                                    <div className="text-xs font-bold text-primary sm:hidden">
-                                      {isOffer && p.precio_oferta ? (
-                                        <span className="flex items-center gap-1">
-                                          <span>{money(p.precio_oferta)}</span>
-                                          <span className="line-through text-[10px] text-muted-foreground font-normal">{money(p.precio)}</span>
-                                        </span>
-                                      ) : (
-                                        <span>{money(p.precio)}</span>
-                                      )}
-                                    </div>
-
-                                    {/* Botón para desplegar variantes de colores */}
-                                    {variantsList.length > 0 && (
-                                      <div className="mt-0.5">
-                                        <button
-                                          type="button"
-                                          onClick={() => toggleExpandVariants(pid)}
-                                          className="inline-flex items-center gap-1 rounded-md bg-muted/80 hover:bg-primary/20 hover:text-primary px-2 py-0.5 text-[10px] font-bold text-muted-foreground transition-colors"
-                                        >
-                                          <span>🎨 {variantsList.length} colores</span>
-                                          {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                        </button>
+                            return (
+                              <Fragment key={pid}>
+                                <tr className={`hover:bg-muted/20 transition-colors ${isSelected ? "bg-primary/5" : ""}`}>
+                                  <td className="px-3 py-3 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => toggleSelectOne(pid)}
+                                      className="h-4 w-4 rounded border-border text-primary accent-primary cursor-pointer"
+                                    />
+                                  </td>
+                                  <td
+                                    className="px-3 py-3 sm:px-4 cursor-pointer"
+                                    onClick={() => setModal(productToInput(p))}
+                                  >
+                                    <img
+                                      src={encodeURI(imageUrl(p.imagen_url) || FALLBACK_IMAGE)}
+                                      alt={p.nombre}
+                                      className="h-10 w-10 rounded-lg object-cover hover:opacity-80 transition-opacity"
+                                      onError={onImageError(p.imagen_url)}
+                                    />
+                                  </td>
+                                  <td className="px-3 py-3 sm:px-4 font-medium max-w-[180px] sm:max-w-none">
+                                    <div className="flex flex-col gap-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap cursor-pointer hover:text-primary transition-colors" onClick={() => setModal(productToInput(p))}>
+                                        <span>{p.nombre}</span>
+                                        {isOffer && (
+                                          <span className="rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-bold flex items-center gap-0.5 border border-primary/20 shrink-0">
+                                            <Flame className="h-3 w-3 fill-primary" /> Oferta
+                                          </span>
+                                        )}
                                       </div>
+
+                                      {/* Precio en Celular */}
+                                      <div className="text-xs font-bold text-primary sm:hidden">
+                                        {isOffer && p.precio_oferta ? (
+                                          <span className="flex items-center gap-1">
+                                            <span>{money(p.precio_oferta)}</span>
+                                            <span className="line-through text-[10px] text-muted-foreground font-normal">{money(p.precio)}</span>
+                                          </span>
+                                        ) : (
+                                          <span>{money(p.precio)}</span>
+                                        )}
+                                      </div>
+
+                                      {/* Botón para desplegar variantes de colores */}
+                                      {variantsList.length > 0 && (
+                                        <div className="mt-0.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleExpandVariants(pid)}
+                                            className="inline-flex items-center gap-1 rounded-md bg-muted/80 hover:bg-primary/20 hover:text-primary px-2 py-0.5 text-[10px] font-bold text-muted-foreground transition-colors"
+                                          >
+                                            <span>🎨 {variantsList.length} colores</span>
+                                            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
+                                  <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
+                                    {isOffer && p.precio_oferta ? (
+                                      <div className="flex flex-col items-end">
+                                        <span className="font-bold text-primary">{money(p.precio_oferta)}</span>
+                                        <span className="line-through text-[11px] text-muted-foreground">{money(p.precio)}</span>
+                                      </div>
+                                    ) : (
+                                      money(p.precio)
                                     )}
-                                  </div>
-                                </td>
-                                <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
-                                <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
-                                  {isOffer && p.precio_oferta ? (
-                                    <div className="flex flex-col items-end">
-                                      <span className="font-bold text-primary">{money(p.precio_oferta)}</span>
-                                      <span className="line-through text-[11px] text-muted-foreground">{money(p.precio)}</span>
-                                    </div>
-                                  ) : (
-                                    money(p.precio)
-                                  )}
-                                </td>
-                                <td className="px-3 py-3 sm:px-4 text-center">
-                                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${String(p.stock ?? "").toUpperCase() === "NO" ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>
-                                    {String(p.stock ?? "SI").toUpperCase() === "NO" ? "Sin stock" : "Con stock"}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-3 sm:px-4">
-                                  <div className="flex items-center justify-end gap-1 sm:gap-1.5">
-                                    <button
-                                      onClick={() => setPriceModalProduct(p)}
-                                      className="rounded-lg p-1.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-                                      title="Editar precio"
-                                    >
-                                      <DollarSign className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => setModal(productToInput(p))}
-                                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
-                                      title="Editar datos del producto"
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => void handleDelete(pid)}
-                                      disabled={deletingId === pid}
-                                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
-                                      title="Eliminar"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-
-                              {/* Sub-fila de Variantes de Color */}
-                              {isExpanded && variantsList.length > 0 && (
-                                <tr className="bg-muted/30">
-                                  <td colSpan={7} className="px-4 py-3 border-t border-dashed border-border/80">
-                                    <div className="space-y-2">
-                                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                                        Variantes de color ({variantsList.length}):
-                                      </p>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                        {variantsList.map((v) => {
-                                          const isVarNoStock = String(v.stock ?? "SI").toUpperCase() === "NO";
-                                          return (
-                                            <div
-                                              key={v.id}
-                                              className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card p-2 px-3 text-xs shadow-xs"
-                                            >
-                                              <div className="flex items-center gap-2 min-w-0">
-                                                {v.imagen_url && (
-                                                  <img
-                                                    src={encodeURI(imageUrl(v.imagen_url) || FALLBACK_IMAGE)}
-                                                    alt={v.color}
-                                                    className="h-7 w-7 rounded-lg object-cover border border-border shrink-0"
-                                                    onError={onImageError(v.imagen_url)}
-                                                  />
-                                                )}
-                                                <div className="min-w-0">
-                                                  <p className="font-bold text-foreground truncate">{v.color}</p>
-                                                  <p className="text-[10px] text-muted-foreground">{money(v.precio)}</p>
-                                                </div>
-                                              </div>
-                                              <button
-                                                type="button"
-                                                onClick={() => void handleToggleVariantStock(v.id, String(v.stock ?? "SI"))}
-                                                className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all shrink-0 ${
-                                                  isVarNoStock
-                                                    ? "bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20"
-                                                    : "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20"
-                                                }`}
-                                              >
-                                                {isVarNoStock ? "Sin stock" : "Con stock"}
-                                              </button>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
+                                  </td>
+                                  <td className="px-3 py-3 sm:px-4 text-center">
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${String(p.stock ?? "").toUpperCase() === "NO" ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>
+                                      {String(p.stock ?? "SI").toUpperCase() === "NO" ? "Sin stock" : "Con stock"}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-3 sm:px-4">
+                                    <div className="flex items-center justify-end gap-1 sm:gap-1.5">
+                                      <button
+                                        onClick={() => setPriceModalProduct(p)}
+                                        className="rounded-lg p-1.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                                        title="Editar precio"
+                                      >
+                                        <DollarSign className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => setModal(productToInput(p))}
+                                        className="rounded-lg p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                                        title="Editar datos del producto"
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => void handleDelete(pid)}
+                                        disabled={deletingId === pid}
+                                        className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40"
+                                        title="Eliminar"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
                                     </div>
                                   </td>
                                 </tr>
-                              )}
-                            </Fragment>
-                          );
-                        })}
-                      </tbody>
-                    </table>
 
-                    {/* Paginación admin */}
-                    {adminTotalPages > 1 && (
-                      <div className="flex items-center justify-center gap-1.5 flex-wrap border-t border-border px-4 py-3 bg-muted/20">
-                        <button
-                          onClick={() => setAdminPage((p) => Math.max(1, p - 1))}
-                          disabled={adminPage === 1}
-                          className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
-                          ← Anterior
-                        </button>
-                        {Array.from({ length: adminTotalPages }, (_, i) => i + 1)
-                          .filter((n) => n === 1 || n === adminTotalPages || Math.abs(n - adminPage) <= 2)
-                          .reduce<(number | "...")[]>((acc, n, idx, arr) => {
-                            if (idx > 0 && (arr[idx - 1] as number) < n - 1) acc.push("...");
-                            acc.push(n);
-                            return acc;
-                          }, [])
-                          .map((item, idx) =>
-                            item === "..." ? (
-                              <span key={`ellipsis-${idx}`} className="px-1 text-muted-foreground text-xs">…</span>
-                            ) : (
-                              <button
-                                key={item}
-                                onClick={() => setAdminPage(item as number)}
-                                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                                  adminPage === item
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                                }`}
-                              >
-                                {item}
-                              </button>
-                            )
-                          )}
-                        <button
-                          onClick={() => setAdminPage((p) => Math.min(adminTotalPages, p + 1))}
-                          disabled={adminPage === adminTotalPages}
-                          className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
-                          Siguiente →
-                        </button>
-                      </div>
-                    )}
+                                {/* Sub-fila de Variantes de Color */}
+                                {isExpanded && variantsList.length > 0 && (
+                                  <tr className="bg-muted/30">
+                                    <td colSpan={7} className="px-4 py-3 border-t border-dashed border-border/80">
+                                      <div className="space-y-2">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                                          Variantes de color ({variantsList.length}):
+                                        </p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                          {variantsList.map((v) => {
+                                            const isVarNoStock = String(v.stock ?? "SI").toUpperCase() === "NO";
+                                            return (
+                                              <div
+                                                key={v.id}
+                                                className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card p-2 px-3 text-xs shadow-xs"
+                                              >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                  {v.imagen_url && (
+                                                    <img
+                                                      src={encodeURI(imageUrl(v.imagen_url) || FALLBACK_IMAGE)}
+                                                      alt={v.color}
+                                                      className="h-7 w-7 rounded-lg object-cover border border-border shrink-0"
+                                                      onError={onImageError(v.imagen_url)}
+                                                    />
+                                                  )}
+                                                  <div className="min-w-0">
+                                                    <p className="font-bold text-foreground truncate">{v.color}</p>
+                                                    <p className="text-[10px] text-muted-foreground">{money(v.precio)}</p>
+                                                  </div>
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => void handleToggleVariantStock(v.id, String(v.stock ?? "SI"))}
+                                                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all shrink-0 ${isVarNoStock
+                                                      ? "bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20"
+                                                      : "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20"
+                                                    }`}
+                                                >
+                                                  {isVarNoStock ? "Sin stock" : "Con stock"}
+                                                </button>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+
+                      {/* Paginación admin */}
+                      {adminTotalPages > 1 && (
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap border-t border-border px-4 py-3 bg-muted/20">
+                          <button
+                            onClick={() => setAdminPage((p) => Math.max(1, p - 1))}
+                            disabled={adminPage === 1}
+                            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            ← Anterior
+                          </button>
+                          {Array.from({ length: adminTotalPages }, (_, i) => i + 1)
+                            .filter((n) => n === 1 || n === adminTotalPages || Math.abs(n - adminPage) <= 2)
+                            .reduce<(number | "...")[]>((acc, n, idx, arr) => {
+                              if (idx > 0 && (arr[idx - 1] as number) < n - 1) acc.push("...");
+                              acc.push(n);
+                              return acc;
+                            }, [])
+                            .map((item, idx) =>
+                              item === "..." ? (
+                                <span key={`ellipsis-${idx}`} className="px-1 text-muted-foreground text-xs">…</span>
+                              ) : (
+                                <button
+                                  key={item}
+                                  onClick={() => setAdminPage(item as number)}
+                                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${adminPage === item
+                                      ? "border-primary bg-primary text-primary-foreground"
+                                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    }`}
+                                >
+                                  {item}
+                                </button>
+                              )
+                            )}
+                          <button
+                            onClick={() => setAdminPage((p) => Math.min(adminTotalPages, p + 1))}
+                            disabled={adminPage === adminTotalPages}
+                            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Siguiente →
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
