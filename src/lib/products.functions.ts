@@ -1580,12 +1580,14 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       albumUrl: string;
       password?: string;
       maxImages?: number;
+      category?: string;
     }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
       albumUrl: str(data?.albumUrl, 500).trim(),
       password: str(data?.password ?? "", 100).trim(),
       maxImages: Math.min(Math.max(Number(data?.maxImages ?? 8), 1), 12),
+      category: str(data?.category ?? "China", 100).trim() || "China",
     }),
   )
   .handler(
@@ -1677,11 +1679,14 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         // Crear el producto
         const imagen_url = uploadedUrls[0]!;
         const extra_images = uploadedUrls.slice(1);
+        const targetCategory = data.category || "China";
 
         const metadata: Record<string, unknown> = {
           whatsapp_only_reason: "china",
           extra_images: extra_images.length > 0 ? extra_images : undefined,
           yupoo_url: data.albumUrl,
+          source: "yupoo",
+          imported_from: "yupoo",
         };
 
         const newId = crypto.randomUUID();
@@ -1690,7 +1695,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
           .insert({
             id: newId,
             nombre: title,
-            categoria: "China",
+            categoria: targetCategory,
             precio: null,
             precio_usd: null,
             descripcion: "",

@@ -9,6 +9,7 @@ import {
   type MoqInfo,
   sanitizeImageUrl,
   galleryImages,
+  waOnlyReasonOf,
 } from "./store";
 
 /* ══════════════════════════════════════════════════════════════════
@@ -461,5 +462,39 @@ describe("galleryImages helper", () => {
     const imgs = galleryImages(p);
     expect(imgs.length).toBe(1);
     expect(imgs[0]).toBe("https://photo.yupoo.com/main.jpg");
+  });
+});
+
+describe("waOnlyReasonOf with Yupoo and custom categories", () => {
+  it("recognizes products with custom category (e.g. Camisetas) as 'china' when imported from Yupoo", () => {
+    const productWithMeta = {
+      nombre: "Camiseta Boca Juniors 2024",
+      categoria: "Camisetas",
+      metadata: {
+        whatsapp_only_reason: "china",
+        source: "yupoo",
+        yupoo_url: "https://16620059194.x.yupoo.com/albums/123",
+      },
+    };
+    expect(waOnlyReasonOf(productWithMeta)).toBe("china");
+  });
+
+  it("recognizes products with top-level source='yupoo' or yupoo_url even if whatsapp_only_reason is missing", () => {
+    const product = {
+      nombre: "Camiseta Retro 1998",
+      categoria: "Camisetas Retro",
+      source: "yupoo",
+      yupoo_url: "https://16620059194.x.yupoo.com/albums/456",
+    };
+    expect(waOnlyReasonOf(product)).toBe("china");
+  });
+
+  it("does not flag regular non-Yupoo products with custom categories", () => {
+    const normalProduct = {
+      nombre: "Camiseta Deportiva Normal",
+      categoria: "Camisetas",
+      precio: 25000,
+    };
+    expect(waOnlyReasonOf(normalProduct)).toBeNull();
   });
 });

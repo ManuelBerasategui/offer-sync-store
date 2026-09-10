@@ -2634,14 +2634,17 @@ type AlbumRow = YupooAlbumPreview & { selected: boolean; status: ImportStatus; s
 function YupooImporter({
   userEmail,
   userToken,
+  existingCategories = [],
   onImported,
 }: {
   userEmail: string;
   userToken: string;
+  existingCategories?: string[];
   onImported: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
+  const [category, setCategory] = useState("China");
   const [password, setPassword] = useState("");
   const [maxImages, setMaxImages] = useState("8");
   const [searching, setSearching] = useState(false);
@@ -2705,6 +2708,7 @@ function YupooImporter({
             albumUrl: album.albumUrl,
             password: password.trim(),
             maxImages: Number(maxImages) || 8,
+            category: category.trim() || "China",
           },
         });
         if (res.error) {
@@ -2762,7 +2766,7 @@ function YupooImporter({
           <span className="text-lg">🇨🇳</span>
           <div>
             <p className="text-sm font-bold text-foreground">Importar de Yupoo</p>
-            <p className="text-xs text-muted-foreground">Cargá productos chinos en bulk desde cualquier catálogo Yupoo</p>
+            <p className="text-xs text-muted-foreground">Cargá productos en bulk asignando categoría propia y modo WhatsApp automático</p>
           </div>
         </div>
         <span className="text-muted-foreground">{open ? "▲" : "▼"}</span>
@@ -2770,8 +2774,8 @@ function YupooImporter({
 
       {open && (
         <div className="border-t border-border px-4 py-4 sm:px-5 sm:py-5 space-y-4">
-          {/* URL + Contraseña */}
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+          {/* URL + Categoría + Contraseña + Fotos */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.5fr_1.2fr_auto_auto]">
             <div>
               <label className="label-sm">URL de Yupoo *</label>
               <input
@@ -2784,6 +2788,31 @@ function YupooImporter({
               />
             </div>
             <div>
+              <label className="label-sm">Categoría para estos productos *</label>
+              <input
+                id="yupoo-category"
+                className="input-base"
+                list="yupoo-categories-list"
+                placeholder="Ej: Camisetas, Zapatillas China..."
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+              <datalist id="yupoo-categories-list">
+                {Array.from(
+                  new Set([
+                    "China",
+                    "Camisetas",
+                    "Zapatillas",
+                    "Ropa",
+                    "Accesorios",
+                    ...existingCategories,
+                  ])
+                ).map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </div>
+            <div>
               <label className="label-sm">Contraseña</label>
               <input
                 id="yupoo-password"
@@ -2794,7 +2823,7 @@ function YupooImporter({
               />
             </div>
             <div>
-              <label className="label-sm">Fotos / producto</label>
+              <label className="label-sm">Fotos / prod</label>
               <select
                 id="yupoo-max-images"
                 className="input-base"
@@ -2806,6 +2835,13 @@ function YupooImporter({
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl bg-muted/40 border border-border/70 px-3.5 py-2.5 text-xs text-muted-foreground">
+            <span className="text-base">💡</span>
+            <span>
+              Categoría destino: <strong className="text-foreground font-semibold">"{category.trim() || "China"}"</strong>. Cada producto se creará con el botón <strong>"Consultar por WhatsApp"</strong> y precio a consultar.
+            </span>
           </div>
 
           <button
@@ -3131,6 +3167,10 @@ function AdminProductosPage() {
     );
   }
 
+  const existingCategories = useMemo(() => {
+    return Array.from(new Set(products.map((p) => String(p.categoria ?? "").trim()).filter(Boolean))).sort();
+  }, [products]);
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader config={config} />
@@ -3156,6 +3196,7 @@ function AdminProductosPage() {
           <YupooImporter
             userEmail={userEmail}
             userToken={userToken}
+            existingCategories={existingCategories}
             onImported={() => void loadProducts()}
           />
         </div>

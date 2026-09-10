@@ -849,6 +849,15 @@ export function waOnlyReasonOf(product: Record<string, unknown>): WaOnlyReason |
     return "whatsapp_only";
   }
 
+  // Si proviene de Yupoo o tiene yupoo_url, siempre es WhatsApp Only (modo China)
+  if (
+    product["source"] === "yupoo" ||
+    product["imported_from"] === "yupoo" ||
+    Boolean(product["yupoo_url"])
+  ) {
+    return "china";
+  }
+
   // Dentro de metadata (raw, por si acaso)
   const meta = product["metadata"];
   if (meta && typeof meta === "object" && !Array.isArray(meta)) {
@@ -860,6 +869,13 @@ export function waOnlyReasonOf(product: Record<string, unknown>): WaOnlyReason |
     }
     if (m["es_zapatilla"] === true || String(m["es_zapatilla"] ?? "").toLowerCase() === "true") {
       return "zapatillas";
+    }
+    if (
+      m["source"] === "yupoo" ||
+      m["imported_from"] === "yupoo" ||
+      Boolean(m["yupoo_url"])
+    ) {
+      return "china";
     }
   }
 
