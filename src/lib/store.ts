@@ -193,6 +193,24 @@ export function onImageError(raw?: string) {
 
 export const FALLBACK_IMAGE = "https://placehold.co/600x600/f4f4f5/71717a?text=Sin+imagen";
 
+/**
+ * Retorna el array completo de imágenes del producto:
+ * [imagen_url principal, ...extra_images de metadata].
+ * Los productos importados de Yupoo pueden tener varias fotos en extra_images.
+ */
+export function galleryImages(product: Product): string[] {
+  const main = product.imagen_url ? [product.imagen_url] : [];
+  const extra = (product as Record<string, unknown>)["extra_images"];
+  if (Array.isArray(extra)) {
+    const extraUrls = (extra as unknown[])
+      .map((u) => String(u ?? "").trim())
+      .filter(Boolean);
+    return [...main, ...extraUrls];
+  }
+  return main;
+}
+
+
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
 
 export function sanitizeUrl(url?: string | null): string {

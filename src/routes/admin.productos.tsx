@@ -25,9 +25,12 @@ import {
   bulkUpdateAdminStock,
   updateVariantStock,
   calcArsFromUsd,
+  parseYupooPage,
+  importYupooAlbum,
   type ProductInput,
   type VariantInput,
   type BannerInput,
+  type YupooAlbumPreview,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
 import { money, toNumber, FALLBACK_IMAGE, imageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
@@ -2622,6 +2625,325 @@ function OfertasDelDiaPanel({
 }
 
 /* ───────────────────────────────────────────────────────── */
+/*  Importador Yupoo                                         */
+/* ───────────────────────────────────────────────────────── */
+
+type ImportStatus = "idle" | "pending" | "ok" | "error";
+type AlbumRow = YupooAlbumPreview & { selected: boolean; status: ImportStatus; statusMsg: string };
+
+function YupooImporter({
+  userEmail,
+  userToken,
+  onImported,
+}: {
+  userEmail: string;
+  userToken: string;
+  onImported: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const [password, setPassword] = useState("");
+  const [maxImages, setMaxImages] = useState("8");
+  const [searching, setSearching] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [albums, setAlbums] = useState<AlbumRow[]>([]);
+  const [searchError, setSearchError] = useState("");
+  const [importDone, setImportDone] = useState(false);
+
+  const allSelected = albums.length > 0 && albums.every((a) => a.selected);
+  const someSelected = albums.some((a) => a.selected);
+  const selectedCount = albums.filter((a) => a.selected).length;
+  const importedCount = albums.filter((a) => a.status === "ok").length;
+
+  async function handleSearch() {
+    if (!url.trim()) return;
+    setSearching(true);
+    setSearchError("");
+    setAlbums([]);
+    setImportDone(false);
+    try {
+      const res = await parseYupooPage({
+        data: { email: userEmail, token: userToken, url: url.trim(), password: password.trim() },
+      });
+      if (res.error) {
+        setSearchError(res.error);
+      } else {
+        setAlbums(
+          (res.albums ?? []).map((a) => ({
+            ...a,
+            selected: true,
+            status: "idle" as ImportStatus,
+            statusMsg: "",
+          }))
+        );
+      }
+    } catch (e) {
+      setSearchError(e instanceof Error ? e.message : "Error al buscar.");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function handleImport() {
+    const toImport = albums.filter((a) => a.selected && a.status !== "ok");
+    if (toImport.length === 0) return;
+    setImporting(true);
+    setImportDone(false);
+
+    for (const album of toImport) {
+      // Marcar como pendiente
+      setAlbums((prev) =>
+        prev.map((a) =>
+          a.albumUrl === album.albumUrl ? { ...a, status: "pending", statusMsg: "Importando…" } : a
+        )
+      );
+      try {
+        const res = await importYupooAlbum({
+          data: {
+            email: userEmail,
+            token: userToken,
+            albumUrl: album.albumUrl,
+            password: password.trim(),
+            maxImages: Number(maxImages) || 8,
+          },
+        });
+        if (res.error) {
+          setAlbums((prev) =>
+            prev.map((a) =>
+              a.albumUrl === album.albumUrl
+                ? { ...a, status: "error", statusMsg: res.error ?? "Error" }
+                : a
+            )
+          );
+        } else {
+          setAlbums((prev) =>
+            prev.map((a) =>
+              a.albumUrl === album.albumUrl
+                ? {
+                    ...a,
+                    status: "ok",
+                    statusMsg: `✅ ${res.imageCount} foto${res.imageCount !== 1 ? "s" : ""}`,
+                  }
+                : a
+            )
+          );
+        }
+      } catch (e) {
+        setAlbums((prev) =>
+          prev.map((a) =>
+            a.albumUrl === album.albumUrl
+              ? { ...a, status: "error", statusMsg: e instanceof Error ? e.message : "Error" }
+              : a
+          )
+        );
+      }
+    }
+    setImporting(false);
+    setImportDone(true);
+    onImported();
+  }
+
+  const statusIcon = (s: ImportStatus) => {
+    if (s === "pending") return <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />;
+    if (s === "ok") return <span className="text-emerald-500">✅</span>;
+    if (s === "error") return <span className="text-red-500">❌</span>;
+    return null;
+  };
+
+  return (
+    <div className="mb-6 rounded-2xl border border-border bg-card overflow-hidden">
+      {/* Header colapsable */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-4 py-3 sm:px-5 sm:py-4 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🇨🇳</span>
+          <div>
+            <p className="text-sm font-bold text-foreground">Importar de Yupoo</p>
+            <p className="text-xs text-muted-foreground">Cargá productos chinos en bulk desde cualquier catálogo Yupoo</p>
+          </div>
+        </div>
+        <span className="text-muted-foreground">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="border-t border-border px-4 py-4 sm:px-5 sm:py-5 space-y-4">
+          {/* URL + Contraseña */}
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+            <div>
+              <label className="label-sm">URL de Yupoo *</label>
+              <input
+                id="yupoo-url"
+                className="input-base"
+                placeholder="https://16620059194.x.yupoo.com/search/album?q=boca"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void handleSearch(); }}
+              />
+            </div>
+            <div>
+              <label className="label-sm">Contraseña</label>
+              <input
+                id="yupoo-password"
+                className="input-base"
+                placeholder="Ej: 111333"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label-sm">Fotos / producto</label>
+              <select
+                id="yupoo-max-images"
+                className="input-base"
+                value={maxImages}
+                onChange={(e) => setMaxImages(e.target.value)}
+              >
+                {[1,2,3,4,5,6,8,10,12].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button
+            id="yupoo-search-btn"
+            type="button"
+            disabled={!url.trim() || searching}
+            onClick={() => void handleSearch()}
+            className="btn-base bg-primary text-primary-foreground flex items-center gap-2 disabled:opacity-50"
+          >
+            {searching ? (
+              <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />Buscando…</>
+            ) : (
+              <>🔍 Buscar productos</>
+            )}
+          </button>
+
+          {searchError && (
+            <p className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 px-3 py-2 text-xs text-red-700 dark:text-red-400">
+              {searchError}
+            </p>
+          )}
+
+          {/* Tabla de resultados */}
+          {albums.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  {albums.length} producto{albums.length !== 1 ? "s" : ""} encontrado{albums.length !== 1 ? "s" : ""}
+                  {selectedCount !== albums.length && ` · ${selectedCount} seleccionado${selectedCount !== 1 ? "s" : ""}`}
+                </p>
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e) =>
+                      setAlbums((prev) => prev.map((a) => ({ ...a, selected: e.target.checked })))
+                    }
+                    className="h-3.5 w-3.5 rounded accent-primary"
+                  />
+                  Seleccionar todos
+                </label>
+              </div>
+
+              <div className="max-h-72 overflow-y-auto rounded-xl border border-border divide-y divide-border">
+                {albums.map((album) => (
+                  <div
+                    key={album.albumUrl}
+                    className={`flex items-center gap-3 px-3 py-2 transition-colors ${
+                      album.status === "ok" ? "bg-emerald-50/50 dark:bg-emerald-950/20" :
+                      album.status === "error" ? "bg-red-50/50 dark:bg-red-950/20" : ""
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={album.selected}
+                      disabled={album.status === "ok" || importing}
+                      onChange={(e) =>
+                        setAlbums((prev) =>
+                          prev.map((a) =>
+                            a.albumUrl === album.albumUrl ? { ...a, selected: e.target.checked } : a
+                          )
+                        )
+                      }
+                      className="h-4 w-4 rounded accent-primary shrink-0"
+                    />
+                    {album.thumbnail ? (
+                      <img
+                        src={album.thumbnail}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border bg-muted"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg bg-muted shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">{album.title}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{album.albumUrl}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {statusIcon(album.status)}
+                      {album.statusMsg && (
+                        <span className={`text-[10px] font-semibold ${
+                          album.status === "error" ? "text-red-500" :
+                          album.status === "ok" ? "text-emerald-600" : "text-muted-foreground"
+                        }`}>
+                          {album.statusMsg}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Barra de progreso */}
+              {importing && (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    Importando {importedCount} de {selectedCount}…
+                  </p>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-300"
+                      style={{ width: `${selectedCount > 0 ? (importedCount / selectedCount) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {importDone && (
+                <p className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400 font-semibold">
+                  ✅ Importación completa: {importedCount} producto{importedCount !== 1 ? "s" : ""} importado{importedCount !== 1 ? "s" : ""} con éxito.
+                </p>
+              )}
+
+              <button
+                id="yupoo-import-btn"
+                type="button"
+                disabled={!someSelected || importing}
+                onClick={() => void handleImport()}
+                className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 disabled:opacity-50"
+              >
+                {importing ? (
+                  <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />Importando…</>
+                ) : (
+                  <>📥 Importar {selectedCount} producto{selectedCount !== 1 ? "s" : ""}</>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────── */
 /*  Página principal                                         */
 /* ───────────────────────────────────────────────────────── */
 
@@ -2826,7 +3148,17 @@ function AdminProductosPage() {
           }
         />
 
+        {/* Importador Yupoo */}
+        <div className="mt-4">
+          <YupooImporter
+            userEmail={userEmail}
+            userToken={userToken}
+            onImported={() => void loadProducts()}
+          />
+        </div>
+
         {/* Navigation Tabs Interas (Catálogo vs Ofertas) */}
+
         <div className="mt-4 flex border-b border-border">
           <button
             onClick={() => setActiveTab("todos")}

@@ -23,6 +23,7 @@ import {
   discountFor,
   findProduct,
   imageUrl,
+  galleryImages,
   isSuplemento,
   onImageError,
   isWhatsappOnly,
@@ -52,6 +53,72 @@ import {
   checkCategoryMins,
   type ProductVariant,
 } from "@/lib/store";
+
+/** Galería de imágenes interactiva con miniaturas clickeables. */
+function ProductGallery({
+  images,
+  productName,
+  selectedVariantImage,
+}: {
+  images: string[];
+  productName: string;
+  selectedVariantImage?: string | null;
+}) {
+  // Si hay imagen de variante, la ponemos primero; si no, usamos las del producto
+  const allImages = selectedVariantImage
+    ? [selectedVariantImage, ...images.filter((u) => u !== selectedVariantImage)]
+    : images;
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  // Resetear al cambiar variante
+  useEffect(() => { setActiveIdx(0); }, [selectedVariantImage]);
+
+  const current = allImages[activeIdx] ?? allImages[0] ?? "";
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Imagen principal */}
+      <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-2xl border border-border bg-surface lg:sticky lg:top-24">
+        <img
+          key={current}
+          src={imageUrl(current) || FALLBACK_IMAGE}
+          alt={`${productName} — foto ${activeIdx + 1}`}
+          decoding="async"
+          referrerPolicy="no-referrer"
+          className="aspect-square w-full bg-surface object-contain p-3 transition-opacity duration-200"
+          onError={onImageError(current)}
+        />
+      </div>
+      {/* Strip de miniaturas (solo si hay más de 1 foto) */}
+      {allImages.length > 1 && (
+        <div className="mx-auto flex max-w-[460px] gap-2 overflow-x-auto pb-1">
+          {allImages.map((url, i) => (
+            <button
+              key={url + i}
+              type="button"
+              onClick={() => setActiveIdx(i)}
+              aria-label={`Ver foto ${i + 1}`}
+              className={[
+                "shrink-0 h-16 w-16 rounded-lg border-2 overflow-hidden bg-surface transition-all",
+                i === activeIdx
+                  ? "border-primary shadow-md scale-105"
+                  : "border-border opacity-60 hover:opacity-100 hover:border-primary/50",
+              ].join(" ")}
+            >
+              <img
+                src={imageUrl(url) || FALLBACK_IMAGE}
+                alt={`Miniatura ${i + 1}`}
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-contain p-0.5"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/producto/$id")({
   loader: async ({ context, params }) => {
@@ -420,16 +487,11 @@ function ProductoPage() {
         </div>
 
         <div className="mt-6 grid gap-8 lg:grid-cols-2 lg:items-start">
-          <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-2xl border border-border bg-surface lg:sticky lg:top-24">
-            <img
-              src={imageUrl(selectedImage) || FALLBACK_IMAGE}
-              alt={product.nombre ?? "Producto"}
-              decoding="async"
-              referrerPolicy="no-referrer"
-              className="aspect-square w-full bg-surface object-contain p-3"
-              onError={onImageError(selectedImage)}
-            />
-          </div>
+          <ProductGallery
+            images={galleryImages(product)}
+            productName={product.nombre ?? "Producto"}
+            selectedVariantImage={selectedVariant?.imagen_url}
+          />
 
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[2px] text-muted-foreground">

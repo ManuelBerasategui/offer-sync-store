@@ -1318,3 +1318,386 @@ export const updateVariantStock = createServerFn({ method: "POST" })
   });
 
 
+/* ─── Yupoo — Parseo de página (Fase 1: rápida) ─────────── */
+
+export type YupooAlbumPreview = {
+  albumUrl: string;
+  title: string;
+  thumbnail: string;
+};
+
+/**
+ * Helpers internos para Yupoo scraping.
+ * Trabajan con fetch nativo (compatible con Cloudflare Workers).
+ */
+
+/** Valida que la URL pertenezca estrictamente a un hostname de Yupoo (anti-SSRF / CWE-918). */
+function assertYupooUrl(rawUrl: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl.trim());
+  } catch {
+    throw new Error("URL de Yupoo inválida.");
+  }
+  if (parsed.protocol !== "https:") throw new Error("La URL debe usar HTTPS.");
+  const hostname = parsed.hostname.toLowerCase();
+  // Solo *.yupoo.com — previene bypass con parámetros de query o path (CWE-918)
+  if (!hostname.endsWith(".yupoo.com") || hostname.startsWith(".")) {
+    throw new Error("La URL debe pertenecer a un dominio Yupoo (*.yupoo.com).");
+  }
+  return parsed;
+}
+
+const YUPOO_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+
+/** Intenta autenticarse con contraseña en un store Yupoo. Retorna la cookie de sesión o null. */
+async function yupooAuth(baseUrl: string, password: string): Promise<string | null> {
+  try {
+    // Obtener el formulario de contraseña para extraer el CSRF token si existe
+    const pageRes = await fetch(baseUrl, {
+      headers: { "User-Agent": YUPOO_UA },
+      redirect: "follow",
+      signal: AbortSignal.timeout(10000),
+    });
+    const pageHtml = await pageRes.text();
+
+    // Extraer el _csrf token del form si lo hay
+    const csrfMatch = pageHtml.match(/name="_csrf"\s+value="([^"]+)"/);
+    const csrf = csrfMatch ? csrfMatch[1] : "";
+
+    // Construir URL del endpoint de autenticación
+    const origin = new URL(baseUrl).origin;
+    const authUrl = `${origin}/password`;
+
+    const body = new URLSearchParams({ password });
+    if (csrf) body.set("_csrf", csrf);
+
+    const authRes = await fetch(authUrl, {
+      method: "POST",
+      headers: {
+        "User-Agent": YUPOO_UA,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Referer: baseUrl,
+        "Cookie": pageRes.headers.get("set-cookie")?.split(";")[0] ?? "",
+      },
+      body: body.toString(),
+      redirect: "manual",
+      signal: AbortSignal.timeout(10000),
+    });
+
+    // Recopilar cookies de autenticación
+    const rawCookies = authRes.headers.get("set-cookie") ?? "";
+    if (rawCookies) {
+      // Extraer solo el par nombre=valor de cada cookie
+      const cookiePairs = rawCookies
+        .split(/,(?=[^ ])/g)
+        .map((c) => c.trim().split(";")[0] ?? "")
+        .filter(Boolean)
+        .join("; ");
+      return cookiePairs;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Extrae el título limpio del álbum del HTML de la página. */
+function extractAlbumTitle(html: string): string {
+  // Clase específica de título de álbum
+  const specificMatch = html.match(/class="showalbumheader__gallerytitle"[^>]*>([^<]+)</);
+  if (specificMatch) return specificMatch[1].trim();
+  // Fallback: buscar en las clases que contienen "title"
+  const titleMatches = [...html.matchAll(/class="[^"]*title[^"]*"[^>]*>([^<]+)</gi)];
+  for (const m of titleMatches) {
+    const t = m[1].trim();
+    // Filtrar los que son el título de la página entera (contienen pipe)
+    if (t && !t.includes("|") && t.length > 2 && t.length < 200) return t;
+  }
+  // Fallback último: <title> tag, primera parte antes del pipe
+  const titleTag = html.match(/<title>([^<]+)<\/title>/i);
+  if (titleTag) return titleTag[1].split("|")[0].trim();
+  return "";
+}
+
+/** Extrae todas las URLs de imágenes de alta resolución de un álbum Yupoo. */
+function extractAlbumImages(html: string): string[] {
+  const urls: string[] = [];
+  const regex = /data-origin-src="([^"]+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(html)) !== null) {
+    const url = m[1].trim();
+    if (url.startsWith("http")) urls.push(url);
+  }
+  return [...new Set(urls)]; // deduplicar
+}
+
+/** Extrae los links de álbumes individuales de una página de búsqueda/galería Yupoo. */
+function extractAlbumLinks(html: string, baseOrigin: string): { albumUrl: string; thumbnail: string }[] {
+  const results: { albumUrl: string; thumbnail: string }[] = [];
+  const seen = new Set<string>();
+
+  // Patrón de URL de álbum: /albums/{id}?...
+  const albumRegex = /href="(\/albums\/\d+[^"]*?)"/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = albumRegex.exec(html)) !== null) {
+    const path = m[1];
+    const albumUrl = `${baseOrigin}${path}`;
+
+    if (seen.has(albumUrl)) continue;
+    seen.add(albumUrl);
+
+    // Buscar thumbnail cercano (data-origin-src o src dentro del mismo bloque)
+    const idx = m.index;
+    const block = html.slice(Math.max(0, idx - 200), idx + 400);
+    const thumbMatch =
+      block.match(/data-origin-src="([^"]+)"/) ||
+      block.match(/src="(https?:\/\/photo\.yupoo\.com[^"]+)"/);
+    const thumbnail = thumbMatch ? thumbMatch[1] : "";
+
+    results.push({ albumUrl, thumbnail });
+  }
+
+  return results;
+}
+
+export const parseYupooPage = createServerFn({ method: "POST" })
+  .validator(
+    (data: { email?: string; token?: string; url: string; password?: string }) => ({
+      email: str(data?.email, 160).toLowerCase(),
+      token: str(data?.token, 2000),
+      url: str(data?.url, 500).trim(),
+      password: str(data?.password ?? "", 100).trim(),
+    }),
+  )
+  .handler(
+    async ({ data }): Promise<{ albums?: YupooAlbumPreview[]; error?: string }> => {
+      try {
+        await assertAdmin(data.email, data.token);
+
+        const rawUrl = data.url;
+        // Validación estricta anti-SSRF: el hostname debe terminar en .yupoo.com
+        let parsed: URL;
+        try {
+          parsed = assertYupooUrl(rawUrl);
+        } catch (e) {
+          return { error: e instanceof Error ? e.message : "URL inválida." };
+        }
+        const origin = parsed.origin;
+
+        // Autenticación si hay contraseña
+        let sessionCookie = "";
+        if (data.password) {
+          sessionCookie = (await yupooAuth(rawUrl, data.password)) ?? "";
+        }
+
+        const headers: Record<string, string> = { "User-Agent": YUPOO_UA };
+        if (sessionCookie) headers["Cookie"] = sessionCookie;
+
+        // Detectar si es página de álbum individual
+        const isSingleAlbum = /\/albums\/\d+/.test(parsed.pathname);
+
+        if (isSingleAlbum) {
+          // Modo single: parsear directamente el álbum
+          const res = await fetch(rawUrl, { headers, signal: AbortSignal.timeout(15000) });
+          const html = await res.text();
+          const title = extractAlbumTitle(html);
+          const images = extractAlbumImages(html);
+          return {
+            albums: [
+              {
+                albumUrl: rawUrl,
+                title: title || "Producto sin título",
+                thumbnail: images[0] ?? "",
+              },
+            ],
+          };
+        }
+
+        // Modo lista: search/gallery/home
+        const res = await fetch(rawUrl, { headers, signal: AbortSignal.timeout(15000) });
+        const html = await res.text();
+
+        const rawAlbums = extractAlbumLinks(html, origin);
+        if (rawAlbums.length === 0) {
+          return { error: "No se encontraron álbumes en la página. Verificá la URL y la contraseña." };
+        }
+
+        // Enriquecer con título (fetch en paralelo, hasta 5 simultáneos para no saturar)
+        const MAX_TITLE_FETCH = 30; // límite para no exceder tiempo de worker
+        const toFetch = rawAlbums.slice(0, MAX_TITLE_FETCH);
+
+        const albums: YupooAlbumPreview[] = await Promise.all(
+          toFetch.map(async ({ albumUrl, thumbnail }) => {
+            try {
+              const aRes = await fetch(albumUrl, { headers, signal: AbortSignal.timeout(8000) });
+              const aHtml = await aRes.text();
+              const title = extractAlbumTitle(aHtml) || albumUrl.split("/").pop() || "Producto";
+              // Si no tenemos thumbnail, intentar desde el HTML del álbum
+              const images = extractAlbumImages(aHtml);
+              return {
+                albumUrl,
+                title,
+                thumbnail: thumbnail || images[0] || "",
+              };
+            } catch {
+              return { albumUrl, title: albumUrl.split("/").pop() ?? "Producto", thumbnail };
+            }
+          }),
+        );
+
+        return { albums };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "Error al procesar la página de Yupoo." };
+      }
+    },
+  );
+
+/* ─── Yupoo — Importar un álbum (Fase 2: por producto) ───── */
+
+export const importYupooAlbum = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      email?: string;
+      token?: string;
+      albumUrl: string;
+      password?: string;
+      maxImages?: number;
+    }) => ({
+      email: str(data?.email, 160).toLowerCase(),
+      token: str(data?.token, 2000),
+      albumUrl: str(data?.albumUrl, 500).trim(),
+      password: str(data?.password ?? "", 100).trim(),
+      maxImages: Math.min(Math.max(Number(data?.maxImages ?? 8), 1), 12),
+    }),
+  )
+  .handler(
+    async ({
+      data,
+    }): Promise<{ productId?: string; nombre?: string; imageCount?: number; error?: string }> => {
+      try {
+        const supabaseAdmin = await assertAdmin(data.email, data.token);
+
+        // Validación estricta anti-SSRF del albumUrl
+        let safeAlbumUrl: URL;
+        try {
+          safeAlbumUrl = assertYupooUrl(data.albumUrl);
+        } catch (e) {
+          return { error: e instanceof Error ? e.message : "URL inválida." };
+        }
+
+        // Auth si hay contraseña
+        let sessionCookie = "";
+        if (data.password) {
+          sessionCookie = (await yupooAuth(safeAlbumUrl.href, data.password)) ?? "";
+        }
+
+        const headers: Record<string, string> = { "User-Agent": YUPOO_UA };
+        if (sessionCookie) headers["Cookie"] = sessionCookie;
+
+        // Fetch del álbum — usando safeAlbumUrl.href (URL validada) para cortar el taint flow
+        const res = await fetch(safeAlbumUrl.href, { headers, signal: AbortSignal.timeout(15000) });
+        if (!res.ok) return { error: `Error al acceder al álbum: HTTP ${res.status}` };
+        const html = await res.text();
+
+        const title = extractAlbumTitle(html) || "Producto Yupoo";
+        const imageUrls = extractAlbumImages(html).slice(0, data.maxImages);
+
+        if (imageUrls.length === 0) {
+          return { error: "No se encontraron imágenes en el álbum." };
+        }
+
+        // Asegurar que el bucket existe
+        const bucketName = "storage-images";
+        try {
+          const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+          if (!buckets?.some((b) => b.name === bucketName)) {
+            await supabaseAdmin.storage.createBucket(bucketName, { public: true });
+          }
+        } catch { /* bucket ya existe */ }
+
+        // Descargar y subir imágenes a Supabase Storage
+        const uploadedUrls: string[] = [];
+
+        for (const imgUrl of imageUrls) {
+          try {
+            const imgRes = await fetch(imgUrl, {
+              headers: { "User-Agent": YUPOO_UA, Referer: data.albumUrl },
+              signal: AbortSignal.timeout(15000),
+            });
+            if (!imgRes.ok) continue;
+
+            const buffer = await imgRes.arrayBuffer();
+            if (buffer.byteLength === 0) continue;
+
+            // Detectar content-type de la respuesta
+            const rawCt = imgRes.headers.get("content-type") ?? "image/jpeg";
+            const ct = rawCt.split(";")[0].trim();
+            const ext = ct === "image/webp" ? "webp" : ct === "image/png" ? "png" : "jpg";
+            const filename = `yupoo/${crypto.randomUUID()}.${ext}`;
+
+            const { error: uploadErr } = await supabaseAdmin.storage
+              .from(bucketName)
+              .upload(filename, buffer, {
+                contentType: ct,
+                cacheControl: "31536000",
+                upsert: false,
+              });
+
+            if (uploadErr) continue;
+
+            const { data: pubData } = supabaseAdmin.storage
+              .from(bucketName)
+              .getPublicUrl(filename);
+            if (pubData.publicUrl) uploadedUrls.push(pubData.publicUrl);
+          } catch { /* imagen individual falló, continuar con las demás */ }
+        }
+
+        if (uploadedUrls.length === 0) {
+          return { error: "No se pudo subir ninguna imagen del álbum." };
+        }
+
+        // Crear el producto
+        const imagen_url = uploadedUrls[0]!;
+        const extra_images = uploadedUrls.slice(1);
+
+        const metadata: Record<string, unknown> = {
+          whatsapp_only_reason: "china",
+          extra_images: extra_images.length > 0 ? extra_images : undefined,
+          yupoo_url: data.albumUrl,
+        };
+
+        const newId = crypto.randomUUID();
+        const { data: inserted, error: insertErr } = await supabaseAdmin
+          .from("products")
+          .insert({
+            id: newId,
+            nombre: title,
+            categoria: "China",
+            precio: null,
+            precio_usd: null,
+            descripcion: "",
+            destacado: "NO",
+            oferta: "NO",
+            stock: "SI",
+            imagen_url,
+            metadata,
+          })
+          .select("id")
+          .single();
+
+        if (insertErr) throw insertErr;
+
+        return {
+          productId: String(inserted.id),
+          nombre: title,
+          imageCount: uploadedUrls.length,
+        };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : "Error al importar el álbum." };
+      }
+    },
+  );
