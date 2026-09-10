@@ -44,9 +44,24 @@ try {
  */
 export function isAllowedProxyUrl(targetUrlStr: string): URL | null {
   if (!targetUrlStr || typeof targetUrlStr !== "string") return null;
+  let cleanStr = targetUrlStr.trim();
+  try {
+    while (
+      cleanStr.includes("%25") ||
+      cleanStr.startsWith("http%3A") ||
+      cleanStr.startsWith("https%3A")
+    ) {
+      const decoded = decodeURIComponent(cleanStr);
+      if (decoded === cleanStr) break;
+      cleanStr = decoded;
+    }
+  } catch {
+    // ignore decoding errors
+  }
+
   let parsed: URL;
   try {
-    parsed = new URL(targetUrlStr.trim());
+    parsed = new URL(cleanStr);
   } catch {
     return null;
   }

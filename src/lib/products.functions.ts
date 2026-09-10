@@ -1626,6 +1626,25 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
           return { error: "No se encontraron imágenes en el álbum." };
         }
 
+        // ── Guardrail anti-duplicados ────────────────────────────────────────
+        // Verificar si ya existe un producto con el mismo nombre (case-insensitive)
+        // antes de gastar tiempo y storage subiendo imágenes.
+        {
+          const { data: existing } = await supabaseAdmin
+            .from("products")
+            .select("id, nombre")
+            .ilike("nombre", title.trim())
+            .limit(1)
+            .maybeSingle();
+
+          if (existing) {
+            return {
+              error: `Duplicado: ya existe un producto con el nombre "${existing.nombre}". Omitido.`,
+            };
+          }
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         // Asegurar que el bucket existe
         const bucketName = "storage-images";
         try {

@@ -33,7 +33,7 @@ import {
   type YupooAlbumPreview,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 
 export const Route = createFileRoute("/admin/productos")({
@@ -1649,7 +1649,7 @@ function ActiveOfferCard({
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-card p-4 sm:p-5 shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <img
-          src={encodeURI(imageUrl(product.imagen_url) || FALLBACK_IMAGE)}
+          src={sanitizeImageUrl(imageUrl(product.imagen_url)) || FALLBACK_IMAGE}
           alt={product.nombre ?? ""}
           className="h-16 w-16 rounded-xl object-cover border border-border shrink-0"
           onError={onImageError(product.imagen_url)}
@@ -1822,7 +1822,7 @@ function CandidateOfferCard({
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <img
-          src={encodeURI(imageUrl(product.imagen_url) || FALLBACK_IMAGE)}
+          src={sanitizeImageUrl(imageUrl(product.imagen_url)) || FALLBACK_IMAGE}
           alt={product.nombre ?? ""}
           className="h-14 w-14 rounded-xl object-cover border border-border shrink-0"
           onError={onImageError(product.imagen_url)}
@@ -2326,7 +2326,7 @@ function ComboBuilderPanel({
                 className="flex flex-col sm:flex-row items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all"
               >
                 <img
-                  src={encodeURI(imageUrl(b.imagen_url) || FALLBACK_IMAGE)}
+                  src={sanitizeImageUrl(imageUrl(b.imagen_url)) || FALLBACK_IMAGE}
                   alt={b.titulo ?? ""}
                   className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-contain p-1.5 bg-surface border border-border shrink-0"
                   onError={onImageError(b.imagen_url)}
@@ -2621,20 +2621,25 @@ function OfertasDelDiaPanel({
 /** Sanitización estricta contra DOM-based XSS (CWE-79) para URLs externas de imágenes. */
 function isSafeHttpUrl(url?: string | null): boolean {
   if (!url || typeof url !== "string") return false;
-  const trimmed = url.trim().toLowerCase();
-  return (trimmed.startsWith("https://") || trimmed.startsWith("http://")) && !trimmed.startsWith("javascript:");
+  try {
+    const parsed = new URL(url.trim());
+    return (parsed.protocol === "https:" || parsed.protocol === "http:") && !url.trim().toLowerCase().startsWith("javascript:");
+  } catch {
+    return false;
+  }
 }
 
 function cleanImageUrl(url?: string | null): string {
   if (!url || typeof url !== "string" || !isSafeHttpUrl(url)) return "";
   try {
-    return encodeURI(url.trim());
+    const parsed = new URL(url.trim());
+    return parsed.href;
   } catch {
     return "";
   }
 }
 
-type ImportStatus = "idle" | "pending" | "ok" | "error";
+type ImportStatus = "idle" | "pending" | "ok" | "error" | "duplicate";
 type AlbumRow = YupooAlbumPreview & { selected: boolean; status: ImportStatus; statusMsg: string };
 
 function YupooImporter({
@@ -2719,10 +2724,11 @@ function YupooImporter({
           },
         });
         if (res.error) {
+          const isDup = res.error.startsWith("Duplicado:");
           setAlbums((prev) =>
             prev.map((a) =>
               a.albumUrl === album.albumUrl
-                ? { ...a, status: "error", statusMsg: res.error ?? "Error" }
+                ? { ...a, status: isDup ? "duplicate" : "error", statusMsg: res.error ?? "Error" }
                 : a
             )
           );
@@ -2785,10 +2791,11 @@ function YupooImporter({
           },
         });
         if (res.error) {
+          const isDup = res.error.startsWith("Duplicado:");
           setAlbums((prev) =>
             prev.map((a) =>
               a.albumUrl === album.albumUrl
-                ? { ...a, status: "error", statusMsg: res.error ?? "Error" }
+                ? { ...a, status: isDup ? "duplicate" : "error", statusMsg: res.error ?? "Error" }
                 : a
             )
           );
@@ -2819,6 +2826,7 @@ function YupooImporter({
   const statusIcon = (s: ImportStatus) => {
     if (s === "pending") return <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />;
     if (s === "ok") return <span className="text-emerald-500">✅</span>;
+    if (s === "duplicate") return <span title="Duplicado">🟡</span>;
     if (s === "error") return <span className="text-red-500">❌</span>;
     return null;
   };
@@ -3021,28 +3029,39 @@ function YupooImporter({
 
               {importDone && (() => {
                 const failedCount = albums.filter((a) => a.status === "error").length;
-                return failedCount > 0 ? (
-                  <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 px-3 py-2 flex items-center justify-between gap-3">
-                    <p className="text-xs text-red-700 dark:text-red-400 font-semibold">
-                      ❌ {failedCount} producto{failedCount !== 1 ? "s" : ""} no se pudo importar.
-                    </p>
-                    <button
-                      type="button"
-                      disabled={importing}
-                      onClick={() => void handleRetryFailed()}
-                      className="shrink-0 rounded-lg bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {importing ? (
-                        <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />Reintentando…</>
-                      ) : (
-                        <>🔁 Reintentar {failedCount === 1 ? "ese" : `los ${failedCount}`}</>
-                      )}
-                    </button>
+                const dupCount = albums.filter((a) => a.status === "duplicate").length;
+                return (
+                  <div className="space-y-2">
+                    {failedCount > 0 && (
+                      <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 px-3 py-2 flex items-center justify-between gap-3">
+                        <p className="text-xs text-red-700 dark:text-red-400 font-semibold">
+                          ❌ {failedCount} producto{failedCount !== 1 ? "s" : ""} no se pudo importar.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={importing}
+                          onClick={() => void handleRetryFailed()}
+                          className="shrink-0 rounded-lg bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          {importing ? (
+                            <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />Reintentando…</>
+                          ) : (
+                            <>🔁 Reintentar {failedCount === 1 ? "ese" : `los ${failedCount}`}</>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                    {dupCount > 0 && (
+                      <p className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-400 font-semibold">
+                        🟡 {dupCount} producto{dupCount !== 1 ? "s omitidos" : " omitido"} — ya existían con el mismo nombre.
+                      </p>
+                    )}
+                    {failedCount === 0 && (
+                      <p className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400 font-semibold">
+                        ✅ Importación completa: {importedCount} producto{importedCount !== 1 ? "s" : ""} importado{importedCount !== 1 ? "s" : ""} con éxito.
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <p className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400 font-semibold">
-                    ✅ Importación completa: {importedCount} producto{importedCount !== 1 ? "s" : ""} importado{importedCount !== 1 ? "s" : ""} con éxito.
-                  </p>
                 );
               })()}
 
@@ -3428,7 +3447,7 @@ function AdminProductosPage() {
                                     onClick={() => setModal(productToInput(p))}
                                   >
                                     <img
-                                      src={encodeURI(imageUrl(p.imagen_url) || FALLBACK_IMAGE)}
+                                      src={sanitizeImageUrl(imageUrl(p.imagen_url)) || FALLBACK_IMAGE}
                                       alt={p.nombre}
                                       className="h-10 w-10 rounded-lg object-cover hover:opacity-80 transition-opacity"
                                       onError={onImageError(p.imagen_url)}
@@ -3535,7 +3554,7 @@ function AdminProductosPage() {
                                                 <div className="flex items-center gap-2 min-w-0">
                                                   {v.imagen_url && (
                                                     <img
-                                                      src={encodeURI(imageUrl(v.imagen_url) || FALLBACK_IMAGE)}
+                                                      src={sanitizeImageUrl(imageUrl(v.imagen_url)) || FALLBACK_IMAGE}
                                                       alt={v.color}
                                                       className="h-7 w-7 rounded-lg object-cover border border-border shrink-0"
                                                       onError={onImageError(v.imagen_url)}

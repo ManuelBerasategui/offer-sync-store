@@ -124,4 +124,27 @@ describe("handleImageProxy request processing", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("handles double-encoded URLs gracefully", async () => {
+    const mockImageBytes = new Uint8Array([1, 2]);
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(mockImageBytes, {
+        status: 200,
+        headers: { "content-type": "image/webp" },
+      }),
+    );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const targetUrl =
+      "https://myproj.supabase.co/storage/v1/object/public/storage-images/photo.webp";
+    const doubleEncoded = encodeURI(encodeURIComponent(targetUrl));
+    const req = new Request(`https://myshop.com/api/img?url=${doubleEncoded}`, {
+      method: "GET",
+    });
+
+    const res = await handleImageProxy(req);
+    expect(res.status).toBe(200);
+
+    vi.unstubAllGlobals();
+  });
 });
