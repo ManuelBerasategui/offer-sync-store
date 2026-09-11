@@ -541,24 +541,30 @@ function ProductoPage() {
 
                 {/* AVISO DE MÍNIMO DE COMPRA POR CATEGORÍA EN LA FICHA DEL PRODUCTO */}
                 {(() => {
-                  const catNorm = normCat(product.categoria ?? "");
-                  const ruleMatch = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
-                  const rule = ruleMatch?.rule;
-                  const hasDynMin = rule?.minAmount || rule?.minUnits;
+                  // hasMoq es la fuente de verdad: respeta moq_group, isMate con prioridad
+                  // y match por categoría como fallback. Garantiza que:
+                  //   - Mates → 10 u. (regla "mates", no "bazar")
+                  //   - Bazar (no-mate) → 5 u. (regla "bazar")
+                  //   - Tecnología → 5 u., etc.
+                  const moqDisplay = hasMoq(product as Record<string, unknown>, catRules);
 
-                  if (hasDynMin && ruleMatch) {
-                    const categoryName = ruleMatch.key.charAt(0).toUpperCase() + ruleMatch.key.slice(1);
-                    const minText = rule.minAmount ? money(rule.minAmount) : `${rule.minUnits} unidades`;
+                  if (moqDisplay?.minUnits) {
+                    const groupLabel = moqDisplay.group.charAt(0).toUpperCase() + moqDisplay.group.slice(1);
+                    const minText = `${moqDisplay.minUnits} unidades`;
+                    const mixMsg =
+                      moqDisplay.group === "mates"
+                        ? "Podés combinar distintos modelos de Mates en tu carrito hasta alcanzar el mínimo."
+                        : "Podés armar surtido con distintos productos de esta categoría para alcanzar el mínimo.";
                     return (
                       <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 sm:p-3.5 text-xs text-foreground">
                         <div className="flex items-start gap-2.5">
                           <span className="text-base shrink-0 mt-0.5">ℹ️</span>
                           <div className="min-w-0 flex-1">
                             <p className="font-bold text-amber-700 dark:text-amber-400 text-xs sm:text-sm">
-                              Compra mínima para {categoryName}: {minText}
+                              Compra mínima para {groupLabel}: {minText}
                             </p>
                             <p className="mt-0.5 text-muted-foreground leading-relaxed text-[11px] sm:text-xs">
-                              Podés combinar distintos productos de esta categoría en tu carrito hasta alcanzar el mínimo.
+                              {mixMsg}
                             </p>
                           </div>
                         </div>
@@ -566,18 +572,18 @@ function ProductoPage() {
                     );
                   }
 
-                  // Aviso especial para Mates (categoria="Bazar" pero tienen MOQ propio)
-                  if (isMate(product.nombre, product.categoria)) {
+                  if (moqDisplay?.minAmount) {
+                    const groupLabel = moqDisplay.group.charAt(0).toUpperCase() + moqDisplay.group.slice(1);
                     return (
                       <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 sm:p-3.5 text-xs text-foreground">
                         <div className="flex items-start gap-2.5">
                           <span className="text-base shrink-0 mt-0.5">ℹ️</span>
                           <div className="min-w-0 flex-1">
                             <p className="font-bold text-amber-700 dark:text-amber-400 text-xs sm:text-sm">
-                              Compra mínima para Mates: 10 unidades
+                              Compra mínima para {groupLabel}: {money(moqDisplay.minAmount)}
                             </p>
                             <p className="mt-0.5 text-muted-foreground leading-relaxed text-[11px] sm:text-xs">
-                              Podés combinar distintos modelos de Mates en tu carrito hasta alcanzar el mínimo.
+                              Podés combinar distintos productos de esta categoría en tu carrito hasta alcanzar el mínimo.
                             </p>
                           </div>
                         </div>

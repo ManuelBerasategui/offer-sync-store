@@ -223,6 +223,10 @@ function CarritoPage() {
 
   const dynamicViolations = checkCategoryMins(
     cartItemsWithCat.map((i) => {
+      // Los combos de la pantalla de inicio (id "combo-*") están exentos de cualquier mínimo de categoría.
+      if (i.id.startsWith("combo-")) {
+        return { nombre: i.nombre, categoria: i.categoria, moq_group: "none", qty: i.qty, unitPrice: i.unitPrice };
+      }
       const prod = i.productId ? findProduct(products, i.productId) : undefined;
       const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
       return { nombre: i.nombre, categoria: i.categoria, moq_group, qty: i.qty, unitPrice: i.unitPrice };

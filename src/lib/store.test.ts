@@ -271,15 +271,21 @@ describe("checkCategoryMins — moq_group explícito", () => {
     expect(v[0]!.current).toBe(9);
   });
 
-  it("9 Mates + 1 Termo (sin moq_group) → violación por 9 Mates", () => {
+  it("9 Mates (moq_group='mates') + 1 Termo (sin moq_group, Bazar) → 2 violaciones: Mates Y Bazar", () => {
+    // Con la regla Bazar (mín 5 u.), el Termo también genera violación de Bazar.
+    // El Mate va directo a 'mates' por moq_group explícito → no interfiere con 'bazar'.
     const items = [
       item("Mate Silicona", "Bazar", 9, 100, "mates"),
       item("Termo Stanley", "Bazar", 1, 100, undefined),
     ];
     const v = checkCategoryMins(items, rules);
-    expect(v.length).toBe(1);
-    expect(v[0]!.current).toBe(9);
-    expect(v[0]!.min).toBe(10);
+    expect(v.length).toBe(2);
+    const matesViolation = v.find((x) => x.category.toLowerCase() === "mates");
+    const bazarViolation = v.find((x) => x.category.toLowerCase() === "bazar");
+    expect(matesViolation?.current).toBe(9);
+    expect(matesViolation?.min).toBe(10);
+    expect(bazarViolation?.current).toBe(1);
+    expect(bazarViolation?.min).toBe(5);
   });
 
   it("Tecnología qty=3 → violación (mínimo 5), qty=5 → sin violación", () => {
@@ -351,6 +357,94 @@ describe("parseCategoryRules", () => {
   it("ignora minUnits=0", () => {
     const rules = makeRules({ cat_min_units_test: "0" });
     expect(rules["test"]?.minUnits).toBeUndefined();
+  });
+
+  it("siempre genera regla 'bazar' con minUnits=5", () => {
+    const rules = makeRules();
+    expect(rules["bazar"]).toBeDefined();
+    expect(rules["bazar"]!.minUnits).toBe(5);
+  });
+
+  it("mates sigue siendo 10 unidades — bazar no interfiere", () => {
+    const rules = makeRules();
+    expect(rules["mates"]!.minUnits).toBe(10);
+    expect(rules["bazar"]!.minUnits).toBe(5);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   checkCategoryMins — Bazar mínimo 5 unidades
+══════════════════════════════════════════════════════════════════ */
+describe("checkCategoryMins — Bazar mínimo 5 unidades", () => {
+  const rules = makeRules();
+
+  it("producto Bazar genérico qty=3 → violación (mínimo 5)", () => {
+    const items = [item("Jabón Liquido", "Bazar", 3, 100, undefined)];
+    const v = checkCategoryMins(items, rules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.min).toBe(5);
+    expect(v[0]!.current).toBe(3);
+  });
+
+  it("producto Bazar genérico qty=5 → sin violación", () => {
+    const items = [item("Jabón Liquido", "Bazar", 5, 100, undefined)];
+    expect(checkCategoryMins(items, rules)).toHaveLength(0);
+  });
+
+  it("surtido Bazar: 2+3 unidades de distintos productos → sin violación (total 5)", () => {
+    const items = [
+      item("Jabón Liquido", "Bazar", 2, 100, undefined),
+      item("Dispenser", "Bazar", 3, 100, undefined),
+    ];
+    expect(checkCategoryMins(items, rules)).toHaveLength(0);
+  });
+
+  it("surtido Bazar: 2+2 = 4 → violación (falta 1)", () => {
+    const items = [
+      item("Jabón Liquido", "Bazar", 2, 100, undefined),
+      item("Dispenser", "Bazar", 2, 100, undefined),
+    ];
+    const v = checkCategoryMins(items, rules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.current).toBe(4);
+    expect(v[0]!.min).toBe(5);
+  });
+
+  it("CRÍTICO: Mate Silicona (Bazar, sin moq_group) → va a regla 'mates' (10 u.), NO a 'bazar' (5 u.)", () => {
+    // Si qty=9, debe violar mínimo de MATES (10), no satisfacer el de bazar (5)
+    const items = [item("Mate Silicona", "Bazar", 9, 100, undefined)];
+    const v = checkCategoryMins(items, rules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.min).toBe(10);   // regla mates, no bazar
+    expect(v[0]!.current).toBe(9);
+  });
+
+  it("CRÍTICO: Mate (Bazar, moq_group='mates') qty=5 → violación de mates (10 u.), aunque cumpla bazar (5 u.)", () => {
+    const items = [item("Mate Acero", "Bazar", 5, 100, "mates")];
+    const v = checkCategoryMins(items, rules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.min).toBe(10);
+  });
+
+  it("producto Bazar con moq_group='none' → sin violación (exento)", () => {
+    const items = [item("Kit Mate + Termo", "Bazar", 1, 100, "none")];
+    expect(checkCategoryMins(items, rules)).toHaveLength(0);
+  });
+
+  it("hasMoq: producto Bazar genérico retorna minUnits=5", () => {
+    const prod = makeProduct("Jabón Liquido", "Bazar", "");
+    const info = hasMoq(prod, rules);
+    expect(info).not.toBeNull();
+    expect(info!.group).toBe("bazar");
+    expect(info!.minUnits).toBe(5);
+  });
+
+  it("hasMoq: Mate Silicona en Bazar (sin moq_group) retorna minUnits=10 (mates), NO bazar", () => {
+    const prod = makeProduct("Mate Silicona", "Bazar");
+    const info = hasMoq(prod, rules);
+    expect(info).not.toBeNull();
+    expect(info!.group).toBe("mates");
+    expect(info!.minUnits).toBe(10);
   });
 });
 

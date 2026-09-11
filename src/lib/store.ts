@@ -538,7 +538,18 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
         ],
   };
 
-  // 5. Suplementación: compra mínima de $250.000
+  // 5. Bazar: mínimo 5 unidades (surtido permitido, Mates excluidos — tienen su propia regla)
+  if (!rules["bazar"]?.minUnits) {
+    rules["bazar"] = {
+      ...rules["bazar"],
+      minUnits: 5,
+      discountTiers: rules["bazar"]?.discountTiers?.length
+        ? rules["bazar"].discountTiers
+        : [],
+    };
+  }
+
+  // 6. Suplementación: compra mínima de $250.000
   if (!rules["suplementos"]?.minAmount) {
     rules["suplementos"] = {
       ...rules["suplementos"],
@@ -546,7 +557,7 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     };
   }
 
-  // 6. Zapatillas: mínimo 3 unidades (derivación WhatsApp)
+  // 7. Zapatillas: mínimo 3 unidades (derivación WhatsApp)
   if (!rules["zapatillas"]?.minUnits) {
     rules["zapatillas"] = {
       ...rules["zapatillas"],
@@ -735,39 +746,42 @@ export function checkCategoryMins(
         minRuleKey = mg;
       }
     } else {
-      // Sin asignación manual → match por categoría
-      const raw = (item.categoria ?? "").trim();
-      const catNorm = normCat(raw);
-      const catWithoutDe = catNorm
-        .replace(/\bde\b\s*/gi, "")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      let minRuleKeyLen = -1;
-      for (const [ruleKey, rule] of Object.entries(rules)) {
-        if (!rule.minUnits && !rule.minAmount) continue;
-        const cleanRuleKey = ruleKey
-          .replace(/\bde\b\s*/gi, "")
-          .replace(/\s+/g, " ")
-          .trim();
-        const matches =
-          catNorm === ruleKey ||
-          catWithoutDe === ruleKey ||
-          catWithoutDe === cleanRuleKey ||
-          catNorm.startsWith(ruleKey) ||
-          catWithoutDe.startsWith(cleanRuleKey);
-        if (matches && ruleKey.length > minRuleKeyLen) {
-          minRuleKey = ruleKey;
-          minRuleKeyLen = ruleKey.length;
-        }
-      }
-      // Fallback: isMate (detecta Mates por nombre/categoría)
-      // Nota: introduce el falso positivo del kit, aceptado provisionalmente
-      // hasta que todos los productos tengan moq_group explícito en admin.
-      if (!minRuleKey && isMate(item.nombre ?? "", item.categoria ?? "")) {
+      // Sin asignación manual → match por nombre (isMate tiene PRIORIDAD) y luego por categoría.
+      // El fallback isMate se evalúa PRIMERO para que Mates en categoría Bazar queden bajo
+      // la regla "mates" (10 u.) y no bajo la regla "bazar" (5 u.).
+      if (isMate(item.nombre ?? "", item.categoria ?? "")) {
         const matesRule = rules["mates"];
         if (matesRule && (matesRule.minUnits || matesRule.minAmount)) {
           minRuleKey = "mates";
+        }
+      }
+
+      if (!minRuleKey) {
+        // Match por categoría (solo si isMate no se activó)
+        const raw = (item.categoria ?? "").trim();
+        const catNorm = normCat(raw);
+        const catWithoutDe = catNorm
+          .replace(/\bde\b\s*/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+
+        let minRuleKeyLen = -1;
+        for (const [ruleKey, rule] of Object.entries(rules)) {
+          if (!rule.minUnits && !rule.minAmount) continue;
+          const cleanRuleKey = ruleKey
+            .replace(/\bde\b\s*/gi, "")
+            .replace(/\s+/g, " ")
+            .trim();
+          const matches =
+            catNorm === ruleKey ||
+            catWithoutDe === ruleKey ||
+            catWithoutDe === cleanRuleKey ||
+            catNorm.startsWith(ruleKey) ||
+            catWithoutDe.startsWith(cleanRuleKey);
+          if (matches && ruleKey.length > minRuleKeyLen) {
+            minRuleKey = ruleKey;
+            minRuleKeyLen = ruleKey.length;
+          }
         }
       }
     }

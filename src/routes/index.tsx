@@ -324,6 +324,7 @@ function Home() {
           { key: "tecnologia", label: "Tecnología", defaultDesc: "5 unidades", icon: "🎧" },
           { key: "perfumes arabes", label: "Perfumes Árabes", defaultDesc: "5 unidades", icon: "🧴" },
           { key: "perfumes disenador", label: "Perfumes Diseñador", defaultDesc: "3 unidades", icon: "💎" },
+          { key: "bazar", label: "Bazar", defaultDesc: "5 unidades", icon: "🏪" },
           { key: "mates", label: "Mates", defaultDesc: "10 unidades", icon: "🧉" },
           { key: "suplementos", label: "Suplementación", defaultDesc: "$250.000", icon: "⚡" },
           { key: "zapatillas", label: "Zapatillas", defaultDesc: "3 unidades", icon: "👟" },
