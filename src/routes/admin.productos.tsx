@@ -3239,6 +3239,7 @@ function AdminProductosPage() {
         setProducts((prev) => prev.filter((p) => !selectedIds.includes(String(p.id))));
         setSelectedIds([]);
         setConfirmBulkDelete(false);
+        await loadProducts();
       }
     } catch {
       toast.error("Error al eliminar los productos seleccionados de la base de datos.");

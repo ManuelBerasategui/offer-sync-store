@@ -706,6 +706,42 @@ export const deleteAdminProduct = createServerFn({ method: "POST" })
     }
   });
 
+/* ─── Eliminar productos en masa (y sus variantes en cascada) ── */
+
+export const bulkDeleteAdminProducts = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string; productIds: string[] }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    productIds: Array.isArray(data?.productIds) ? data.productIds.map((id) => str(id, 200)).filter(Boolean) : [],
+  }))
+  .handler(async ({ data }): Promise<{ success?: boolean; count?: number; error?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+      if (data.productIds.length === 0) return { success: true, count: 0 };
+
+      // Limpieza defensiva de variantes asociadas (también tienen ON DELETE CASCADE en DB)
+      try {
+        await supabaseAdmin
+          .from("product_variants")
+          .delete()
+          .in("product_id", data.productIds);
+      } catch (err) {
+        console.warn("Aviso al limpiar variantes de productos eliminados:", err);
+      }
+
+      const { error: prodErr } = await supabaseAdmin
+        .from("products")
+        .delete()
+        .in("id", data.productIds);
+      if (prodErr) throw prodErr;
+
+      return { success: true, count: data.productIds.length };
+    } catch (err) {
+      console.error("Error in bulkDeleteAdminProducts:", err);
+      return { error: err instanceof Error ? err.message : "Error al eliminar productos de la base de datos." };
+    }
+  });
+
 /* ─── Subir imagen de producto (Admin, bypass RLS) ─────── */
 
 export const uploadAdminProductImage = createServerFn({ method: "POST" })
@@ -1422,14 +1458,132 @@ function extractAlbumTitle(html: string): string {
   return "";
 }
 
+/** Convierte URLs de thumbnail de Yupoo (small/medium/square/thumb) a alta resolución (big). */
+export function toYupooHighRes(url: string): string {
+  if (!url) return "";
+  const full = url.startsWith("//") ? `https:${url}` : url;
+  return full.replace(/\/(?:small|medium|square|thumb)\.([a-zA-Z0-9]+)/i, "/big.$1");
+}
+
+/** Obtiene el ID único de la foto en Yupoo (ej: photo.yupoo.com/user/<photoId>/size.ext). */
+export function getYupooPhotoId(url: string): string | null {
+  try {
+    const u = new URL(url.startsWith("//") ? `https:${url}` : url);
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (parts.length >= 2) {
+      return parts[parts.length - 2] ?? null;
+    }
+  } catch {
+    const m = url.match(/\/([a-zA-Z0-9_-]+)\/(?:small|medium|big|square|thumb|original|\d+)\.[a-zA-Z]+/i);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+/** Extrae la portada oficial designada por Yupoo en la página del álbum (og:image, meta o cabecera). */
+export function extractAlbumCover(html: string): string {
+  // 1. og:image tag (el estándar de Yupoo para la portada del álbum)
+  const ogMatch =
+    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (ogMatch && ogMatch[1]) {
+    const raw = ogMatch[1].trim();
+    if (raw && !raw.includes("logo") && !raw.includes("avatar")) {
+      const url = raw.startsWith("//") ? `https:${raw}` : raw;
+      return toYupooHighRes(url);
+    }
+  }
+
+  // 2. twitter:image tag
+  const twMatch =
+    html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
+  if (twMatch && twMatch[1]) {
+    const raw = twMatch[1].trim();
+    if (raw && !raw.includes("logo") && !raw.includes("avatar")) {
+      const url = raw.startsWith("//") ? `https:${raw}` : raw;
+      return toYupooHighRes(url);
+    }
+  }
+
+  // 3. Clase específica de portada en el álbum
+  const coverMatch =
+    html.match(/class="[^"]*(?:showalbumheader__gallerycover|album__cover|cover__img)[^"]*"[^>]+(?:data-origin-src|data-src|src)=["']([^"']+)["']/i) ||
+    html.match(/(?:data-origin-src|data-src|src)=["']([^"']+)["'][^>]+class="[^"]*(?:showalbumheader__gallerycover|album__cover|cover__img)[^"]*"/i);
+  if (coverMatch && coverMatch[1]) {
+    const raw = coverMatch[1].trim();
+    const url = raw.startsWith("//") ? `https:${raw}` : raw;
+    return toYupooHighRes(url);
+  }
+
+  // 4. JSON embebido
+  const jsonMatch = html.match(/"(?:cover|cover_url|cover_path|cover_image)"\s*:\s*"([^"]+)"/i);
+  if (jsonMatch && jsonMatch[1]) {
+    const raw = jsonMatch[1].replace(/\\/g, "").trim();
+    if (raw.includes("photo.yupoo.com") || raw.startsWith("http") || raw.startsWith("//")) {
+      const url = raw.startsWith("//") ? `https:${raw}` : raw;
+      return toYupooHighRes(url);
+    }
+  }
+
+  return "";
+}
+
+/**
+ * Reordena el arreglo de imágenes garantizando que la foto de portada designada
+ * por Yupoo se posicione estrictamente en el índice 0 para ser la foto de portada del producto.
+ */
+export function prioritizeCoverImage(images: string[], coverUrl?: string): string[] {
+  if (!coverUrl) return images;
+
+  const targetCover = toYupooHighRes(coverUrl);
+  const targetPhotoId = getYupooPhotoId(coverUrl);
+
+  const matchIdx = images.findIndex((img) => {
+    if (img === coverUrl || img === targetCover) return true;
+    if (targetPhotoId) {
+      const imgId = getYupooPhotoId(img);
+      if (imgId && imgId === targetPhotoId) return true;
+    }
+    return false;
+  });
+
+  if (matchIdx > 0) {
+    const coverItem = images[matchIdx]!;
+    const rest = images.filter((_, i) => i !== matchIdx);
+    return [coverItem, ...rest];
+  } else if (matchIdx === 0) {
+    return images;
+  } else {
+    if (targetCover && (targetCover.startsWith("http://") || targetCover.startsWith("https://"))) {
+      return [targetCover, ...images];
+    }
+    return images;
+  }
+}
+
 /** Extrae todas las URLs de imágenes de alta resolución de un álbum Yupoo. */
 function extractAlbumImages(html: string): string[] {
   const urls: string[] = [];
   const regex = /data-origin-src="([^"]+)"/g;
   let m: RegExpExecArray | null;
   while ((m = regex.exec(html)) !== null) {
-    const url = m[1].trim();
-    if (url.startsWith("http")) urls.push(url);
+    const raw = m[1].trim();
+    const url = raw.startsWith("//") ? `https:${raw}` : raw;
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      urls.push(url);
+    }
+  }
+  // Fallback si no hubo data-origin-src
+  if (urls.length === 0) {
+    const fallbackRegex = /(?:data-src|data-original|src)=["']((?:https?:)?\/\/photo\.yupoo\.com[^"']+)["']/gi;
+    while ((m = fallbackRegex.exec(html)) !== null) {
+      const raw = m[1].trim();
+      const url = raw.startsWith("//") ? `https:${raw}` : raw;
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        urls.push(toYupooHighRes(url));
+      }
+    }
   }
   return [...new Set(urls)]; // deduplicar
 }
@@ -1450,22 +1604,23 @@ function extractAlbumLinks(html: string, baseOrigin: string): { albumUrl: string
     if (seen.has(albumUrl)) continue;
     seen.add(albumUrl);
 
-    // Buscar thumbnail cercano (data-origin-src o src dentro del mismo bloque)
+    // Buscar thumbnail en el bloque circundante (ampliado a 800 chars para no perder la portada)
     const idx = m.index;
-    const block = html.slice(Math.max(0, idx - 200), idx + 400);
+    const block = html.slice(Math.max(0, idx - 800), idx + 800);
     const thumbMatch =
-      block.match(/data-origin-src="([^"]+)"/) ||
-      block.match(/src="(https?:\/\/photo\.yupoo\.com[^"]+)"/);
+      block.match(/(?:data-origin-src|data-src|data-original)=["']([^"']+)["']/i) ||
+      block.match(/src=["']((?:https?:)?\/\/photo\.yupoo\.com[^"']+)["']/i);
     let thumbnail = "";
     if (thumbMatch && thumbMatch[1]) {
       try {
         const raw = thumbMatch[1].trim();
-        const u = new URL(raw.startsWith("//") ? `https:${raw}` : raw);
+        const fullUrl = raw.startsWith("//") ? `https:${raw}` : raw;
+        const u = new URL(fullUrl);
         if (
           (u.protocol === "https:" || u.protocol === "http:") &&
           (u.hostname === "photo.yupoo.com" || u.hostname.endsWith(".yupoo.com"))
         ) {
-          thumbnail = u.href;
+          thumbnail = toYupooHighRes(u.href);
         }
       } catch {
         thumbnail = "";
@@ -1519,13 +1674,15 @@ export const parseYupooPage = createServerFn({ method: "POST" })
           const res = await fetch(rawUrl, { headers, signal: AbortSignal.timeout(15000) });
           const html = await res.text();
           const title = extractAlbumTitle(html);
-          const images = extractAlbumImages(html);
+          const albumCover = extractAlbumCover(html);
+          const rawImages = extractAlbumImages(html);
+          const images = prioritizeCoverImage(rawImages, albumCover);
           return {
             albums: [
               {
                 albumUrl: rawUrl,
                 title: title || "Producto sin título",
-                thumbnail: images[0] ?? "",
+                thumbnail: images[0] ?? albumCover ?? "",
               },
             ],
           };
@@ -1550,12 +1707,14 @@ export const parseYupooPage = createServerFn({ method: "POST" })
               const aRes = await fetch(albumUrl, { headers, signal: AbortSignal.timeout(8000) });
               const aHtml = await aRes.text();
               const title = extractAlbumTitle(aHtml) || albumUrl.split("/").pop() || "Producto";
-              // Si no tenemos thumbnail, intentar desde el HTML del álbum
-              const images = extractAlbumImages(aHtml);
+              const albumCover = extractAlbumCover(aHtml);
+              const bestCover = thumbnail || albumCover;
+              const rawImages = extractAlbumImages(aHtml);
+              const images = prioritizeCoverImage(rawImages, bestCover);
               return {
                 albumUrl,
                 title,
-                thumbnail: thumbnail || images[0] || "",
+                thumbnail: images[0] || bestCover || "",
               };
             } catch {
               return { albumUrl, title: albumUrl.split("/").pop() ?? "Producto", thumbnail };
@@ -1578,6 +1737,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       email?: string;
       token?: string;
       albumUrl: string;
+      coverUrl?: string;
       password?: string;
       maxImages?: number;
       category?: string;
@@ -1585,6 +1745,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
       albumUrl: str(data?.albumUrl, 500).trim(),
+      coverUrl: str(data?.coverUrl, 1000).trim(),
       password: str(data?.password ?? "", 100).trim(),
       maxImages: Math.min(Math.max(Number(data?.maxImages ?? 8), 1), 12),
       category: str(data?.category ?? "China", 100).trim() || "China",
@@ -1620,7 +1781,11 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         const html = await res.text();
 
         const title = extractAlbumTitle(html) || "Producto Yupoo";
-        const imageUrls = extractAlbumImages(html).slice(0, data.maxImages);
+        const albumCover = extractAlbumCover(html);
+        const bestCover = data.coverUrl || albumCover;
+        const rawImages = extractAlbumImages(html);
+        const orderedImages = prioritizeCoverImage(rawImages, bestCover);
+        const imageUrls = orderedImages.slice(0, data.maxImages);
 
         if (imageUrls.length === 0) {
           return { error: "No se encontraron imágenes en el álbum." };
