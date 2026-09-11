@@ -1458,6 +1458,46 @@ function extractAlbumTitle(html: string): string {
   return "";
 }
 
+/**
+ * Traduce texto con caracteres chinos/asiáticos a español automáticamente.
+ * Aplica correcciones automáticas para terminología común de indumentaria deportiva.
+ */
+export async function translateChineseToSpanish(text?: string | null): Promise<string> {
+  const clean = String(text ?? "").trim();
+  if (!clean) return "";
+
+  // Si no contiene caracteres CJK / chinos, retornar directamente
+  const hasChinese = /[\u4e00-\u9fa5]/.test(clean);
+  if (!hasChinese) return clean;
+
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(clean)}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return clean;
+    const data = await res.json();
+    let translated = Array.isArray(data?.[0])
+      ? data[0].map((item: unknown) => (Array.isArray(item) && typeof item[0] === "string" ? item[0] : "")).join("")
+      : clean;
+
+    // Normalizar términos deportivos comunes traducidos de forma literal
+    translated = translated
+      .replace(/segundo invitado/gi, "Tercera")
+      .replace(/primer invitado/gi, "Segunda")
+      .replace(/tercer invitado/gi, "Tercera")
+      .replace(/invitado/gi, "Visitante")
+      .replace(/pasajero/gi, "Visitante")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return translated || clean;
+  } catch {
+    return clean;
+  }
+}
+
 /** Convierte URLs de thumbnail de Yupoo (small/medium/square/thumb) a alta resolución (big). */
 export function toYupooHighRes(url: string): string {
   if (!url) return "";
@@ -1673,7 +1713,8 @@ export const parseYupooPage = createServerFn({ method: "POST" })
           // Modo single: parsear directamente el álbum
           const res = await fetch(rawUrl, { headers, signal: AbortSignal.timeout(15000) });
           const html = await res.text();
-          const title = extractAlbumTitle(html);
+          const rawTitle = extractAlbumTitle(html);
+          const title = (await translateChineseToSpanish(rawTitle)) || rawTitle || "Producto sin título";
           const albumCover = extractAlbumCover(html);
           const rawImages = extractAlbumImages(html);
           const images = prioritizeCoverImage(rawImages, albumCover);
@@ -1681,7 +1722,7 @@ export const parseYupooPage = createServerFn({ method: "POST" })
             albums: [
               {
                 albumUrl: rawUrl,
-                title: title || "Producto sin título",
+                title,
                 thumbnail: images[0] ?? albumCover ?? "",
               },
             ],
@@ -1706,7 +1747,8 @@ export const parseYupooPage = createServerFn({ method: "POST" })
             try {
               const aRes = await fetch(albumUrl, { headers, signal: AbortSignal.timeout(8000) });
               const aHtml = await aRes.text();
-              const title = extractAlbumTitle(aHtml) || albumUrl.split("/").pop() || "Producto";
+              const rawTitle = extractAlbumTitle(aHtml) || albumUrl.split("/").pop() || "Producto";
+              const title = (await translateChineseToSpanish(rawTitle)) || rawTitle;
               const albumCover = extractAlbumCover(aHtml);
               const bestCover = thumbnail || albumCover;
               const rawImages = extractAlbumImages(aHtml);
@@ -1737,6 +1779,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       email?: string;
       token?: string;
       albumUrl: string;
+      title?: string;
       coverUrl?: string;
       password?: string;
       maxImages?: number;
@@ -1745,10 +1788,11 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
       albumUrl: str(data?.albumUrl, 500).trim(),
+      title: str(data?.title, 300).trim(),
       coverUrl: str(data?.coverUrl, 1000).trim(),
       password: str(data?.password ?? "", 100).trim(),
       maxImages: Math.min(Math.max(Number(data?.maxImages ?? 8), 1), 12),
-      category: str(data?.category ?? "China", 100).trim() || "China",
+      category: str(data?.category, 100).trim(),
     }),
   )
   .handler(
@@ -1780,7 +1824,9 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         if (!res.ok) return { error: `Error al acceder al álbum: HTTP ${res.status}` };
         const html = await res.text();
 
-        const title = extractAlbumTitle(html) || "Producto Yupoo";
+        const rawTitle = data.title || extractAlbumTitle(html) || "Producto Yupoo";
+        // Traducir antes de verificar duplicados y antes de guardar en la DB
+        const title = (await translateChineseToSpanish(rawTitle)) || rawTitle;
         const albumCover = extractAlbumCover(html);
         const bestCover = data.coverUrl || albumCover;
         const rawImages = extractAlbumImages(html);
@@ -1863,7 +1909,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         // Crear el producto
         const imagen_url = uploadedUrls[0]!;
         const extra_images = uploadedUrls.slice(1);
-        const targetCategory = data.category || "China";
+        const targetCategory = data.category || "";
 
         const metadata: Record<string, unknown> = {
           whatsapp_only_reason: "china",

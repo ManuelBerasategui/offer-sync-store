@@ -4,7 +4,22 @@ import {
   getYupooPhotoId,
   extractAlbumCover,
   prioritizeCoverImage,
+  translateChineseToSpanish,
 } from "./products.functions";
+
+describe("translateChineseToSpanish", () => {
+  it("no modifica texto que no contiene caracteres chinos", async () => {
+    expect(await translateChineseToSpanish("Camiseta Nike Barcelona")).toBe("Camiseta Nike Barcelona");
+    expect(await translateChineseToSpanish("")).toBe("");
+  });
+
+  it("traduce títulos en chino a español", async () => {
+    const res = await translateChineseToSpanish("26-27切尔西二客S—2XL");
+    expect(res).toContain("Chelsea");
+    // No debe contener caracteres chinos residuales
+    expect(/[\u4e00-\u9fa5]/.test(res)).toBe(false);
+  });
+});
 
 describe("Yupoo cover image helpers", () => {
   it("toYupooHighRes convierte thumbnails a resolución big", () => {

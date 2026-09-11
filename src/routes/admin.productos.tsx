@@ -2696,6 +2696,7 @@ function YupooImporter({
             email: userEmail,
             token: userToken,
             albumUrl: album.albumUrl,
+            title: album.title,
             coverUrl: album.thumbnail,
             password: password.trim(),
             maxImages: Number(maxImages) || 8,
@@ -2764,6 +2765,7 @@ function YupooImporter({
             email: userEmail,
             token: userToken,
             albumUrl: album.albumUrl,
+            title: album.title,
             coverUrl: album.thumbnail,
             password: password.trim(),
             maxImages: Number(maxImages) || 8,
@@ -2974,9 +2976,22 @@ function YupooImporter({
                     ) : (
                       <div className="h-12 w-12 rounded-lg bg-muted shrink-0" />
                     )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-foreground truncate">{album.title}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{album.albumUrl}</p>
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <input
+                        type="text"
+                        value={album.title}
+                        disabled={album.status === "ok" || importing}
+                        onChange={(e) =>
+                          setAlbums((prev) =>
+                            prev.map((a) =>
+                              a.albumUrl === album.albumUrl ? { ...a, title: e.target.value } : a
+                            )
+                          )
+                        }
+                        className="w-full bg-transparent text-xs font-semibold text-foreground focus:bg-background focus:outline-hidden focus:ring-1 focus:ring-primary rounded px-1.5 py-0.5 border border-transparent hover:border-border transition-colors truncate"
+                        title="Click para editar el nombre traducido antes de importar"
+                      />
+                      <p className="text-[10px] text-muted-foreground truncate px-1.5">{album.albumUrl}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {statusIcon(album.status)}
