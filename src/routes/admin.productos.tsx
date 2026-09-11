@@ -2633,7 +2633,7 @@ function YupooImporter({
 }) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
-  const [category, setCategory] = useState("China");
+  const [category, setCategory] = useState("");
   const [password, setPassword] = useState("");
   const [maxImages, setMaxImages] = useState("8");
   const [searching, setSearching] = useState(false);
@@ -2699,7 +2699,7 @@ function YupooImporter({
             coverUrl: album.thumbnail,
             password: password.trim(),
             maxImages: Number(maxImages) || 8,
-            category: category.trim() || "China",
+            category: category.trim(),
           },
         });
         if (res.error) {
@@ -2767,7 +2767,7 @@ function YupooImporter({
             coverUrl: album.thumbnail,
             password: password.trim(),
             maxImages: Number(maxImages) || 8,
-            category: category.trim() || "China",
+            category: category.trim(),
           },
         });
         if (res.error) {
@@ -2897,14 +2897,14 @@ function YupooImporter({
           <div className="flex items-center gap-2 rounded-xl bg-muted/40 border border-border/70 px-3.5 py-2.5 text-xs text-muted-foreground">
             <span className="text-base">💡</span>
             <span>
-              Categoría destino: <strong className="text-foreground font-semibold">"{category.trim() || "China"}"</strong>. Cada producto se creará con el botón <strong>"Consultar por WhatsApp"</strong> y precio a consultar.
+              Categoría destino: <strong className="text-foreground font-semibold">"{category.trim() || <span className="text-amber-500">sin categoría</span>}"</strong>. Cada producto se creará con el botón <strong>"Consultar por WhatsApp"</strong> y precio a consultar.
             </span>
           </div>
 
           <button
             id="yupoo-search-btn"
             type="button"
-            disabled={!url.trim() || searching}
+            disabled={!url.trim() || !category.trim() || searching}
             onClick={() => void handleSearch()}
             className="btn-base bg-primary text-primary-foreground flex items-center gap-2 disabled:opacity-50"
           >
