@@ -18,6 +18,7 @@ import {
   upsertAdminProduct,
   updateProductPrice,
   deleteAdminProduct,
+  bulkDeleteAdminProducts,
   uploadAdminProductImage,
   getAdminBanners,
   upsertAdminBanner,
@@ -1651,7 +1652,7 @@ function ActiveOfferCard({
         <img
           src={sanitizeImageUrl(imageUrl(product.imagen_url)) || FALLBACK_IMAGE}
           alt={product.nombre ?? ""}
-          className="h-16 w-16 rounded-xl object-cover border border-border shrink-0"
+          className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover border border-border shadow-xs shrink-0"
           onError={onImageError(product.imagen_url)}
         />
         <div className="min-w-0">
@@ -1824,7 +1825,7 @@ function CandidateOfferCard({
         <img
           src={sanitizeImageUrl(imageUrl(product.imagen_url)) || FALLBACK_IMAGE}
           alt={product.nombre ?? ""}
-          className="h-14 w-14 rounded-xl object-cover border border-border shrink-0"
+          className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover border border-border shadow-xs shrink-0"
           onError={onImageError(product.imagen_url)}
         />
         <div className="min-w-0">
@@ -2614,39 +2615,7 @@ function OfertasDelDiaPanel({
   );
 }
 
-/* ───────────────────────────────────────────────────────── */
-/*  Importador Yupoo                                         */
-/* ───────────────────────────────────────────────────────── */
 
-/**
- * Valida que una URL sea http o https usando un allowlist estricto (sin denylist).
- * Snyk CWE-79: nunca verificar esquemas maliciosos por negación.
- */
-function isSafeHttpUrl(url?: string | null): boolean {
-  if (!url || typeof url !== "string") return false;
-  try {
-    const parsed = new URL(url.trim());
-    // Allowlist estricto — solo estos dos protocolos son permitidos
-    return parsed.protocol === "https:" || parsed.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Reconstruye la URL desde las partes parseadas para nunca pasar la string
- * original (tainted) directamente al atributo src del DOM (CWE-79).
- */
-function cleanImageUrl(url?: string | null): string {
-  if (!url || typeof url !== "string") return "";
-  try {
-    const parsed = new URL(url.trim());
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
-    return parsed.protocol + "//" + parsed.host + parsed.pathname + parsed.search + parsed.hash;
-  } catch {
-    return "";
-  }
-}
 
 type ImportStatus = "idle" | "pending" | "ok" | "error" | "duplicate";
 type AlbumRow = YupooAlbumPreview & { selected: boolean; status: ImportStatus; statusMsg: string };
@@ -2694,7 +2663,7 @@ function YupooImporter({
         setAlbums(
           (res.albums ?? []).map((a) => ({
             ...a,
-            thumbnail: cleanImageUrl(a.thumbnail),
+            thumbnail: sanitizeImageUrl(a.thumbnail),
             selected: true,
             status: "idle" as ImportStatus,
             statusMsg: "",
@@ -2727,6 +2696,7 @@ function YupooImporter({
             email: userEmail,
             token: userToken,
             albumUrl: album.albumUrl,
+            coverUrl: album.thumbnail,
             password: password.trim(),
             maxImages: Number(maxImages) || 8,
             category: category.trim() || "China",
@@ -2794,6 +2764,7 @@ function YupooImporter({
             email: userEmail,
             token: userToken,
             albumUrl: album.albumUrl,
+            coverUrl: album.thumbnail,
             password: password.trim(),
             maxImages: Number(maxImages) || 8,
             category: category.trim() || "China",
@@ -2992,9 +2963,9 @@ function YupooImporter({
                       }
                       className="h-4 w-4 rounded accent-primary shrink-0"
                     />
-                    {isSafeHttpUrl(album.thumbnail) ? (
+                    {album.thumbnail ? (
                       <img
-                        src={cleanImageUrl(album.thumbnail)}
+                        src={album.thumbnail}
                         alt=""
                         referrerPolicy="no-referrer"
                         className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border bg-muted"
@@ -3248,6 +3219,34 @@ function AdminProductosPage() {
     }
   }
 
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const res = await bulkDeleteAdminProducts({
+        data: { email: userEmail, token: userToken, productIds: selectedIds },
+      });
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        const count = res.count ?? selectedIds.length;
+        toast.success(
+          `${count} producto${count === 1 ? "" : "s"} eliminado${count === 1 ? "" : "s"} permanentemente de la base de datos.`
+        );
+        setProducts((prev) => prev.filter((p) => !selectedIds.includes(String(p.id))));
+        setSelectedIds([]);
+        setConfirmBulkDelete(false);
+      }
+    } catch {
+      toast.error("Error al eliminar los productos seleccionados de la base de datos.");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   async function handleToggleVariantStock(variantId: string, currentStock: string) {
     const nextStock = String(currentStock ?? "SI").toUpperCase() === "NO" ? "SI" : "NO";
     try {
@@ -3373,7 +3372,7 @@ function AdminProductosPage() {
               />
             ) : (
               <div className="space-y-6">
-                {/* Buscador */}
+                {/* Buscador y Acciones */}
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <input
                     className="input-base w-full max-w-sm"
@@ -3381,16 +3380,30 @@ function AdminProductosPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
-                  {filtered.length > 0 && (
-                    <p className="text-xs text-muted-foreground shrink-0">
-                      {filtered.length} producto{filtered.length !== 1 ? "s" : ""}
-                      {adminTotalPages > 1 && (
-                        <span className="ml-1 text-muted-foreground/70">
-                          — pág. {adminPage}/{adminTotalPages}
-                        </span>
-                      )}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {selectedIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmBulkDelete(true)}
+                        disabled={bulkDeleting}
+                        className="btn-base bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs py-1.5 px-3 flex items-center gap-1.5 font-semibold rounded-xl shadow-xs transition-colors shrink-0"
+                        title="Eliminar productos seleccionados de la base de datos"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Eliminar {selectedIds.length} de la DB</span>
+                      </button>
+                    )}
+                    {filtered.length > 0 && (
+                      <p className="text-xs text-muted-foreground shrink-0">
+                        {filtered.length} producto{filtered.length !== 1 ? "s" : ""}
+                        {adminTotalPages > 1 && (
+                          <span className="ml-1 text-muted-foreground/70">
+                            — pág. {adminPage}/{adminTotalPages}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Tabla de productos */}
@@ -3424,7 +3437,7 @@ function AdminProductosPage() {
                                 title="Seleccionar todos en esta página"
                               />
                             </th>
-                            <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Imagen</th>
+                            <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4 w-24 sm:w-28">Imagen</th>
                             <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Nombre</th>
                             <th className="hidden px-4 py-3 text-left font-semibold text-muted-foreground sm:table-cell">Categoría</th>
                             <th className="hidden px-4 py-3 text-right font-semibold text-muted-foreground sm:table-cell">Precio</th>
@@ -3452,15 +3465,17 @@ function AdminProductosPage() {
                                     />
                                   </td>
                                   <td
-                                    className="px-3 py-3 sm:px-4 cursor-pointer"
+                                    className="px-3 py-3 sm:px-4 cursor-pointer align-middle"
                                     onClick={() => setModal(productToInput(p))}
                                   >
-                                    <img
-                                      src={sanitizeImageUrl(imageUrl(p.imagen_url)) || FALLBACK_IMAGE}
-                                      alt={p.nombre}
-                                      className="h-10 w-10 rounded-lg object-cover hover:opacity-80 transition-opacity"
-                                      onError={onImageError(p.imagen_url)}
-                                    />
+                                    <div className="relative h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 rounded-xl overflow-hidden border border-border/80 bg-muted/40 shadow-xs group/img shrink-0">
+                                      <img
+                                        src={sanitizeImageUrl(imageUrl(p.imagen_url)) || FALLBACK_IMAGE}
+                                        alt={p.nombre}
+                                        className="h-full w-full object-cover transition-transform duration-300 group-hover/img:scale-105"
+                                        onError={onImageError(p.imagen_url)}
+                                      />
+                                    </div>
                                   </td>
                                   <td className="px-3 py-3 sm:px-4 font-medium max-w-[180px] sm:max-w-none">
                                     <div className="flex flex-col gap-1">
@@ -3565,7 +3580,7 @@ function AdminProductosPage() {
                                                     <img
                                                       src={sanitizeImageUrl(imageUrl(v.imagen_url)) || FALLBACK_IMAGE}
                                                       alt={v.color}
-                                                      className="h-7 w-7 rounded-lg object-cover border border-border shrink-0"
+                                                      className="h-10 w-10 sm:h-11 sm:w-11 rounded-lg object-cover border border-border shrink-0"
                                                       onError={onImageError(v.imagen_url)}
                                                     />
                                                   )}
@@ -3651,24 +3666,33 @@ function AdminProductosPage() {
 
       {/* Barra Flotante de Acciones Masivas */}
       {selectedIds.length > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 rounded-2xl border border-border bg-card/95 backdrop-blur-md px-3.5 py-2.5 sm:px-5 sm:py-3 shadow-2xl max-w-[95vw]">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 rounded-2xl border border-border bg-card/95 backdrop-blur-md px-3.5 py-2.5 sm:px-5 sm:py-3 shadow-2xl max-w-[95vw] flex-wrap justify-center sm:justify-start">
           <span className="text-xs font-bold text-foreground shrink-0">
             {selectedIds.length} {selectedIds.length === 1 ? "seleccionado" : "seleccionados"}
           </span>
-          <div className="h-4 w-px bg-border shrink-0" />
+          <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
           <button
             onClick={() => void handleBulkStock("SI")}
-            disabled={bulkUpdating}
-            className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 px-3 flex items-center gap-1 shrink-0 disabled:opacity-50"
+            disabled={bulkUpdating || bulkDeleting}
+            className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 px-3 flex items-center gap-1 shrink-0 disabled:opacity-50 font-medium"
           >
             🟢 Con stock
           </button>
           <button
             onClick={() => void handleBulkStock("NO")}
-            disabled={bulkUpdating}
-            className="btn-base bg-red-600 hover:bg-red-700 text-white text-xs py-1.5 px-3 flex items-center gap-1 shrink-0 disabled:opacity-50"
+            disabled={bulkUpdating || bulkDeleting}
+            className="btn-base bg-amber-600 hover:bg-amber-700 text-white text-xs py-1.5 px-3 flex items-center gap-1 shrink-0 disabled:opacity-50 font-medium"
           >
             🔴 Sin stock
+          </button>
+          <button
+            onClick={() => setConfirmBulkDelete(true)}
+            disabled={bulkUpdating || bulkDeleting}
+            className="btn-base bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs py-1.5 px-3 flex items-center gap-1.5 shrink-0 disabled:opacity-50 font-semibold shadow-xs transition-colors"
+            title="Eliminar de la DB los productos seleccionados"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>Eliminar de la DB ({selectedIds.length})</span>
           </button>
           <button
             onClick={() => setSelectedIds([])}
@@ -3677,6 +3701,74 @@ function AdminProductosPage() {
           >
             <X className="h-4 w-4" />
           </button>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Eliminación Masiva */}
+      {confirmBulkDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-destructive/10 p-2.5 text-destructive shrink-0">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-foreground">
+                  ¿Eliminar {selectedIds.length} {selectedIds.length === 1 ? "producto" : "productos"} de la DB?
+                </h3>
+                <p className="text-xs text-destructive font-medium">
+                  ⚠️ Esta acción borrará permanentemente de la base de datos estos productos y todas sus variantes asociadas.
+                </p>
+              </div>
+            </div>
+
+            {/* Vista previa de productos a eliminar */}
+            <div className="max-h-40 overflow-y-auto rounded-xl border border-border bg-muted/30 p-2.5 space-y-1 text-xs">
+              {products
+                .filter((p) => selectedIds.includes(String(p.id)))
+                .slice(0, 10)
+                .map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 truncate">
+                    <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
+                    <span className="truncate font-medium text-foreground">{p.nombre}</span>
+                  </div>
+                ))}
+              {selectedIds.length > 10 && (
+                <p className="text-[11px] text-muted-foreground/70 italic pl-3.5">
+                  ... y {selectedIds.length - 10} más
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmBulkDelete(false)}
+                disabled={bulkDeleting}
+                className="btn-base bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 text-xs px-3.5 py-2 font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBulkDelete()}
+                disabled={bulkDeleting}
+                className="btn-base bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs px-3.5 py-2 flex items-center gap-1.5 font-semibold disabled:opacity-50 shadow-xs"
+              >
+                {bulkDeleting ? (
+                  <>
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Sí, eliminar de la DB</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

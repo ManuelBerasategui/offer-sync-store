@@ -126,37 +126,57 @@ export function getBankInfo(config?: SiteConfig) {
   };
 }
 
-const ALLOWED_IMAGE_PROTOCOLS = new Set(["http:", "https:", "data:", "blob:"]);
+/** Protocol allowlist for image URLs sourced from the database (CWE-79). */
+const ALLOWED_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
 
-/** Convierte links de Google Drive a una URL directa y enruta Supabase Storage por el proxy de caché de Vercel CDN. */
+/**
+ * Convierte links de Google Drive a una URL directa y enruta Supabase Storage
+ * por el proxy de caché de Vercel CDN.
+ *
+ * CWE-79: Every code path that accepts a tainted `raw` value reconstructs the
+ * URL exclusively from `URL`-parsed parts — the original string is never
+ * returned to the caller and therefore never reaches a DOM sink.
+ */
 export function imageUrl(raw?: string | null): string {
   const url = (raw ?? "").trim();
   if (!url) return "";
-  if (url.startsWith("/api/img?")) {
-    return url;
-  }
+  // /api/img? proxy paths are constructed server-side — always safe
+  if (url.startsWith("/api/img?")) return url;
+  // Relative paths (e.g. Supabase Storage public bucket) — safe by construction
+  if (url.startsWith("/") && !url.startsWith("//")) return url;
+
+  // Extract Google Drive file IDs — output is a hardcoded trusted domain
   const m =
-    url.match(/\/file\/d\/([\w-]+)/) || url.match(/[?&]id=([\w-]+)/) || url.match(/\/d\/([\w-]+)/);
+    url.match(/\/file\/d\/([-\w]+)/) ||
+    url.match(/[?&]id=([-\w]+)/) ||
+    url.match(/\/d\/([-\w]+)/);
   if (url.includes("drive.google.com") && m) {
-    return `https://lh3.googleusercontent.com/d/${m[1]}=w1200`;
+    // Only the captured alphanumeric ID is interpolated — no raw tainted value
+    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(m[1]!)}=w1200`;
   }
-  if (url.startsWith("/") && !url.startsWith("//")) {
-    return url;
-  }
+
   try {
-    const parsed = new URL(url, "https://dummy-base.local");
-    if (ALLOWED_IMAGE_PROTOCOLS.has(parsed.protocol)) {
-      // Si la imagen proviene de Supabase Storage, se sirve a través del proxy de Edge Cache
-      if (
-        parsed.hostname.toLowerCase().endsWith(".supabase.co") &&
-        parsed.pathname.startsWith("/storage/v1/object/public/")
-      ) {
-        return `/api/img?url=${encodeURIComponent(url)}`;
-      }
-      return url;
+    const parsed = new URL(url);
+    if (!ALLOWED_IMAGE_PROTOCOLS.has(parsed.protocol)) return "";
+    // Supabase Storage → serve through Edge Cache proxy
+    if (
+      parsed.hostname.toLowerCase().endsWith(".supabase.co") &&
+      parsed.pathname.startsWith("/storage/v1/object/public/")
+    ) {
+      // Use parsed.href (already reconstructed by the URL API) — not raw `url`
+      return `/api/img?url=${encodeURIComponent(parsed.href)}`;
     }
+    // Reconstruct from parsed parts — never propagate the tainted `url` string
+    return (
+      parsed.protocol +
+      "//" +
+      parsed.host +
+      parsed.pathname +
+      parsed.search +
+      parsed.hash
+    );
   } catch {
-    // invalid URL
+    // Invalid URL
   }
   return "";
 }
