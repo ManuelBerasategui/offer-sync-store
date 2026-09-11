@@ -1,12 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Check, Search, RefreshCw, MessageCircle, PackageCheck, DollarSign, ShoppingBag, Building2, CheckCircle2, Clock } from "lucide-react";
+import { Copy, Check, Search, RefreshCw, MessageCircle, PackageCheck, DollarSign, ShoppingBag, Building2, CheckCircle2, Clock, Trash2 } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { AdminHeader } from "@/components/AdminHeader";
 import { storeQueryOptions } from "@/lib/store-query";
-import { getAdminPaidOrders, getAdminReservedOrders, updateOrderStatus, type AdminOrder } from "@/lib/orders.functions";
+import { getAdminPaidOrders, getAdminReservedOrders, updateOrderStatus, deleteAdminOrder, type AdminOrder } from "@/lib/orders.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { money, sanitizeUrl } from "@/lib/store";
 
@@ -42,6 +42,9 @@ function AdminOrdenesPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleteOrderCode, setDeleteOrderCode] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const userId = user?.id;
   const authPayload = { email: user?.email ?? "", token: session?.access_token ?? "" };
@@ -153,6 +156,32 @@ function AdminOrdenesPage() {
       }
     } catch (err) {
       console.error("Error actualizando orden:", err);
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deleteOrderCode) return;
+    setDeleting(true);
+    try {
+      const res = await deleteAdminOrder({
+        data: {
+          orderCode: deleteOrderCode,
+          token: session?.access_token ?? "",
+          email: user?.email ?? "",
+        },
+      });
+      if (res.status === "success") {
+        const remover = (prev: AdminOrder[]) =>
+          prev.filter((o) => o.order_code !== deleteOrderCode);
+        setPaidOrders(remover);
+        setReservedOrders(remover);
+      }
+    } catch (err) {
+      console.error("Error eliminando orden:", err);
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmOpen(false);
+      setDeleteOrderCode(null);
     }
   };
 
@@ -559,6 +588,15 @@ TOTAL: ${money(order.total)}`;
                             </>
                           )}
                         </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setDeleteOrderCode(order.order_code); setDeleteConfirmOpen(true); }}
+                          className="btn-base w-full sm:w-auto justify-center bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 text-xs font-semibold py-2 px-3 flex items-center gap-1.5 sm:ml-auto"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Eliminar Venta
+                        </button>
                       </div>
                     </div>
 
@@ -622,6 +660,53 @@ TOTAL: ${money(order.total)}`;
       </main>
 
       <SiteFooter config={config} />
+
+      {/* Modal de confirmación de eliminación */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => { if (!deleting) { setDeleteConfirmOpen(false); setDeleteOrderCode(null); } }}
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl border border-red-500/30 bg-background shadow-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/15">
+                <Trash2 className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-foreground">Eliminar Venta</h3>
+                <p className="text-xs text-muted-foreground">Esta acción no se puede deshacer.</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              ¿Estás seguro de que querés eliminar la orden
+            </p>
+            <p className="text-sm font-bold text-foreground mb-5 font-mono">{deleteOrderCode}?</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setDeleteConfirmOpen(false); setDeleteOrderCode(null); }}
+                disabled={deleting}
+                className="btn-base flex-1 justify-center border border-border bg-surface hover:bg-muted text-sm font-semibold py-2.5 text-foreground disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteOrder()}
+                disabled={deleting}
+                className="btn-base flex-1 justify-center bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2.5 flex items-center gap-2 disabled:opacity-60"
+              >
+                {deleting ? (
+                  <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Eliminando...</>
+                ) : (
+                  <><Trash2 className="h-4 w-4" /> Eliminar</>  
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -491,6 +491,69 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
   });
 
 /**
+ * Elimina una orden de la base de datos (por ejemplo, pedidos por transferencia no completados o cancelados).
+ */
+export const deleteAdminOrder = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      orderId?: string | undefined;
+      orderCode: string;
+      token?: string | undefined;
+      email?: string | undefined;
+    }) => ({
+      orderId: data.orderId ? text(data.orderId, 60) : undefined,
+      orderCode: text(data.orderCode, 60),
+      token: data.token ? text(data.token, 4000) : undefined,
+      email: data.email ? text(data.email, 254) : undefined,
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
+    const adminEmails = adminEmailsRaw
+      .toLowerCase()
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    let requestingEmail = data.email?.toLowerCase().trim() || "";
+    if (data.token) {
+      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
+      if (userData?.user?.email) {
+        requestingEmail = userData.user.email.toLowerCase().trim();
+      }
+    }
+
+    if (!requestingEmail) {
+      return { status: "error", message: "Acceso denegado: Debés iniciar sesión como administrador." };
+    }
+
+    if (adminEmails.length > 0) {
+      if (!adminEmails.includes(requestingEmail)) {
+        return { status: "error", message: "Acceso denegado: Sin permisos de administrador." };
+      }
+    } else {
+      const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
+      if (!defaultAdmins.includes(requestingEmail)) {
+        return { status: "error", message: "Acceso denegado: Configurá ADMIN_EMAILS en el archivo .env." };
+      }
+    }
+
+    const query = supabaseAdmin.from("orders").delete();
+    const { error } = data.orderId
+      ? await query.eq("id", data.orderId)
+      : await query.eq("order_code", data.orderCode);
+
+    if (error) {
+      console.error("Error al eliminar orden de la DB:", error);
+      return { status: "error", message: "No se pudo eliminar la orden de la base de datos." };
+    }
+
+    return { status: "success" };
+  });
+
+/**
  * Registra una orden de pago por Transferencia Bancaria con el descuento aplicado.
  */
 export const createTransferOrder = createServerFn({ method: "POST" })
