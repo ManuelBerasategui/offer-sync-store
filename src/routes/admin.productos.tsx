@@ -2618,22 +2618,31 @@ function OfertasDelDiaPanel({
 /*  Importador Yupoo                                         */
 /* ───────────────────────────────────────────────────────── */
 
-/** Sanitización estricta contra DOM-based XSS (CWE-79) para URLs externas de imágenes. */
+/**
+ * Valida que una URL sea http o https usando un allowlist estricto (sin denylist).
+ * Snyk CWE-79: nunca verificar esquemas maliciosos por negación.
+ */
 function isSafeHttpUrl(url?: string | null): boolean {
   if (!url || typeof url !== "string") return false;
   try {
     const parsed = new URL(url.trim());
-    return (parsed.protocol === "https:" || parsed.protocol === "http:") && !url.trim().toLowerCase().startsWith("javascript:");
+    // Allowlist estricto — solo estos dos protocolos son permitidos
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
   } catch {
     return false;
   }
 }
 
+/**
+ * Reconstruye la URL desde las partes parseadas para nunca pasar la string
+ * original (tainted) directamente al atributo src del DOM (CWE-79).
+ */
 function cleanImageUrl(url?: string | null): string {
-  if (!url || typeof url !== "string" || !isSafeHttpUrl(url)) return "";
+  if (!url || typeof url !== "string") return "";
   try {
     const parsed = new URL(url.trim());
-    return parsed.href;
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
+    return parsed.protocol + "//" + parsed.host + parsed.pathname + parsed.search + parsed.hash;
   } catch {
     return "";
   }

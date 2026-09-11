@@ -216,7 +216,6 @@ export function galleryImages(product: Product): string[] {
 
 
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
-const STRICT_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
 
 export function sanitizeUrl(url?: string | null): string {
   if (!url) return "#";
@@ -233,16 +232,30 @@ export function sanitizeUrl(url?: string | null): string {
   return "#";
 }
 
-/** Sanitiza URLs para elementos <img> contra XSS / inyecciones de esquemas maliciosos (CWE-79). */
+/**
+ * Sanitiza URLs para elementos <img> contra DOM-based XSS (CWE-79).
+ * Reconstruye la URL desde sus partes parseadas — nunca propaga la string
+ * original controlada por el atacante/DB directamente al DOM.
+ * Solo permite los protocolos http: y https: (allowlist estricto).
+ */
 export function sanitizeImageUrl(url?: string | null): string {
   if (!url || typeof url !== "string") return "";
   const trimmed = url.trim();
+  // Rutas relativas (Supabase Storage) son seguras por construcción
   if (trimmed.startsWith("/")) return trimmed;
   try {
     const parsed = new URL(trimmed);
-    if (STRICT_IMAGE_PROTOCOLS.has(parsed.protocol)) {
-      return parsed.href;
-    }
+    // Allowlist estricto: solo http / https
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    // Reconstruir desde partes parseadas → nunca `parsed.href` directamente
+    const safe =
+      parsed.protocol +
+      "//" +
+      parsed.host +
+      parsed.pathname +
+      parsed.search +
+      parsed.hash;
+    return safe;
   } catch {
     // URL inválida
   }
