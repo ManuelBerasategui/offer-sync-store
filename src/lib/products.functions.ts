@@ -1461,7 +1461,6 @@ function extractAlbumTitle(html: string): string {
 /**
  * Traduce texto con caracteres chinos/asiáticos a español automáticamente.
  * Aplica correcciones automáticas para terminología común de indumentaria deportiva.
- * Incluye reintentos con backoff exponencial para tolerar el rate-limiting de Google Translate.
  */
 export async function translateChineseToSpanish(text?: string | null): Promise<string> {
   const clean = String(text ?? "").trim();
@@ -1471,49 +1470,32 @@ export async function translateChineseToSpanish(text?: string | null): Promise<s
   const hasChinese = /[\u4e00-\u9fa5]/.test(clean);
   if (!hasChinese) return clean;
 
-  const MAX_RETRIES = 3;
-  const BASE_DELAY_MS = 600; // backoff: 600ms, 1200ms, 2400ms
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(clean)}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return clean;
+    const data = await res.json();
+    let translated = Array.isArray(data?.[0])
+      ? data[0].map((item: unknown) => (Array.isArray(item) && typeof item[0] === "string" ? item[0] : "")).join("")
+      : clean;
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      if (attempt > 0) {
-        // Esperar antes de reintentar (backoff exponencial)
-        await new Promise((r) => setTimeout(r, BASE_DELAY_MS * 2 ** (attempt - 1)));
-      }
-      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(clean)}`;
-      const res = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0" },
-        signal: AbortSignal.timeout(8000),
-      });
-      // 429 / 5xx → reintentar; cualquier otro error no recuperable → salir
-      if (res.status === 429 || res.status >= 500) {
-        if (attempt < MAX_RETRIES - 1) continue;
-        return clean;
-      }
-      if (!res.ok) return clean;
+    // Normalizar términos deportivos comunes traducidos de forma literal
+    translated = translated
+      .replace(/segundo invitado/gi, "Tercera")
+      .replace(/primer invitado/gi, "Segunda")
+      .replace(/tercer invitado/gi, "Tercera")
+      .replace(/invitado/gi, "Visitante")
+      .replace(/pasajero/gi, "Visitante")
+      .replace(/\s+/g, " ")
+      .trim();
 
-      const data = await res.json();
-      let translated = Array.isArray(data?.[0])
-        ? data[0].map((item: unknown) => (Array.isArray(item) && typeof item[0] === "string" ? item[0] : "")).join("")
-        : clean;
-
-      // Normalizar términos deportivos comunes traducidos de forma literal
-      translated = translated
-        .replace(/segundo invitado/gi, "Tercera")
-        .replace(/primer invitado/gi, "Segunda")
-        .replace(/tercer invitado/gi, "Tercera")
-        .replace(/invitado/gi, "Visitante")
-        .replace(/pasajero/gi, "Visitante")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      return translated || clean;
-    } catch {
-      if (attempt < MAX_RETRIES - 1) continue;
-      return clean;
-    }
+    return translated || clean;
+  } catch {
+    return clean;
   }
-  return clean;
 }
 
 /** Convierte URLs de thumbnail de Yupoo (small/medium/square/thumb) a alta resolución (big). */
@@ -1756,32 +1738,41 @@ export const parseYupooPage = createServerFn({ method: "POST" })
           return { error: "No se encontraron álbumes en la página. Verificá la URL y la contraseña." };
         }
 
-        // Enriquecer con título: procesamiento secuencial para no saturar Google Translate
-        // (con Promise.all en paralelo, el rate-limiting de la API deja títulos sin traducir)
-        const MAX_TITLE_FETCH = 30; // límite para no exceder tiempo de worker
+        // Fase 1 — Fetch en paralelo (solo HTML, sin traducir todavía)
+        // Hasta 30 requests a Yupoo en simultáneo: rápido y sin conflicto porque
+        // son requests a dominios distintos, no a Google Translate.
+        const MAX_TITLE_FETCH = 30;
         const toFetch = rawAlbums.slice(0, MAX_TITLE_FETCH);
 
+        type RawAlbum = { albumUrl: string; rawTitle: string; thumbnail: string; bestCover: string; firstImage: string };
+
+        const rawFetched: RawAlbum[] = await Promise.all(
+          toFetch.map(async ({ albumUrl, thumbnail }) => {
+            try {
+              const aRes = await fetch(albumUrl, { headers, signal: AbortSignal.timeout(8000) });
+              const aHtml = await aRes.text();
+              const rawTitle = extractAlbumTitle(aHtml) || albumUrl.split("/").pop() || "Producto";
+              const albumCover = extractAlbumCover(aHtml);
+              const bestCover = thumbnail || albumCover;
+              const rawImages = extractAlbumImages(aHtml);
+              const images = prioritizeCoverImage(rawImages, bestCover);
+              return { albumUrl, rawTitle, thumbnail, bestCover, firstImage: images[0] || bestCover || "" };
+            } catch {
+              const fallback = decodeURIComponent(albumUrl.split("/").pop() ?? "Producto");
+              return { albumUrl, rawTitle: fallback, thumbnail, bestCover: thumbnail, firstImage: thumbnail };
+            }
+          }),
+        );
+
+        // Fase 2 — Traducción secuencial con delay entre llamadas
+        // De a una por vez evita el rate-limiting de Google Translate.
+        // 30 títulos × ~200ms = ~6s adicionales, totalmente aceptable.
         const albums: YupooAlbumPreview[] = [];
-        for (const { albumUrl, thumbnail } of toFetch) {
-          try {
-            const aRes = await fetch(albumUrl, { headers, signal: AbortSignal.timeout(8000) });
-            const aHtml = await aRes.text();
-            const rawTitle = extractAlbumTitle(aHtml) || albumUrl.split("/").pop() || "Producto";
-            const title = (await translateChineseToSpanish(rawTitle)) || rawTitle;
-            const albumCover = extractAlbumCover(aHtml);
-            const bestCover = thumbnail || albumCover;
-            const rawImages = extractAlbumImages(aHtml);
-            const images = prioritizeCoverImage(rawImages, bestCover);
-            albums.push({
-              albumUrl,
-              title,
-              thumbnail: images[0] || bestCover || "",
-            });
-          } catch {
-            // Si el fetch del álbum falla, usar el fragmento final de la URL como título
-            const fallbackTitle = decodeURIComponent(albumUrl.split("/").pop() ?? "Producto");
-            albums.push({ albumUrl, title: fallbackTitle, thumbnail });
-          }
+        for (let i = 0; i < rawFetched.length; i++) {
+          const { albumUrl, rawTitle, firstImage } = rawFetched[i];
+          if (i > 0) await new Promise((r) => setTimeout(r, 200));
+          const title = (await translateChineseToSpanish(rawTitle)) || rawTitle;
+          albums.push({ albumUrl, title, thumbnail: firstImage });
         }
 
         return { albums };
@@ -1803,7 +1794,6 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       coverUrl?: string;
       password?: string;
       category?: string;
-      maxImages?: number;
     }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
@@ -1812,7 +1802,6 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       coverUrl: str(data?.coverUrl, 1000).trim(),
       password: str(data?.password ?? "", 100).trim(),
       category: str(data?.category, 100).trim(),
-      maxImages: Math.min(Math.max(Number(data?.maxImages ?? 8) || 8, 1), 50),
     }),
   )
   .handler(
@@ -1851,7 +1840,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         const bestCover = data.coverUrl || albumCover;
         const rawImages = extractAlbumImages(html);
         const orderedImages = prioritizeCoverImage(rawImages, bestCover);
-        const imageUrls = orderedImages.slice(0, data.maxImages);
+        const imageUrls = orderedImages; // sin límite: se importan todas las fotos disponibles
 
         if (imageUrls.length === 0) {
           return { error: "No se encontraron imágenes en el álbum." };
@@ -1968,5 +1957,10 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       } catch (err) {
         return { error: err instanceof Error ? err.message : "Error al importar el álbum." };
       }
+    },
+  );
+      } catch (err) {
+  return { error: err instanceof Error ? err.message : "Error al importar el álbum." };
+}
     },
   );
