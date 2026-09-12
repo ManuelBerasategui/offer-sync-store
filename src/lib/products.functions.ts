@@ -1461,6 +1461,7 @@ function extractAlbumTitle(html: string): string {
 /**
  * Traduce texto con caracteres chinos/asiáticos a español automáticamente.
  * Aplica correcciones automáticas para terminología común de indumentaria deportiva.
+ * Incluye reintentos con backoff exponencial para tolerar el rate-limiting de Google Translate.
  */
 export async function translateChineseToSpanish(text?: string | null): Promise<string> {
   const clean = String(text ?? "").trim();
@@ -1470,32 +1471,49 @@ export async function translateChineseToSpanish(text?: string | null): Promise<s
   const hasChinese = /[\u4e00-\u9fa5]/.test(clean);
   if (!hasChinese) return clean;
 
-  try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(clean)}`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!res.ok) return clean;
-    const data = await res.json();
-    let translated = Array.isArray(data?.[0])
-      ? data[0].map((item: unknown) => (Array.isArray(item) && typeof item[0] === "string" ? item[0] : "")).join("")
-      : clean;
+  const MAX_RETRIES = 3;
+  const BASE_DELAY_MS = 600; // backoff: 600ms, 1200ms, 2400ms
 
-    // Normalizar términos deportivos comunes traducidos de forma literal
-    translated = translated
-      .replace(/segundo invitado/gi, "Tercera")
-      .replace(/primer invitado/gi, "Segunda")
-      .replace(/tercer invitado/gi, "Tercera")
-      .replace(/invitado/gi, "Visitante")
-      .replace(/pasajero/gi, "Visitante")
-      .replace(/\s+/g, " ")
-      .trim();
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) {
+        // Esperar antes de reintentar (backoff exponencial)
+        await new Promise((r) => setTimeout(r, BASE_DELAY_MS * 2 ** (attempt - 1)));
+      }
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(clean)}`;
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(8000),
+      });
+      // 429 / 5xx → reintentar; cualquier otro error no recuperable → salir
+      if (res.status === 429 || res.status >= 500) {
+        if (attempt < MAX_RETRIES - 1) continue;
+        return clean;
+      }
+      if (!res.ok) return clean;
 
-    return translated || clean;
-  } catch {
-    return clean;
+      const data = await res.json();
+      let translated = Array.isArray(data?.[0])
+        ? data[0].map((item: unknown) => (Array.isArray(item) && typeof item[0] === "string" ? item[0] : "")).join("")
+        : clean;
+
+      // Normalizar términos deportivos comunes traducidos de forma literal
+      translated = translated
+        .replace(/segundo invitado/gi, "Tercera")
+        .replace(/primer invitado/gi, "Segunda")
+        .replace(/tercer invitado/gi, "Tercera")
+        .replace(/invitado/gi, "Visitante")
+        .replace(/pasajero/gi, "Visitante")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      return translated || clean;
+    } catch {
+      if (attempt < MAX_RETRIES - 1) continue;
+      return clean;
+    }
   }
+  return clean;
 }
 
 /** Convierte URLs de thumbnail de Yupoo (small/medium/square/thumb) a alta resolución (big). */
@@ -1738,31 +1756,33 @@ export const parseYupooPage = createServerFn({ method: "POST" })
           return { error: "No se encontraron álbumes en la página. Verificá la URL y la contraseña." };
         }
 
-        // Enriquecer con título (fetch en paralelo, hasta 5 simultáneos para no saturar)
+        // Enriquecer con título: procesamiento secuencial para no saturar Google Translate
+        // (con Promise.all en paralelo, el rate-limiting de la API deja títulos sin traducir)
         const MAX_TITLE_FETCH = 30; // límite para no exceder tiempo de worker
         const toFetch = rawAlbums.slice(0, MAX_TITLE_FETCH);
 
-        const albums: YupooAlbumPreview[] = await Promise.all(
-          toFetch.map(async ({ albumUrl, thumbnail }) => {
-            try {
-              const aRes = await fetch(albumUrl, { headers, signal: AbortSignal.timeout(8000) });
-              const aHtml = await aRes.text();
-              const rawTitle = extractAlbumTitle(aHtml) || albumUrl.split("/").pop() || "Producto";
-              const title = (await translateChineseToSpanish(rawTitle)) || rawTitle;
-              const albumCover = extractAlbumCover(aHtml);
-              const bestCover = thumbnail || albumCover;
-              const rawImages = extractAlbumImages(aHtml);
-              const images = prioritizeCoverImage(rawImages, bestCover);
-              return {
-                albumUrl,
-                title,
-                thumbnail: images[0] || bestCover || "",
-              };
-            } catch {
-              return { albumUrl, title: albumUrl.split("/").pop() ?? "Producto", thumbnail };
-            }
-          }),
-        );
+        const albums: YupooAlbumPreview[] = [];
+        for (const { albumUrl, thumbnail } of toFetch) {
+          try {
+            const aRes = await fetch(albumUrl, { headers, signal: AbortSignal.timeout(8000) });
+            const aHtml = await aRes.text();
+            const rawTitle = extractAlbumTitle(aHtml) || albumUrl.split("/").pop() || "Producto";
+            const title = (await translateChineseToSpanish(rawTitle)) || rawTitle;
+            const albumCover = extractAlbumCover(aHtml);
+            const bestCover = thumbnail || albumCover;
+            const rawImages = extractAlbumImages(aHtml);
+            const images = prioritizeCoverImage(rawImages, bestCover);
+            albums.push({
+              albumUrl,
+              title,
+              thumbnail: images[0] || bestCover || "",
+            });
+          } catch {
+            // Si el fetch del álbum falla, usar el fragmento final de la URL como título
+            const fallbackTitle = decodeURIComponent(albumUrl.split("/").pop() ?? "Producto");
+            albums.push({ albumUrl, title: fallbackTitle, thumbnail });
+          }
+        }
 
         return { albums };
       } catch (err) {
