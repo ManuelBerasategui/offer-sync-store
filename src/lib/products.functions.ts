@@ -1803,6 +1803,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       coverUrl?: string;
       password?: string;
       category?: string;
+      maxImages?: number;
     }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
@@ -1811,6 +1812,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       coverUrl: str(data?.coverUrl, 1000).trim(),
       password: str(data?.password ?? "", 100).trim(),
       category: str(data?.category, 100).trim(),
+      maxImages: Math.min(Math.max(Number(data?.maxImages ?? 8) || 8, 1), 50),
     }),
   )
   .handler(
@@ -1849,7 +1851,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         const bestCover = data.coverUrl || albumCover;
         const rawImages = extractAlbumImages(html);
         const orderedImages = prioritizeCoverImage(rawImages, bestCover);
-        const imageUrls = orderedImages; // sin límite: se importan todas las fotos disponibles
+        const imageUrls = orderedImages.slice(0, data.maxImages);
 
         if (imageUrls.length === 0) {
           return { error: "No se encontraron imágenes en el álbum." };
