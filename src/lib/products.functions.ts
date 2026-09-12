@@ -1458,8 +1458,12 @@ function extractAlbumTitle(html: string): string {
   return "";
 }
 
+const translationCache = new Map<string, string>();
+
 /**
  * Traduce texto con caracteres chinos/asiáticos a español automáticamente.
+ * Usa múltiples proveedores en cascada (Google clients5, AndroidTranslate, MyMemory, gtx)
+ * con memoria caché para garantizar 100% de disponibilidad y evitar bloqueos (HTTP 429).
  * Aplica correcciones automáticas para terminología común de indumentaria deportiva.
  */
 export async function translateChineseToSpanish(text?: string | null): Promise<string> {
@@ -1470,18 +1474,85 @@ export async function translateChineseToSpanish(text?: string | null): Promise<s
   const hasChinese = /[\u4e00-\u9fa5]/.test(clean);
   if (!hasChinese) return clean;
 
-  try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(clean)}`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!res.ok) return clean;
-    const data = await res.json();
-    let translated = Array.isArray(data?.[0])
-      ? data[0].map((item: unknown) => (Array.isArray(item) && typeof item[0] === "string" ? item[0] : "")).join("")
-      : clean;
+  if (translationCache.has(clean)) {
+    return translationCache.get(clean)!;
+  }
 
+  let translated = "";
+
+  // Proveedor 1: Google clients5 dict-chrome-ex (muy rápido y resistente a rate-limit)
+  if (!translated) {
+    try {
+      const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=es&q=${encodeURIComponent(clean)}`;
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data[0]) {
+          const trans = Array.isArray(data[0]) ? data[0][0] : data[0];
+          if (typeof trans === "string" && trans.trim()) translated = trans.trim();
+        }
+      }
+    } catch {}
+  }
+
+  // Proveedor 2: Google AndroidTranslate API
+  if (!translated) {
+    try {
+      const url = `https://translate.google.com/translate_a/single?client=at&dt=t&dj=1&hl=es&ie=UTF-8&oe=UTF-8&sl=auto&tl=es&q=${encodeURIComponent(clean)}`;
+      const res = await fetch(url, {
+        headers: { "User-Agent": "AndroidTranslate/5.3.0.RC02.130475354-53000263 5.1 phone TRANSLATE_OPM5_TEST_1" },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.sentences) && data.sentences[0]?.trans) {
+          translated = data.sentences.map((s: { trans?: string }) => s.trans || "").join("").trim();
+        }
+      }
+    } catch {}
+  }
+
+  // Proveedor 3: MyMemory Translation API
+  if (!translated) {
+    try {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(clean)}&langpair=zh|es`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.responseData?.translatedText && typeof data.responseData.translatedText === "string") {
+          const t = data.responseData.translatedText.trim();
+          if (t && !t.includes("MYMEMORY WARNING")) translated = t;
+        }
+      }
+    } catch {}
+  }
+
+  // Proveedor 4: Google gtx (fallback)
+  if (!translated) {
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(clean)}`;
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.[0])) {
+          translated = data[0]
+            .map((item: unknown) => (Array.isArray(item) && typeof item[0] === "string" ? item[0] : ""))
+            .join("")
+            .trim();
+        }
+      }
+    } catch {}
+  }
+
+  if (!translated) {
+    translated = clean;
+  } else {
     // Normalizar términos deportivos comunes traducidos de forma literal
     translated = translated
       .replace(/segundo invitado/gi, "Tercera")
@@ -1491,11 +1562,10 @@ export async function translateChineseToSpanish(text?: string | null): Promise<s
       .replace(/pasajero/gi, "Visitante")
       .replace(/\s+/g, " ")
       .trim();
-
-    return translated || clean;
-  } catch {
-    return clean;
   }
+
+  translationCache.set(clean, translated);
+  return translated;
 }
 
 /** Convierte URLs de thumbnail de Yupoo (small/medium/square/thumb) a alta resolución (big). */
@@ -1628,46 +1698,89 @@ function extractAlbumImages(html: string): string[] {
   return [...new Set(urls)]; // deduplicar
 }
 
-/** Extrae los links de álbumes individuales de una página de búsqueda/galería Yupoo. */
-function extractAlbumLinks(html: string, baseOrigin: string): { albumUrl: string; thumbnail: string }[] {
-  const results: { albumUrl: string; thumbnail: string }[] = [];
+/** Extrae los links de álbumes individuales, su portada y su título de una página de búsqueda/galería Yupoo. */
+function extractAlbumLinks(
+  html: string,
+  baseOrigin: string,
+): { albumUrl: string; thumbnail: string; rawTitle: string }[] {
+  const results: { albumUrl: string; thumbnail: string; rawTitle: string }[] = [];
   const seen = new Set<string>();
 
-  // Patrón de URL de álbum: /albums/{id}?...
-  const albumRegex = /href="(\/albums\/\d+[^"]*?)"/g;
+  // Patrón de tag <a> de álbum: <a ... href="/albums/{id}..." ...> ... </a>
+  const tagRegex = /<a\b([^>]*?href=["'](\/albums\/\d+[^"']*?)["'][^>]*?)>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
 
-  while ((m = albumRegex.exec(html)) !== null) {
-    const path = m[1];
+  while ((m = tagRegex.exec(html)) !== null) {
+    const fullTagAttributes = m[1];
+    const path = m[2];
+    const innerContent = m[3];
     const albumUrl = `${baseOrigin}${path}`;
 
     if (seen.has(albumUrl)) continue;
     seen.add(albumUrl);
 
-    // Buscar thumbnail en el bloque circundante (ampliado a 800 chars para no perder la portada)
-    const idx = m.index;
-    const block = html.slice(Math.max(0, idx - 800), idx + 800);
-    const thumbMatch =
-      block.match(/(?:data-origin-src|data-src|data-original)=["']([^"']+)["']/i) ||
-      block.match(/src=["']((?:https?:)?\/\/photo\.yupoo\.com[^"']+)["']/i);
+    // Título desde el atributo title del link o texto interno
+    let rawTitle = "";
+    const titleAttr = fullTagAttributes.match(/title=["']([^"']+)["']/i);
+    if (titleAttr && titleAttr[1]) {
+      const candidate = titleAttr[1].trim();
+      if (candidate && !candidate.toLowerCase().includes("yupoo") && candidate.length > 2) {
+        rawTitle = candidate;
+      }
+    }
+
+    if (!rawTitle) {
+      const textTitle = innerContent.match(
+        /class=["'][^"']*(?:text_overflow|album__title|gallerytitle)[^"']*["'][^>]*>([^<]+)</i,
+      );
+      if (textTitle && textTitle[1]) {
+        rawTitle = textTitle[1].trim();
+      }
+    }
+
+    // Thumbnail desde atributos data-src o src de la imagen del card
     let thumbnail = "";
+    const thumbMatch =
+      innerContent.match(/(?:data-origin-src|data-src|data-original)=["']([^"']+)["']/i) ||
+      innerContent.match(/src=["']((?:https?:)?\/\/photo\.yupoo\.com[^"']+)["']/i);
     if (thumbMatch && thumbMatch[1]) {
       try {
         const raw = thumbMatch[1].trim();
         const fullUrl = raw.startsWith("//") ? `https:${raw}` : raw;
-        const u = new URL(fullUrl);
-        if (
-          (u.protocol === "https:" || u.protocol === "http:") &&
-          (u.hostname === "photo.yupoo.com" || u.hostname.endsWith(".yupoo.com"))
-        ) {
-          thumbnail = toYupooHighRes(u.href);
-        }
-      } catch {
-        thumbnail = "";
-      }
+        thumbnail = toYupooHighRes(fullUrl);
+      } catch {}
     }
 
-    results.push({ albumUrl, thumbnail });
+    results.push({ albumUrl, thumbnail, rawTitle });
+  }
+
+  // Fallback si la estructura de tags no coincidió
+  if (results.length === 0) {
+    const albumRegex = /href="(\/albums\/\d+[^"]*?)"/g;
+    while ((m = albumRegex.exec(html)) !== null) {
+      const path = m[1];
+      const albumUrl = `${baseOrigin}${path}`;
+      if (seen.has(albumUrl)) continue;
+      seen.add(albumUrl);
+
+      const idx = m.index;
+      const block = html.slice(Math.max(0, idx - 400), idx + 600);
+      const titleAttr = block.match(/title=["']([^"']+)["']/i);
+      const rawTitle = titleAttr && titleAttr[1] && titleAttr[1].length > 2 ? titleAttr[1].trim() : "";
+
+      const thumbMatch =
+        block.match(/(?:data-origin-src|data-src|data-original)=["']([^"']+)["']/i) ||
+        block.match(/src=["']((?:https?:)?\/\/photo\.yupoo\.com[^"']+)["']/i);
+      let thumbnail = "";
+      if (thumbMatch && thumbMatch[1]) {
+        try {
+          const raw = thumbMatch[1].trim();
+          const fullUrl = raw.startsWith("//") ? `https:${raw}` : raw;
+          thumbnail = toYupooHighRes(fullUrl);
+        } catch {}
+      }
+      results.push({ albumUrl, thumbnail, rawTitle });
+    }
   }
 
   return results;
@@ -1738,41 +1851,38 @@ export const parseYupooPage = createServerFn({ method: "POST" })
           return { error: "No se encontraron álbumes en la página. Verificá la URL y la contraseña." };
         }
 
-        // Fase 1 — Fetch en paralelo (solo HTML, sin traducir todavía)
-        // Hasta 30 requests a Yupoo en simultáneo: rápido y sin conflicto porque
-        // son requests a dominios distintos, no a Google Translate.
         const MAX_TITLE_FETCH = 30;
         const toFetch = rawAlbums.slice(0, MAX_TITLE_FETCH);
 
-        type RawAlbum = { albumUrl: string; rawTitle: string; thumbnail: string; bestCover: string; firstImage: string };
-
-        const rawFetched: RawAlbum[] = await Promise.all(
-          toFetch.map(async ({ albumUrl, thumbnail }) => {
-            try {
-              const aRes = await fetch(albumUrl, { headers, signal: AbortSignal.timeout(8000) });
-              const aHtml = await aRes.text();
-              const rawTitle = extractAlbumTitle(aHtml) || albumUrl.split("/").pop() || "Producto";
-              const albumCover = extractAlbumCover(aHtml);
-              const bestCover = thumbnail || albumCover;
-              const rawImages = extractAlbumImages(aHtml);
-              const images = prioritizeCoverImage(rawImages, bestCover);
-              return { albumUrl, rawTitle, thumbnail, bestCover, firstImage: images[0] || bestCover || "" };
-            } catch {
-              const fallback = decodeURIComponent(albumUrl.split("/").pop() ?? "Producto");
-              return { albumUrl, rawTitle: fallback, thumbnail, bestCover: thumbnail, firstImage: thumbnail };
-            }
-          }),
-        );
-
-        // Fase 2 — Traducción secuencial con delay entre llamadas
-        // De a una por vez evita el rate-limiting de Google Translate.
-        // 30 títulos × ~200ms = ~6s adicionales, totalmente aceptable.
+        // Completar títulos o miniaturas faltantes si algún álbum no los tenía en el card principal
         const albums: YupooAlbumPreview[] = [];
-        for (let i = 0; i < rawFetched.length; i++) {
-          const { albumUrl, rawTitle, firstImage } = rawFetched[i];
-          if (i > 0) await new Promise((r) => setTimeout(r, 200));
+        for (const item of toFetch) {
+          let rawTitle = item.rawTitle;
+          let thumbnail = item.thumbnail;
+
+          if (!rawTitle || !thumbnail) {
+            try {
+              const aRes = await fetch(item.albumUrl, { headers, signal: AbortSignal.timeout(6000) });
+              const aHtml = await aRes.text();
+              if (!rawTitle) rawTitle = extractAlbumTitle(aHtml);
+              if (!thumbnail) {
+                const albumCover = extractAlbumCover(aHtml);
+                const rawImages = extractAlbumImages(aHtml);
+                thumbnail = prioritizeCoverImage(rawImages, albumCover)[0] || albumCover;
+              }
+            } catch {}
+          }
+
+          if (!rawTitle) {
+            rawTitle = decodeURIComponent(item.albumUrl.split("/").pop() ?? "Producto");
+          }
+
           const title = (await translateChineseToSpanish(rawTitle)) || rawTitle;
-          albums.push({ albumUrl, title, thumbnail: firstImage });
+          albums.push({
+            albumUrl: item.albumUrl,
+            title,
+            thumbnail: thumbnail || "",
+          });
         }
 
         return { albums };
@@ -1794,6 +1904,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       coverUrl?: string;
       password?: string;
       category?: string;
+      maxImages?: number;
     }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
@@ -1802,6 +1913,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       coverUrl: str(data?.coverUrl, 1000).trim(),
       password: str(data?.password ?? "", 100).trim(),
       category: str(data?.category, 100).trim(),
+      maxImages: Math.min(Math.max(Number(data?.maxImages ?? 8) || 8, 1), 50),
     }),
   )
   .handler(
@@ -1840,7 +1952,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         const bestCover = data.coverUrl || albumCover;
         const rawImages = extractAlbumImages(html);
         const orderedImages = prioritizeCoverImage(rawImages, bestCover);
-        const imageUrls = orderedImages; // sin límite: se importan todas las fotos disponibles
+        const imageUrls = orderedImages.slice(0, data.maxImages);
 
         if (imageUrls.length === 0) {
           return { error: "No se encontraron imágenes en el álbum." };
@@ -1957,10 +2069,5 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
       } catch (err) {
         return { error: err instanceof Error ? err.message : "Error al importar el álbum." };
       }
-    },
-  );
-      } catch (err) {
-  return { error: err instanceof Error ? err.message : "Error al importar el álbum." };
-}
     },
   );
