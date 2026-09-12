@@ -2635,6 +2635,7 @@ function YupooImporter({
   const [url, setUrl] = useState("");
   const [category, setCategory] = useState("");
   const [password, setPassword] = useState("");
+  const [maxImages, setMaxImages] = useState("8");
   const [searching, setSearching] = useState(false);
   const [importing, setImporting] = useState(false);
   const [albums, setAlbums] = useState<AlbumRow[]>([]);
@@ -2878,6 +2879,19 @@ function YupooImporter({
                 placeholder="Ej: 111333"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label-sm">Máx fotos</label>
+              <input
+                id="yupoo-max-images"
+                type="number"
+                min={1}
+                max={50}
+                className="input-base w-24"
+                placeholder="8"
+                value={maxImages}
+                onChange={(e) => setMaxImages(e.target.value)}
               />
             </div>
           </div>
