@@ -385,7 +385,8 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         };
       } else {
         // EN EDICIÓN GENERAL DE PRODUCTO EXISTENTE:
-        // NO se tocan ni recalculan las columnas de precio bajo ninguna circunstancia
+        // NO se tocan ni recalculan las columnas de precio base principal,
+        // pero sí se preservan y actualizan los datos de oferta si fueron provistos
         row = {
           nombre: p.nombre,
           categoria: p.categoria,
@@ -398,6 +399,19 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
           imagen_url: p.imagen_url ?? null,
           metadata: Object.keys(metadata).length > 0 ? metadata : null,
         };
+
+        if (p.precio_oferta !== undefined) {
+          row.precio_oferta = p.precio_oferta ? String(p.precio_oferta) : null;
+        }
+        if (p.precio_oferta_usd !== undefined) {
+          row.precio_oferta_usd = p.precio_oferta_usd ? Number(p.precio_oferta_usd) : null;
+        }
+        if (p.precio_oferta_base !== undefined) {
+          row.precio_oferta_base = p.precio_oferta_base ? Number(p.precio_oferta_base) : null;
+        }
+        if (p.moneda_oferta_base !== undefined) {
+          row.moneda_oferta_base = p.moneda_oferta_base || null;
+        }
       }
 
       let productId: string;

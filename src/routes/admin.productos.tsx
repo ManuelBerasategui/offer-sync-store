@@ -34,7 +34,7 @@ import {
   type YupooAlbumPreview,
 } from "@/lib/products.functions";
 import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 
 export const Route = createFileRoute("/admin/productos")({
@@ -3451,6 +3451,9 @@ function AdminProductosPage() {
                           {paginatedFiltered.map((p) => {
                             const pid = String(p.id ?? "");
                             const isOffer = String(p.oferta ?? "").trim().toUpperCase() === "SI";
+                            const effPrice = priceOf(p);
+                            const origPrice = originalPriceOf(p);
+                            const isDiscounted = isOffer && origPrice > effPrice && effPrice > 0;
                             const isSelected = selectedIds.includes(pid);
                             const isExpanded = Boolean(expandedVariants[pid]);
                             const variantsList = p.variants ?? [];
@@ -3492,13 +3495,13 @@ function AdminProductosPage() {
 
                                       {/* Precio en Celular */}
                                       <div className="text-xs font-bold text-primary sm:hidden">
-                                        {isOffer && p.precio_oferta ? (
+                                        {isDiscounted ? (
                                           <span className="flex items-center gap-1">
-                                            <span>{money(p.precio_oferta)}</span>
-                                            <span className="line-through text-[10px] text-muted-foreground font-normal">{money(p.precio)}</span>
+                                            <span>{money(effPrice)}</span>
+                                            <span className="line-through text-[10px] text-muted-foreground font-normal">{money(origPrice)}</span>
                                           </span>
                                         ) : (
-                                          <span>{money(p.precio)}</span>
+                                          <span>{money(origPrice || effPrice)}</span>
                                         )}
                                       </div>
 
@@ -3519,13 +3522,13 @@ function AdminProductosPage() {
                                   </td>
                                   <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
                                   <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
-                                    {isOffer && p.precio_oferta ? (
+                                    {isDiscounted ? (
                                       <div className="flex flex-col items-end">
-                                        <span className="font-bold text-primary">{money(p.precio_oferta)}</span>
-                                        <span className="line-through text-[11px] text-muted-foreground">{money(p.precio)}</span>
+                                        <span className="font-bold text-primary">{money(effPrice)}</span>
+                                        <span className="line-through text-[11px] text-muted-foreground">{money(origPrice)}</span>
                                       </div>
                                     ) : (
-                                      money(p.precio)
+                                      money(origPrice || effPrice)
                                     )}
                                   </td>
                                   <td className="px-3 py-3 sm:px-4 text-center">
