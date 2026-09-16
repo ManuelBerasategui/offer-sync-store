@@ -208,7 +208,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (item.id.startsWith("combo-")) {
         const rawIdx = item.id.replace("combo-", "");
         const bannerIdx = !isNaN(Number(rawIdx)) ? Number(rawIdx) : -1;
-        const banner = bannerIdx >= 0 ? banners[bannerIdx] : undefined;
+        const banner =
+          bannerIdx >= 0 && bannerIdx < banners.length
+            ? banners[bannerIdx]
+            : banners.find((b) => b.titulo?.trim().toLowerCase() === item.nombre?.trim().toLowerCase());
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rawTiers = banner?.quantity_tiers ?? (banner as any)?.link;
         let tiers: ComboQuantityTier[] | null = null;
@@ -221,18 +224,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
           } catch { /* ignorar */ }
         }
 
+        const bannerBase = banner ? Number(banner.precio ?? 0) : 0;
+        const baseP =
+          bannerBase > 0
+            ? bannerBase
+            : item.basePrice && item.basePrice > 0
+            ? item.basePrice
+            : item.unitPrice;
+
         if (tiers) {
           // Encontrar el tier con mayor cantidad mínima que sea <= qty actual
           const sorted = [...tiers].sort((a, b) => b.units - a.units);
-          const activeTier = sorted.find(t => item.qty >= t.units);
+          const activeTier = sorted.find((t) => item.qty >= t.units);
           if (activeTier) {
             const newPrice = Math.round(activeTier.price);
-            return newPrice === item.unitPrice ? item : { ...item, unitPrice: newPrice };
+            return { ...item, basePrice: Math.round(baseP), unitPrice: newPrice };
           }
         }
         // Sin tier aplicable: mantener precio base (1 unidad)
-        const baseP = item.basePrice ?? item.unitPrice;
-        return baseP === item.unitPrice ? item : { ...item, unitPrice: Math.round(baseP) };
+        return { ...item, basePrice: Math.round(baseP), unitPrice: Math.round(baseP) };
       }
 
       const product = findProduct(products, item.productId || item.id || item.nombre);
@@ -243,19 +253,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const catRule = match?.rule;
       const ruleKey = match?.key;
 
+      const base = item.basePrice && item.basePrice > 0 ? item.basePrice : priceOf(product);
       let unitPrice: number;
       if (Array.isArray(catRule?.discountTiers) && catRule.discountTiers.length > 0 && ruleKey) {
         // Descuento de categoría: reemplaza al individual del producto
         const totalCatUnits = catTotals[ruleKey] ?? 0;
         const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
-        const base = item.basePrice ?? priceOf(product);
         unitPrice = Math.round(base * (1 - percent / 100));
       } else {
         // Fallback: descuento individual por cantidad del producto
-        unitPrice = Math.round(unitPriceFor(product, item.qty, item.basePrice));
+        unitPrice = Math.round(unitPriceFor(product, item.qty, base));
       }
 
-      return unitPrice === item.unitPrice ? item : { ...item, unitPrice };
+      return { ...item, basePrice: Math.round(base), unitPrice };
     });
   }, [items, data?.products, data?.banners, data?.config]);
 
