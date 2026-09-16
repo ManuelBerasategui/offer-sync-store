@@ -180,52 +180,26 @@ function ComboPage() {
             </p>
 
             {basePrice > 0 && (
-              <div className="mt-6 rounded-2xl border border-border/80 bg-surface/40 p-4 sm:p-5">
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    {unitSavings > 0 && (
-                      <span className="tabular-nums text-lg sm:text-xl text-muted-foreground line-through opacity-75">
-                        {money(qty > 1 ? transferPrice(basePrice * qty, discPct) : transferPrice(basePrice, discPct))}
-                      </span>
-                    )}
-                    <span className="tabular-nums text-3xl sm:text-4xl font-extrabold text-foreground">
-                      {qty > 1 ? money(totalTransferPrice) : money(unitTransferPrice)}
+              <div className="mt-4 flex flex-col gap-1.5">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  {unitSavings > 0 && (
+                    <span className="tabular-nums text-base text-muted-foreground line-through">
+                      {money(transferPrice(basePrice, discPct))}
                     </span>
-                    <span className="rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                      {discPct}% OFF Transferencia
-                    </span>
-                    {savingsPct > 0 && (
-                      <span className="rounded-lg bg-primary/15 px-2.5 py-1 text-xs font-bold text-primary border border-primary/20">
-                        🎁 {savingsPct}% OFF x Cantidad
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    o{" "}
-                    {unitSavings > 0 && (
-                      <span className="line-through opacity-75 mr-1">{money(basePrice * qty)}</span>
-                    )}
-                    <span className="font-semibold text-foreground/80">
-                      {qty > 1 ? money(totalListPrice) : money(unitListPrice)}
-                    </span>{" "}
-                    con Mercado Pago
-                    {qty > 1 && (
-                      <span className="ml-1 text-muted-foreground">
-                        ({money(unitListPrice)} c/u)
-                      </span>
-                    )}
-                  </p>
-
-                  {totalSavings > 0 && (
-                    <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded-lg px-3 py-1.5 border border-emerald-500/20">
-                      <span>🎉</span>
-                      <span>
-                        ¡Ahorrás {money(totalSavings)} en total por llevar {qty} unidades ({money(unitSavings)} menos por unidad)!
-                      </span>
-                    </div>
+                  )}
+                  <span className="tabular-nums text-3xl font-bold text-foreground">
+                    {money(unitTransferPrice)}
+                  </span>
+                  <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                    {discPct}% OFF con Transferencia
+                  </span>
+                  {savingsPct > 0 && (
+                    <span className="text-xs font-bold text-primary">({savingsPct}% OFF x volumen)</span>
                   )}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  o <span className="font-semibold text-foreground/80">{money(unitListPrice)}</span> con Mercado Pago
+                </p>
               </div>
             )}
 
@@ -236,7 +210,7 @@ function ComboPage() {
                   <span className="text-base shrink-0 mt-0.5">🎁</span>
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-primary text-xs sm:text-sm">
-                      Descuento por cantidad en {banner.titulo ? banner.titulo.trim() : "este combo"}:
+                      Descuento por cantidad en este combo:
                     </p>
                     <ul className="mt-1.5 space-y-1 text-muted-foreground text-[11px] sm:text-xs">
                       {sortedTiers.map((tier) => {
@@ -290,7 +264,8 @@ function ComboPage() {
                   </label>
                   {qty > 1 && (
                     <span className="text-xs font-semibold text-muted-foreground">
-                      Subtotal: <strong className="text-foreground">{money(totalListPrice)}</strong>
+                      Total: <strong className="text-foreground">{money(totalTransferPrice)}</strong> (Transf.) /{" "}
+                      <strong className="text-foreground/80">{money(totalListPrice)}</strong>
                     </span>
                   )}
                 </div>
@@ -313,14 +288,9 @@ function ComboPage() {
                   >
                     <Plus className="h-4 w-4" />
                   </button>
-                  <span className="text-xs text-primary font-semibold">
-                    {money(unitListPrice)} c/u
+                  <span className="text-xs text-muted-foreground font-medium">
+                    ({money(unitTransferPrice)} c/u transf.)
                   </span>
-                  {activeTier && (
-                    <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                      Precio tramo activo
-                    </span>
-                  )}
                 </div>
               </div>
             )}
