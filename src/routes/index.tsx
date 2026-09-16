@@ -48,38 +48,12 @@ function Home() {
   const { products, banners, config } = data;
 
   const combosScrollRef = useRef<HTMLDivElement>(null);
-  const [isMouseDown, setIsMouseDown] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeftPos, setScrollLeftPos] = useState(0);
-  const hasDraggedRef = useRef(false);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!combosScrollRef.current) return;
-    setIsMouseDown(true);
-    hasDraggedRef.current = false;
-    setStartX(e.pageX - combosScrollRef.current.offsetLeft);
-    setScrollLeftPos(combosScrollRef.current.scrollLeft);
-  };
-
-  const handleMouseLeaveOrUp = () => {
-    setIsMouseDown(false);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isMouseDown || !combosScrollRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - combosScrollRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5;
-    if (Math.abs(walk) > 5) {
-      hasDraggedRef.current = true;
-    }
-    combosScrollRef.current.scrollLeft = scrollLeftPos - walk;
-  };
 
   const scrollCombos = (dir: "left" | "right") => {
-    if (!combosScrollRef.current) return;
+    const el = combosScrollRef.current;
+    if (!el) return;
     const scrollAmount = 380;
-    combosScrollRef.current.scrollBy({
+    el.scrollBy({
       left: dir === "left" ? -scrollAmount : scrollAmount,
       behavior: "smooth",
     });
@@ -256,7 +230,11 @@ function Home() {
                   <div className="hidden sm:flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => scrollCombos("left")}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        scrollCombos("left");
+                      }}
                       aria-label="Deslizar combo anterior"
                       className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all active:scale-95 shadow-xs cursor-pointer"
                     >
@@ -264,7 +242,11 @@ function Home() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => scrollCombos("right")}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        scrollCombos("right");
+                      }}
                       aria-label="Deslizar combo siguiente"
                       className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all active:scale-95 shadow-xs cursor-pointer"
                     >
@@ -279,17 +261,25 @@ function Home() {
                   <>
                     <button
                       type="button"
-                      onClick={() => scrollCombos("left")}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        scrollCombos("left");
+                      }}
                       aria-label="Deslizar hacia la izquierda"
-                      className="absolute -left-3.5 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/95 backdrop-blur-xs text-foreground shadow-md hover:bg-surface hover:border-primary transition-all active:scale-95 cursor-pointer"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/95 backdrop-blur-xs text-foreground shadow-md hover:bg-surface hover:border-primary transition-all active:scale-95 cursor-pointer"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => scrollCombos("right")}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        scrollCombos("right");
+                      }}
                       aria-label="Deslizar hacia la derecha"
-                      className="absolute -right-3.5 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/95 backdrop-blur-xs text-foreground shadow-md hover:bg-surface hover:border-primary transition-all active:scale-95 cursor-pointer"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/95 backdrop-blur-xs text-foreground shadow-md hover:bg-surface hover:border-primary transition-all active:scale-95 cursor-pointer"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
@@ -298,13 +288,9 @@ function Home() {
 
                 <div
                   ref={combosScrollRef}
-                  onMouseDown={handleMouseDown}
-                  onMouseLeave={handleMouseLeaveOrUp}
-                  onMouseUp={handleMouseLeaveOrUp}
-                  onMouseMove={handleMouseMove}
-                  className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 sm:px-0 select-none ${
-                    isMouseDown ? "cursor-grabbing" : "cursor-grab"
-                  } ${banners.length === 1 ? "justify-center" : ""}`}
+                  className={`no-scrollbar flex gap-4 overflow-x-auto px-4 sm:px-0 scroll-smooth ${
+                    banners.length === 1 ? "justify-center" : ""
+                  }`}
                 >
                   {banners.map((b, i) => {
                     const basePrice = toNumber(b.precio);
@@ -316,12 +302,7 @@ function Home() {
                         key={i}
                         to="/combo/$index"
                         params={{ index: String(i) }}
-                        onClick={(e) => {
-                          if (hasDraggedRef.current) {
-                            e.preventDefault();
-                          }
-                        }}
-                        className={`group/card relative flex flex-col snap-center overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${banners.length === 1
+                        className={`group/card relative flex flex-col shrink-0 overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${banners.length === 1
                             ? "w-full max-w-[440px]"
                             : "w-[85vw] max-w-[380px] sm:w-[360px] shrink-0"
                           }`}
