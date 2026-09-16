@@ -87,9 +87,18 @@ function ComboPage() {
   const discPct = transferDiscountPct(config);
 
   // Tiers de precio por cantidad (precio fijo en ARS, sin descuento por transferencia)
-  const tiers = Array.isArray(banner.quantity_tiers) && banner.quantity_tiers.length > 0
-    ? banner.quantity_tiers
-    : null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawTiers = banner.quantity_tiers ?? (banner as any).link;
+  const tiers: ComboQuantityTier[] | null = useMemo(() => {
+    if (Array.isArray(rawTiers) && rawTiers.length > 0) return rawTiers;
+    if (typeof rawTiers === "string" && rawTiers.trim().startsWith("[")) {
+      try {
+        const parsed = JSON.parse(rawTiers);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch { /* ignorar */ }
+    }
+    return null;
+  }, [rawTiers]);
 
   // Precio unitario en lista según cantidad elegida
   const unitListPrice = useMemo(() => {

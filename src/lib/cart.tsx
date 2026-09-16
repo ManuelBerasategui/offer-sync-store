@@ -13,6 +13,7 @@ import {
   categoryDiscountForUnits,
   findRuleForCat,
   normCat,
+  type ComboQuantityTier,
 } from "./store";
 
 export type CartItem = {
@@ -208,9 +209,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const rawIdx = item.id.replace("combo-", "");
         const bannerIdx = !isNaN(Number(rawIdx)) ? Number(rawIdx) : -1;
         const banner = bannerIdx >= 0 ? banners[bannerIdx] : undefined;
-        const tiers = Array.isArray(banner?.quantity_tiers) && banner.quantity_tiers.length > 0
-          ? banner.quantity_tiers
-          : null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawTiers = banner?.quantity_tiers ?? (banner as any)?.link;
+        let tiers: ComboQuantityTier[] | null = null;
+        if (Array.isArray(rawTiers) && rawTiers.length > 0) {
+          tiers = rawTiers;
+        } else if (typeof rawTiers === "string" && rawTiers.trim().startsWith("[")) {
+          try {
+            const parsed = JSON.parse(rawTiers);
+            if (Array.isArray(parsed) && parsed.length > 0) tiers = parsed;
+          } catch { /* ignorar */ }
+        }
 
         if (tiers) {
           // Encontrar el tier con mayor cantidad mínima que sea <= qty actual

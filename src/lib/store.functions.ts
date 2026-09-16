@@ -61,8 +61,16 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
 
       const banners: Banner[] = (bannersRaw ?? []).map((raw: any) => {
         let quantity_tiers: Banner["quantity_tiers"] = null;
-        if (typeof raw.quantity_tiers === "string" && raw.quantity_tiers.length > 0) {
-          try { quantity_tiers = JSON.parse(raw.quantity_tiers); } catch { /* ignorar JSON inválido */ }
+        const candidate = raw.quantity_tiers || raw.link;
+        if (Array.isArray(candidate) && candidate.length > 0) {
+          quantity_tiers = candidate;
+        } else if (typeof candidate === "string" && candidate.trim().startsWith("[")) {
+          try {
+            const parsed = JSON.parse(candidate);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              quantity_tiers = parsed;
+            }
+          } catch { /* ignorar JSON inválido */ }
         }
         return { ...raw, quantity_tiers } as Banner;
       });

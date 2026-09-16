@@ -1194,8 +1194,16 @@ export const getAdminBanners = createServerFn({ method: "POST" })
 
       const parsedBanners: Banner[] = (bannersRes.data ?? []).map((raw: any) => {
         let quantity_tiers: Banner["quantity_tiers"] = null;
-        if (typeof raw.quantity_tiers === "string" && raw.quantity_tiers.length > 0) {
-          try { quantity_tiers = JSON.parse(raw.quantity_tiers); } catch { /* ignorar */ }
+        const candidate = raw.quantity_tiers || raw.link;
+        if (Array.isArray(candidate) && candidate.length > 0) {
+          quantity_tiers = candidate;
+        } else if (typeof candidate === "string" && candidate.trim().startsWith("[")) {
+          try {
+            const parsed = JSON.parse(candidate);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              quantity_tiers = parsed;
+            }
+          } catch { /* ignorar */ }
         }
         return { ...raw, quantity_tiers } as Banner;
       });
@@ -1224,28 +1232,29 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
       const supabaseAdmin = await assertAdmin(data.email, data.token);
       const b = data.banner;
 
+      const tiersJson = Array.isArray(b.quantity_tiers) && b.quantity_tiers.length > 0
+        ? JSON.stringify(b.quantity_tiers)
+        : null;
+
       const fullRow: Record<string, unknown> = {
         titulo: b.titulo,
         subtitulo: b.subtitulo ?? "",
         imagen_url: b.imagen_url ?? "",
-        link: b.link ?? "",
+        link: tiersJson ?? (b.link ?? ""),
         activo: b.activo ?? "SI",
         precio: String(b.precio ?? "0"),
         precio_base: b.precio_base !== undefined && b.precio_base !== null && b.precio_base !== "" ? Number(b.precio_base) : null,
         moneda_base: b.moneda_base ?? "USD",
         precio_usd: b.precio_usd !== undefined && b.precio_usd !== null && b.precio_usd !== "" ? Number(b.precio_usd) : null,
         precio_actualizado_en: new Date().toISOString(),
-        // quantity_tiers se serializa como JSON; si la columna no existe en DB, el retry con basicRow lo omitirá.
-        quantity_tiers: Array.isArray(b.quantity_tiers) && b.quantity_tiers.length > 0
-          ? JSON.stringify(b.quantity_tiers)
-          : null,
+        quantity_tiers: tiersJson,
       };
 
       const basicRow: Record<string, unknown> = {
         titulo: b.titulo,
         subtitulo: b.subtitulo ?? "",
         imagen_url: b.imagen_url ?? "",
-        link: b.link ?? "",
+        link: tiersJson ?? (b.link ?? ""),
         activo: b.activo ?? "SI",
         precio: String(b.precio ?? "0"),
       };
