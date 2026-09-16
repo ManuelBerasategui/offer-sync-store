@@ -229,25 +229,17 @@ function ComboPage() {
               </div>
             )}
 
-            {/* Bloque 🎁 Descuentos por cantidad interactivo */}
+            {/* Bloque 🎁 Descuentos por cantidad en lista clásica */}
             {tiers && sortedTiers.length > 0 && (
-              <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-xs text-foreground">
+              <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 sm:p-3.5 text-xs text-foreground">
                 <div className="flex items-start gap-2.5">
-                  <span className="text-xl shrink-0 mt-0.5">🎁</span>
+                  <span className="text-base shrink-0 mt-0.5">🎁</span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-bold text-primary text-sm">
-                        Descuentos por cantidad en este Combo:
-                      </p>
-                      <span className="text-[11px] text-muted-foreground hidden sm:inline">
-                        Tocá un tramo para seleccionarlo
-                      </span>
-                    </div>
-
-                    <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
+                    <p className="font-bold text-primary text-xs sm:text-sm">
+                      Descuento por cantidad en {banner.titulo ? banner.titulo.trim() : "este combo"}:
+                    </p>
+                    <ul className="mt-1.5 space-y-1 text-muted-foreground text-[11px] sm:text-xs">
                       {sortedTiers.map((tier) => {
-                        const isCurrentActive = activeTier?.units === tier.units;
-                        const isReached = qty >= tier.units;
                         const tierSavings = basePrice > tier.price ? basePrice - tier.price : 0;
                         const tierPct =
                           basePrice > 0 && tierSavings > 0
@@ -255,58 +247,33 @@ function ComboPage() {
                             : 0;
 
                         return (
-                          <button
-                            key={tier.units}
-                            type="button"
-                            onClick={() => setQty(tier.units)}
-                            className={`flex flex-col text-left p-2.5 rounded-lg border transition-all cursor-pointer ${
-                              isCurrentActive
-                                ? "border-primary bg-primary/15 shadow-xs ring-2 ring-primary/40"
-                                : isReached
-                                ? "border-emerald-500/40 bg-emerald-500/10"
-                                : "border-border/70 bg-surface/60 hover:border-primary/50 hover:bg-surface"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-1.5">
-                              <span className="font-bold text-foreground text-xs">
-                                Llevando {tier.units} u. o más
-                              </span>
-                              {isCurrentActive ? (
-                                <span className="rounded bg-primary text-primary-foreground px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider">
-                                  ✓ APLICADO
-                                </span>
-                              ) : isReached ? (
-                                <span className="rounded bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 text-[9px] font-bold uppercase">
-                                  alcanzado
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-medium text-muted-foreground">
-                                  Faltan {tier.units - qty} u.
-                                </span>
-                              )}
-                            </div>
-                            <div className="mt-1 flex items-baseline gap-1.5">
-                              <span className="font-extrabold text-sm text-primary">
-                                {money(tier.price)}{" "}
-                                <span className="text-[10px] font-normal text-muted-foreground">c/u</span>
-                              </span>
-                              {tierPct > 0 && (
-                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                  -{tierPct}% OFF
-                                </span>
-                              )}
-                            </div>
-                          </button>
+                          <li key={tier.units} className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-foreground">
+                              • Llevando {tier.units} u. o más:
+                            </span>
+                            <span className="font-bold text-primary">
+                              {tierPct > 0 ? `${tierPct}% OFF ` : ""}({money(tier.price)} c/u)
+                            </span>
+                          </li>
                         );
                       })}
-                    </div>
-
-                    {nextTier && (
-                      <p className="mt-2.5 text-[11px] text-muted-foreground flex items-center gap-1">
-                        <span>💡</span>
+                    </ul>
+                    {nextTier ? (
+                      <p className="mt-1.5 text-[11px] text-muted-foreground flex items-start gap-1">
+                        <span className="shrink-0">💡</span>
                         <span>
-                          Llevá <strong className="text-foreground">{nextTier.units - qty} unidad{nextTier.units - qty !== 1 ? "es" : ""} más</strong> para pagar <strong className="text-primary">{money(nextTier.price)} c/u</strong>.
+                          Llevá <strong className="text-foreground">{nextTier.units - qty} unidad{nextTier.units - qty !== 1 ? "es" : ""} más</strong> para pagar{" "}
+                          <strong className="text-primary">{money(nextTier.price)} c/u</strong>
+                          {(() => {
+                            const nextSavings = basePrice > nextTier.price ? basePrice - nextTier.price : 0;
+                            const nextPct = basePrice > 0 && nextSavings > 0 ? Math.round((nextSavings / basePrice) * 100) : 0;
+                            return nextPct > 0 ? <> (<strong className="text-primary">{nextPct}% OFF</strong>)</> : null;
+                          })()}.
                         </span>
+                      </p>
+                    ) : (
+                      <p className="mt-1.5 text-[10px] sm:text-[11px] text-muted-foreground">
+                        Descuento automático por volumen al agregar al carrito.
                       </p>
                     )}
                   </div>

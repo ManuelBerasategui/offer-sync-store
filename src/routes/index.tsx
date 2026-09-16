@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag } from "lucide-react";
+import { useState, useRef } from "react";
+import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -46,6 +46,17 @@ export const Route = createFileRoute("/")({
 function Home() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { products, banners, config } = data;
+
+  const combosScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollCombos = (dir: "left" | "right") => {
+    if (!combosScrollRef.current) return;
+    const scrollAmount = 380;
+    combosScrollRef.current.scrollBy({
+      left: dir === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+  };
 
   const ofertasDelDia = products.filter((p) => hasOffer(p));
 
@@ -207,16 +218,60 @@ function Home() {
 
           {banners.length > 0 && (
             <div className="mb-8">
-              <div className="mb-3.5 flex items-center gap-2.5">
-                <span className="text-xs font-black uppercase tracking-widest text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20">
-                  Combos
-                </span>
-                <div className="h-px flex-1 bg-gradient-to-r from-primary/30 to-transparent" />
+              <div className="mb-3.5 flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5 flex-1">
+                  <span className="text-xs font-black uppercase tracking-widest text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20">
+                    Combos
+                  </span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-primary/30 to-transparent" />
+                </div>
+                {banners.length > 1 && (
+                  <div className="hidden sm:flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => scrollCombos("left")}
+                      aria-label="Deslizar combo anterior"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all active:scale-95 shadow-xs cursor-pointer"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollCombos("right")}
+                      aria-label="Deslizar combo siguiente"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all active:scale-95 shadow-xs cursor-pointer"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="relative -mx-4 sm:mx-0">
+              <div className="relative group -mx-4 sm:mx-0">
+                {banners.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => scrollCombos("left")}
+                      aria-label="Deslizar hacia la izquierda"
+                      className="absolute -left-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/90 backdrop-blur-xs text-foreground shadow-md hover:bg-surface hover:border-primary transition-all active:scale-95 opacity-0 group-hover:opacity-100 cursor-pointer"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollCombos("right")}
+                      aria-label="Deslizar hacia la derecha"
+                      className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/90 backdrop-blur-xs text-foreground shadow-md hover:bg-surface hover:border-primary transition-all active:scale-95 opacity-0 group-hover:opacity-100 cursor-pointer"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+
                 <div
-                  className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${banners.length === 1 ? "justify-center" : ""
+                  ref={combosScrollRef}
+                  className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 sm:px-0 ${banners.length === 1 ? "justify-center" : ""
                     }`}
                 >
                   {banners.map((b, i) => {
@@ -229,7 +284,7 @@ function Home() {
                         key={i}
                         to="/combo/$index"
                         params={{ index: String(i) }}
-                        className={`group relative flex flex-col snap-center overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${banners.length === 1
+                        className={`group/card relative flex flex-col snap-center overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${banners.length === 1
                             ? "w-full max-w-[440px]"
                             : "w-[85vw] max-w-[380px] sm:w-[360px] shrink-0"
                           }`}
@@ -240,14 +295,20 @@ function Home() {
                             src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
                             alt={b.titulo ?? ""}
                             referrerPolicy="no-referrer"
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-105"
                             onError={onImageError(b.imagen_url)}
                           />
+                          {/* Badge si tiene tramos de descuento por cantidad */}
+                          {Array.isArray(b.quantity_tiers) && b.quantity_tiers.length > 0 && (
+                            <span className="absolute bottom-2 left-2 rounded-md bg-background/90 backdrop-blur-xs px-2 py-0.5 text-[10px] font-bold text-primary border border-primary/30 shadow-xs">
+                              🎁 Descuento x cantidad
+                            </span>
+                          )}
                         </div>
 
                         {/* Footer con título y precios bien legibles */}
                         <div className="flex flex-1 flex-col justify-between gap-2 border-t border-border bg-card p-3.5 sm:p-4">
-                          <h3 className="font-bold text-sm sm:text-base text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-1">
+                          <h3 className="font-bold text-sm sm:text-base text-foreground leading-snug group-hover/card:text-primary transition-colors line-clamp-1">
                             {b.titulo}
                           </h3>
 
