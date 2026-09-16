@@ -626,50 +626,32 @@ function ProductoPage() {
                     const activeCatTier = [...allTiers].sort((a, b) => b.units - a.units).find(t => qty >= t.units);
                     const nextCatTier = [...allTiers].sort((a, b) => a.units - b.units).find(t => t.units > qty);
                     return (
-                      <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-xs text-foreground">
-                        <div className="flex items-start gap-2">
-                          <span className="text-base shrink-0 mt-px">🎁</span>
+                      <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 sm:p-3.5 text-xs text-foreground">
+                        <div className="flex items-start gap-2.5">
+                          <span className="text-base shrink-0 mt-0.5">🎁</span>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap mb-2">
-                              <p className="font-bold text-primary text-[13px]">
-                                Descuento por cantidad en {categoryName}:
-                              </p>
-                              {activeCatTier && (
-                                <span className="rounded bg-primary text-primary-foreground px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider">
-                                  ✓ {activeCatTier.percent}% OFF activo
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {allTiers.map((tier) => {
-                                const isActive = activeCatTier?.units === tier.units;
-                                const isReached = qty >= tier.units;
-                                return (
-                                  <span
-                                    key={tier.units}
-                                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold border transition-colors ${
-                                      isActive
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : isReached
-                                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                                        : "bg-background text-muted-foreground border-border/60"
-                                    }`}
-                                  >
-                                    {isActive && <span className="text-[9px]">✓</span>}
-                                    {tier.units} u. → {tier.percent}% OFF
+                            <p className="font-bold text-primary text-xs sm:text-sm">
+                              Descuento por cantidad en {categoryName}:
+                            </p>
+                            <ul className="mt-1.5 space-y-1 text-muted-foreground text-[11px] sm:text-xs">
+                              {allTiers.map((tier) => (
+                                <li key={tier.units} className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-foreground">
+                                    Llevando {tier.units} u. o más:
                                   </span>
-                                );
-                              })}
-                            </div>
+                                  <span className="font-bold text-primary">{tier.percent}% OFF</span>
+                                </li>
+                              ))}
+                            </ul>
                             {nextCatTier ? (
-                              <p className="mt-2 text-[11px] text-muted-foreground flex items-start gap-1">
+                              <p className="mt-1.5 text-[11px] text-muted-foreground flex items-start gap-1">
                                 <span className="shrink-0">💡</span>
                                 <span>
                                   Llevá <strong className="text-foreground">{nextCatTier.units - qty} unidad{nextCatTier.units - qty !== 1 ? "es" : ""} más</strong> para activar el <strong className="text-primary">{nextCatTier.percent}% OFF</strong>. Podés combinar distintos productos de {categoryName}.
                                 </span>
                               </p>
                             ) : (
-                              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                              <p className="mt-1.5 text-[10px] sm:text-[11px] text-muted-foreground">
                                 Podés combinar distintos productos de {categoryName} en tu carrito.
                               </p>
                             )}
@@ -684,50 +666,32 @@ function ProductoPage() {
                     const activeProdTier = [...tiers].sort((a, b) => b.units - a.units).find(t => qty >= t.units);
                     const nextProdTier = [...tiers].sort((a, b) => a.units - b.units).find(t => t.units > qty);
                     return (
-                      <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-xs text-foreground">
-                        <div className="flex items-start gap-2">
-                          <span className="text-base shrink-0 mt-px">🎁</span>
+                      <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 sm:p-3.5 text-xs text-foreground">
+                        <div className="flex items-start gap-2.5">
+                          <span className="text-base shrink-0 mt-0.5">🎁</span>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap mb-2">
-                              <p className="font-bold text-primary text-[13px]">
-                                Descuento por cantidad:
-                              </p>
-                              {activeProdTier && (
-                                <span className="rounded bg-primary text-primary-foreground px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider">
-                                  ✓ {activeProdTier.percent}% OFF activo
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {tiers.map((tier) => {
-                                const isActive = activeProdTier?.units === tier.units;
-                                const isReached = qty >= tier.units;
-                                return (
-                                  <span
-                                    key={tier.units}
-                                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold border transition-colors ${
-                                      isActive
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : isReached
-                                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                                        : "bg-background text-muted-foreground border-border/60"
-                                    }`}
-                                  >
-                                    {isActive && <span className="text-[9px]">✓</span>}
-                                    {tier.units} u. → {tier.percent}% OFF
+                            <p className="font-bold text-primary text-xs sm:text-sm">
+                              Descuento por cantidad en {catName}:
+                            </p>
+                            <ul className="mt-1.5 space-y-1 text-muted-foreground text-[11px] sm:text-xs">
+                              {tiers.map((tier) => (
+                                <li key={tier.units} className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-foreground">
+                                    Llevando {tier.units} u. o más:
                                   </span>
-                                );
-                              })}
-                            </div>
+                                  <span className="font-bold text-primary">{tier.percent}% OFF</span>
+                                </li>
+                              ))}
+                            </ul>
                             {nextProdTier ? (
-                              <p className="mt-2 text-[11px] text-muted-foreground flex items-start gap-1">
+                              <p className="mt-1.5 text-[11px] text-muted-foreground flex items-start gap-1">
                                 <span className="shrink-0">💡</span>
                                 <span>
                                   Llevá <strong className="text-foreground">{nextProdTier.units - qty} unidad{nextProdTier.units - qty !== 1 ? "es" : ""} más</strong> para activar el <strong className="text-primary">{nextProdTier.percent}% OFF</strong> automático.
                                 </span>
                               </p>
                             ) : (
-                              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                              <p className="mt-1.5 text-[10px] sm:text-[11px] text-muted-foreground">
                                 Descuento automático por volumen al agregar al carrito.
                               </p>
                             )}
