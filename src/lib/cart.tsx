@@ -186,6 +186,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const resolvedItems = useMemo(() => {
     const products = data?.products;
+    const banners = data?.banners ?? [];
     const config = data?.config ?? {};
     if (!products || products.length === 0) return items;
 
@@ -202,6 +203,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     return items.map((item) => {
+      // ── Ítems de combo: calcular precio según quantity_tiers del banner ──
+      if (item.id.startsWith("combo-")) {
+        const rawIdx = item.id.replace("combo-", "");
+        const bannerIdx = !isNaN(Number(rawIdx)) ? Number(rawIdx) : -1;
+        const banner = bannerIdx >= 0 ? banners[bannerIdx] : undefined;
+        const tiers = Array.isArray(banner?.quantity_tiers) && banner.quantity_tiers.length > 0
+          ? banner.quantity_tiers
+          : null;
+
+        if (tiers) {
+          // Encontrar el tier con mayor cantidad mínima que sea <= qty actual
+          const sorted = [...tiers].sort((a, b) => b.units - a.units);
+          const activeTier = sorted.find(t => item.qty >= t.units);
+          if (activeTier) {
+            const newPrice = Math.round(activeTier.price);
+            return newPrice === item.unitPrice ? item : { ...item, unitPrice: newPrice };
+          }
+        }
+        // Sin tier aplicable: mantener precio base (1 unidad)
+        const baseP = item.basePrice ?? item.unitPrice;
+        return baseP === item.unitPrice ? item : { ...item, unitPrice: Math.round(baseP) };
+      }
+
       const product = findProduct(products, item.productId || item.id || item.nombre);
       if (!product) return item;
 
@@ -224,7 +248,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       return unitPrice === item.unitPrice ? item : { ...item, unitPrice };
     });
-  }, [items, data?.products, data?.config]);
+  }, [items, data?.products, data?.banners, data?.config]);
 
   const add = useCallback((item: CartItem) => {
     setItems((prev) => {

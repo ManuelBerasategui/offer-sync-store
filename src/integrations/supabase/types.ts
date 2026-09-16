@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      banners: {
+        Row: {
+          id: string
+          titulo: string | null
+          subtitulo: string | null
+          imagen_url: string | null
+          link: string | null
+          activo: string | null
+          precio: string | null
+          precio_usd: number | null
+          precio_base: number | null
+          moneda_base: string | null
+          precio_actualizado_en: string | null
+          quantity_tiers: string | null
+        }
+        Insert: {
+          id?: string
+          titulo?: string | null
+          subtitulo?: string | null
+          imagen_url?: string | null
+          link?: string | null
+          activo?: string | null
+          precio?: string | null
+          precio_usd?: number | null
+          precio_base?: number | null
+          moneda_base?: string | null
+          precio_actualizado_en?: string | null
+          quantity_tiers?: string | null
+        }
+        Update: {
+          id?: string
+          titulo?: string | null
+          subtitulo?: string | null
+          imagen_url?: string | null
+          link?: string | null
+          activo?: string | null
+          precio?: string | null
+          precio_usd?: number | null
+          precio_base?: number | null
+          moneda_base?: string | null
+          precio_actualizado_en?: string | null
+          quantity_tiers?: string | null
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           categoria: string | null

@@ -136,12 +136,15 @@ export const getAdminProducts = createServerFn({ method: "POST" })
       const supabaseAdmin = await assertAdmin(data.email, data.token);
 
       const [productsRes, variantsRes, pricingRes] = await Promise.all([
-        supabaseAdmin.from("products").select("*").order("nombre"),
-        supabaseAdmin.from("product_variants").select("*"),
+        (supabaseAdmin as any).from("products").select("*").order("nombre"),
+        (supabaseAdmin as any).from("product_variants").select("*"),
         (supabaseAdmin as any).from("pricing_settings").select("last_rate, markup_percentage, rounding_increment").eq("id", true).maybeSingle(),
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const productsResTyped = productsRes as { data: any[] | null; error: any };
+      const variantsResTyped = variantsRes as { data: any[] | null; error: any };
 
-      if (productsRes.error) throw productsRes.error;
+      if (productsResTyped.error) throw productsResTyped.error;
 
       let dolarRate = 0;
       let roundingIncrement = 10;
@@ -173,7 +176,7 @@ export const getAdminProducts = createServerFn({ method: "POST" })
       }
 
       const variantsByProduct = new Map<string, ProductVariant[]>();
-      for (const v of variantsRes.data ?? []) {
+      for (const v of variantsResTyped.data ?? []) {
         const pid = String(v.product_id ?? "");
         if (!pid) continue;
         const list = variantsByProduct.get(pid) ?? [];
@@ -181,7 +184,7 @@ export const getAdminProducts = createServerFn({ method: "POST" })
         variantsByProduct.set(pid, list);
       }
 
-      const products: Product[] = (productsRes.data ?? []).map((p) => {
+      const products: Product[] = (productsResTyped.data ?? []).map((p: any) => {
         const meta = typeof p.metadata === "object" && p.metadata !== null ? p.metadata as Record<string, unknown> : {};
         const { metadata, ...rest } = p;
         const linkedVariants = variantsByProduct.get(String(p.id ?? "")) ?? [];
@@ -418,13 +421,15 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
 
       if (p.id) {
         // Actualizar datos generales
-        const { error } = await supabaseAdmin.from("products").update(row).eq("id", p.id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabaseAdmin as any).from("products").update(row).eq("id", p.id);
         if (error) throw error;
         productId = p.id;
       } else {
         // Crear
         const newId = crypto.randomUUID();
-        const { data: inserted, error } = await supabaseAdmin
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: inserted, error } = await (supabaseAdmin as any)
           .from("products")
           .insert({ id: newId, ...row })
           .select("id")
@@ -436,15 +441,17 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       // Gestionar variantes: si es creación o edición general
       if (p.variants !== undefined) {
         // Leer variantes existentes para conservar precios si ya existían
-        const { data: existingVariants } = await supabaseAdmin
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: existingVariants } = await (supabaseAdmin as any)
           .from("product_variants")
           .select("*")
           .eq("product_id", productId);
 
-        const existingMap = new Map((existingVariants ?? []).map((v) => [v.color.toLowerCase().trim(), v]));
+        const existingMap = new Map<string, any>((existingVariants ?? []).map((v: any) => [v.color.toLowerCase().trim(), v]));
 
         // Borrar las existentes
-        await supabaseAdmin.from("product_variants").delete().eq("product_id", productId);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabaseAdmin as any).from("product_variants").delete().eq("product_id", productId);
 
         // Insertar las nuevas
         if (p.variants.length > 0) {
@@ -500,7 +507,8 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
             };
           });
 
-          const { error: vErr } = await supabaseAdmin.from("product_variants").insert(variantRows);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { error: vErr } = await (supabaseAdmin as any).from("product_variants").insert(variantRows);
           if (vErr) throw vErr;
         }
       }
@@ -647,7 +655,8 @@ export const updateProductPrice = createServerFn({ method: "POST" })
         precio_actualizado_en: new Date().toISOString(),
       };
 
-      const { error: prodErr } = await supabaseAdmin
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: prodErr } = await (supabaseAdmin as any)
         .from("products")
         .update(productUpdate)
         .eq("id", data.productId);
@@ -679,9 +688,11 @@ export const updateProductPrice = createServerFn({ method: "POST" })
           };
 
           if (v.id) {
-            await supabaseAdmin.from("product_variants").update(vUpdate).eq("id", v.id);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabaseAdmin as any).from("product_variants").update(vUpdate).eq("id", v.id);
           } else {
-            await supabaseAdmin
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabaseAdmin as any)
               .from("product_variants")
               .update(vUpdate)
               .eq("product_id", data.productId)
@@ -710,8 +721,10 @@ export const deleteAdminProduct = createServerFn({ method: "POST" })
       const supabaseAdmin = await assertAdmin(data.email, data.token);
 
       // Variantes primero (FK)
-      await supabaseAdmin.from("product_variants").delete().eq("product_id", data.productId);
-      const { error } = await supabaseAdmin.from("products").delete().eq("id", data.productId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabaseAdmin as any).from("product_variants").delete().eq("product_id", data.productId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabaseAdmin as any).from("products").delete().eq("id", data.productId);
       if (error) throw error;
 
       return {};
@@ -735,7 +748,8 @@ export const bulkDeleteAdminProducts = createServerFn({ method: "POST" })
 
       // Limpieza defensiva de variantes asociadas (también tienen ON DELETE CASCADE en DB)
       try {
-        await supabaseAdmin
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabaseAdmin as any)
           .from("product_variants")
           .delete()
           .in("product_id", data.productIds);
@@ -743,7 +757,8 @@ export const bulkDeleteAdminProducts = createServerFn({ method: "POST" })
         console.warn("Aviso al limpiar variantes de productos eliminados:", err);
       }
 
-      const { error: prodErr } = await supabaseAdmin
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: prodErr } = await (supabaseAdmin as any)
         .from("products")
         .delete()
         .in("id", data.productIds);
@@ -853,7 +868,8 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
       const supabaseAdmin = await assertAdmin(data.email, data.token);
 
       // Borra todas las reglas de categoría existentes
-      const { error: delErr } = await supabaseAdmin
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: delErr } = await (supabaseAdmin as any)
         .from("site_config")
         .delete()
         .like("clave", "cat_%");
@@ -993,7 +1009,8 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
         }
 
         // 2. Obtener configuración de cupones desde site_config
-        const { data: configRows } = await supabaseAdmin.from("site_config").select("*");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: configRows } = await (supabaseAdmin as any).from("site_config").select("*");
         const configMap: Record<string, string> = {};
         for (const row of configRows ?? []) {
           if (row.clave && row.valor) configMap[row.clave] = row.valor;
@@ -1034,7 +1051,7 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
         }
 
         try {
-          const { data: usageRows } = await supabaseAdmin
+          const { data: usageRows } = await (supabaseAdmin as any)
             .from("coupon_usages")
             .select("id")
             .eq("coupon_code", validCode)
@@ -1079,7 +1096,7 @@ export const getCouponUsagesSummary = createServerFn({ method: "POST" })
       const supabaseAdmin = await assertAdmin(data.email, data.token);
       let count = 0;
       try {
-        const { count: dbCount } = await supabaseAdmin
+        const { count: dbCount } = await (supabaseAdmin as any)
           .from("coupon_usages")
           .select("*", { count: "exact", head: true });
         if (typeof dbCount === "number") count = dbCount;
@@ -1087,7 +1104,7 @@ export const getCouponUsagesSummary = createServerFn({ method: "POST" })
         // ignore
       }
 
-      const { data: scRows } = await supabaseAdmin
+      const { data: scRows } = await (supabaseAdmin as any)
         .from("site_config")
         .select("clave")
         .like("clave", "coupon_usage_%");
@@ -1136,6 +1153,8 @@ export type BannerInput = {
   moneda_base?: "USD" | "ARS" | string | null;
   precio_usd?: number | string | null;
   precio_actualizado_en?: string | null;
+  /** Tramos de precio fijo por cantidad (precio en ARS). Null/undefined = sin descuento por cantidad. */
+  quantity_tiers?: { units: number; price: number }[] | null;
 };
 
 export const getAdminBanners = createServerFn({ method: "POST" })
@@ -1147,7 +1166,8 @@ export const getAdminBanners = createServerFn({ method: "POST" })
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
       const [bannersRes, pricingRes] = await Promise.all([
-        supabaseAdmin.from("banners").select("*"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabaseAdmin as any).from("banners").select("*"),
         (supabaseAdmin as any).from("pricing_settings").select("last_rate, markup_percentage, rounding_increment").eq("id", true).maybeSingle(),
       ]);
       if (bannersRes.error) throw bannersRes.error;
@@ -1172,8 +1192,16 @@ export const getAdminBanners = createServerFn({ method: "POST" })
         } catch { }
       }
 
+      const parsedBanners: Banner[] = (bannersRes.data ?? []).map((raw: any) => {
+        let quantity_tiers: Banner["quantity_tiers"] = null;
+        if (typeof raw.quantity_tiers === "string" && raw.quantity_tiers.length > 0) {
+          try { quantity_tiers = JSON.parse(raw.quantity_tiers); } catch { /* ignorar */ }
+        }
+        return { ...raw, quantity_tiers } as Banner;
+      });
+
       return {
-        banners: (bannersRes.data ?? []) as Banner[],
+        banners: parsedBanners,
         dolarRate: dolarRate || 1500,
         roundingIncrement,
         markupPercentage,
@@ -1207,6 +1235,10 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
         moneda_base: b.moneda_base ?? "USD",
         precio_usd: b.precio_usd !== undefined && b.precio_usd !== null && b.precio_usd !== "" ? Number(b.precio_usd) : null,
         precio_actualizado_en: new Date().toISOString(),
+        // quantity_tiers se serializa como JSON; si la columna no existe en DB, el retry con basicRow lo omitirá.
+        quantity_tiers: Array.isArray(b.quantity_tiers) && b.quantity_tiers.length > 0
+          ? JSON.stringify(b.quantity_tiers)
+          : null,
       };
 
       const basicRow: Record<string, unknown> = {
@@ -1219,17 +1251,20 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
       };
 
       if (b.id) {
-        let { error } = await supabaseAdmin.from("banners").update(fullRow).eq("id", b.id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let { error } = await (supabaseAdmin as any).from("banners").update(fullRow).eq("id", b.id);
         if (error) {
           console.warn("Retrying banner update with basic columns:", error.message);
-          const retry = await supabaseAdmin.from("banners").update(basicRow).eq("id", b.id);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const retry = await (supabaseAdmin as any).from("banners").update(basicRow).eq("id", b.id);
           if (retry.error) throw retry.error;
         }
         return { id: b.id };
       } else {
         const newId = crypto.randomUUID();
         // 1. Intento completo con UUID
-        let { data: ins, error } = await supabaseAdmin
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let { data: ins, error } = await (supabaseAdmin as any)
           .from("banners")
           .insert({ id: newId, ...fullRow })
           .select("id")
@@ -1238,7 +1273,8 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
         // 2. Si falla por columnas nuevas no migradas, reintentar con basicRow y UUID
         if (error) {
           console.warn("Retrying banner insert with basic columns:", error.message);
-          const retryBasic = await supabaseAdmin
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const retryBasic = await (supabaseAdmin as any)
             .from("banners")
             .insert({ id: newId, ...basicRow })
             .select("id")
@@ -1250,7 +1286,8 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
         // 3. Si falla por ID serial / autogenerado, reintentar sin ID
         if (error) {
           console.warn("Retrying banner insert without custom ID:", error.message);
-          const retryNoId = await supabaseAdmin
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const retryNoId = await (supabaseAdmin as any)
             .from("banners")
             .insert(basicRow)
             .select("id")
@@ -1277,7 +1314,8 @@ export const deleteAdminBanner = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ error?: string }> => {
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
-      const { error } = await supabaseAdmin.from("banners").delete().eq("id", data.bannerId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabaseAdmin as any).from("banners").delete().eq("id", data.bannerId);
       if (error) throw error;
       return {};
     } catch (err) {
@@ -1300,7 +1338,7 @@ export const bulkUpdateAdminStock = createServerFn({ method: "POST" })
       if (data.productIds.length === 0) return { success: true };
 
       // 1. Obtener productos para actualizar sus metadata de talles si aplica
-      const { data: prods, error: fetchErr } = await supabaseAdmin
+      const { data: prods, error: fetchErr } = await (supabaseAdmin as any)
         .from("products")
         .select("id, metadata")
         .in("id", data.productIds);
@@ -1321,12 +1359,12 @@ export const bulkUpdateAdminStock = createServerFn({ method: "POST" })
           } else {
             updatedMeta["talles_disponibles"] = tipo === "ZAPATILLAS" ? defaultShoes : defaultClothes;
           }
-          await supabaseAdmin
+          await (supabaseAdmin as any)
             .from("products")
             .update({ stock: data.stock, metadata: updatedMeta })
             .eq("id", p.id);
         } else {
-          await supabaseAdmin
+          await (supabaseAdmin as any)
             .from("products")
             .update({ stock: data.stock })
             .eq("id", p.id);
@@ -1334,7 +1372,8 @@ export const bulkUpdateAdminStock = createServerFn({ method: "POST" })
       }
 
       // 2. Actualizar también todas las variantes de color pertenecientes a estos productos
-      await supabaseAdmin
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabaseAdmin as any)
         .from("product_variants")
         .update({ stock: data.stock })
         .in("product_id", data.productIds);
@@ -1355,7 +1394,7 @@ export const updateVariantStock = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ success?: boolean; error?: string }> => {
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
-      const { error } = await supabaseAdmin
+      const { error } = await (supabaseAdmin as any)
         .from("product_variants")
         .update({ stock: data.stock })
         .eq("id", data.variantId);
@@ -1976,7 +2015,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         // Verificar si ya existe un producto con el mismo nombre (case-insensitive)
         // antes de gastar tiempo y storage subiendo imágenes.
         {
-          const { data: existing } = await supabaseAdmin
+          const { data: existing } = await (supabaseAdmin as any)
             .from("products")
             .select("id, nombre")
             .ilike("nombre", title.trim())
@@ -2055,7 +2094,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         };
 
         const newId = crypto.randomUUID();
-        const { data: inserted, error: insertErr } = await supabaseAdmin
+        const { data: inserted, error: insertErr } = await (supabaseAdmin as any)
           .from("products")
           .insert({
             id: newId,

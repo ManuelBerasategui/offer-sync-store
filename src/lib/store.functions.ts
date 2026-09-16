@@ -8,10 +8,14 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
       const [productsResult, variantsResult, bannersResult, configResult] = await Promise.all([
         // La consulta principal no depende de la tabla opcional de variantes.
         // Así, un error de relación/caché de Supabase nunca deja el catálogo vacío.
-        supabase.from('products').select('*').neq('stock', 'NO'),
-        supabase.from('product_variants').select('*'),
-        supabase.from('banners').select('*').eq('activo', 'SI'),
-        supabase.from('site_config').select('*'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any).from('products').select('*').neq('stock', 'NO'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any).from('product_variants').select('*'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any).from('banners').select('*').eq('activo', 'SI'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any).from('site_config').select('*'),
       ]);
 
       if (productsResult.error) throw productsResult.error;
@@ -30,7 +34,7 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
         variantsByProduct.set(productId, current);
       }
 
-      const products: Product[] = (productsRaw ?? []).map(p => {
+      const products: Product[] = (productsRaw ?? []).map((p: any) => {
         // Expand metadata back onto the product object
         const meta = typeof p.metadata === 'object' && p.metadata !== null ? p.metadata as Record<string, unknown> : {};
         const { metadata, ...rest } = p;
@@ -55,7 +59,13 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
         return { ...meta, ...rest, variants } as Product;
       });
 
-      const banners: Banner[] = (bannersRaw ?? []) as Banner[];
+      const banners: Banner[] = (bannersRaw ?? []).map((raw: any) => {
+        let quantity_tiers: Banner["quantity_tiers"] = null;
+        if (typeof raw.quantity_tiers === "string" && raw.quantity_tiers.length > 0) {
+          try { quantity_tiers = JSON.parse(raw.quantity_tiers); } catch { /* ignorar JSON inválido */ }
+        }
+        return { ...raw, quantity_tiers } as Banner;
+      });
 
       const config: SiteConfig = {};
       for (const row of configRaw ?? []) {

@@ -1955,6 +1955,9 @@ function ComboBuilderPanel({
   const [sourceCurrency, setSourceCurrency] = useState<"USD" | "ARS">("USD");
   const [basePrice, setBasePrice] = useState("");
   const [saving, setSaving] = useState(false);
+  // Tramos de precio por cantidad: precio fijo en ARS
+  const [comboTiers, setComboTiers] = useState<{ units: number; price: number }[]>([]);
+  const [hasTiers, setHasTiers] = useState(false);
 
   // Cálculos en vivo
   const numBase = Number(basePrice.replace(/[^\d.-]/g, "")) || 0;
@@ -2008,6 +2011,8 @@ function ComboBuilderPanel({
     setBasePrice("");
     setCreating(false);
     setEditingBanner(null);
+    setComboTiers([]);
+    setHasTiers(false);
   }
 
   function handleEditClick(b: Banner) {
@@ -2027,20 +2032,26 @@ function ComboBuilderPanel({
     }
 
     setEditingBanner({
-      id: b.id,
+      ...(b.id !== undefined ? { id: b.id } : {}),
       titulo: b.titulo ?? "",
       subtitulo: b.subtitulo ?? "",
       imagen_url: b.imagen_url ?? "",
       precio: String(b.precio ?? ""),
-      precio_base: b.precio_base,
-      moneda_base: b.moneda_base,
-      precio_usd: b.precio_usd,
+      precio_base: b.precio_base ?? null,
+      moneda_base: (b.moneda_base as "USD" | "ARS" | null) ?? null,
+      precio_usd: b.precio_usd ?? null,
       activo: b.activo ?? "SI",
-    });
+    } as BannerInput);
     setComboTitle(b.titulo ?? "");
     setComboSubtitle(b.subtitulo ?? "");
     setComboImage(b.imagen_url ?? "");
     setBasePrice(baseVal);
+    // Cargar tramos existentes
+    const existingTiers = Array.isArray(b.quantity_tiers) && b.quantity_tiers.length > 0
+      ? b.quantity_tiers
+      : [];
+    setComboTiers(existingTiers);
+    setHasTiers(existingTiers.length > 0);
     setCreating(true);
   }
 
@@ -2057,7 +2068,7 @@ function ComboBuilderPanel({
     setSaving(true);
     try {
       const bannerInput: BannerInput = {
-        id: editingBanner?.id,
+        ...(editingBanner?.id !== undefined ? { id: editingBanner.id } : {}),
         titulo: comboTitle,
         subtitulo: comboSubtitle,
         imagen_url: comboImage,
@@ -2066,6 +2077,10 @@ function ComboBuilderPanel({
         moneda_base: sourceCurrency,
         precio_usd: finalUsd > 0 ? finalUsd : null,
         activo: "SI",
+        // Guardar tramos ordenados por cantidad; si no hay, guardar null.
+        quantity_tiers: hasTiers && comboTiers.length > 0
+          ? [...comboTiers].sort((a, b) => a.units - b.units)
+          : null,
       };
 
       const res = await upsertAdminBanner({ data: { email: userEmail, token: userToken, banner: bannerInput } });
@@ -2266,6 +2281,126 @@ function ComboBuilderPanel({
                 folder="combos"
                 label="Arrastrá la foto generada por IA o haz clic para subir"
               />
+            </div>
+
+            {/* ─── Tramos de Precio por Cantidad ─── */}
+            <div className="rounded-xl border border-border bg-surface/60 p-3.5 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <Tag className="h-4 w-4 text-primary" />
+                  Descuento por Cantidad (opcional)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !hasTiers;
+                    setHasTiers(next);
+                    if (next && comboTiers.length === 0 && finalArs > 0) {
+                      // Pre-cargar un tramo de ejemplo con el precio base
+                      setComboTiers([{ units: 3, price: Math.round(finalArs * 0.95) }]);
+                    }
+                    if (!next) setComboTiers([]);
+                  }}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border-2 transition-colors ${hasTiers ? "bg-primary border-primary" : "bg-muted border-border"}`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${hasTiers ? "translate-x-4" : "translate-x-0.5"}`} />
+                </button>
+              </div>
+
+              {hasTiers && (
+                <div className="space-y-2.5">
+                  <p className="text-[11px] text-muted-foreground">
+                    Definí un precio fijo en ARS para cada tramo. El precio de 1 unidad es <strong>{money(finalArs)}</strong> (precio lista).
+                  </p>
+
+                  {/* Encabezado columnas */}
+                  <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-1">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Cantidad mínima</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Precio fijo (ARS)</span>
+                    <span />
+                  </div>
+
+                  {comboTiers.map((tier, idx) => (
+                    <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-2 text-[11px] text-muted-foreground font-semibold">u.</span>
+                        <input
+                          type="number"
+                          min={2}
+                          value={tier.units}
+                          onChange={(e) => {
+                            const updated = [...comboTiers];
+                            const cur = updated[idx];
+                            if (!cur) return;
+                            updated[idx] = { units: Number(e.target.value) || 2, price: cur.price };
+                            setComboTiers(updated);
+                          }}
+                          className="input-base pl-7 text-sm font-bold"
+                          placeholder="3"
+                        />
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-2 text-[11px] text-muted-foreground font-semibold">$</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={tier.price}
+                          onChange={(e) => {
+                            const updated = [...comboTiers];
+                            const cur = updated[idx];
+                            if (!cur) return;
+                            updated[idx] = { units: cur.units, price: Number(e.target.value) || 0 };
+                            setComboTiers(updated);
+                          }}
+                          className="input-base pl-6 text-sm font-bold"
+                          placeholder="30000"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setComboTiers(comboTiers.filter((_, i) => i !== idx))}
+                        className="rounded-lg p-1.5 text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Eliminar tramo"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const lastTier = comboTiers[comboTiers.length - 1];
+                      const newUnits = lastTier ? lastTier.units + 2 : 3;
+                      const newPrice = lastTier ? Math.round(lastTier.price * 0.95) : (finalArs > 0 ? Math.round(finalArs * 0.9) : 0);
+                      setComboTiers([...comboTiers, { units: newUnits, price: newPrice }]);
+                    }}
+                    className="btn-base border border-dashed border-primary/50 text-primary text-xs py-1.5 px-3 hover:bg-primary/5 flex items-center gap-1.5 w-full justify-center"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Agregar tramo de precio
+                  </button>
+
+                  {/* Preview de cómo quedará en la tienda */}
+                  {comboTiers.length > 0 && (
+                    <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-xs mt-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-sm shrink-0">🎁</span>
+                        <div>
+                          <p className="font-bold text-primary text-xs">Vista previa en la tienda:</p>
+                          <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                            {[...comboTiers].sort((a, b) => a.units - b.units).map((t, i) => (
+                              <li key={i} className="flex items-center gap-1">
+                                <span className="font-semibold text-foreground">Llevando {t.units} u. o más:</span>
+                                <span className="font-bold text-primary">{money(t.price)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>

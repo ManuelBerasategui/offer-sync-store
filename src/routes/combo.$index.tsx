@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Minus, Plus } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
@@ -16,6 +17,7 @@ import {
   transferPrice,
   transferDiscountPct,
 } from "@/lib/store";
+import type { ComboQuantityTier } from "@/lib/store";
 
 export const Route = createFileRoute("/combo/$index")({
   loader: ({ context }) => {
@@ -46,6 +48,15 @@ export const Route = createFileRoute("/combo/$index")({
   component: ComboPage,
 });
 
+/** Dado un array de tramos y una cantidad, devuelve el precio fijo aplicable (o null si no hay tramo). */
+function priceForQty(tiers: ComboQuantityTier[], qty: number): number | null {
+  const sorted = [...tiers].sort((a, b) => b.units - a.units); // mayor a menor
+  for (const tier of sorted) {
+    if (qty >= tier.units) return tier.price;
+  }
+  return null;
+}
+
 function ComboPage() {
   const { index } = Route.useParams();
   const navigate = useNavigate();
@@ -53,6 +64,7 @@ function ComboPage() {
   const { banners, config } = data;
   const cart = useCart();
   const [showCheckout, setShowCheckout] = useState(false);
+  const [qty, setQty] = useState(1);
 
   const banner = banners[Number(index)];
 
@@ -73,16 +85,39 @@ function ComboPage() {
 
   const basePrice = toNumber(banner.precio);
   const discPct = transferDiscountPct(config);
-  const tPrice = transferPrice(basePrice, discPct);
+
+  // Tiers de precio por cantidad (precio fijo en ARS, sin descuento por transferencia)
+  const tiers = Array.isArray(banner.quantity_tiers) && banner.quantity_tiers.length > 0
+    ? banner.quantity_tiers
+    : null;
+
+  // Precio unitario en lista según cantidad elegida
+  const unitListPrice = useMemo(() => {
+    if (tiers) {
+      const tierPrice = priceForQty(tiers, qty);
+      if (tierPrice !== null) return tierPrice;
+    }
+    return basePrice;
+  }, [tiers, qty, basePrice]);
+
+  // Precio con descuento por transferencia
+  const unitTransferPrice = transferPrice(unitListPrice, discPct);
+
+  // Total
+  const totalListPrice = unitListPrice * qty;
+  const totalTransferPrice = unitTransferPrice * qty;
 
   const item = {
     id: `combo-${index}`,
     nombre: banner.titulo ?? "Combo",
-    qty: 1,
-    unitPrice: Math.round(basePrice),
+    qty,
+    unitPrice: Math.round(unitListPrice),
     basePrice: Math.round(basePrice),
     imagen: banner.imagen_url || imageUrl(banner.imagen_url),
   };
+
+  const activeTier = tiers ? tiers.find(t => qty >= t.units) : null;
+  const sortedTiers = tiers ? [...tiers].sort((a, b) => a.units - b.units) : [];
 
   return (
     <div className="min-h-screen">
@@ -123,15 +158,96 @@ function ComboPage() {
                 <div className="flex flex-col gap-1">
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="tabular-nums text-3xl sm:text-4xl font-extrabold text-foreground">
-                      {money(tPrice)}
+                      {qty > 1 ? money(totalTransferPrice) : money(unitTransferPrice)}
                     </span>
                     <span className="rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
                       {discPct}% OFF Transferencia
                     </span>
+                    {activeTier && (
+                      <span className="rounded-lg bg-primary/15 px-2.5 py-1 text-xs font-bold text-primary border border-primary/20">
+                        Precio por volumen activo
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con Mercado Pago
+                    o{" "}
+                    <span className="font-semibold text-foreground/80">
+                      {qty > 1 ? money(totalListPrice) : money(unitListPrice)}
+                    </span>{" "}
+                    con Mercado Pago
+                    {qty > 1 && (
+                      <span className="ml-1 text-muted-foreground">
+                        ({money(unitListPrice)} c/u)
+                      </span>
+                    )}
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Bloque 🎁 Descuentos por cantidad */}
+            {tiers && sortedTiers.length > 0 && (
+              <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 sm:p-3.5 text-xs text-foreground">
+                <div className="flex items-start gap-2.5">
+                  <span className="text-base shrink-0 mt-0.5">🎁</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-primary text-xs sm:text-sm">
+                      Descuento por cantidad en este Combo:
+                    </p>
+                    <ul className="mt-1.5 space-y-1 text-muted-foreground text-[11px] sm:text-xs">
+                      {sortedTiers.map((tier) => (
+                        <li
+                          key={tier.units}
+                          className={`flex items-center gap-1.5 ${qty >= tier.units ? "opacity-100" : "opacity-70"}`}
+                        >
+                          <span className="font-semibold text-foreground">
+                            Llevando {tier.units} u. o más:
+                          </span>
+                          <span className="font-bold text-primary">{money(tier.price)}</span>
+                          {qty >= tier.units && (
+                            <span className="ml-1 rounded bg-primary/20 px-1 py-0.5 text-[9px] font-bold text-primary uppercase">activo</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1.5 text-[10px] sm:text-[11px] text-muted-foreground">
+                      Elegí la cantidad abajo para ver el precio aplicado.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Selector de Cantidad */}
+            {basePrice > 0 && (
+              <div className="mt-5">
+                <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+                  Cantidad
+                </label>
+                <div className="mt-2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setQty((q) => Math.max(1, q - 1))}
+                    disabled={qty <= 1}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface text-foreground hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+                    aria-label="Reducir cantidad"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="min-w-[2rem] text-center text-lg font-bold tabular-nums">{qty}</span>
+                  <button
+                    type="button"
+                    onClick={() => setQty((q) => q + 1)}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface text-foreground hover:border-primary hover:text-primary transition-colors"
+                    aria-label="Aumentar cantidad"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                  {tiers && activeTier && (
+                    <span className="text-xs text-primary font-semibold">
+                      {money(unitListPrice)} c/u
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -139,8 +255,8 @@ function ComboPage() {
             <div className="mt-6 flex flex-col gap-3">
               {showCheckout ? (
                 <CheckoutFlow
-                  items={[{ nombre: item.nombre, qty: 1, unitPrice: item.unitPrice }]}
-                  total={item.unitPrice}
+                  items={[{ nombre: item.nombre, qty, unitPrice: item.unitPrice }]}
+                  total={item.unitPrice * qty}
                 />
               ) : (
                 <>

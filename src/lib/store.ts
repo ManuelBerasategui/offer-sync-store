@@ -39,6 +39,11 @@ export type Product = {
     string | number | boolean | ProductVariant[] | undefined | null | Record<string, unknown>;
 };
 
+export type ComboQuantityTier = {
+  units: number;
+  price: number; // precio fijo en ARS a partir de `units` unidades
+};
+
 export type Banner = {
   id?: string;
   titulo?: string;
@@ -51,6 +56,8 @@ export type Banner = {
   precio_base?: number | string | null;
   moneda_base?: "USD" | "ARS" | string | null;
   precio_actualizado_en?: string | null;
+  /** Tramos de precio fijo por cantidad para combos (precio en ARS). */
+  quantity_tiers?: ComboQuantityTier[] | null;
 };
 
 export type SiteConfig = Record<string, string>;
