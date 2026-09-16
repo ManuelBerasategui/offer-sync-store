@@ -226,25 +226,27 @@ function ComboPage() {
                               • Llevando {tier.units} u. o más:
                             </span>
                             <span className="font-bold text-primary">
-                              {tierPct > 0 ? `${tierPct}% OFF ` : ""}({money(tier.price)} c/u)
+                              {tierPct > 0 ? `${tierPct}% OFF` : ""}
                             </span>
                           </li>
                         );
                       })}
                     </ul>
                     {nextTier ? (
-                      <p className="mt-1.5 text-[11px] text-muted-foreground flex items-start gap-1">
-                        <span className="shrink-0">💡</span>
-                        <span>
-                          Llevá <strong className="text-foreground">{nextTier.units - qty} unidad{nextTier.units - qty !== 1 ? "es" : ""} más</strong> para pagar{" "}
-                          <strong className="text-primary">{money(nextTier.price)} c/u</strong>
-                          {(() => {
-                            const nextSavings = basePrice > nextTier.price ? basePrice - nextTier.price : 0;
-                            const nextPct = basePrice > 0 && nextSavings > 0 ? Math.round((nextSavings / basePrice) * 100) : 0;
-                            return nextPct > 0 ? <> (<strong className="text-primary">{nextPct}% OFF</strong>)</> : null;
-                          })()}.
-                        </span>
-                      </p>
+                      (() => {
+                        const nextSavings = basePrice > nextTier.price ? basePrice - nextTier.price : 0;
+                        const nextPct =
+                          basePrice > 0 && nextSavings > 0 ? Math.round((nextSavings / basePrice) * 100) : 0;
+                        return nextPct > 0 ? (
+                          <p className="mt-1.5 text-[11px] text-muted-foreground flex items-start gap-1">
+                            <span className="shrink-0">💡</span>
+                            <span>
+                              Llevá <strong className="text-foreground">{nextTier.units - qty} unidad{nextTier.units - qty !== 1 ? "es" : ""} más</strong> para activar el{" "}
+                              <strong className="text-primary">{nextPct}% OFF</strong>.
+                            </span>
+                          </p>
+                        ) : null;
+                      })()
                     ) : (
                       <p className="mt-1.5 text-[10px] sm:text-[11px] text-muted-foreground">
                         Descuento automático por volumen al agregar al carrito.
