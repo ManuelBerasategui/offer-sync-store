@@ -238,11 +238,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const activeTier = sorted.find((t) => item.qty >= t.units);
           if (activeTier) {
             const newPrice = Math.round(activeTier.price);
-            return { ...item, basePrice: Math.round(baseP), unitPrice: newPrice };
+            const rBase = Math.round(baseP);
+            if (item.unitPrice === newPrice && item.basePrice === rBase) return item;
+            return { ...item, basePrice: rBase, unitPrice: newPrice };
           }
         }
         // Sin tier aplicable: mantener precio base (1 unidad)
-        return { ...item, basePrice: Math.round(baseP), unitPrice: Math.round(baseP) };
+        const rBase = Math.round(baseP);
+        if (item.unitPrice === rBase && item.basePrice === rBase) return item;
+        return { ...item, basePrice: rBase, unitPrice: rBase };
       }
 
       const product = findProduct(products, item.productId || item.id || item.nombre);
@@ -265,7 +269,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         unitPrice = Math.round(unitPriceFor(product, item.qty, base));
       }
 
-      return { ...item, basePrice: Math.round(base), unitPrice };
+      const rBase = Math.round(base);
+      if (item.unitPrice === unitPrice && item.basePrice === rBase) {
+        return item;
+      }
+      return { ...item, basePrice: rBase, unitPrice };
     });
   }, [items, data?.products, data?.banners, data?.config]);
 

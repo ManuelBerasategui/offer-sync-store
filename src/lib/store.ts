@@ -197,10 +197,13 @@ export function driveId(raw?: string) {
   return m ? m[1]! : "";
 }
 
-/** Maneja el error de carga probando otras variantes de URL de Drive. */
+/** Maneja el error de carga probando otras variantes de URL de Drive de forma segura. */
 export function onImageError(raw?: string) {
   return (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
+    // Si ya aplicó el fallback o falló, cortar de inmediato cualquier bucle recursivo
+    if (img.dataset["failed"] === "true") return;
+
     const id = driveId(raw);
     const step = Number(img.dataset["retry"] ?? "0");
     const variants = id
@@ -214,11 +217,16 @@ export function onImageError(raw?: string) {
       img.src = variants[step]!;
       return;
     }
-    img.src = FALLBACK_IMAGE;
+    // Desconectar el handler antes de asignar el fallback final para garantizar 0 loops
+    img.dataset["failed"] = "true";
+    img.onerror = null;
+    if (img.src !== FALLBACK_IMAGE) {
+      img.src = FALLBACK_IMAGE;
+    }
   };
 }
 
-export const FALLBACK_IMAGE = "https://placehold.co/600x600/f4f4f5/71717a?text=Sin+imagen";
+export const FALLBACK_IMAGE = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%23f4f4f5'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' fill='%2371717a'%3ESin imagen%3C/text%3E%3C/svg%3E";
 
 /**
  * Retorna el array completo de imágenes del producto:
