@@ -148,6 +148,49 @@ function Home() {
       </section>
 
 
+      {/* MÁS VENDIDOS */}
+      <section id="mas-vendidos" className="relative overflow-hidden bg-gradient-to-b from-surface via-surface to-primary/5 px-4 py-14 sm:px-6">
+        <div aria-hidden className="pointer-events-none absolute -bottom-20 -left-16 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+
+        <div className="relative mx-auto max-w-[1180px]">
+          <SectionHead title="Más vendidos" sub="Los tres productos que más salen esta semana." />
+
+          {masVendidos.length > 0 && (
+            <div className="relative -mx-4 sm:mx-0">
+              <div
+                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${masVendidos.length === 1 ? "justify-center" : ""
+                  }`}
+              >
+                {masVendidos.map((p, i) => (
+                  <div
+                    key={p.id ?? i}
+                    className={`snap-center shrink-0 ${masVendidos.length === 1
+                        ? "w-full max-w-[300px]"
+                        : "w-[72vw] max-w-[280px] sm:w-[260px]"
+                      }`}
+                  >
+                    <ProductCard p={p} config={config} />
+                  </div>
+                ))}
+              </div>
+              {masVendidos.length > 1 && (
+                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-surface to-transparent sm:block" />
+              )}
+            </div>
+          )}
+
+          <div className="mt-8 flex justify-center">
+            <Link
+              to="/catalogo"
+              className="btn-base grad-urgente group inline-flex w-full items-center justify-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:w-auto sm:px-12"
+            >
+              Ver más
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* OFERTAS DEL DÍA */}
       <section id="ofertas" className="relative overflow-hidden px-4 pt-6 pb-12 sm:px-6 sm:pt-12 sm:pb-16">
         <div aria-hidden className="pointer-events-none absolute -top-16 right-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
@@ -269,49 +312,6 @@ function Home() {
               </div>
             </div>
           )}
-        </div>
-      </section>
-
-      {/* MÁS VENDIDOS */}
-      <section id="mas-vendidos" className="relative overflow-hidden bg-gradient-to-b from-surface via-surface to-primary/5 px-4 py-14 sm:px-6">
-        <div aria-hidden className="pointer-events-none absolute -bottom-20 -left-16 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
-
-        <div className="relative mx-auto max-w-[1180px]">
-          <SectionHead title="Más vendidos" sub="Los tres productos que más salen esta semana." />
-
-          {masVendidos.length > 0 && (
-            <div className="relative -mx-4 sm:mx-0">
-              <div
-                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${masVendidos.length === 1 ? "justify-center" : ""
-                  }`}
-              >
-                {masVendidos.map((p, i) => (
-                  <div
-                    key={p.id ?? i}
-                    className={`snap-center shrink-0 ${masVendidos.length === 1
-                        ? "w-full max-w-[300px]"
-                        : "w-[72vw] max-w-[280px] sm:w-[260px]"
-                      }`}
-                  >
-                    <ProductCard p={p} config={config} />
-                  </div>
-                ))}
-              </div>
-              {masVendidos.length > 1 && (
-                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-surface to-transparent sm:block" />
-              )}
-            </div>
-          )}
-
-          <div className="mt-8 flex justify-center">
-            <Link
-              to="/catalogo"
-              className="btn-base grad-urgente group inline-flex w-full items-center justify-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:w-auto sm:px-12"
-            >
-              Ver más
-              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-            </Link>
-          </div>
         </div>
       </section>
 
