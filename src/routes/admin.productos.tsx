@@ -1955,8 +1955,8 @@ function ComboBuilderPanel({
   const [sourceCurrency, setSourceCurrency] = useState<"USD" | "ARS">("USD");
   const [basePrice, setBasePrice] = useState("");
   const [saving, setSaving] = useState(false);
-  // Tramos de precio por cantidad: precio fijo en ARS
-  const [comboTiers, setComboTiers] = useState<{ units: number; price: number }[]>([]);
+  // Tramos de precio por cantidad: precio base SIN recargo (string mientras se edita, igual que basePrice)
+  const [comboTiers, setComboTiers] = useState<{ units: number; priceStr: string }[]>([]);
   const [hasTiers, setHasTiers] = useState(false);
 
   // Cálculos en vivo
@@ -2059,7 +2059,14 @@ function ComboBuilderPanel({
         if (Array.isArray(parsed) && parsed.length > 0) existingTiers = parsed;
       } catch { /* ignorar */ }
     }
-    setComboTiers(existingTiers);
+    // Al cargar, convertir price numérico → string base (sin recargo, dividiendo el 7% ya aplicado)
+    setComboTiers(
+      existingTiers.map((t) => ({
+        units: t.units,
+        // Si el precio guardado ya incluye 7%, revertirlo para mostrar el precio base
+        priceStr: t.price > 0 ? String(Math.round(t.price / 1.07)) : "",
+      }))
+    );
     setHasTiers(existingTiers.length > 0);
     setCreating(true);
   }
@@ -2076,10 +2083,12 @@ function ComboBuilderPanel({
 
     setSaving(true);
     try {
-      // Filtrar tramos válidos (mínimo 2 unidades y precio mayor a 0)
+      // Filtrar tramos válidos (mínimo 2 unidades y precio base mayor a 0)
+      // Guardar precios YA CON el recargo del 7% (igual que finalArs)
       const validTiers = comboTiers
-        .filter((t) => Number(t.units) >= 2 && Number(t.price) > 0)
-        .sort((a, b) => a.units - b.units);
+        .filter((t) => Number(t.units) >= 2 && Number(t.priceStr) > 0)
+        .sort((a, b) => a.units - b.units)
+        .map((t) => ({ units: t.units, price: Math.round(Number(t.priceStr) * 1.07) }));
 
       const bannerInput: BannerInput = {
         ...(editingBanner?.id !== undefined ? { id: editingBanner.id } : {}),
@@ -2332,11 +2341,12 @@ function ComboBuilderPanel({
                     type="button"
                     onClick={() => {
                       setHasTiers(true);
-                      const p1 = finalArs > 0 ? Math.round(finalArs * 0.94) : 33000;
-                      const p2 = finalArs > 0 ? Math.round(finalArs * 0.86) : 30000;
+                      // Precios base sugeridos (sin el 7%), redondeados
+                      const p1 = numBase > 0 ? Math.round(numBase * 0.94) : 31000;
+                      const p2 = numBase > 0 ? Math.round(numBase * 0.86) : 28000;
                       setComboTiers([
-                        { units: 3, price: p1 },
-                        { units: 5, price: p2 },
+                        { units: 3, priceStr: String(p1) },
+                        { units: 5, priceStr: String(p2) },
                       ]);
                     }}
                     className="btn-base bg-primary text-primary-foreground text-xs py-2 px-3.5 hover:opacity-90 flex items-center gap-1.5 shrink-0 font-bold"
@@ -2354,8 +2364,14 @@ function ComboBuilderPanel({
                   </div>
 
                   {comboTiers.map((tier, idx) => {
-                    const discountPct = finalArs > 0 && tier.price < finalArs ? Math.round((1 - tier.price / finalArs) * 100) : 0;
-                    const diff = finalArs > 0 ? finalArs - tier.price : 0;
+                    // Precio base ingresado por el usuario (sin recargo)
+                    const numTierBase = Number(tier.priceStr) || 0;
+                    // Precio final con 7% de recargo aplicado
+                    const tierFinalArs = numTierBase > 0 ? Math.round(numTierBase * 1.07) : 0;
+                    const discountPct = finalArs > 0 && tierFinalArs > 0 && tierFinalArs < finalArs
+                      ? Math.round((1 - tierFinalArs / finalArs) * 100)
+                      : 0;
+                    const diff = finalArs > 0 && tierFinalArs > 0 ? finalArs - tierFinalArs : 0;
 
                     return (
                       <div key={idx} className="grid grid-cols-[85px_130px_1fr_auto] gap-2 items-center bg-card p-2 rounded-xl border border-border">
@@ -2369,7 +2385,9 @@ function ComboBuilderPanel({
                               const updated = [...comboTiers];
                               const cur = updated[idx];
                               if (!cur) return;
-                              updated[idx] = { units: Number(e.target.value) || 2, price: cur.price };
+                              // Nunca coercer units a 0 mientras se escribe
+                              const rawUnits = e.target.value;
+                              updated[idx] = { units: rawUnits === "" ? 2 : Math.max(2, Number(rawUnits)), priceStr: cur.priceStr };
                               setComboTiers(updated);
                             }}
                             className="input-base pl-6 text-xs font-bold"
@@ -2379,32 +2397,39 @@ function ComboBuilderPanel({
                         <div className="relative">
                           <span className="absolute left-2.5 top-2 text-[11px] text-muted-foreground font-semibold">$</span>
                           <input
-                            type="number"
-                            min={0}
-                            value={tier.price}
+                            type="text"
+                            inputMode="decimal"
+                            value={tier.priceStr}
                             onChange={(e) => {
                               const updated = [...comboTiers];
                               const cur = updated[idx];
                               if (!cur) return;
-                              updated[idx] = { units: cur.units, price: Number(e.target.value) || 0 };
+                              // Guardar como string para no romper mientras se escribe
+                              const raw = e.target.value.replace(/[^\d]/g, "");
+                              updated[idx] = { units: cur.units, priceStr: raw };
                               setComboTiers(updated);
                             }}
                             className="input-base pl-6 text-xs font-bold"
-                            placeholder="33000"
+                            placeholder="Precio base s/recargo"
                           />
                         </div>
                         <div className="text-xs truncate">
-                          {tier.price > 0 ? (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-primary">{money(tier.price)}/u.</span>
-                              {discountPct > 0 && (
-                                <span className="rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-bold text-[10px] px-1.5 py-0.5">
-                                  {discountPct}% OFF (-{money(diff)})
-                                </span>
-                              )}
+                          {tierFinalArs > 0 ? (
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-primary">{money(tierFinalArs)}/u.</span>
+                                {discountPct > 0 && (
+                                  <span className="rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-bold text-[10px] px-1.5 py-0.5">
+                                    {discountPct}% OFF (-{money(diff)})
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">
+                                +7% recargo incluido
+                              </span>
                             </div>
                           ) : (
-                            <span className="text-[11px] text-muted-foreground italic">Ingresá el precio</span>
+                            <span className="text-[11px] text-muted-foreground italic">Ingresá el precio base</span>
                           )}
                         </div>
                         <button
@@ -2424,8 +2449,11 @@ function ComboBuilderPanel({
                     onClick={() => {
                       const lastTier = comboTiers[comboTiers.length - 1];
                       const newUnits = lastTier ? lastTier.units + 2 : 3;
-                      const newPrice = lastTier ? Math.round(lastTier.price * 0.95) : (finalArs > 0 ? Math.round(finalArs * 0.9) : 0);
-                      setComboTiers([...comboTiers, { units: newUnits, price: newPrice }]);
+                      const lastBase = lastTier ? Number(lastTier.priceStr) : 0;
+                      const newPriceBase = lastBase > 0
+                        ? Math.round(lastBase * 0.95)
+                        : (numBase > 0 ? Math.round(numBase * 0.9) : 0);
+                      setComboTiers([...comboTiers, { units: newUnits, priceStr: newPriceBase > 0 ? String(newPriceBase) : "" }]);
                     }}
                     className="btn-base border border-dashed border-primary/50 text-primary text-xs py-2 px-3 hover:bg-primary/10 flex items-center gap-1.5 w-full justify-center font-bold"
                   >
@@ -2442,11 +2470,13 @@ function ComboBuilderPanel({
                         • 1 unidad: <strong className="text-foreground">{money(finalArs)}</strong> (precio default)
                       </div>
                       {[...comboTiers].sort((a, b) => a.units - b.units).map((t, i) => {
-                        const pct = finalArs > 0 && t.price < finalArs ? Math.round((1 - t.price / finalArs) * 100) : 0;
+                        const tBase = Number(t.priceStr) || 0;
+                        const tFinal = tBase > 0 ? Math.round(tBase * 1.07) : 0;
+                        const pct = finalArs > 0 && tFinal > 0 && tFinal < finalArs ? Math.round((1 - tFinal / finalArs) * 100) : 0;
                         return (
                           <div key={i} className="flex items-center gap-2">
                             <span>• Llevando {t.units} u. o más:</span>
-                            <strong className="text-primary font-bold">{money(t.price)} cada una</strong>
+                            <strong className="text-primary font-bold">{tFinal > 0 ? money(tFinal) : "–"} cada una</strong>
                             {pct > 0 && (
                               <span className="rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1 py-0.2 text-[10px] font-bold">
                                 {pct}% OFF
