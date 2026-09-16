@@ -2087,30 +2087,30 @@ function ComboBuilderPanel({
       if (res?.error) {
         toast.error(res.error);
       } else {
-        toast.success(`¡Oferta "${comboTitle}" guardada correctamente!`);
+        toast.success(`¡Combo "${comboTitle}" guardado correctamente!`);
         resetForm();
         await loadBanners();
         await onRefresh();
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al guardar la oferta.");
+      toast.error(err instanceof Error ? err.message : "Error al guardar el combo.");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDeleteCombo(id: string, title: string) {
-    if (!confirm(`¿Eliminar la oferta "${title}"?`)) return;
+    if (!confirm(`¿Eliminar el combo "${title}"?`)) return;
     try {
       const res = await deleteAdminBanner({ data: { email: userEmail, token: userToken, bannerId: id } });
       if (res.error) toast.error(res.error);
       else {
-        toast.info("Oferta eliminada.");
+        toast.info("Combo eliminado.");
         await loadBanners();
         await onRefresh();
       }
     } catch {
-      toast.error("Error al eliminar la oferta.");
+      toast.error("Error al eliminar el combo.");
     }
   }
 
@@ -2120,10 +2120,10 @@ function ComboBuilderPanel({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-muted/40 p-4 rounded-2xl border border-border">
         <div>
           <h3 className="font-bold text-base text-foreground flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" /> Combos y Packs en Oferta ({banners.length})
+            <Sparkles className="h-4 w-4 text-primary" /> Combos y Packs ({banners.length})
           </h3>
           <p className="text-xs text-muted-foreground">
-            Cargá fácilmente en USD o ARS: el sistema aplica el 7% de recargo automáticamente, actualiza los precios según la cotización del dólar y muestra el precio con descuento por transferencia.
+            Creá combos con precio unitario y descuentos por cantidad opcionales (tramos de precio con cantidad mínima).
           </p>
         </div>
         {!creating && (
@@ -2134,7 +2134,7 @@ function ComboBuilderPanel({
             }}
             className="btn-base bg-primary text-primary-foreground text-xs py-2 px-4 hover:opacity-90 flex items-center gap-1.5 shrink-0"
           >
-            <Plus className="h-4 w-4" /> Crear Oferta / Combo
+            <Plus className="h-4 w-4" /> Crear Nuevo Combo
           </button>
         )}
       </div>
@@ -2144,8 +2144,8 @@ function ComboBuilderPanel({
         <div className="rounded-2xl border border-primary/30 bg-card p-5 sm:p-6 shadow-md space-y-5 max-w-2xl mx-auto">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <h3 className="font-bold text-lg flex items-center gap-2 text-primary">
-              <Flame className="h-5 w-5 fill-primary" />
-              {editingBanner ? "Editar Oferta / Combo" : "Nueva Oferta del Día (Foto + Precios)"}
+              <Sparkles className="h-5 w-5 text-primary" />
+              {editingBanner ? "Editar Combo" : "Nuevo Combo (Foto + Precios + Descuentos)"}
             </h3>
             <button onClick={resetForm} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
               <X className="h-5 w-5" />
@@ -2154,12 +2154,12 @@ function ComboBuilderPanel({
 
           <div className="space-y-4">
             <div>
-              <label className="label-sm">Nombre de la Oferta / Combo *</label>
+              <label className="label-sm">Nombre del Combo *</label>
               <input
                 type="text"
                 value={comboTitle}
                 onChange={(e) => setComboTitle(e.target.value)}
-                placeholder="Ej: Combo mayorista bazar o Combo mate más indumentaria"
+                placeholder="Ej: Combo Ropa, Combo Mate + Indumentaria, etc."
                 className="input-base"
               />
             </div>
@@ -2527,7 +2527,6 @@ function ComboBuilderPanel({
 
 function OfertasDelDiaPanel({
   products,
-  initialBanners = [],
   userEmail,
   userToken,
   onRefresh,
@@ -2536,7 +2535,6 @@ function OfertasDelDiaPanel({
   markupPercentage = 0,
 }: {
   products: Product[];
-  initialBanners?: Banner[];
   userEmail: string;
   userToken: string;
   onRefresh: () => Promise<void>;
@@ -2544,7 +2542,7 @@ function OfertasDelDiaPanel({
   roundingIncrement?: number;
   markupPercentage?: number;
 }) {
-  const [subTab, setSubTab] = useState<"activas" | "combos" | "agregar">("activas");
+  const [subTab, setSubTab] = useState<"activas" | "agregar">("activas");
   const [search, setSearch] = useState("");
   const [clearingAll, setClearingAll] = useState(false);
 
@@ -2639,20 +2637,10 @@ function OfertasDelDiaPanel({
               }`}
           >
             <Flame className="h-3.5 w-3.5 text-primary fill-primary/20" />
-            Ofertas por Producto
+            Ofertas Activas
             <span className="rounded-full bg-primary/10 text-primary text-[10px] px-1.5 py-0.2 font-bold">
               {activeOffers.length}
             </span>
-          </button>
-          <button
-            onClick={() => { setSubTab("combos"); setSearch(""); }}
-            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${subTab === "combos"
-              ? "bg-card text-foreground shadow-xs border border-border"
-              : "text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Armador de Combos & Packs
           </button>
           <button
             onClick={() => { setSubTab("agregar"); setSearch(""); }}
@@ -2670,34 +2658,20 @@ function OfertasDelDiaPanel({
         </div>
 
         {/* Buscador dentro de panel */}
-        {subTab !== "combos" && (
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={subTab === "activas" ? "Buscar entre ofertas..." : "Buscar producto del catálogo..."}
-              className="input-base text-xs pl-9 py-2"
-            />
-          </div>
-        )}
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={subTab === "activas" ? "Buscar entre ofertas..." : "Buscar producto del catálogo..."}
+            className="input-base text-xs pl-9 py-2"
+          />
+        </div>
       </div>
 
       {/* Contenido subtab */}
-      {subTab === "combos" ? (
-        <ComboPanelBoundary>
-          <ComboBuilderPanel
-            initialBanners={initialBanners}
-            userEmail={userEmail}
-            userToken={userToken}
-            onRefresh={onRefresh}
-            dolarRate={dolarRate}
-            roundingIncrement={roundingIncrement}
-            markupPercentage={markupPercentage}
-          />
-        </ComboPanelBoundary>
-      ) : subTab === "activas" ? (
+      {subTab === "activas" ? (
         filteredActiveOffers.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-14 text-center rounded-2xl border border-dashed border-border bg-card/50">
             <Flame className="h-10 w-10 text-muted-foreground/30" />
@@ -3234,7 +3208,7 @@ function AdminProductosPage() {
   const [priceModalProduct, setPriceModalProduct] = useState<Product | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"todos" | "ofertas">("todos");
+  const [activeTab, setActiveTab] = useState<"todos" | "combos" | "ofertas">("todos");
   const [dolarRate, setDolarRate] = useState<number>(1500);
   const [roundingIncrement, setRoundingIncrement] = useState<number>(10);
   const [markupPercentage, setMarkupPercentage] = useState<number>(0);
@@ -3464,12 +3438,12 @@ function AdminProductosPage() {
           />
         </div>
 
-        {/* Navigation Tabs Interas (Catálogo vs Ofertas) */}
+        {/* Navigation Tabs (Catálogo vs Combos vs Ofertas) */}
 
-        <div className="mt-4 flex border-b border-border">
+        <div className="mt-4 flex border-b border-border overflow-x-auto">
           <button
             onClick={() => setActiveTab("todos")}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm ${activeTab === "todos"
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm shrink-0 ${activeTab === "todos"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
@@ -3481,8 +3455,21 @@ function AdminProductosPage() {
             </span>
           </button>
           <button
+            onClick={() => setActiveTab("combos")}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm shrink-0 ${activeTab === "combos"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+          >
+            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+            <span>Combos</span>
+            <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] sm:text-xs font-bold">
+              {initialBanners.length}
+            </span>
+          </button>
+          <button
             onClick={() => setActiveTab("ofertas")}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm ${activeTab === "ofertas"
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-bold transition-all sm:px-4 sm:py-3 sm:text-sm shrink-0 ${activeTab === "ofertas"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
@@ -3510,10 +3497,21 @@ function AdminProductosPage() {
 
         {(!loading || products.length > 0) && (
           <div className="mt-6">
-            {activeTab === "ofertas" ? (
+            {activeTab === "combos" ? (
+              <ComboPanelBoundary>
+                <ComboBuilderPanel
+                  initialBanners={initialBanners}
+                  userEmail={userEmail}
+                  userToken={userToken}
+                  onRefresh={loadProducts}
+                  dolarRate={dolarRate}
+                  roundingIncrement={roundingIncrement}
+                  markupPercentage={markupPercentage}
+                />
+              </ComboPanelBoundary>
+            ) : activeTab === "ofertas" ? (
               <OfertasDelDiaPanel
                 products={products}
-                initialBanners={initialBanners}
                 userEmail={userEmail}
                 userToken={userToken}
                 onRefresh={loadProducts}
