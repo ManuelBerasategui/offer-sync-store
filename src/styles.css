@@ -99,6 +99,21 @@
   }
 }
 
+@utility font-sans {
+  font-family: var(--font-sans), 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+@utility font-mono {
+  font-family: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace !important;
+}
+
+@utility font-price-clean {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-feature-settings: 'tnum' on, 'lnum' on;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.02em;
+}
+
 @utility grad-urgente {
   background-image: linear-gradient(100deg, var(--primary) 0%, var(--accent) 100%);
 }

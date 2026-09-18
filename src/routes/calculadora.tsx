@@ -418,7 +418,10 @@ export function CalculadoraPage() {
                         <div className="font-mono text-[10.5px] uppercase tracking-wider text-[#4B5A6B] dark:text-muted-foreground mb-1 font-medium">
                           PRECIO UNITARIO PUESTO EN ARGENTINA
                         </div>
-                        <div className="font-sans font-extrabold text-3xl sm:text-4xl text-[#E8590F] tracking-tight leading-none">
+                        <div
+                          className="font-price-clean font-bold text-3xl sm:text-4xl text-[#E8590F] tracking-tight leading-none"
+                          style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+                        >
                           {fmt(i.unitPrice)}
                         </div>
                       </div>
@@ -465,7 +468,10 @@ export function CalculadoraPage() {
                     <span className="font-mono text-xs uppercase tracking-wider">
                       TOTAL TRAYENDO TODO
                     </span>
-                    <span className="font-sans text-2xl sm:text-3xl font-extrabold tracking-tight">
+                    <span
+                      className="font-price-clean text-2xl sm:text-3xl font-bold tracking-tight"
+                      style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+                    >
                       {fmt(quote.grandTotal)}
                     </span>
                   </div>
@@ -496,7 +502,10 @@ export function CalculadoraPage() {
                     <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                       TOTAL PUESTO EN ARGENTINA
                     </span>
-                    <span className="font-sans text-2xl sm:text-4xl font-extrabold text-foreground tracking-tight">
+                    <span
+                      className="font-price-clean text-2xl sm:text-4xl font-bold text-foreground tracking-tight"
+                      style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+                    >
                       {fmt(quote.grandTotal)}
                     </span>
                   </div>
