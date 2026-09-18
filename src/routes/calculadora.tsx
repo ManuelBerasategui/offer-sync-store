@@ -367,7 +367,7 @@ export function CalculadoraPage() {
                     alt="Te Importamos"
                     className="h-8.5 w-auto object-contain block max-h-9"
                   />
-                  <h2 className="font-serif text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+                  <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
                     Cotización
                   </h2>
                 </div>
@@ -401,7 +401,7 @@ export function CalculadoraPage() {
                 <div className="space-y-4">
                   {quote.itemsIsolated.map((i) => (
                     <div key={i.id} className="q-product-block">
-                      <div className="flex justify-between items-baseline gap-2 mb-2 font-serif">
+                      <div className="flex justify-between items-baseline gap-2 mb-2">
                         <div className="text-sm sm:text-base font-bold text-foreground">
                           {i.nombre}
                           <span className="font-mono text-xs font-normal text-muted-foreground ml-2">
@@ -418,7 +418,7 @@ export function CalculadoraPage() {
                         <div className="font-mono text-[10.5px] uppercase tracking-wider text-[#4B5A6B] dark:text-muted-foreground mb-1 font-medium">
                           PRECIO UNITARIO PUESTO EN ARGENTINA
                         </div>
-                        <div className="font-serif font-bold text-3xl sm:text-4xl text-[#E8590F] font-mono leading-none">
+                        <div className="font-sans font-extrabold text-3xl sm:text-4xl text-[#E8590F] tracking-tight leading-none">
                           {fmt(i.unitPrice)}
                         </div>
                       </div>
@@ -465,7 +465,7 @@ export function CalculadoraPage() {
                     <span className="font-mono text-xs uppercase tracking-wider">
                       TOTAL TRAYENDO TODO
                     </span>
-                    <span className="font-serif text-2xl sm:text-3xl font-bold font-mono">
+                    <span className="font-sans text-2xl sm:text-3xl font-extrabold tracking-tight">
                       {fmt(quote.grandTotal)}
                     </span>
                   </div>
@@ -496,7 +496,7 @@ export function CalculadoraPage() {
                     <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                       TOTAL PUESTO EN ARGENTINA
                     </span>
-                    <span className="font-serif text-2xl sm:text-4xl font-bold text-foreground font-mono">
+                    <span className="font-sans text-2xl sm:text-4xl font-extrabold text-foreground tracking-tight">
                       {fmt(quote.grandTotal)}
                     </span>
                   </div>
