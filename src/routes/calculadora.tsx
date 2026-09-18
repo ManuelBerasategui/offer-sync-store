@@ -215,10 +215,6 @@ export function CalculadoraPage() {
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           {/* Header principal */}
           <div className="text-center mb-8 sm:mb-10">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary mb-3 border border-primary/20">
-              <Calculator className="h-3.5 w-3.5" />
-              <span>Herramienta Oficial de Cotización</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
               Calculadora de Importaciones
             </h1>
