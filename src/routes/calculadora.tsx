@@ -211,10 +211,10 @@ export function CalculadoraPage() {
 
   return (
     <SiteChrome config={config}>
-      <main className="min-h-[80vh] py-8 sm:py-12 bg-background">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+      <main className="min-h-[80vh] py-8 sm:py-12 bg-background print:min-h-0 print:py-0">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 print:max-w-none print:px-0">
           {/* Header principal */}
-          <div className="text-center mb-8 sm:mb-10">
+          <div className="text-center mb-8 sm:mb-10 print:hidden">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
               Calculadora de Importaciones
             </h1>
@@ -224,7 +224,7 @@ export function CalculadoraPage() {
           </div>
 
           {/* Formulario de carga */}
-          <div className="rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-xs mb-8">
+          <div className="rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-xs mb-8 print:hidden">
             <div className="mb-6">
               <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
                 Cliente o Referencia
