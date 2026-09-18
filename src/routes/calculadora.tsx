@@ -420,6 +420,7 @@ export function CalculadoraPage() {
                         </div>
                         <div
                           className="price-num font-price-clean font-bold text-3xl sm:text-4xl text-[#E8590F] tracking-tight leading-none"
+                          style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontVariantNumeric: "normal", fontFeatureSettings: "normal" }}
                         >
                           {fmt(i.unitPrice)}
                         </div>
@@ -467,7 +468,10 @@ export function CalculadoraPage() {
                     <span className="font-mono text-xs uppercase tracking-wider">
                       TOTAL TRAYENDO TODO
                     </span>
-                    <span className="price-num font-price-clean text-2xl sm:text-3xl font-bold tracking-tight">
+                    <span
+                      className="price-num font-price-clean text-2xl sm:text-3xl font-bold tracking-tight"
+                      style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontVariantNumeric: "normal", fontFeatureSettings: "normal" }}
+                    >
                       {fmt(quote.grandTotal)}
                     </span>
                   </div>
@@ -498,7 +502,10 @@ export function CalculadoraPage() {
                     <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                       TOTAL PUESTO EN ARGENTINA
                     </span>
-                    <span className="price-num font-price-clean text-2xl sm:text-4xl font-bold text-foreground tracking-tight">
+                    <span
+                      className="price-num font-price-clean text-2xl sm:text-4xl font-bold text-foreground tracking-tight"
+                      style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontVariantNumeric: "normal", fontFeatureSettings: "normal" }}
+                    >
                       {fmt(quote.grandTotal)}
                     </span>
                   </div>

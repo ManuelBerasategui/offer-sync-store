@@ -117,10 +117,10 @@
 /* Clase real (no utility) para forzar fuente limpia en números grandes de cotización */
 .price-num {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-  font-feature-settings: 'tnum' on, 'lnum' on !important;
-  font-variant-numeric: tabular-nums lining-nums !important;
+  font-feature-settings: normal !important;
+  font-variant-numeric: normal !important;
   font-style: normal !important;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
 @utility grad-urgente {
