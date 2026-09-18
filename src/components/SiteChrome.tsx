@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { LayoutGrid, ShoppingCart, Calculator } from "lucide-react";
+import { LayoutGrid, ShoppingCart } from "lucide-react";
 import { waLink } from "@/lib/store";
 import type { SiteConfig } from "@/lib/store";
 import { useCart } from "@/lib/cart";
@@ -31,9 +31,8 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
             <Link to="/catalogo" className="text-muted-foreground hover:text-primary">
               Catálogo
             </Link>
-            <Link to="/calculadora" className="text-muted-foreground hover:text-primary font-semibold flex items-center gap-1.5">
-              <Calculator className="h-4 w-4 text-primary" />
-              <span>Calculadora</span>
+            <Link to="/calculadora" className="text-muted-foreground hover:text-primary">
+              Calculadora
             </Link>
             <Link to="/" hash="nosotros" className="text-muted-foreground hover:text-primary">
               Nosotros
@@ -53,9 +52,8 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
           <Link
             to="/calculadora"
             aria-label="Calculadora de importaciones"
-            className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
+            className="inline-flex items-center rounded-full border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
           >
-            <Calculator className="h-3.5 w-3.5 shrink-0 text-primary" />
             <span>Calculadora</span>
           </Link>
           <HeaderAuth />

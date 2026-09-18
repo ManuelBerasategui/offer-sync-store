@@ -349,19 +349,21 @@ export function CalculadoraPage() {
           {quote && (
             <div
               ref={resultRef}
-              className="rounded-2xl border-2 border-primary/40 bg-card p-6 sm:p-8 shadow-md relative print:border-none print:shadow-none"
+              className="rounded-xl border border-border border-t-4 border-t-[#E8590F] bg-card p-6 sm:p-9 shadow-sm relative print:border-none print:p-0 print:shadow-none"
             >
               {/* Encabezado del comprobante */}
-              <div className="flex items-start justify-between gap-4 border-b-2 border-foreground/90 pb-4 mb-6">
-                <div>
+              <div className="flex items-end justify-between border-b-2 border-foreground/90 pb-3.5 mb-5 gap-4">
+                <div className="flex flex-col gap-2">
                   <img
                     src="/businessicon-header.jpg?v=3"
                     alt="Te Importamos"
-                    className="h-9 w-auto object-contain mb-2"
+                    className="h-8.5 w-auto object-contain block max-h-9"
                   />
-                  <h2 className="text-xl font-bold text-foreground">Comprobante de Cotización</h2>
+                  <h2 className="font-serif text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+                    Cotización
+                  </h2>
                 </div>
-                <div className="text-right text-xs font-mono text-muted-foreground">
+                <div className="text-right text-xs font-mono text-muted-foreground whitespace-nowrap leading-relaxed">
                   <div>COT-{Date.now().toString(36).toUpperCase()}</div>
                   <div>{new Date().toLocaleDateString("es-AR")}</div>
                 </div>
@@ -369,37 +371,48 @@ export function CalculadoraPage() {
 
               {/* Cliente */}
               <div className="mb-6">
-                <span className="block text-[11px] font-bold text-muted-foreground uppercase">Cliente</span>
-                <span className="text-base font-semibold text-foreground">{quote.client}</span>
+                <span className="block font-mono text-[10.5px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">
+                  CLIENTE
+                </span>
+                <span className="text-sm font-semibold text-foreground">{quote.client}</span>
               </div>
 
               {/* Productos y Precio Unitario Puesto en Argentina */}
-              <div className="mb-8">
+              <div className="mb-5">
                 {multi && (
-                  <>
-                    <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border pb-1.5 mb-2">
+                  <div className="mb-4">
+                    <div className="font-mono text-[11.5px] uppercase tracking-wider text-muted-foreground border-b border-border pb-1 mb-1">
                       Productos por separado puestos en Argentina
                     </div>
-                    <p className="text-xs text-muted-foreground italic mb-4">
+                    <p className="text-xs text-muted-foreground italic">
                       Cada producto calculado de forma aislada, como si fuera el único artículo del envío.
                     </p>
-                  </>
+                  </div>
                 )}
 
                 <div className="space-y-4">
                   {quote.itemsIsolated.map((i) => (
-                    <div key={i.id} className="rounded-xl border border-border bg-muted/15 p-4">
-                      <div className="flex items-center justify-between text-sm font-semibold mb-2">
-                        <span>
-                          {i.nombre} <span className="text-xs text-muted-foreground font-normal">x{i.cantidad}</span>
-                        </span>
-                        <span className="font-mono">{fmt(i.total)}</span>
+                    <div key={i.id} className="q-product-block">
+                      <div className="flex justify-between items-baseline gap-2 mb-2 font-serif">
+                        <div className="text-sm sm:text-base font-bold text-foreground">
+                          {i.nombre}
+                          <span className="font-mono text-xs font-normal text-muted-foreground ml-2">
+                            x{i.cantidad}
+                          </span>
+                        </div>
+                        <div className="font-mono text-sm font-semibold text-foreground whitespace-nowrap">
+                          {fmt(i.total)}
+                        </div>
                       </div>
-                      <div className="rounded-lg bg-primary/10 border-l-4 border-primary p-3">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                          Precio unitario puesto en Argentina
-                        </span>
-                        <span className="text-2xl font-black text-primary font-mono">{fmt(i.unitPrice)}</span>
+
+                      {/* Caja destacada de Precio Unitario */}
+                      <div className="bg-[#FBEADD]/80 dark:bg-amber-950/25 border-l-4 border-[#E8590F] p-3.5 sm:p-4 mb-4 rounded-r-md">
+                        <div className="font-mono text-[10.5px] uppercase tracking-wider text-[#4B5A6B] dark:text-muted-foreground mb-1 font-medium">
+                          PRECIO UNITARIO PUESTO EN ARGENTINA
+                        </div>
+                        <div className="font-serif font-bold text-3xl sm:text-4xl text-[#E8590F] font-mono leading-none">
+                          {fmt(i.unitPrice)}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -407,67 +420,87 @@ export function CalculadoraPage() {
               </div>
 
               {/* Desglose / Resumen */}
-              <div className="mb-6">
-                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border pb-1.5 mb-2">
-                  {multi ? "Trayendo todos los productos juntos" : "Desglose de costos"}
-                </div>
-                {multi && (
+              {multi ? (
+                <div>
+                  <div className="font-mono text-[11.5px] uppercase tracking-wider text-muted-foreground border-b border-border pb-1 mb-1 mt-6">
+                    Trayendo todos los productos
+                  </div>
                   <p className="text-xs text-muted-foreground italic mb-3">
                     Cálculo unificado compartiendo flete y handling entre todos los productos del pedido.
                   </p>
-                )}
 
-                <div className="divide-y divide-border text-sm">
-                  {multi &&
-                    quote.items.map((i) => (
-                      <div key={i.id} className="flex justify-between py-2">
+                  <div className="divide-y divide-border/60 text-sm">
+                    {quote.items.map((i) => (
+                      <div key={i.id} className="flex justify-between py-2 text-sm">
                         <span className="text-foreground">
                           {i.nombre} — FOB (x{i.cantidad})
                         </span>
-                        <span className="font-mono text-muted-foreground">{fmt(i.cantidad * i.fob)}</span>
+                        <span className="font-mono text-foreground">{fmt(i.cantidad * i.fob)}</span>
                       </div>
                     ))}
-
-                  {!multi && (
-                    <div className="flex justify-between py-2">
-                      <span className="text-foreground">Costo mercadería (FOB)</span>
-                      <span className="font-mono text-muted-foreground">{fmt(quote.totalFOB)}</span>
+                    <div className="flex justify-between py-2 text-sm font-medium">
+                      <span className="text-foreground">Flete</span>
+                      <span className="font-mono text-foreground">{fmt(quote.freightTotal)}</span>
                     </div>
-                  )}
-
-                  {/* SOLAMENTE FLETE */}
-                  <div className="flex justify-between py-2 font-medium">
-                    <span className="text-foreground">Flete</span>
-                    <span className="font-mono text-foreground">{fmt(quote.freightTotal)}</span>
+                    <div className="flex justify-between py-2 text-sm">
+                      <span className="text-foreground">Handling</span>
+                      <span className="font-mono text-foreground">{fmt(quote.handlingTotal)}</span>
+                    </div>
+                    <div className="flex justify-between py-2 text-sm font-medium">
+                      <span className="text-foreground">Impuestos</span>
+                      <span className="font-mono text-foreground">{fmt(quote.taxesTotal)}</span>
+                    </div>
                   </div>
 
-                  <div className="flex justify-between py-2">
-                    <span className="text-foreground">Handling</span>
-                    <span className="font-mono text-muted-foreground">{fmt(quote.handlingTotal)}</span>
-                  </div>
-
-                  {/* SOLAMENTE IMPUESTOS */}
-                  <div className="flex justify-between py-2 font-medium">
-                    <span className="text-foreground">Impuestos</span>
-                    <span className="font-mono text-foreground">{fmt(quote.taxesTotal)}</span>
+                  {/* Gran Total */}
+                  <div className="mt-5 rounded-lg bg-foreground text-background p-4 sm:p-5 flex items-center justify-between">
+                    <span className="font-mono text-xs uppercase tracking-wider">
+                      TOTAL TRAYENDO TODO
+                    </span>
+                    <span className="font-serif text-2xl sm:text-3xl font-bold font-mono">
+                      {fmt(quote.grandTotal)}
+                    </span>
                   </div>
                 </div>
+              ) : (
+                <div className="mt-2">
+                  <div className="font-mono text-xs text-[#4B5A6B] dark:text-muted-foreground space-y-1.5 py-2">
+                    <div className="flex justify-between">
+                      <span>Costo mercadería (FOB)</span>
+                      <span>{fmt(quote.totalFOB)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Flete</span>
+                      <span>{fmt(quote.freightTotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Handling</span>
+                      <span>{fmt(quote.handlingTotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Impuestos</span>
+                      <span>{fmt(quote.taxesTotal)}</span>
+                    </div>
+                  </div>
 
-                {/* Gran Total */}
-                <div className="mt-4 rounded-xl bg-foreground text-background p-4 sm:p-5 flex items-center justify-between">
-                  <span className="text-xs sm:text-sm font-bold uppercase tracking-wider">
-                    {multi ? "Total trayendo todo" : "Total puesto en Argentina"}
-                  </span>
-                  <span className="text-xl sm:text-3xl font-black font-mono">{fmt(quote.grandTotal)}</span>
+                  {/* Total en una sola fila limpia como en la imagen */}
+                  <div className="flex justify-between items-baseline pt-6 sm:pt-8 mt-2">
+                    <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                      TOTAL PUESTO EN ARGENTINA
+                    </span>
+                    <span className="font-serif text-2xl sm:text-4xl font-bold text-foreground font-mono">
+                      {fmt(quote.grandTotal)}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Botones de acción */}
-              <div className="flex flex-wrap gap-3 pt-3 border-t border-border print:hidden">
+              <div className="flex flex-wrap gap-3 pt-6 mt-6 border-t border-border print:hidden">
                 <button
                   type="button"
                   onClick={copyForWhatsapp}
-                  className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 flex items-center gap-1.5"
+                  className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 flex items-center gap-1.5 cursor-pointer"
                 >
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   <span>{copied ? "¡Copiado al portapapeles!" : "Copiar para WhatsApp"}</span>
@@ -475,7 +508,7 @@ export function CalculadoraPage() {
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="btn-base border border-border hover:bg-muted text-xs font-semibold px-4 py-2 flex items-center gap-1.5"
+                  className="btn-base border border-border hover:bg-muted text-xs font-semibold px-4 py-2 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="h-4 w-4" />
                   <span>Imprimir / Guardar PDF</span>
