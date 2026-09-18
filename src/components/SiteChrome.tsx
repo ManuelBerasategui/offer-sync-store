@@ -9,7 +9,7 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
   const cart = useCart();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md print:hidden">
       <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3">
         <Link
           to="/"
@@ -85,7 +85,7 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
 
 export function SiteFooter({ config }: { config: SiteConfig }) {
   return (
-    <footer className="border-t border-border bg-surface px-4 py-10 text-center text-[13px] text-muted-foreground">
+    <footer className="border-t border-border bg-surface px-4 py-10 text-center text-[13px] text-muted-foreground print:hidden">
       <p className="mb-1 font-display text-base text-foreground">Te importamos</p>
       <p>Productos importados · Envíos a todo el país</p>
       {config["instagram"] && <p className="mt-1">{config["instagram"]}</p>}
