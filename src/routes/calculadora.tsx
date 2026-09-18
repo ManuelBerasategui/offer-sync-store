@@ -213,131 +213,134 @@ export function CalculadoraPage() {
     <SiteChrome config={config}>
       <main className="min-h-[80vh] py-8 sm:py-12 bg-background print:min-h-0 print:py-0">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 print:max-w-none print:px-0">
-          {/* Header principal */}
-          <div className="text-center mb-8 sm:mb-10 print:hidden">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-              Calculadora de Importaciones
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              Producto puesto en Argentina con flete internacional, handling y gestión integral de aduana.
-            </p>
-          </div>
-
-          {/* Formulario de carga */}
-          <div className="rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-xs mb-8 print:hidden">
-            <div className="mb-6">
-              <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
-                Cliente o Referencia
-              </label>
-              <input
-                type="text"
-                value={client}
-                onChange={(e) => setClient(e.target.value)}
-                placeholder="Nombre de la empresa o cliente"
-                className="input-base text-sm font-medium w-full sm:max-w-md"
-              />
+          {/* Header y Formulario (ocultos en PDF/impresión) */}
+          <div className="no-print print:hidden">
+            {/* Header principal */}
+            <div className="text-center mb-8 sm:mb-10">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+                Calculadora de Importaciones
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                Producto puesto en Argentina con flete internacional, handling y gestión integral de aduana.
+              </p>
             </div>
 
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center justify-between pb-2 border-b border-border">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Productos a cotizar
-                </span>
-                <span className="text-[11px] text-muted-foreground">FOB y peso unitarios</span>
+            {/* Formulario de carga */}
+            <div className="rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-xs mb-8">
+              <div className="mb-6">
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+                  Cliente o Referencia
+                </label>
+                <input
+                  type="text"
+                  value={client}
+                  onChange={(e) => setClient(e.target.value)}
+                  placeholder="Nombre de la empresa o cliente"
+                  className="input-base text-sm font-medium w-full sm:max-w-md"
+                />
               </div>
 
-              {items.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1.2fr_1.2fr_auto] gap-2.5 items-end p-3 rounded-xl bg-muted/25 border border-border/60"
-                >
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                      Producto #{idx + 1}
-                    </label>
-                    <input
-                      type="text"
-                      value={item.nombre}
-                      onChange={(e) => updateItem(item.id, "nombre", e.target.value)}
-                      placeholder="ej: Power Bank 20000mAh"
-                      className="input-base text-xs font-medium"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                      Cantidad
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.cantidad || ""}
-                      onChange={(e) => updateItem(item.id, "cantidad", e.target.value)}
-                      className="input-base text-xs font-bold"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                      FOB unit. (USD)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={item.fob || ""}
-                      onChange={(e) => updateItem(item.id, "fob", e.target.value)}
-                      placeholder="0.00"
-                      className="input-base text-xs font-bold"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                      Peso unit. (kg)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={item.peso || ""}
-                      onChange={(e) => updateItem(item.id, "peso", e.target.value)}
-                      placeholder="0.20"
-                      className="input-base text-xs font-bold"
-                    />
-                  </div>
-
-                  <div className="flex justify-end pb-0.5">
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.id)}
-                      disabled={items.length <= 1}
-                      className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-30"
-                      title="Quitar producto"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center justify-between pb-2 border-b border-border">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Productos a cotizar
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">FOB y peso unitarios</span>
                 </div>
-              ))}
-            </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <button
-                type="button"
-                onClick={addItem}
-                className="btn-base border border-dashed border-border hover:border-foreground/50 text-xs text-foreground font-semibold px-4 py-2 w-full sm:w-auto flex items-center justify-center gap-1.5"
-              >
-                <Plus className="h-3.5 w-3.5" /> + Agregar otro producto
-              </button>
+                {items.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1.2fr_1.2fr_auto] gap-2.5 items-end p-3 rounded-xl bg-muted/25 border border-border/60"
+                  >
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                        Producto #{idx + 1}
+                      </label>
+                      <input
+                        type="text"
+                        value={item.nombre}
+                        onChange={(e) => updateItem(item.id, "nombre", e.target.value)}
+                        placeholder="ej: Power Bank 20000mAh"
+                        className="input-base text-xs font-medium"
+                      />
+                    </div>
 
-              <button
-                type="button"
-                onClick={handleCalculate}
-                className="btn-base bg-primary text-primary-foreground font-bold text-sm px-6 py-2.5 w-full sm:flex-1 hover:opacity-90 flex items-center justify-center gap-2 shadow-xs"
-              >
-                <Calculator className="h-4 w-4" /> Generar cotización
-              </button>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                        Cantidad
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.cantidad || ""}
+                        onChange={(e) => updateItem(item.id, "cantidad", e.target.value)}
+                        className="input-base text-xs font-bold"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                        FOB unit. (USD)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.fob || ""}
+                        onChange={(e) => updateItem(item.id, "fob", e.target.value)}
+                        placeholder="0.00"
+                        className="input-base text-xs font-bold"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                        Peso unit. (kg)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.peso || ""}
+                        onChange={(e) => updateItem(item.id, "peso", e.target.value)}
+                        placeholder="0.20"
+                        className="input-base text-xs font-bold"
+                      />
+                    </div>
+
+                    <div className="flex justify-end pb-0.5">
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        disabled={items.length <= 1}
+                        className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-30"
+                        title="Quitar producto"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="btn-base border border-dashed border-border hover:border-foreground/50 text-xs text-foreground font-semibold px-4 py-2 w-full sm:w-auto flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" /> + Agregar otro producto
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCalculate}
+                  className="btn-base bg-primary text-primary-foreground font-bold text-sm px-6 py-2.5 w-full sm:flex-1 hover:opacity-90 flex items-center justify-center gap-2 shadow-xs"
+                >
+                  <Calculator className="h-4 w-4" /> Generar cotización
+                </button>
+              </div>
             </div>
           </div>
 
