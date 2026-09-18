@@ -3683,6 +3683,7 @@ function AdminProductosPage() {
                             <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4 w-24 sm:w-28">Imagen</th>
                             <th className="px-3 py-3 text-left font-semibold text-muted-foreground sm:px-4">Nombre</th>
                             <th className="hidden px-4 py-3 text-left font-semibold text-muted-foreground sm:table-cell">Categoría</th>
+                            <th className="hidden px-3 py-3 text-right font-semibold text-muted-foreground sm:table-cell">Precio Base</th>
                             <th className="hidden px-4 py-3 text-right font-semibold text-muted-foreground sm:table-cell">Precio</th>
                             <th className="px-3 py-3 text-center font-semibold text-muted-foreground sm:px-4">Estado</th>
                             <th className="px-3 py-3 text-right font-semibold text-muted-foreground sm:px-4">Acciones</th>
@@ -3762,6 +3763,32 @@ function AdminProductosPage() {
                                     </div>
                                   </td>
                                   <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{p.categoria}</td>
+                                  {/* Columna Precio Base junto a Precios */}
+                                  <td className="hidden px-3 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
+                                    {(() => {
+                                      const pR = p as Record<string, unknown>;
+                                      const bVal = pR["precio_base"] !== null && pR["precio_base"] !== undefined ? Number(pR["precio_base"]) : null;
+                                      const bCurr = String(pR["moneda_base"] ?? "USD").toUpperCase();
+                                      return (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPriceModalProduct(p)}
+                                          className="group/pb inline-flex flex-col items-end hover:opacity-80 transition-opacity text-right"
+                                          title="Hacé clic para editar precio base y márgenes"
+                                        >
+                                          {bVal && bVal > 0 ? (
+                                            <span className="font-semibold text-foreground text-xs underline decoration-dotted decoration-primary/50 group-hover/pb:text-primary">
+                                              {bCurr === "ARS" ? money(bVal) : `u$d ${bVal.toFixed(2)}`}
+                                            </span>
+                                          ) : (
+                                            <span className="text-[11px] text-muted-foreground/80 italic group-hover/pb:text-primary">
+                                              Sin base
+                                            </span>
+                                          )}
+                                        </button>
+                                      );
+                                    })()}
+                                  </td>
                                   <td className="hidden px-4 py-3 text-right tabular-nums text-muted-foreground sm:table-cell">
                                     {isDiscounted ? (
                                       <div className="flex flex-col items-end">
@@ -3808,7 +3835,7 @@ function AdminProductosPage() {
                                 {/* Sub-fila de Variantes de Color */}
                                 {isExpanded && variantsList.length > 0 && (
                                   <tr className="bg-muted/30">
-                                    <td colSpan={7} className="px-4 py-3 border-t border-dashed border-border/80">
+                                    <td colSpan={8} className="px-4 py-3 border-t border-dashed border-border/80">
                                       <div className="space-y-2">
                                         <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                                           Variantes de color ({variantsList.length}):

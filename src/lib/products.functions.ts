@@ -853,6 +853,16 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         codigo?: string;
         descuentoPct?: number;
       };
+      calculatorRates?: {
+        fleteKg?: number;
+        handling?: number;
+        impuestosPct?: number;
+        aereoFijo?: number;
+        aereoDesde?: number;
+        aereoHasta?: number;
+        barcoFijo?: number;
+        barcoDesde?: number;
+      };
     }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
@@ -861,6 +871,7 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
       bankInfo: data.bankInfo,
       resendConfig: data.resendConfig,
       couponConfig: data.couponConfig,
+      calculatorRates: data.calculatorRates,
     }),
   )
   .handler(async ({ data }): Promise<{ error?: string }> => {
@@ -946,6 +957,22 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         ];
         for (const cRow of couponRows) {
           await (supabaseAdmin as any).from("site_config").upsert(cRow, { onConflict: "clave" });
+        }
+      }
+
+      if (data.calculatorRates) {
+        const calcRows = [
+          { clave: "calc_flete_kg", valor: String(data.calculatorRates.fleteKg ?? 22) },
+          { clave: "calc_handling", valor: String(data.calculatorRates.handling ?? 30) },
+          { clave: "calc_impuestos_pct", valor: String(data.calculatorRates.impuestosPct ?? 70) },
+          { clave: "calc_aereo_fijo", valor: String(data.calculatorRates.aereoFijo ?? 950) },
+          { clave: "calc_aereo_desde", valor: String(data.calculatorRates.aereoDesde ?? 50) },
+          { clave: "calc_aereo_hasta", valor: String(data.calculatorRates.aereoHasta ?? 250) },
+          { clave: "calc_barco_fijo", valor: String(data.calculatorRates.barcoFijo ?? 100) },
+          { clave: "calc_barco_desde", valor: String(data.calculatorRates.barcoDesde ?? 250) },
+        ];
+        for (const row of calcRows) {
+          await (supabaseAdmin as any).from("site_config").upsert(row, { onConflict: "clave" });
         }
       }
 

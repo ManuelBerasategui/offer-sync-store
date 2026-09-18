@@ -92,6 +92,16 @@ function AdminConfiguracionPage() {
   const [couponUsageCount, setCouponUsageCount] = useState<number | null>(null);
   const [testEmailTarget, setTestEmailTarget] = useState<string>("");
 
+  // Estado para Tarifas de Calculadora de Importaciones (solo admin)
+  const [calcFleteKg, setCalcFleteKg] = useState<string>(config["calc_flete_kg"] ?? "22");
+  const [calcHandling, setCalcHandling] = useState<string>(config["calc_handling"] ?? "30");
+  const [calcImpuestosPct, setCalcImpuestosPct] = useState<string>(config["calc_impuestos_pct"] ?? "70");
+  const [calcAereoFijo, setCalcAereoFijo] = useState<string>(config["calc_aereo_fijo"] ?? "950");
+  const [calcAereoDesde, setCalcAereoDesde] = useState<string>(config["calc_aereo_desde"] ?? "50");
+  const [calcAereoHasta, setCalcAereoHasta] = useState<string>(config["calc_aereo_hasta"] ?? "250");
+  const [calcBarcoFijo, setCalcBarcoFijo] = useState<string>(config["calc_barco_fijo"] ?? "100");
+  const [calcBarcoDesde, setCalcBarcoDesde] = useState<string>(config["calc_barco_desde"] ?? "250");
+
   // Estado para Campañas de Email por Tandas
   const [newsletterSummary, setNewsletterSummary] = useState<CampaignSummary | null>(null);
   const [batchSize, setBatchSize] = useState<number>(50);
@@ -331,6 +341,16 @@ function AdminConfiguracionPage() {
             activo: couponActive,
             codigo: couponCode,
             descuentoPct: Number(couponDiscountPct) || 5,
+          },
+          calculatorRates: {
+            fleteKg: Number(calcFleteKg) || 22,
+            handling: Number(calcHandling) || 30,
+            impuestosPct: Number(calcImpuestosPct) || 70,
+            aereoFijo: Number(calcAereoFijo) || 950,
+            aereoDesde: Number(calcAereoDesde) || 50,
+            aereoHasta: Number(calcAereoHasta) || 250,
+            barcoFijo: Number(calcBarcoFijo) || 100,
+            barcoDesde: Number(calcBarcoDesde) || 250,
           },
         },
       });
@@ -1040,6 +1060,151 @@ function AdminConfiguracionPage() {
               placeholder="1500"
             />
             <span className="text-xs font-semibold text-muted-foreground">ARS por USD (Resguardo manual)</span>
+          </div>
+        </div>
+
+        {/* Tarjeta: Tarifas de la Calculadora de Importaciones */}
+        <div className="mb-6 rounded-2xl border border-primary/30 bg-card p-3.5 sm:p-5 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h2 className="text-base font-bold flex items-center gap-2 text-foreground">
+              🚢 Tarifas Calculadora de Importaciones (Solo Admin)
+            </h2>
+            <span className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-bold border border-primary/20">
+              Panel de Control
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Configuración de las tarifas base utilizadas por la <strong>Calculadora de Importaciones</strong> para cotizaciones de clientes. Los clientes nunca verán estos costos internos ni porcentajes, únicamente verán "Flete" e "Impuestos".
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Flete USD/kg (menor a 50kg)</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-muted-foreground">u$d</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  className="input-base text-xs font-bold"
+                  value={calcFleteKg}
+                  onChange={(e) => setCalcFleteKg(e.target.value)}
+                  placeholder="22"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Handling fijo por envío</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-muted-foreground">u$d</span>
+                <input
+                  type="number"
+                  step="1"
+                  className="input-base text-xs font-bold"
+                  value={calcHandling}
+                  onChange={(e) => setCalcHandling(e.target.value)}
+                  placeholder="30"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Impuestos (%)</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-muted-foreground">%</span>
+                <input
+                  type="number"
+                  step="1"
+                  className="input-base text-xs font-bold"
+                  value={calcImpuestosPct}
+                  onChange={(e) => setCalcImpuestosPct(e.target.value)}
+                  placeholder="70"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-dashed border-border pt-3 mb-3">
+            <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+              ✈️ Tramo Aéreo Fijo (ej. 50 a 250 kg)
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Costo Aéreo Fijo (USD)</label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-muted-foreground">u$d</span>
+                  <input
+                    type="number"
+                    step="10"
+                    className="input-base text-xs font-bold"
+                    value={calcAereoFijo}
+                    onChange={(e) => setCalcAereoFijo(e.target.value)}
+                    placeholder="950"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Rango desde (kg)</label>
+                <input
+                  type="number"
+                  step="1"
+                  className="input-base text-xs font-bold"
+                  value={calcAereoDesde}
+                  onChange={(e) => setCalcAereoDesde(e.target.value)}
+                  placeholder="50"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Rango hasta (kg)</label>
+                <input
+                  type="number"
+                  step="1"
+                  className="input-base text-xs font-bold"
+                  value={calcAereoHasta}
+                  onChange={(e) => setCalcAereoHasta(e.target.value)}
+                  placeholder="250"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-dashed border-border pt-3 bg-muted/20 p-3 rounded-xl">
+            <h3 className="text-xs font-bold text-primary mb-1.5 flex items-center gap-1.5">
+              🚢 Tramo Marítimo (Barco: si supera los 250 kg)
+            </h3>
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Si la carga supera los 250 kg (o el umbral configurado), se transporta por barco con una tarifa plana fija.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Flete Barco Fijo (USD)</label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-muted-foreground">u$d</span>
+                  <input
+                    type="number"
+                    step="10"
+                    className="input-base text-xs font-bold border-primary/40 focus:border-primary"
+                    value={calcBarcoFijo}
+                    onChange={(e) => setCalcBarcoFijo(e.target.value)}
+                    placeholder="100"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Aplica a partir de (kg)</label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-muted-foreground">kg</span>
+                  <input
+                    type="number"
+                    step="1"
+                    className="input-base text-xs font-bold"
+                    value={calcBarcoDesde}
+                    onChange={(e) => setCalcBarcoDesde(e.target.value)}
+                    placeholder="250"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

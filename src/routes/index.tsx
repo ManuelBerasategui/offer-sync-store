@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, ChevronRight } from "lucide-react";
+import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, ChevronRight, Calculator } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -140,16 +140,25 @@ function Home() {
           <span>Productos originales</span>
         </div>
 
-        {/* CTA — naranja exclusivo aquí, máxima jerarquía */}
-        <div className="relative mt-6 sm:mt-8 flex flex-col items-center gap-2.5 sm:gap-3">
-          <a
-            href="/catalogo"
-            className="btn-base grad-urgente inline-flex items-center justify-center gap-2 px-10 py-3.5 text-base font-black uppercase tracking-wide text-primary-foreground shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-95"
+        {/* CTA — Catálogo y Calculadora de Importaciones */}
+        <div className="relative mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3">
+          <Link
+            to="/catalogo"
+            className="btn-base grad-urgente inline-flex items-center justify-center gap-2 px-8 py-3.5 text-base font-black uppercase tracking-wide text-primary-foreground shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-95 w-full sm:w-auto"
           >
             Ver Catálogo Mayorista
-          </a>
+          </Link>
+          <Link
+            to="/calculadora"
+            className="btn-base border border-border bg-card/80 backdrop-blur-xs hover:bg-muted text-foreground inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-bold shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:scale-95 w-full sm:w-auto"
+          >
+            <Calculator className="h-4 w-4 text-primary" />
+            <span>Calculadora de Importaciones</span>
+          </Link>
+        </div>
 
-          {/* Aviso mínimos — gris puro, sin ámbar */}
+        {/* Aviso mínimos — gris puro, sin ámbar */}
+        <div className="relative mt-2 text-center">
           <a
             href="#minimos"
             className="text-[11px] font-medium text-muted-foreground/80 transition-colors hover:text-muted-foreground active:scale-95"
