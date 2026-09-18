@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import { Calculator, Plus, Trash2, Copy, Printer, Check } from "lucide-react";
+import { Calculator, Plus, Trash2, Copy, Printer, Check, MessageCircle } from "lucide-react";
 import { SiteChrome } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
+import { waLink } from "@/lib/store";
 
 export const Route = createFileRoute("/calculadora")({
   loader: ({ context }) => {
@@ -173,10 +174,10 @@ export function CalculadoraPage() {
     }, 100);
   }
 
-  function copyForWhatsapp() {
-    if (!quote) return;
+  function buildWhatsappMessage() {
+    if (!quote) return "";
     const multi = quote.items.length > 1;
-    let msg = `*Cotización — ${quote.client}*\n\n`;
+    let msg = `Hola! Te comparto la cotización para *${quote.client}*:\n\n`;
 
     if (multi) {
       msg += `_Productos por separado (c/u aislado):_\n`;
@@ -190,13 +191,21 @@ export function CalculadoraPage() {
       msg += `• Flete: ${fmt(quote.freightTotal)}\n`;
       msg += `• Handling: ${fmt(quote.handlingTotal)}\n`;
       msg += `• Impuestos: ${fmt(quote.taxesTotal)}\n`;
-      msg += `\n*Total trayendo todo: ${fmt(quote.grandTotal)}*`;
+      msg += `\n*Total trayendo todo: ${fmt(quote.grandTotal)}*\n`;
     } else {
       const i = quote.itemsIsolated[0];
       msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u puesto en Argentina\n`;
       msg += `\n*Total puesto en Argentina: ${fmt(quote.grandTotal)}*\n`;
-      msg += `\n_(incluye flete, handling e impuestos)_`;
+      msg += `_(incluye flete, handling e impuestos)_\n`;
     }
+
+    msg += `\n*Nota:* El precio final es estimativo. Me gustaría confirmar el pedido y obtener el valor definitivo.`;
+    return msg;
+  }
+
+  function copyForWhatsapp() {
+    const msg = buildWhatsappMessage();
+    if (!msg) return;
 
     navigator.clipboard
       .writeText(msg)
@@ -494,15 +503,31 @@ export function CalculadoraPage() {
                 </div>
               )}
 
+              {/* Aclaración precio estimativo (visible en pantalla y en PDF) */}
+              <div className="mt-6 pt-3.5 border-t border-border/70 text-xs text-muted-foreground leading-relaxed">
+                <p className="text-[11.5px] sm:text-xs text-foreground/80">
+                  <span className="font-semibold text-foreground">* Nota:</span> El precio final es estimativo. Si deseás obtener el valor definitivo o confirmar tu pedido, escribinos a WhatsApp.
+                </p>
+              </div>
+
               {/* Botones de acción */}
               <div className="flex flex-wrap gap-3 pt-6 mt-6 border-t border-border print:hidden">
+                <a
+                  href={waLink(config, buildWhatsappMessage())}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Confirmar por WhatsApp</span>
+                </a>
                 <button
                   type="button"
                   onClick={copyForWhatsapp}
-                  className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 flex items-center gap-1.5 cursor-pointer"
+                  className="btn-base border border-border hover:bg-muted text-xs font-semibold px-4 py-2 flex items-center gap-1.5 cursor-pointer"
                 >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  <span>{copied ? "¡Copiado al portapapeles!" : "Copiar para WhatsApp"}</span>
+                  {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  <span>{copied ? "¡Copiado!" : "Copiar cotización"}</span>
                 </button>
                 <button
                   type="button"
