@@ -148,9 +148,9 @@ export function imageUrl(raw?: string | null): string {
   const url = (raw ?? "").trim();
   if (!url) return "";
   // /api/img? proxy paths are constructed server-side — always safe
-  if (url.startsWith("/api/img?")) return url;
+  if (url.startsWith("/api/img?")) return url.replace(/[^\w\-./?&=%#@+:,;~]/g, "");
   // Relative paths (e.g. Supabase Storage public bucket) — safe by construction
-  if (url.startsWith("/") && !url.startsWith("//")) return url;
+  if (url.startsWith("/") && !url.startsWith("//")) return url.replace(/[^\w\-./?&=%#@+:,;~]/g, "");
 
   // Extract Google Drive file IDs — output is a hardcoded trusted domain
   const m =
@@ -253,13 +253,20 @@ export function galleryImages(product: Product): string[] {
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
 
 export function sanitizeUrl(url?: string | null): string {
-  if (!url) return "#";
+  if (!url || typeof url !== "string") return "#";
   const trimmed = url.trim();
-  if (trimmed.startsWith("/") || trimmed.startsWith("#")) return trimmed;
+  if (trimmed.startsWith("#")) {
+    return "#" + trimmed.slice(1).replace(/[^\w\-]/g, "");
+  }
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+    return trimmed.replace(/[^\w\-./?&=%#@+:,;~]/g, "");
+  }
   try {
     const parsed = new URL(trimmed, "https://dummy-base.local");
-    if (ALLOWED_PROTOCOLS.has(parsed.protocol)) {
-      return trimmed;
+    if (ALLOWED_PROTOCOLS.has(parsed.protocol) && !trimmed.startsWith("//")) {
+      return parsed.href.startsWith("https://dummy-base.local/")
+        ? parsed.pathname + parsed.search + parsed.hash
+        : parsed.href;
     }
   } catch {
     // invalid URL
@@ -277,7 +284,9 @@ export function sanitizeImageUrl(url?: string | null): string {
   if (!url || typeof url !== "string") return "";
   const trimmed = url.trim();
   // Rutas relativas (Supabase Storage) son seguras por construcción
-  if (trimmed.startsWith("/")) return trimmed;
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+    return trimmed.replace(/[^\w\-./?&=%#@+:,;~]/g, "");
+  }
   try {
     const parsed = new URL(trimmed);
     // Allowlist estricto: solo http / https

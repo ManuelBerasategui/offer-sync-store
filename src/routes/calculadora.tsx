@@ -176,8 +176,9 @@ export function CalculadoraPage() {
 
   function buildWhatsappMessage() {
     if (!quote) return "";
+    const cleanClient = (quote.client || "").replace(/[\r\n\t]/g, " ").trim();
     const multi = quote.items.length > 1;
-    let msg = `Hola! Te comparto la cotización para *${quote.client}*:\n\n`;
+    let msg = `Hola! Te comparto la cotización para *${cleanClient}*:\n\n`;
 
     if (multi) {
       msg += `_Productos por separado (c/u aislado):_\n`;
@@ -201,6 +202,23 @@ export function CalculadoraPage() {
 
     msg += `\n*Nota:* El precio final es estimativo. Me gustaría confirmar el pedido y obtener el valor definitivo.`;
     return msg;
+  }
+
+  function handleConfirmWhatsapp() {
+    const msg = buildWhatsappMessage();
+    if (!msg) return;
+    const url = waLink(config, msg);
+    try {
+      const parsed = new URL(url);
+      if (
+        parsed.protocol === "https:" &&
+        (parsed.hostname === "wa.me" || parsed.hostname === "api.whatsapp.com")
+      ) {
+        window.open(parsed.href, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      // URL inválida ignorada de forma segura
+    }
   }
 
   function copyForWhatsapp() {
@@ -521,15 +539,14 @@ export function CalculadoraPage() {
 
               {/* Botones de acción */}
               <div className="flex flex-wrap gap-3 pt-6 mt-6 border-t border-border print:hidden">
-                <a
-                  href={waLink(config, buildWhatsappMessage())}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={handleConfirmWhatsapp}
                   className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 flex items-center gap-1.5 cursor-pointer"
                 >
                   <MessageCircle className="h-4 w-4" />
                   <span>Confirmar por WhatsApp</span>
-                </a>
+                </button>
                 <button
                   type="button"
                   onClick={copyForWhatsapp}

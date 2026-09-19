@@ -36,6 +36,7 @@ import {
 import type { Product, Banner } from "@/lib/store";
 import { money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
+import { SafeImage } from "@/components/SafeImage";
 
 export const Route = createFileRoute("/admin/productos")({
   loader: ({ context }) => {
@@ -1649,8 +1650,8 @@ function ActiveOfferCard({
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-card p-4 sm:p-5 shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        <img
-          src={sanitizeImageUrl(imageUrl(product.imagen_url)) || FALLBACK_IMAGE}
+        <SafeImage
+          rawSrc={product.imagen_url}
           alt={product.nombre ?? ""}
           className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover border border-border shadow-xs shrink-0"
           onError={onImageError(product.imagen_url)}
@@ -1822,8 +1823,8 @@ function CandidateOfferCard({
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all">
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        <img
-          src={sanitizeImageUrl(imageUrl(product.imagen_url)) || FALLBACK_IMAGE}
+        <SafeImage
+          rawSrc={product.imagen_url}
           alt={product.nombre ?? ""}
           className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover border border-border shadow-xs shrink-0"
           onError={onImageError(product.imagen_url)}
@@ -2550,8 +2551,8 @@ function ComboBuilderPanel({
                 key={b.id ?? idx}
                 className="flex flex-col sm:flex-row items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all"
               >
-                <img
-                  src={sanitizeImageUrl(imageUrl(b.imagen_url)) || FALLBACK_IMAGE}
+                <SafeImage
+                  rawSrc={b.imagen_url}
                   alt={b.titulo ?? ""}
                   className="h-24 w-24 sm:h-28 sm:w-28 rounded-xl object-contain p-1.5 bg-surface border border-border shrink-0"
                   onError={onImageError(b.imagen_url)}
@@ -3169,8 +3170,8 @@ function YupooImporter({
                       className="h-4 w-4 rounded accent-primary shrink-0"
                     />
                     {album.thumbnail ? (
-                      <img
-                        src={album.thumbnail}
+                      <SafeImage
+                        rawSrc={album.thumbnail}
                         alt=""
                         referrerPolicy="no-referrer"
                         className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border bg-muted"
@@ -3716,8 +3717,8 @@ function AdminProductosPage() {
                                     onClick={() => setModal(productToInput(p))}
                                   >
                                     <div className="relative h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 rounded-xl overflow-hidden border border-border/80 bg-muted/40 shadow-xs group/img shrink-0">
-                                      <img
-                                        src={sanitizeImageUrl(imageUrl(p.imagen_url)) || FALLBACK_IMAGE}
+                                      <SafeImage
+                                        rawSrc={p.imagen_url}
                                         alt={p.nombre}
                                         className="h-full w-full object-cover transition-transform duration-300 group-hover/img:scale-105"
                                         onError={onImageError(p.imagen_url)}
@@ -3850,8 +3851,8 @@ function AdminProductosPage() {
                                               >
                                                 <div className="flex items-center gap-2 min-w-0">
                                                   {v.imagen_url && (
-                                                    <img
-                                                      src={sanitizeImageUrl(imageUrl(v.imagen_url)) || FALLBACK_IMAGE}
+                                                    <SafeImage
+                                                      rawSrc={v.imagen_url}
                                                       alt={v.color}
                                                       className="h-10 w-10 sm:h-11 sm:w-11 rounded-lg object-cover border border-border shrink-0"
                                                       onError={onImageError(v.imagen_url)}
