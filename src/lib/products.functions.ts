@@ -3,7 +3,6 @@ import type { Banner, Product, ProductVariant } from "@/lib/store";
 
 const str = (v: unknown, max = 2000) => String(v ?? "").slice(0, max);
 
-
 /* ─── Tipos de entrada ─────────────────────────────────── */
 
 export type CategoryRuleInput = {
@@ -106,7 +105,7 @@ export function calcArsFromUsd(
   rate: number,
   markupPct = 0,
   increment = 10,
-  surcharge = 1
+  surcharge = 1,
 ): number {
   const numUsd = typeof usd === "number" ? usd : Number(String(usd).replace(/[^\d.-]/g, ""));
   if (!Number.isFinite(numUsd) || numUsd <= 0 || !rate || rate <= 0) return 0;
@@ -125,99 +124,118 @@ export const getAdminProducts = createServerFn({ method: "POST" })
     email: str(data?.email, 160).toLowerCase(),
     token: str(data?.token, 2000),
   }))
-  .handler(async ({ data }): Promise<{
-    products: Product[];
-    dolarRate?: number;
-    roundingIncrement?: number;
-    markupPercentage?: number;
-    error?: string;
-  }> => {
-    try {
-      const supabaseAdmin = await assertAdmin(data.email, data.token);
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      products: Product[];
+      dolarRate?: number;
+      roundingIncrement?: number;
+      markupPercentage?: number;
+      error?: string;
+    }> => {
+      try {
+        const supabaseAdmin = await assertAdmin(data.email, data.token);
 
-      const [productsRes, variantsRes, pricingRes] = await Promise.all([
-        (supabaseAdmin as any).from("products").select("*").order("nombre"),
-        (supabaseAdmin as any).from("product_variants").select("*"),
-        (supabaseAdmin as any).from("pricing_settings").select("last_rate, markup_percentage, rounding_increment").eq("id", true).maybeSingle(),
-      ]);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const productsResTyped = productsRes as { data: any[] | null; error: any };
-      const variantsResTyped = variantsRes as { data: any[] | null; error: any };
+        const [productsRes, variantsRes, pricingRes] = await Promise.all([
+          (supabaseAdmin as any).from("products").select("*").order("nombre"),
+          (supabaseAdmin as any).from("product_variants").select("*"),
+          (supabaseAdmin as any)
+            .from("pricing_settings")
+            .select("last_rate, markup_percentage, rounding_increment")
+            .eq("id", true)
+            .maybeSingle(),
+        ]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const productsResTyped = productsRes as { data: any[] | null; error: any };
+        const variantsResTyped = variantsRes as { data: any[] | null; error: any };
 
-      if (productsResTyped.error) throw productsResTyped.error;
+        if (productsResTyped.error) throw productsResTyped.error;
 
-      let dolarRate = 0;
-      let roundingIncrement = 10;
-      let markupPercentage = 0;
+        let dolarRate = 0;
+        let roundingIncrement = 10;
+        let markupPercentage = 0;
 
-      if (pricingRes?.data) {
-        if (Number(pricingRes.data.last_rate) > 0) dolarRate = Number(pricingRes.data.last_rate);
-        if (Number(pricingRes.data.rounding_increment) > 0) roundingIncrement = Number(pricingRes.data.rounding_increment);
-        if (pricingRes.data.markup_percentage !== undefined) markupPercentage = Number(pricingRes.data.markup_percentage);
-      }
+        if (pricingRes?.data) {
+          if (Number(pricingRes.data.last_rate) > 0) dolarRate = Number(pricingRes.data.last_rate);
+          if (Number(pricingRes.data.rounding_increment) > 0)
+            roundingIncrement = Number(pricingRes.data.rounding_increment);
+          if (pricingRes.data.markup_percentage !== undefined)
+            markupPercentage = Number(pricingRes.data.markup_percentage);
+        }
 
-      if (!dolarRate) {
-        try {
-          const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", { signal: AbortSignal.timeout(3000) });
-          if (apiRes.ok) {
-            const apiData = (await apiRes.json()) as { venta?: number };
-            if (apiData?.venta && apiData.venta > 0) dolarRate = Math.round(apiData.venta);
-          }
-        } catch { }
-      }
+        if (!dolarRate) {
+          try {
+            const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", {
+              signal: AbortSignal.timeout(3000),
+            });
+            if (apiRes.ok) {
+              const apiData = (await apiRes.json()) as { venta?: number };
+              if (apiData?.venta && apiData.venta > 0) dolarRate = Math.round(apiData.venta);
+            }
+          } catch {}
+        }
 
-      if (!dolarRate) {
-        const { data: cfgRow } = await (supabaseAdmin as any)
-          .from("site_config")
-          .select("valor")
-          .eq("clave", "dolar_cotizacion")
-          .maybeSingle();
-        dolarRate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
-      }
+        if (!dolarRate) {
+          const { data: cfgRow } = await (supabaseAdmin as any)
+            .from("site_config")
+            .select("valor")
+            .eq("clave", "dolar_cotizacion")
+            .maybeSingle();
+          dolarRate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
+        }
 
-      const variantsByProduct = new Map<string, ProductVariant[]>();
-      for (const v of variantsResTyped.data ?? []) {
-        const pid = String(v.product_id ?? "");
-        if (!pid) continue;
-        const list = variantsByProduct.get(pid) ?? [];
-        list.push(v as ProductVariant);
-        variantsByProduct.set(pid, list);
-      }
+        const variantsByProduct = new Map<string, ProductVariant[]>();
+        for (const v of variantsResTyped.data ?? []) {
+          const pid = String(v.product_id ?? "");
+          if (!pid) continue;
+          const list = variantsByProduct.get(pid) ?? [];
+          list.push(v as ProductVariant);
+          variantsByProduct.set(pid, list);
+        }
 
-      const products: Product[] = (productsResTyped.data ?? []).map((p: any) => {
-        const meta = typeof p.metadata === "object" && p.metadata !== null ? p.metadata as Record<string, unknown> : {};
-        const { metadata, ...rest } = p;
-        const linkedVariants = variantsByProduct.get(String(p.id ?? "")) ?? [];
-        const variants = linkedVariants.map((v) => {
-          const colorClean = String(v.color ?? "").trim();
-          const colorKey = `talles_color_${colorClean.toLowerCase().normalize("NFC").replace(/\s+/g, "_")}`;
-          const rawTalles = meta[colorKey];
-          const talles_disponibles: string[] = Array.isArray(rawTalles)
-            ? (rawTalles as string[])
-            : typeof rawTalles === "string" && rawTalles.length > 0
-              ? rawTalles.split(",").map((t) => t.trim()).filter(Boolean)
-              : [];
-          return { ...v, talles_disponibles };
+        const products: Product[] = (productsResTyped.data ?? []).map((p: any) => {
+          const meta =
+            typeof p.metadata === "object" && p.metadata !== null
+              ? (p.metadata as Record<string, unknown>)
+              : {};
+          const { metadata, ...rest } = p;
+          const linkedVariants = variantsByProduct.get(String(p.id ?? "")) ?? [];
+          const variants = linkedVariants.map((v) => {
+            const colorClean = String(v.color ?? "").trim();
+            const colorKey = `talles_color_${colorClean.toLowerCase().normalize("NFC").replace(/\s+/g, "_")}`;
+            const rawTalles = meta[colorKey];
+            const talles_disponibles: string[] = Array.isArray(rawTalles)
+              ? (rawTalles as string[])
+              : typeof rawTalles === "string" && rawTalles.length > 0
+                ? rawTalles
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                : [];
+            return { ...v, talles_disponibles };
+          });
+          return { ...meta, ...rest, variants } as Product;
         });
-        return { ...meta, ...rest, variants } as Product;
-      });
 
-      return { products, dolarRate, roundingIncrement, markupPercentage };
-    } catch (err) {
-      return { products: [], error: err instanceof Error ? err.message : "Error al cargar productos." };
-    }
-  });
+        return { products, dolarRate, roundingIncrement, markupPercentage };
+      } catch (err) {
+        return {
+          products: [],
+          error: err instanceof Error ? err.message : "Error al cargar productos.",
+        };
+      }
+    },
+  );
 
 /* ─── Crear / actualizar un producto con variantes ──────── */
 
 export const upsertAdminProduct = createServerFn({ method: "POST" })
-  .validator(
-    (data: { email?: string; token?: string; product: ProductInput }) => ({
-      email: str(data?.email, 160).toLowerCase(),
-      token: str(data?.token, 2000),
-      product: data.product,
-    }),
-  )
+  .validator((data: { email?: string; token?: string; product: ProductInput }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    product: data.product,
+  }))
   .handler(async ({ data }): Promise<{ id?: string; error?: string }> => {
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
@@ -260,14 +278,19 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
           const colorClean = String(v.color ?? "").trim();
           if (colorClean && v.talles_disponibles && v.talles_disponibles.length > 0) {
             const key = `talles_color_${colorClean.toLowerCase().normalize("NFC").replace(/\s+/g, "_")}`;
-            metadata[key] = v.talles_disponibles.map((t) => String(t).trim()).filter(Boolean).join(",");
+            metadata[key] = v.talles_disponibles
+              .map((t) => String(t).trim())
+              .filter(Boolean)
+              .join(",");
           }
         }
       }
 
       const parsePrice = (val: string | number | undefined | null) => {
         if (val === undefined || val === null) return null;
-        const cleaned = String(val).replace(/[^\d.-]/g, "").trim();
+        const cleaned = String(val)
+          .replace(/[^\d.-]/g, "")
+          .trim();
         if (cleaned === "") return null;
         const num = Number(cleaned);
         return isNaN(num) ? null : num;
@@ -287,21 +310,25 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
 
         if (pSettings) {
           if (Number(pSettings.last_rate) > 0) rate = Number(pSettings.last_rate);
-          if (pSettings.markup_percentage !== undefined) markup = Number(pSettings.markup_percentage) / 100;
-          if (Number(pSettings.rounding_increment) > 0) increment = Number(pSettings.rounding_increment);
+          if (pSettings.markup_percentage !== undefined)
+            markup = Number(pSettings.markup_percentage) / 100;
+          if (Number(pSettings.rounding_increment) > 0)
+            increment = Number(pSettings.rounding_increment);
         }
-      } catch { }
+      } catch {}
 
       if (!rate) {
         try {
-          const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", { signal: AbortSignal.timeout(3000) });
+          const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", {
+            signal: AbortSignal.timeout(3000),
+          });
           if (apiRes.ok) {
             const apiData = (await apiRes.json()) as { venta?: number };
             if (apiData?.venta && apiData.venta > 0) {
               rate = Math.round(apiData.venta);
             }
           }
-        } catch { }
+        } catch {}
       }
 
       if (!rate) {
@@ -319,6 +346,19 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         }
         return Math.round(usd * rate * (1 + markup));
       };
+
+      // ── Regla de Optimización Obligatoria ──
+      // Asegura que toda imagen entrante (individual o variantes) pase por optimización a WebP
+      if (p.imagen_url) {
+        p.imagen_url = await optimizeImageOnServer(supabaseAdmin, p.imagen_url, "products");
+      }
+      if (p.variants && p.variants.length > 0) {
+        for (const v of p.variants) {
+          if (v.imagen_url) {
+            v.imagen_url = await optimizeImageOnServer(supabaseAdmin, v.imagen_url, "variants");
+          }
+        }
+      }
 
       const isNew = !p.id;
 
@@ -447,7 +487,9 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
           .select("*")
           .eq("product_id", productId);
 
-        const existingMap = new Map<string, any>((existingVariants ?? []).map((v: any) => [v.color.toLowerCase().trim(), v]));
+        const existingMap = new Map<string, any>(
+          (existingVariants ?? []).map((v: any) => [v.color.toLowerCase().trim(), v]),
+        );
 
         // Borrar las existentes
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -456,7 +498,9 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         // Insertar las nuevas
         if (p.variants.length > 0) {
           const variantRows = p.variants.map((v) => {
-            const colorKey = String(v.color ?? "").toLowerCase().trim();
+            const colorKey = String(v.color ?? "")
+              .toLowerCase()
+              .trim();
             const existing = existingMap.get(colorKey);
 
             let vBase = existing?.precio_base ?? null;
@@ -508,7 +552,9 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
           });
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error: vErr } = await (supabaseAdmin as any).from("product_variants").insert(variantRows);
+          const { error: vErr } = await (supabaseAdmin as any)
+            .from("product_variants")
+            .insert(variantRows);
           if (vErr) throw vErr;
         }
       }
@@ -547,166 +593,502 @@ export const updateProductPrice = createServerFn({ method: "POST" })
       sourceCurrency: data?.sourceCurrency === "ARS" ? ("ARS" as const) : ("USD" as const),
       basePrice: Number(data?.basePrice) || 0,
       hasOffer: Boolean(data?.hasOffer),
-      offerSourceCurrency: data?.offerSourceCurrency === "ARS" ? ("ARS" as const) : ("USD" as const),
-      offerBasePrice: data?.offerBasePrice !== null && data?.offerBasePrice !== undefined ? Number(data.offerBasePrice) : null,
+      offerSourceCurrency:
+        data?.offerSourceCurrency === "ARS" ? ("ARS" as const) : ("USD" as const),
+      offerBasePrice:
+        data?.offerBasePrice !== null && data?.offerBasePrice !== undefined
+          ? Number(data.offerBasePrice)
+          : null,
       variants: Array.isArray(data?.variants)
         ? data.variants.map((v) => ({
-          id: v.id ? str(v.id, 100) : undefined,
-          color: str(v.color, 100),
-          sourceCurrency: v.sourceCurrency === "ARS" ? ("ARS" as const) : ("USD" as const),
-          basePrice: v.basePrice !== null && v.basePrice !== undefined ? Number(v.basePrice) : null,
-        }))
+            id: v.id ? str(v.id, 100) : undefined,
+            color: str(v.color, 100),
+            sourceCurrency: v.sourceCurrency === "ARS" ? ("ARS" as const) : ("USD" as const),
+            basePrice:
+              v.basePrice !== null && v.basePrice !== undefined ? Number(v.basePrice) : null,
+          }))
         : undefined,
     }),
   )
-  .handler(async ({ data }): Promise<{ success?: boolean; untouched?: boolean; error?: string }> => {
-    try {
-      const supabaseAdmin = await assertAdmin(data.email, data.token);
-
-      if (!data.productId) throw new Error("ID de producto no provisto.");
-      if (data.basePrice <= 0) throw new Error("El precio base debe ser mayor a 0.");
-
-      // Leer settings de cotización
-      let rate = 1500;
-      let markup = 0;
-      let increment = 10;
-
+  .handler(
+    async ({ data }): Promise<{ success?: boolean; untouched?: boolean; error?: string }> => {
       try {
-        const { data: pSettings } = await (supabaseAdmin as any)
-          .from("pricing_settings")
-          .select("last_rate, markup_percentage, rounding_increment")
-          .eq("id", true)
-          .maybeSingle();
+        const supabaseAdmin = await assertAdmin(data.email, data.token);
 
-        if (pSettings) {
-          if (Number(pSettings.last_rate) > 0) rate = Number(pSettings.last_rate);
-          if (pSettings.markup_percentage !== undefined) markup = Number(pSettings.markup_percentage) / 100;
-          if (Number(pSettings.rounding_increment) > 0) increment = Number(pSettings.rounding_increment);
-        }
-      } catch { }
+        if (!data.productId) throw new Error("ID de producto no provisto.");
+        if (data.basePrice <= 0) throw new Error("El precio base debe ser mayor a 0.");
 
-      if (!rate) {
+        // Leer settings de cotización
+        let rate = 1500;
+        let markup = 0;
+        let increment = 10;
+
         try {
-          const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", { signal: AbortSignal.timeout(3000) });
-          if (apiRes.ok) {
-            const apiData = (await apiRes.json()) as { venta?: number };
-            if (apiData?.venta && apiData.venta > 0) rate = Math.round(apiData.venta);
+          const { data: pSettings } = await (supabaseAdmin as any)
+            .from("pricing_settings")
+            .select("last_rate, markup_percentage, rounding_increment")
+            .eq("id", true)
+            .maybeSingle();
+
+          if (pSettings) {
+            if (Number(pSettings.last_rate) > 0) rate = Number(pSettings.last_rate);
+            if (pSettings.markup_percentage !== undefined)
+              markup = Number(pSettings.markup_percentage) / 100;
+            if (Number(pSettings.rounding_increment) > 0)
+              increment = Number(pSettings.rounding_increment);
           }
-        } catch { }
-      }
+        } catch {}
 
-      if (!rate) {
-        const { data: cfgRow } = await (supabaseAdmin as any)
-          .from("site_config")
-          .select("valor")
-          .eq("clave", "dolar_cotizacion")
-          .maybeSingle();
-        rate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
-      }
-
-      const arsFromUsd = (usd: number) => {
-        if (increment > 1) {
-          return Math.ceil((usd * rate * (1 + markup)) / increment) * increment;
+        if (!rate) {
+          try {
+            const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", {
+              signal: AbortSignal.timeout(3000),
+            });
+            if (apiRes.ok) {
+              const apiData = (await apiRes.json()) as { venta?: number };
+              if (apiData?.venta && apiData.venta > 0) rate = Math.round(apiData.venta);
+            }
+          } catch {}
         }
-        return Math.round(usd * rate * (1 + markup));
-      };
 
-      // 1. Calcular precio principal a partir del precio base + 7%
-      let finalUsd: number;
-      let finalArs: number;
+        if (!rate) {
+          const { data: cfgRow } = await (supabaseAdmin as any)
+            .from("site_config")
+            .select("valor")
+            .eq("clave", "dolar_cotizacion")
+            .maybeSingle();
+          rate = Number(cfgRow?.valor) > 0 ? Number(cfgRow?.valor) : 1500;
+        }
 
-      if (data.sourceCurrency === "USD") {
-        finalUsd = Math.round(data.basePrice * 1.07 * 100) / 100;
-        finalArs = arsFromUsd(finalUsd);
-      } else {
-        finalArs = Math.round(data.basePrice * 1.07);
-        finalUsd = rate > 0 ? Math.round((finalArs / rate) * 100) / 100 : 0;
-      }
+        const arsFromUsd = (usd: number) => {
+          if (increment > 1) {
+            return Math.ceil((usd * rate * (1 + markup)) / increment) * increment;
+          }
+          return Math.round(usd * rate * (1 + markup));
+        };
 
-      // 2. Calcular precio de oferta si aplica
-      let finalOfferUsd: number | null = null;
-      let finalOfferArs: number | null = null;
-      let offerBase: number | null = null;
-      let offerMoneda: string | null = null;
+        // 1. Calcular precio principal a partir del precio base + 7%
+        let finalUsd: number;
+        let finalArs: number;
 
-      if (data.hasOffer && data.offerBasePrice && data.offerBasePrice > 0) {
-        offerBase = data.offerBasePrice;
-        offerMoneda = data.offerSourceCurrency;
-
-        if (data.offerSourceCurrency === "USD") {
-          finalOfferUsd = Math.round(data.offerBasePrice * 1.07 * 100) / 100;
-          finalOfferArs = arsFromUsd(finalOfferUsd);
+        if (data.sourceCurrency === "USD") {
+          finalUsd = Math.round(data.basePrice * 1.07 * 100) / 100;
+          finalArs = arsFromUsd(finalUsd);
         } else {
-          finalOfferArs = Math.round(data.offerBasePrice * 1.07);
-          finalOfferUsd = rate > 0 ? Math.round((finalOfferArs / rate) * 100) / 100 : null;
+          finalArs = Math.round(data.basePrice * 1.07);
+          finalUsd = rate > 0 ? Math.round((finalArs / rate) * 100) / 100 : 0;
         }
-      }
 
-      const productUpdate: Record<string, unknown> = {
-        precio_base: data.basePrice,
-        moneda_base: data.sourceCurrency,
-        precio_usd: finalUsd,
-        precio: String(finalArs),
-        oferta: data.hasOffer ? "SI" : "NO",
-        precio_oferta_base: offerBase,
-        moneda_oferta_base: offerMoneda,
-        precio_oferta_usd: finalOfferUsd,
-        precio_oferta: finalOfferArs !== null ? String(finalOfferArs) : null,
-        precio_actualizado_en: new Date().toISOString(),
-      };
+        // 2. Calcular precio de oferta si aplica
+        let finalOfferUsd: number | null = null;
+        let finalOfferArs: number | null = null;
+        let offerBase: number | null = null;
+        let offerMoneda: string | null = null;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: prodErr } = await (supabaseAdmin as any)
-        .from("products")
-        .update(productUpdate)
-        .eq("id", data.productId);
+        if (data.hasOffer && data.offerBasePrice && data.offerBasePrice > 0) {
+          offerBase = data.offerBasePrice;
+          offerMoneda = data.offerSourceCurrency;
 
-      if (prodErr) throw prodErr;
-
-      // 3. Actualizar precios de variantes si corresponde
-      if (data.variants && data.variants.length > 0) {
-        for (const v of data.variants) {
-          let vBase = v.basePrice && v.basePrice > 0 ? v.basePrice : data.basePrice;
-          let vMoneda = v.basePrice && v.basePrice > 0 ? (v.sourceCurrency || data.sourceCurrency) : data.sourceCurrency;
-          let vFinalUsd: number;
-          let vFinalArs: number;
-
-          if (vMoneda === "USD") {
-            vFinalUsd = Math.round(vBase * 1.07 * 100) / 100;
-            vFinalArs = arsFromUsd(vFinalUsd);
+          if (data.offerSourceCurrency === "USD") {
+            finalOfferUsd = Math.round(data.offerBasePrice * 1.07 * 100) / 100;
+            finalOfferArs = arsFromUsd(finalOfferUsd);
           } else {
-            vFinalArs = Math.round(vBase * 1.07);
-            vFinalUsd = rate > 0 ? Math.round((vFinalArs / rate) * 100) / 100 : 0;
-          }
-
-          const vUpdate = {
-            precio_base: vBase,
-            moneda_base: vMoneda,
-            precio_usd: vFinalUsd,
-            precio: vFinalArs,
-            precio_actualizado_en: new Date().toISOString(),
-          };
-
-          if (v.id) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (supabaseAdmin as any).from("product_variants").update(vUpdate).eq("id", v.id);
-          } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (supabaseAdmin as any)
-              .from("product_variants")
-              .update(vUpdate)
-              .eq("product_id", data.productId)
-              .eq("color", v.color);
+            finalOfferArs = Math.round(data.offerBasePrice * 1.07);
+            finalOfferUsd = rate > 0 ? Math.round((finalOfferArs / rate) * 100) / 100 : null;
           }
         }
-      }
 
-      return { success: true };
-    } catch (err) {
-      console.error("Error in updateProductPrice:", err);
-      return { error: err instanceof Error ? err.message : "Error al actualizar precios." };
+        const productUpdate: Record<string, unknown> = {
+          precio_base: data.basePrice,
+          moneda_base: data.sourceCurrency,
+          precio_usd: finalUsd,
+          precio: String(finalArs),
+          oferta: data.hasOffer ? "SI" : "NO",
+          precio_oferta_base: offerBase,
+          moneda_oferta_base: offerMoneda,
+          precio_oferta_usd: finalOfferUsd,
+          precio_oferta: finalOfferArs !== null ? String(finalOfferArs) : null,
+          precio_actualizado_en: new Date().toISOString(),
+        };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: prodErr } = await (supabaseAdmin as any)
+          .from("products")
+          .update(productUpdate)
+          .eq("id", data.productId);
+
+        if (prodErr) throw prodErr;
+
+        // 3. Actualizar precios de variantes si corresponde
+        if (data.variants && data.variants.length > 0) {
+          for (const v of data.variants) {
+            const vBase = v.basePrice && v.basePrice > 0 ? v.basePrice : data.basePrice;
+            const vMoneda =
+              v.basePrice && v.basePrice > 0
+                ? v.sourceCurrency || data.sourceCurrency
+                : data.sourceCurrency;
+            let vFinalUsd: number;
+            let vFinalArs: number;
+
+            if (vMoneda === "USD") {
+              vFinalUsd = Math.round(vBase * 1.07 * 100) / 100;
+              vFinalArs = arsFromUsd(vFinalUsd);
+            } else {
+              vFinalArs = Math.round(vBase * 1.07);
+              vFinalUsd = rate > 0 ? Math.round((vFinalArs / rate) * 100) / 100 : 0;
+            }
+
+            const vUpdate = {
+              precio_base: vBase,
+              moneda_base: vMoneda,
+              precio_usd: vFinalUsd,
+              precio: vFinalArs,
+              precio_actualizado_en: new Date().toISOString(),
+            };
+
+            if (v.id) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabaseAdmin as any).from("product_variants").update(vUpdate).eq("id", v.id);
+            } else {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabaseAdmin as any)
+                .from("product_variants")
+                .update(vUpdate)
+                .eq("product_id", data.productId)
+                .eq("color", v.color);
+            }
+          }
+        }
+
+        return { success: true };
+      } catch (err) {
+        console.error("Error in updateProductPrice:", err);
+        return { error: err instanceof Error ? err.message : "Error al actualizar precios." };
+      }
+    },
+  );
+
+/* ─── Helpers de eliminación de imágenes en Supabase Storage ─── */
+
+/**
+ * Extrae de forma segura el bucket y la ruta interna de una URL de Supabase Storage.
+ * Compatible con URLs públicas y firmadas, sin uso de RegEx dinámicas (anti-ReDoS).
+ */
+export function parseSupabaseStorageUrl(
+  url?: string | null,
+): { bucket: string; path: string } | null {
+  if (!url || typeof url !== "string") return null;
+  const markerPublic = "/storage/v1/object/public/";
+  const markerSign = "/storage/v1/object/sign/";
+  let idx = url.indexOf(markerPublic);
+  let offset = markerPublic.length;
+  if (idx === -1) {
+    idx = url.indexOf(markerSign);
+    offset = markerSign.length;
+  }
+  if (idx === -1) return null;
+
+  const remainder = url.slice(idx + offset);
+  const slashIdx = remainder.indexOf("/");
+  if (slashIdx === -1) return null;
+
+  const bucket = remainder.slice(0, slashIdx).trim();
+  const rawPath = remainder
+    .slice(slashIdx + 1)
+    .split(/[?#]/)[0]
+    .trim();
+  if (!bucket || !rawPath) return null;
+
+  try {
+    return { bucket, path: decodeURIComponent(rawPath) };
+  } catch {
+    return { bucket, path: rawPath };
+  }
+}
+
+/**
+ * Extrae la URL de descarga directa si es un enlace de Google Drive.
+ * Implementación puramente posicional sin expresiones regulares para evitar ReDoS (AppSec Directive 1).
+ */
+export function getDownloadableUrl(url: string): string {
+  const trimmed = String(url ?? "").trim();
+  const driveIdx = trimmed.indexOf("drive.google.com");
+  if (driveIdx !== -1) {
+    const fileDIdx = trimmed.indexOf("/file/d/");
+    if (fileDIdx !== -1) {
+      const rest = trimmed.slice(fileDIdx + 8);
+      const nextSlash = rest.indexOf("/");
+      const id = nextSlash === -1 ? rest.split(/[?#]/)[0] : rest.slice(0, nextSlash);
+      if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
     }
-  });
+    const idIdx = trimmed.indexOf("id=");
+    if (idIdx !== -1) {
+      const id = trimmed.slice(idIdx + 3).split(/[&#]/)[0];
+      if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
+    }
+  }
+  return trimmed;
+}
+
+/**
+ * Determina si una URL ya apunta a una imagen WebP optimizada alojada en Supabase Storage.
+ */
+export function isOptimizedStorageUrl(url?: string | null): boolean {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim();
+  const hasStorageMarker =
+    trimmed.includes("/storage/v1/object/public/") ||
+    trimmed.includes("/storage/v1/object/sign/");
+  if (!hasStorageMarker) return false;
+  const cleanUrl = trimmed.split(/[?#]/)[0].toLowerCase();
+  return cleanUrl.endsWith(".webp");
+}
+
+/**
+ * Asegura que cualquier imagen que entre a la base de datos (individual o en bulk)
+ * pase por optimización a WebP (máx 900x900px, 80% calidad) y se aloje en Supabase Storage.
+ */
+export async function optimizeImageOnServer(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdmin: any,
+  url?: string | null,
+  folder = "products",
+): Promise<string> {
+  if (!url || typeof url !== "string") return url ?? "";
+  const trimmed = url.trim();
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+
+  // Si ya es un WebP alojado en Supabase Storage, ya está optimizado
+  if (isOptimizedStorageUrl(trimmed)) {
+    return trimmed;
+  }
+
+  try {
+    const downloadUrl = getDownloadableUrl(trimmed);
+    const headers: Record<string, string> = {
+      accept: "image/avif,image/webp,image/*,*/*;q=0.8",
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    };
+    if (trimmed.includes("yupoo.com")) {
+      headers["referer"] = "https://photo.yupoo.com/";
+    }
+
+    const res = await fetch(downloadUrl, {
+      headers,
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) {
+      console.warn("[Optimize] Error al descargar imagen para optimizar:", res.status, trimmed);
+      return trimmed;
+    }
+
+    const rawBuffer = Buffer.from(await res.arrayBuffer());
+    if (rawBuffer.length === 0) return trimmed;
+
+    // Comprimir con sharp a WebP: máx 900x900, 80% calidad
+    const sharp = (await import("sharp")).default;
+    const compressedBuffer = await sharp(rawBuffer)
+      .rotate()
+      .resize({
+        width: 900,
+        height: 900,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 80, effort: 4 })
+      .toBuffer();
+
+    const bucketName = "store-images";
+    const filename = `${folder}/${crypto.randomUUID()}.webp`;
+
+    // Asegurar existencia del bucket si hiciera falta
+    try {
+      const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+      if (!buckets?.some((b: { name: string }) => b.name === bucketName)) {
+        await supabaseAdmin.storage.createBucket(bucketName, { public: true });
+      }
+    } catch {
+      /* bucket ya existe */
+    }
+
+    const { error: upErr } = await supabaseAdmin.storage
+      .from(bucketName)
+      .upload(filename, compressedBuffer, {
+        contentType: "image/webp",
+        cacheControl: "31536000",
+        upsert: false,
+      });
+
+    if (upErr) {
+      console.warn("[Optimize] Error al subir imagen optimizada al bucket:", bucketName, upErr.message);
+      return trimmed;
+    }
+
+    const { data: pubData } = supabaseAdmin.storage
+      .from(bucketName)
+      .getPublicUrl(filename);
+
+    if (pubData?.publicUrl) {
+      console.log("[Optimize] Imagen optimizada exitosamente a WebP:", filename);
+
+      // Si la imagen anterior estaba en nuestros buckets pero era un formato pesado (png/jpg),
+      // limpiar el archivo viejo para no acumular huérfanos
+      const oldStorage = parseSupabaseStorageUrl(trimmed);
+      if (oldStorage && oldStorage.path !== filename) {
+        supabaseAdmin.storage
+          .from(oldStorage.bucket)
+          .remove([oldStorage.path])
+          .catch(() => {});
+      }
+
+      return pubData.publicUrl;
+    }
+  } catch (err) {
+    console.warn(
+      "[Optimize] No se pudo optimizar la imagen con sharp, conservando original:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
+  return trimmed;
+}
+
+/**
+ * Recolecta todas las URLs de imágenes asociadas a un conjunto de productos (imagen principal,
+ * extra_images en metadata y variantes).
+ */
+async function collectProductImages(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdmin: any,
+  productIds: string[],
+): Promise<string[]> {
+  if (!productIds || productIds.length === 0) return [];
+
+  const [prodsRes, varsRes] = await Promise.all([
+    supabaseAdmin.from("products").select("imagen_url, metadata").in("id", productIds),
+    supabaseAdmin.from("product_variants").select("imagen_url").in("product_id", productIds),
+  ]);
+
+  const urls = new Set<string>();
+
+  for (const p of prodsRes.data ?? []) {
+    if (typeof p.imagen_url === "string" && p.imagen_url.trim()) {
+      urls.add(p.imagen_url.trim());
+    }
+    if (p.metadata && typeof p.metadata === "object") {
+      const meta = p.metadata as Record<string, unknown>;
+      const extra = meta["extra_images"];
+      if (Array.isArray(extra)) {
+        for (const item of extra) {
+          if (typeof item === "string" && item.trim()) urls.add(item.trim());
+        }
+      }
+      for (const val of Object.values(meta)) {
+        if (typeof val === "string" && val.includes("/storage/v1/object/")) {
+          urls.add(val.trim());
+        }
+      }
+    }
+  }
+
+  for (const v of varsRes.data ?? []) {
+    if (typeof v.imagen_url === "string" && v.imagen_url.trim()) {
+      urls.add(v.imagen_url.trim());
+    }
+  }
+
+  return Array.from(urls);
+}
+
+/**
+ * Elimina las fotos de los buckets de Supabase Storage correspondientes,
+ * verificando de forma segura que ningún otro producto o banner activo las siga usando.
+ */
+async function deleteImagesFromStorage(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdmin: any,
+  imageUrls: string[],
+): Promise<void> {
+  if (!imageUrls || imageUrls.length === 0) return;
+
+  const filesByBucket = new Map<string, Set<string>>();
+  for (const url of imageUrls) {
+    const parsed = parseSupabaseStorageUrl(url);
+    if (!parsed) continue;
+    if (!filesByBucket.has(parsed.bucket)) {
+      filesByBucket.set(parsed.bucket, new Set());
+    }
+    filesByBucket.get(parsed.bucket)!.add(parsed.path);
+  }
+
+  if (filesByBucket.size === 0) return;
+
+  try {
+    // Consultar imágenes aún activas en la BD para no borrar archivos compartidos
+    const [remProds, remVars, banners] = await Promise.all([
+      supabaseAdmin.from("products").select("imagen_url"),
+      supabaseAdmin.from("product_variants").select("imagen_url"),
+      supabaseAdmin.from("banners").select("imagen_url"),
+    ]);
+
+    const activeKeys = new Set<string>();
+    const registerActive = (u?: string | null) => {
+      const parsed = parseSupabaseStorageUrl(u);
+      if (parsed) activeKeys.add(`${parsed.bucket}::${parsed.path}`);
+    };
+
+    (remProds.data ?? []).forEach((p: { imagen_url?: string | null }) =>
+      registerActive(p.imagen_url),
+    );
+    (remVars.data ?? []).forEach((v: { imagen_url?: string | null }) =>
+      registerActive(v.imagen_url),
+    );
+    (banners.data ?? []).forEach((b: { imagen_url?: string | null }) =>
+      registerActive(b.imagen_url),
+    );
+
+    for (const [bucket, pathSet] of filesByBucket.entries()) {
+      const pathsToDelete: string[] = [];
+      for (const p of pathSet) {
+        if (!activeKeys.has(`${bucket}::${p}`)) {
+          pathsToDelete.push(p);
+        } else {
+          console.log(
+            "[Storage] Imagen protegida porque sigue referenciada por otro producto:",
+            bucket,
+            p,
+          );
+        }
+      }
+
+      if (pathsToDelete.length > 0) {
+        for (let i = 0; i < pathsToDelete.length; i += 50) {
+          const batch = pathsToDelete.slice(i, i + 50);
+          const { error } = await supabaseAdmin.storage.from(bucket).remove(batch);
+          if (error) {
+            console.warn(
+              "[Storage] Error al eliminar lote de fotos en bucket:",
+              bucket,
+              batch.length,
+              error.message,
+            );
+          } else {
+            console.log(
+              "[Storage] Eliminadas exitosamente fotos del bucket:",
+              bucket,
+              batch.length,
+            );
+          }
+        }
+      }
+    }
+  } catch (storageErr) {
+    console.warn("[Storage] Error no bloqueante al limpiar fotos del storage:", storageErr);
+  }
+}
 
 /* ─── Eliminar un producto (y sus variantes en cascada) ── */
 
@@ -720,12 +1102,26 @@ export const deleteAdminProduct = createServerFn({ method: "POST" })
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
 
-      // Variantes primero (FK)
+      // 1. Recolectar URLs de fotos antes del borrado en BD
+      const imageUrls = await collectProductImages(supabaseAdmin, [data.productId]);
+
+      // 2. Variantes primero (FK)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabaseAdmin as any).from("product_variants").delete().eq("product_id", data.productId);
+      await (supabaseAdmin as any)
+        .from("product_variants")
+        .delete()
+        .eq("product_id", data.productId);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabaseAdmin as any).from("products").delete().eq("id", data.productId);
+      const { error } = await (supabaseAdmin as any)
+        .from("products")
+        .delete()
+        .eq("id", data.productId);
       if (error) throw error;
+
+      // 3. Eliminar fotos del bucket si ningún otro producto las utiliza
+      if (imageUrls.length > 0) {
+        await deleteImagesFromStorage(supabaseAdmin, imageUrls);
+      }
 
       return {};
     } catch (err) {
@@ -739,14 +1135,19 @@ export const bulkDeleteAdminProducts = createServerFn({ method: "POST" })
   .validator((data: { email?: string; token?: string; productIds: string[] }) => ({
     email: str(data?.email, 160).toLowerCase(),
     token: str(data?.token, 2000),
-    productIds: Array.isArray(data?.productIds) ? data.productIds.map((id) => str(id, 200)).filter(Boolean) : [],
+    productIds: Array.isArray(data?.productIds)
+      ? data.productIds.map((id) => str(id, 200)).filter(Boolean)
+      : [],
   }))
   .handler(async ({ data }): Promise<{ success?: boolean; count?: number; error?: string }> => {
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
       if (data.productIds.length === 0) return { success: true, count: 0 };
 
-      // Limpieza defensiva de variantes asociadas (también tienen ON DELETE CASCADE en DB)
+      // 1. Recolectar URLs de fotos antes del borrado en BD
+      const imageUrls = await collectProductImages(supabaseAdmin, data.productIds);
+
+      // 2. Limpieza defensiva de variantes asociadas (también tienen ON DELETE CASCADE en DB)
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabaseAdmin as any)
@@ -757,6 +1158,7 @@ export const bulkDeleteAdminProducts = createServerFn({ method: "POST" })
         console.warn("Aviso al limpiar variantes de productos eliminados:", err);
       }
 
+      // 3. Borrado de los productos en DB
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: prodErr } = await (supabaseAdmin as any)
         .from("products")
@@ -764,10 +1166,18 @@ export const bulkDeleteAdminProducts = createServerFn({ method: "POST" })
         .in("id", data.productIds);
       if (prodErr) throw prodErr;
 
+      // 4. Eliminar fotos de los buckets de almacenamiento
+      if (imageUrls.length > 0) {
+        await deleteImagesFromStorage(supabaseAdmin, imageUrls);
+      }
+
       return { success: true, count: data.productIds.length };
     } catch (err) {
       console.error("Error in bulkDeleteAdminProducts:", err);
-      return { error: err instanceof Error ? err.message : "Error al eliminar productos de la base de datos." };
+      return {
+        error:
+          err instanceof Error ? err.message : "Error al eliminar productos de la base de datos.",
+      };
     }
   });
 
@@ -775,7 +1185,14 @@ export const bulkDeleteAdminProducts = createServerFn({ method: "POST" })
 
 export const uploadAdminProductImage = createServerFn({ method: "POST" })
   .validator(
-    (data: { email?: string; token?: string; filename: string; base64: string; bucket?: string; contentType?: string }) => ({
+    (data: {
+      email?: string;
+      token?: string;
+      filename: string;
+      base64: string;
+      bucket?: string;
+      contentType?: string;
+    }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
       filename: str(data?.filename, 200),
@@ -793,13 +1210,29 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
       const buffer = Buffer.from(base64Data, "base64");
       const bucketName = data.bucket || "storage-images";
 
-      // Determinar contentType adecuado
-      let cType = data.contentType;
-      if (!cType) {
-        if (data.filename.endsWith(".webp")) cType = "image/webp";
-        else if (data.filename.endsWith(".png")) cType = "image/png";
-        else if (data.filename.endsWith(".gif")) cType = "image/gif";
-        else cType = "image/jpeg";
+      let uploadBuffer = buffer;
+      let filename = data.filename;
+      let cType = data.contentType || "image/webp";
+
+      try {
+        const sharp = (await import("sharp")).default;
+        uploadBuffer = await sharp(buffer)
+          .rotate()
+          .resize({ width: 900, height: 900, fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 80, effort: 4 })
+          .toBuffer();
+        cType = "image/webp";
+        if (!filename.toLowerCase().endsWith(".webp")) {
+          filename = filename.replace(/\.[^.]+$/, "") + ".webp";
+        }
+      } catch (sharpErr) {
+        console.warn("[Upload] Aviso al comprimir con sharp:", sharpErr);
+        if (!cType) {
+          if (filename.endsWith(".webp")) cType = "image/webp";
+          else if (filename.endsWith(".png")) cType = "image/png";
+          else if (filename.endsWith(".gif")) cType = "image/gif";
+          else cType = "image/jpeg";
+        }
       }
 
       // Crear bucket si no existe
@@ -808,11 +1241,11 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
         if (!buckets?.some((b) => b.name === bucketName)) {
           await supabaseAdmin.storage.createBucket(bucketName, { public: true });
         }
-      } catch { }
+      } catch {}
 
       const { error: uploadErr } = await supabaseAdmin.storage
         .from(bucketName)
-        .upload(data.filename, buffer, {
+        .upload(filename, uploadBuffer, {
           contentType: cType,
           cacheControl: "31536000",
           upsert: true,
@@ -820,7 +1253,7 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
 
       if (uploadErr) throw uploadErr;
 
-      const { data: pubData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(data.filename);
+      const { data: pubData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(filename);
       return { publicUrl: pubData.publicUrl };
     } catch (err) {
       console.error("Error al subir imagen:", err);
@@ -906,10 +1339,12 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
       }
 
       if (data.dolarCotizacion && data.dolarCotizacion > 0) {
-        await (supabaseAdmin as any).from("site_config").upsert(
-          { clave: "dolar_cotizacion", valor: String(data.dolarCotizacion) },
-          { onConflict: "clave" }
-        );
+        await (supabaseAdmin as any)
+          .from("site_config")
+          .upsert(
+            { clave: "dolar_cotizacion", valor: String(data.dolarCotizacion) },
+            { onConflict: "clave" },
+          );
       }
 
       if (data.bankInfo) {
@@ -927,16 +1362,20 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
 
       if (data.resendConfig) {
         if (data.resendConfig.apiKey) {
-          await (supabaseAdmin as any).from("site_config").upsert(
-            { clave: "resend_api_key", valor: data.resendConfig.apiKey.trim() },
-            { onConflict: "clave" }
-          );
+          await (supabaseAdmin as any)
+            .from("site_config")
+            .upsert(
+              { clave: "resend_api_key", valor: data.resendConfig.apiKey.trim() },
+              { onConflict: "clave" },
+            );
         }
         if (data.resendConfig.from) {
-          await (supabaseAdmin as any).from("site_config").upsert(
-            { clave: "resend_from", valor: data.resendConfig.from.trim() },
-            { onConflict: "clave" }
-          );
+          await (supabaseAdmin as any)
+            .from("site_config")
+            .upsert(
+              { clave: "resend_from", valor: data.resendConfig.from.trim() },
+              { onConflict: "clave" },
+            );
         }
       }
 
@@ -992,14 +1431,12 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
  * Valida si un código promocional es válido, activo y si el usuario aún no lo utilizó.
  */
 export const validatePromoCoupon = createServerFn({ method: "POST" })
-  .validator(
-    (data: { code: string; userId?: string; email?: string; token?: string }) => ({
-      code: str(data.code, 40).toUpperCase().trim(),
-      userId: data.userId ? str(data.userId, 60) : undefined,
-      email: data.email ? str(data.email, 160).toLowerCase().trim() : undefined,
-      token: data.token ? str(data.token, 4000) : undefined,
-    }),
-  )
+  .validator((data: { code: string; userId?: string; email?: string; token?: string }) => ({
+    code: str(data.code, 40).toUpperCase().trim(),
+    userId: data.userId ? str(data.userId, 60) : undefined,
+    email: data.email ? str(data.email, 160).toLowerCase().trim() : undefined,
+    token: data.token ? str(data.token, 4000) : undefined,
+  }))
   .handler(
     async ({
       data,
@@ -1063,11 +1500,14 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
 
         // 3. Verificar si el usuario ya consumió el cupón en site_config
         const userUsageKey = `coupon_usage_${validCode}_${verifiedUserId}`;
-        const emailUsageKey = verifiedEmail ? `coupon_usage_${validCode}_${verifiedEmail.trim().toLowerCase()}` : "";
+        const emailUsageKey = verifiedEmail
+          ? `coupon_usage_${validCode}_${verifiedEmail.trim().toLowerCase()}`
+          : "";
         if (configMap[userUsageKey] || (emailUsageKey && configMap[emailUsageKey])) {
           return {
             valid: false,
-            error: "Ya utilizaste este código de descuento en una compra anterior (válido 1 sola vez por cuenta).",
+            error:
+              "Ya utilizaste este código de descuento en una compra anterior (válido 1 sola vez por cuenta).",
           };
         }
 
@@ -1088,7 +1528,8 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
           if (usageRows && usageRows.length > 0) {
             return {
               valid: false,
-              error: "Ya utilizaste este código de descuento en una compra anterior (válido 1 sola vez por cuenta).",
+              error:
+                "Ya utilizaste este código de descuento en una compra anterior (válido 1 sola vez por cuenta).",
             };
           }
         } catch (usageErr) {
@@ -1189,90 +1630,118 @@ export const getAdminBanners = createServerFn({ method: "POST" })
     email: str(data?.email, 160).toLowerCase(),
     token: str(data?.token, 2000),
   }))
-  .handler(async ({ data }): Promise<{ banners: Banner[]; dolarRate?: number; roundingIncrement?: number; markupPercentage?: number; error?: string }> => {
-    try {
-      const supabaseAdmin = await assertAdmin(data.email, data.token);
-      const [bannersRes, pricingRes] = await Promise.all([
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabaseAdmin as any).from("banners").select("*"),
-        (supabaseAdmin as any).from("pricing_settings").select("last_rate, markup_percentage, rounding_increment").eq("id", true).maybeSingle(),
-      ]);
-      if (bannersRes.error) throw bannersRes.error;
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      banners: Banner[];
+      dolarRate?: number;
+      roundingIncrement?: number;
+      markupPercentage?: number;
+      error?: string;
+    }> => {
+      try {
+        const supabaseAdmin = await assertAdmin(data.email, data.token);
+        const [bannersRes, pricingRes] = await Promise.all([
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (supabaseAdmin as any).from("banners").select("*"),
+          (supabaseAdmin as any)
+            .from("pricing_settings")
+            .select("last_rate, markup_percentage, rounding_increment")
+            .eq("id", true)
+            .maybeSingle(),
+        ]);
+        if (bannersRes.error) throw bannersRes.error;
 
-      let dolarRate = 0;
-      let roundingIncrement = 10;
-      let markupPercentage = 0;
+        let dolarRate = 0;
+        let roundingIncrement = 10;
+        let markupPercentage = 0;
 
-      if (pricingRes?.data) {
-        if (Number(pricingRes.data.last_rate) > 0) dolarRate = Number(pricingRes.data.last_rate);
-        if (Number(pricingRes.data.rounding_increment) > 0) roundingIncrement = Number(pricingRes.data.rounding_increment);
-        if (pricingRes.data.markup_percentage !== undefined) markupPercentage = Number(pricingRes.data.markup_percentage);
-      }
-
-      if (!dolarRate) {
-        try {
-          const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", { signal: AbortSignal.timeout(3000) });
-          if (apiRes.ok) {
-            const apiData = (await apiRes.json()) as { venta?: number };
-            if (apiData?.venta && apiData.venta > 0) dolarRate = Math.round(apiData.venta);
-          }
-        } catch { }
-      }
-
-      const parsedBanners: Banner[] = (bannersRes.data ?? []).map((raw: any) => {
-        let quantity_tiers: Banner["quantity_tiers"] = null;
-        const candidate = raw.quantity_tiers || raw.link;
-        if (Array.isArray(candidate) && candidate.length > 0) {
-          quantity_tiers = candidate;
-        } else if (typeof candidate === "string" && candidate.trim().startsWith("[")) {
-          try {
-            const parsed = JSON.parse(candidate);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              quantity_tiers = parsed;
-            }
-          } catch { /* ignorar */ }
+        if (pricingRes?.data) {
+          if (Number(pricingRes.data.last_rate) > 0) dolarRate = Number(pricingRes.data.last_rate);
+          if (Number(pricingRes.data.rounding_increment) > 0)
+            roundingIncrement = Number(pricingRes.data.rounding_increment);
+          if (pricingRes.data.markup_percentage !== undefined)
+            markupPercentage = Number(pricingRes.data.markup_percentage);
         }
-        return { ...raw, quantity_tiers } as Banner;
-      });
 
-      return {
-        banners: parsedBanners,
-        dolarRate: dolarRate || 1500,
-        roundingIncrement,
-        markupPercentage,
-      };
-    } catch (err) {
-      return { banners: [], error: err instanceof Error ? err.message : "Error al cargar combos." };
-    }
-  });
+        if (!dolarRate) {
+          try {
+            const apiRes = await fetch("https://dolarapi.com/v1/dolares/cripto", {
+              signal: AbortSignal.timeout(3000),
+            });
+            if (apiRes.ok) {
+              const apiData = (await apiRes.json()) as { venta?: number };
+              if (apiData?.venta && apiData.venta > 0) dolarRate = Math.round(apiData.venta);
+            }
+          } catch {}
+        }
+
+        const parsedBanners: Banner[] = (bannersRes.data ?? []).map((raw: any) => {
+          let quantity_tiers: Banner["quantity_tiers"] = null;
+          const candidate = raw.quantity_tiers || raw.link;
+          if (Array.isArray(candidate) && candidate.length > 0) {
+            quantity_tiers = candidate;
+          } else if (typeof candidate === "string" && candidate.trim().startsWith("[")) {
+            try {
+              const parsed = JSON.parse(candidate);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                quantity_tiers = parsed;
+              }
+            } catch {
+              /* ignorar */
+            }
+          }
+          return { ...raw, quantity_tiers } as Banner;
+        });
+
+        return {
+          banners: parsedBanners,
+          dolarRate: dolarRate || 1500,
+          roundingIncrement,
+          markupPercentage,
+        };
+      } catch (err) {
+        return {
+          banners: [],
+          error: err instanceof Error ? err.message : "Error al cargar combos.",
+        };
+      }
+    },
+  );
 
 export const upsertAdminBanner = createServerFn({ method: "POST" })
-  .validator(
-    (data: { email?: string; token?: string; banner: BannerInput }) => ({
-      email: str(data?.email, 160).toLowerCase(),
-      token: str(data?.token, 2000),
-      banner: data.banner,
-    })
-  )
+  .validator((data: { email?: string; token?: string; banner: BannerInput }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    banner: data.banner,
+  }))
   .handler(async ({ data }): Promise<{ id?: string; error?: string }> => {
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
       const b = data.banner;
 
-      const tiersJson = Array.isArray(b.quantity_tiers) && b.quantity_tiers.length > 0
-        ? JSON.stringify(b.quantity_tiers)
-        : null;
+      const tiersJson =
+        Array.isArray(b.quantity_tiers) && b.quantity_tiers.length > 0
+          ? JSON.stringify(b.quantity_tiers)
+          : null;
 
       const fullRow: Record<string, unknown> = {
         titulo: b.titulo,
         subtitulo: b.subtitulo ?? "",
         imagen_url: b.imagen_url ?? "",
-        link: tiersJson ?? (b.link ?? ""),
+        link: tiersJson ?? b.link ?? "",
         activo: b.activo ?? "SI",
         precio: String(b.precio ?? "0"),
-        precio_base: b.precio_base !== undefined && b.precio_base !== null && b.precio_base !== "" ? Number(b.precio_base) : null,
+        precio_base:
+          b.precio_base !== undefined && b.precio_base !== null && b.precio_base !== ""
+            ? Number(b.precio_base)
+            : null,
         moneda_base: b.moneda_base ?? "USD",
-        precio_usd: b.precio_usd !== undefined && b.precio_usd !== null && b.precio_usd !== "" ? Number(b.precio_usd) : null,
+        precio_usd:
+          b.precio_usd !== undefined && b.precio_usd !== null && b.precio_usd !== ""
+            ? Number(b.precio_usd)
+            : null,
         precio_actualizado_en: new Date().toISOString(),
         quantity_tiers: tiersJson,
       };
@@ -1281,18 +1750,21 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
         titulo: b.titulo,
         subtitulo: b.subtitulo ?? "",
         imagen_url: b.imagen_url ?? "",
-        link: tiersJson ?? (b.link ?? ""),
+        link: tiersJson ?? b.link ?? "",
         activo: b.activo ?? "SI",
         precio: String(b.precio ?? "0"),
       };
 
       if (b.id) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let { error } = await (supabaseAdmin as any).from("banners").update(fullRow).eq("id", b.id);
+        const { error } = await (supabaseAdmin as any).from("banners").update(fullRow).eq("id", b.id);
         if (error) {
           console.warn("Retrying banner update with basic columns:", error.message);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const retry = await (supabaseAdmin as any).from("banners").update(basicRow).eq("id", b.id);
+          const retry = await (supabaseAdmin as any)
+            .from("banners")
+            .update(basicRow)
+            .eq("id", b.id);
           if (retry.error) throw retry.error;
         }
         return { id: b.id };
@@ -1351,7 +1823,10 @@ export const deleteAdminBanner = createServerFn({ method: "POST" })
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabaseAdmin as any).from("banners").delete().eq("id", data.bannerId);
+      const { error } = await (supabaseAdmin as any)
+        .from("banners")
+        .delete()
+        .eq("id", data.bannerId);
       if (error) throw error;
       return {};
     } catch (err) {
@@ -1362,12 +1837,14 @@ export const deleteAdminBanner = createServerFn({ method: "POST" })
 /* ─── Actualización masiva de stock y variantes ────────────────── */
 
 export const bulkUpdateAdminStock = createServerFn({ method: "POST" })
-  .validator((data: { email?: string; token?: string; productIds: string[]; stock: "SI" | "NO" }) => ({
-    email: str(data?.email, 160).toLowerCase(),
-    token: str(data?.token, 2000),
-    productIds: Array.isArray(data?.productIds) ? data.productIds.map((id) => str(id, 100)) : [],
-    stock: data?.stock === "NO" ? ("NO" as const) : ("SI" as const),
-  }))
+  .validator(
+    (data: { email?: string; token?: string; productIds: string[]; stock: "SI" | "NO" }) => ({
+      email: str(data?.email, 160).toLowerCase(),
+      token: str(data?.token, 2000),
+      productIds: Array.isArray(data?.productIds) ? data.productIds.map((id) => str(id, 100)) : [],
+      stock: data?.stock === "NO" ? ("NO" as const) : ("SI" as const),
+    }),
+  )
   .handler(async ({ data }): Promise<{ success?: boolean; error?: string }> => {
     try {
       const supabaseAdmin = await assertAdmin(data.email, data.token);
@@ -1393,7 +1870,8 @@ export const bulkUpdateAdminStock = createServerFn({ method: "POST" })
           if (data.stock === "NO") {
             updatedMeta["talles_disponibles"] = "";
           } else {
-            updatedMeta["talles_disponibles"] = tipo === "ZAPATILLAS" ? defaultShoes : defaultClothes;
+            updatedMeta["talles_disponibles"] =
+              tipo === "ZAPATILLAS" ? defaultShoes : defaultClothes;
           }
           await (supabaseAdmin as any)
             .from("products")
@@ -1438,10 +1916,11 @@ export const updateVariantStock = createServerFn({ method: "POST" })
       if (error) throw error;
       return { success: true };
     } catch (err) {
-      return { error: err instanceof Error ? err.message : "Error al actualizar stock de la variante." };
+      return {
+        error: err instanceof Error ? err.message : "Error al actualizar stock de la variante.",
+      };
     }
   });
-
 
 /* ─── Yupoo — Parseo de página (Fase 1: rápida) ─────────── */
 
@@ -1476,7 +1955,6 @@ function assertYupooUrl(rawUrl: string): URL {
 const YUPOO_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
-
 /** Intenta autenticarse con contraseña en un store Yupoo. Retorna la cookie de sesión o null. */
 async function yupooAuth(baseUrl: string, password: string): Promise<string | null> {
   try {
@@ -1505,7 +1983,7 @@ async function yupooAuth(baseUrl: string, password: string): Promise<string | nu
         "User-Agent": YUPOO_UA,
         "Content-Type": "application/x-www-form-urlencoded",
         Referer: baseUrl,
-        "Cookie": pageRes.headers.get("set-cookie")?.split(";")[0] ?? "",
+        Cookie: pageRes.headers.get("set-cookie")?.split(";")[0] ?? "",
       },
       body: body.toString(),
       redirect: "manual",
@@ -1592,13 +2070,19 @@ export async function translateChineseToSpanish(text?: string | null): Promise<s
     try {
       const url = `https://translate.google.com/translate_a/single?client=at&dt=t&dj=1&hl=es&ie=UTF-8&oe=UTF-8&sl=auto&tl=es&q=${encodeURIComponent(clean)}`;
       const res = await fetch(url, {
-        headers: { "User-Agent": "AndroidTranslate/5.3.0.RC02.130475354-53000263 5.1 phone TRANSLATE_OPM5_TEST_1" },
+        headers: {
+          "User-Agent":
+            "AndroidTranslate/5.3.0.RC02.130475354-53000263 5.1 phone TRANSLATE_OPM5_TEST_1",
+        },
         signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data?.sentences) && data.sentences[0]?.trans) {
-          translated = data.sentences.map((s: { trans?: string }) => s.trans || "").join("").trim();
+          translated = data.sentences
+            .map((s: { trans?: string }) => s.trans || "")
+            .join("")
+            .trim();
         }
       }
     } catch {}
@@ -1611,7 +2095,10 @@ export async function translateChineseToSpanish(text?: string | null): Promise<s
       const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
-        if (data?.responseData?.translatedText && typeof data.responseData.translatedText === "string") {
+        if (
+          data?.responseData?.translatedText &&
+          typeof data.responseData.translatedText === "string"
+        ) {
           const t = data.responseData.translatedText.trim();
           if (t && !t.includes("MYMEMORY WARNING")) translated = t;
         }
@@ -1631,7 +2118,9 @@ export async function translateChineseToSpanish(text?: string | null): Promise<s
         const data = await res.json();
         if (Array.isArray(data?.[0])) {
           translated = data[0]
-            .map((item: unknown) => (Array.isArray(item) && typeof item[0] === "string" ? item[0] : ""))
+            .map((item: unknown) =>
+              Array.isArray(item) && typeof item[0] === "string" ? item[0] : "",
+            )
             .join("")
             .trim();
         }
@@ -1673,7 +2162,9 @@ export function getYupooPhotoId(url: string): string | null {
       return parts[parts.length - 2] ?? null;
     }
   } catch {
-    const m = url.match(/\/([a-zA-Z0-9_-]+)\/(?:small|medium|big|square|thumb|original|\d+)\.[a-zA-Z]+/i);
+    const m = url.match(
+      /\/([a-zA-Z0-9_-]+)\/(?:small|medium|big|square|thumb|original|\d+)\.[a-zA-Z]+/i,
+    );
     if (m) return m[1];
   }
   return null;
@@ -1707,8 +2198,12 @@ export function extractAlbumCover(html: string): string {
 
   // 3. Clase específica de portada en el álbum
   const coverMatch =
-    html.match(/class="[^"]*(?:showalbumheader__gallerycover|album__cover|cover__img)[^"]*"[^>]+(?:data-origin-src|data-src|src)=["']([^"']+)["']/i) ||
-    html.match(/(?:data-origin-src|data-src|src)=["']([^"']+)["'][^>]+class="[^"]*(?:showalbumheader__gallerycover|album__cover|cover__img)[^"]*"/i);
+    html.match(
+      /class="[^"]*(?:showalbumheader__gallerycover|album__cover|cover__img)[^"]*"[^>]+(?:data-origin-src|data-src|src)=["']([^"']+)["']/i,
+    ) ||
+    html.match(
+      /(?:data-origin-src|data-src|src)=["']([^"']+)["'][^>]+class="[^"]*(?:showalbumheader__gallerycover|album__cover|cover__img)[^"]*"/i,
+    );
   if (coverMatch && coverMatch[1]) {
     const raw = coverMatch[1].trim();
     const url = raw.startsWith("//") ? `https:${raw}` : raw;
@@ -1775,7 +2270,8 @@ function extractAlbumImages(html: string): string[] {
   }
   // Fallback si no hubo data-origin-src
   if (urls.length === 0) {
-    const fallbackRegex = /(?:data-src|data-original|src)=["']((?:https?:)?\/\/photo\.yupoo\.com[^"']+)["']/gi;
+    const fallbackRegex =
+      /(?:data-src|data-original|src)=["']((?:https?:)?\/\/photo\.yupoo\.com[^"']+)["']/gi;
     while ((m = fallbackRegex.exec(html)) !== null) {
       const raw = m[1].trim();
       const url = raw.startsWith("//") ? `https:${raw}` : raw;
@@ -1855,7 +2351,8 @@ function extractAlbumLinks(
       const idx = m.index;
       const block = html.slice(Math.max(0, idx - 400), idx + 600);
       const titleAttr = block.match(/title=["']([^"']+)["']/i);
-      const rawTitle = titleAttr && titleAttr[1] && titleAttr[1].length > 2 ? titleAttr[1].trim() : "";
+      const rawTitle =
+        titleAttr && titleAttr[1] && titleAttr[1].length > 2 ? titleAttr[1].trim() : "";
 
       const thumbMatch =
         block.match(/(?:data-origin-src|data-src|data-original)=["']([^"']+)["']/i) ||
@@ -1876,110 +2373,111 @@ function extractAlbumLinks(
 }
 
 export const parseYupooPage = createServerFn({ method: "POST" })
-  .validator(
-    (data: { email?: string; token?: string; url: string; password?: string }) => ({
-      email: str(data?.email, 160).toLowerCase(),
-      token: str(data?.token, 2000),
-      url: str(data?.url, 500).trim(),
-      password: str(data?.password ?? "", 100).trim(),
-    }),
-  )
-  .handler(
-    async ({ data }): Promise<{ albums?: YupooAlbumPreview[]; error?: string }> => {
+  .validator((data: { email?: string; token?: string; url: string; password?: string }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    url: str(data?.url, 500).trim(),
+    password: str(data?.password ?? "", 100).trim(),
+  }))
+  .handler(async ({ data }): Promise<{ albums?: YupooAlbumPreview[]; error?: string }> => {
+    try {
+      await assertAdmin(data.email, data.token);
+
+      const rawUrl = data.url;
+      // Validación estricta anti-SSRF: el hostname debe terminar en .yupoo.com
+      let parsed: URL;
       try {
-        await assertAdmin(data.email, data.token);
+        parsed = assertYupooUrl(rawUrl);
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : "URL inválida." };
+      }
+      const origin = parsed.origin;
 
-        const rawUrl = data.url;
-        // Validación estricta anti-SSRF: el hostname debe terminar en .yupoo.com
-        let parsed: URL;
-        try {
-          parsed = assertYupooUrl(rawUrl);
-        } catch (e) {
-          return { error: e instanceof Error ? e.message : "URL inválida." };
-        }
-        const origin = parsed.origin;
+      // Autenticación si hay contraseña
+      let sessionCookie = "";
+      if (data.password) {
+        sessionCookie = (await yupooAuth(rawUrl, data.password)) ?? "";
+      }
 
-        // Autenticación si hay contraseña
-        let sessionCookie = "";
-        if (data.password) {
-          sessionCookie = (await yupooAuth(rawUrl, data.password)) ?? "";
-        }
+      const headers: Record<string, string> = { "User-Agent": YUPOO_UA };
+      if (sessionCookie) headers["Cookie"] = sessionCookie;
 
-        const headers: Record<string, string> = { "User-Agent": YUPOO_UA };
-        if (sessionCookie) headers["Cookie"] = sessionCookie;
+      // Detectar si es página de álbum individual
+      const isSingleAlbum = /\/albums\/\d+/.test(parsed.pathname);
 
-        // Detectar si es página de álbum individual
-        const isSingleAlbum = /\/albums\/\d+/.test(parsed.pathname);
-
-        if (isSingleAlbum) {
-          // Modo single: parsear directamente el álbum
-          const res = await fetch(rawUrl, { headers, signal: AbortSignal.timeout(15000) });
-          const html = await res.text();
-          const rawTitle = extractAlbumTitle(html);
-          const title = (await translateChineseToSpanish(rawTitle)) || rawTitle || "Producto sin título";
-          const albumCover = extractAlbumCover(html);
-          const rawImages = extractAlbumImages(html);
-          const images = prioritizeCoverImage(rawImages, albumCover);
-          return {
-            albums: [
-              {
-                albumUrl: rawUrl,
-                title,
-                thumbnail: images[0] ?? albumCover ?? "",
-              },
-            ],
-          };
-        }
-
-        // Modo lista: search/gallery/home
+      if (isSingleAlbum) {
+        // Modo single: parsear directamente el álbum
         const res = await fetch(rawUrl, { headers, signal: AbortSignal.timeout(15000) });
         const html = await res.text();
-
-        const rawAlbums = extractAlbumLinks(html, origin);
-        if (rawAlbums.length === 0) {
-          return { error: "No se encontraron álbumes en la página. Verificá la URL y la contraseña." };
-        }
-
-        const MAX_TITLE_FETCH = 30;
-        const toFetch = rawAlbums.slice(0, MAX_TITLE_FETCH);
-
-        // Completar títulos o miniaturas faltantes si algún álbum no los tenía en el card principal
-        const albums: YupooAlbumPreview[] = [];
-        for (const item of toFetch) {
-          let rawTitle = item.rawTitle;
-          let thumbnail = item.thumbnail;
-
-          if (!rawTitle || !thumbnail) {
-            try {
-              const aRes = await fetch(item.albumUrl, { headers, signal: AbortSignal.timeout(6000) });
-              const aHtml = await aRes.text();
-              if (!rawTitle) rawTitle = extractAlbumTitle(aHtml);
-              if (!thumbnail) {
-                const albumCover = extractAlbumCover(aHtml);
-                const rawImages = extractAlbumImages(aHtml);
-                thumbnail = prioritizeCoverImage(rawImages, albumCover)[0] || albumCover;
-              }
-            } catch {}
-          }
-
-          if (!rawTitle) {
-            rawTitle = decodeURIComponent(item.albumUrl.split("/").pop() ?? "Producto");
-          }
-
-          const title = (await translateChineseToSpanish(rawTitle)) || rawTitle;
-          albums.push({
-            albumUrl: item.albumUrl,
-            title,
-            thumbnail: thumbnail || "",
-          });
-        }
-
-        return { albums };
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : "Error al procesar la página de Yupoo." };
+        const rawTitle = extractAlbumTitle(html);
+        const title =
+          (await translateChineseToSpanish(rawTitle)) || rawTitle || "Producto sin título";
+        const albumCover = extractAlbumCover(html);
+        const rawImages = extractAlbumImages(html);
+        const images = prioritizeCoverImage(rawImages, albumCover);
+        return {
+          albums: [
+            {
+              albumUrl: rawUrl,
+              title,
+              thumbnail: images[0] ?? albumCover ?? "",
+            },
+          ],
+        };
       }
-    },
-  );
+
+      // Modo lista: search/gallery/home
+      const res = await fetch(rawUrl, { headers, signal: AbortSignal.timeout(15000) });
+      const html = await res.text();
+
+      const rawAlbums = extractAlbumLinks(html, origin);
+      if (rawAlbums.length === 0) {
+        return {
+          error: "No se encontraron álbumes en la página. Verificá la URL y la contraseña.",
+        };
+      }
+
+      const MAX_TITLE_FETCH = 30;
+      const toFetch = rawAlbums.slice(0, MAX_TITLE_FETCH);
+
+      // Completar títulos o miniaturas faltantes si algún álbum no los tenía en el card principal
+      const albums: YupooAlbumPreview[] = [];
+      for (const item of toFetch) {
+        let rawTitle = item.rawTitle;
+        let thumbnail = item.thumbnail;
+
+        if (!rawTitle || !thumbnail) {
+          try {
+            const aRes = await fetch(item.albumUrl, { headers, signal: AbortSignal.timeout(6000) });
+            const aHtml = await aRes.text();
+            if (!rawTitle) rawTitle = extractAlbumTitle(aHtml);
+            if (!thumbnail) {
+              const albumCover = extractAlbumCover(aHtml);
+              const rawImages = extractAlbumImages(aHtml);
+              thumbnail = prioritizeCoverImage(rawImages, albumCover)[0] || albumCover;
+            }
+          } catch {}
+        }
+
+        if (!rawTitle) {
+          rawTitle = decodeURIComponent(item.albumUrl.split("/").pop() ?? "Producto");
+        }
+
+        const title = (await translateChineseToSpanish(rawTitle)) || rawTitle;
+        albums.push({
+          albumUrl: item.albumUrl,
+          title,
+          thumbnail: thumbnail || "",
+        });
+      }
+
+      return { albums };
+    } catch (err) {
+      return {
+        error: err instanceof Error ? err.message : "Error al procesar la página de Yupoo.",
+      };
+    }
+  });
 
 /* ─── Yupoo — Importar un álbum (Fase 2: por producto) ───── */
 
@@ -2073,7 +2571,9 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
           if (!buckets?.some((b) => b.name === bucketName)) {
             await supabaseAdmin.storage.createBucket(bucketName, { public: true });
           }
-        } catch { /* bucket ya existe */ }
+        } catch {
+          /* bucket ya existe */
+        }
 
         // Descargar y subir imágenes a Supabase Storage
         const uploadedUrls: string[] = [];
@@ -2105,11 +2605,11 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
 
             if (uploadErr) continue;
 
-            const { data: pubData } = supabaseAdmin.storage
-              .from(bucketName)
-              .getPublicUrl(filename);
+            const { data: pubData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(filename);
             if (pubData.publicUrl) uploadedUrls.push(pubData.publicUrl);
-          } catch { /* imagen individual falló, continuar con las demás */ }
+          } catch {
+            /* imagen individual falló, continuar con las demás */
+          }
         }
 
         if (uploadedUrls.length === 0) {

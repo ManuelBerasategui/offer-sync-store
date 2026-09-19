@@ -128,7 +128,7 @@ async function run() {
           const batch = orphans.slice(i, i + batchSize).map(o => o.path);
           const { error: delErr } = await supabase.storage.from(bucketName).remove(batch);
           if (delErr) {
-            console.error(`Error borrando lote ${i}:`, delErr.message);
+            console.error("Error borrando lote:", i, delErr.message);
           } else {
             process.stdout.write(`.`);
           }

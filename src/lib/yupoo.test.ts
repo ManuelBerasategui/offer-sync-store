@@ -5,11 +5,14 @@ import {
   extractAlbumCover,
   prioritizeCoverImage,
   translateChineseToSpanish,
+  parseSupabaseStorageUrl,
 } from "./products.functions";
 
 describe("translateChineseToSpanish", () => {
   it("no modifica texto que no contiene caracteres chinos", async () => {
-    expect(await translateChineseToSpanish("Camiseta Nike Barcelona")).toBe("Camiseta Nike Barcelona");
+    expect(await translateChineseToSpanish("Camiseta Nike Barcelona")).toBe(
+      "Camiseta Nike Barcelona",
+    );
     expect(await translateChineseToSpanish("")).toBe("");
   });
 
@@ -24,24 +27,26 @@ describe("translateChineseToSpanish", () => {
 describe("Yupoo cover image helpers", () => {
   it("toYupooHighRes convierte thumbnails a resolución big", () => {
     expect(toYupooHighRes("https://photo.yupoo.com/seller/12345/small.jpg")).toBe(
-      "https://photo.yupoo.com/seller/12345/big.jpg"
+      "https://photo.yupoo.com/seller/12345/big.jpg",
     );
     expect(toYupooHighRes("//photo.yupoo.com/seller/12345/medium.png")).toBe(
-      "https://photo.yupoo.com/seller/12345/big.png"
+      "https://photo.yupoo.com/seller/12345/big.png",
     );
     expect(toYupooHighRes("https://photo.yupoo.com/seller/12345/square.jpeg")).toBe(
-      "https://photo.yupoo.com/seller/12345/big.jpeg"
+      "https://photo.yupoo.com/seller/12345/big.jpeg",
     );
     expect(toYupooHighRes("https://photo.yupoo.com/seller/12345/thumb.webp")).toBe(
-      "https://photo.yupoo.com/seller/12345/big.webp"
+      "https://photo.yupoo.com/seller/12345/big.webp",
     );
     expect(toYupooHighRes("https://photo.yupoo.com/seller/12345/big.jpg")).toBe(
-      "https://photo.yupoo.com/seller/12345/big.jpg"
+      "https://photo.yupoo.com/seller/12345/big.jpg",
     );
   });
 
   it("getYupooPhotoId extrae el ID de la foto correctamente", () => {
-    expect(getYupooPhotoId("https://photo.yupoo.com/nikefactory/a1b2c3d4/medium.jpg")).toBe("a1b2c3d4");
+    expect(getYupooPhotoId("https://photo.yupoo.com/nikefactory/a1b2c3d4/medium.jpg")).toBe(
+      "a1b2c3d4",
+    );
     expect(getYupooPhotoId("//photo.yupoo.com/nikefactory/98765432/big.jpg")).toBe("98765432");
   });
 
@@ -104,5 +109,53 @@ describe("Yupoo cover image helpers", () => {
 
     expect(reordered[0]).toBe("https://photo.yupoo.com/nikefactory/portada1/big.jpg");
     expect(reordered[1]).toBe("https://photo.yupoo.com/nikefactory/hombro2/big.jpg");
+  });
+});
+
+describe("parseSupabaseStorageUrl", () => {
+  it("extrae bucket y path de URLs públicas de Supabase Storage", () => {
+    const url =
+      "https://abcxyz.supabase.co/storage/v1/object/public/store-images/products/nike-air-123.webp";
+    expect(parseSupabaseStorageUrl(url)).toEqual({
+      bucket: "store-images",
+      path: "products/nike-air-123.webp",
+    });
+  });
+
+  it("extrae bucket y path de URLs del bucket storage-images con subcarpetas", () => {
+    const url =
+      "https://myproj.supabase.co/storage/v1/object/public/storage-images/yupoo/camisetas/real-madrid.webp?token=xyz#hash";
+    expect(parseSupabaseStorageUrl(url)).toEqual({
+      bucket: "storage-images",
+      path: "yupoo/camisetas/real-madrid.webp",
+    });
+  });
+
+  it("soporta URLs firmadas /storage/v1/object/sign/", () => {
+    const url =
+      "https://abcxyz.supabase.co/storage/v1/object/sign/store-images/temp/file.png?token=9999";
+    expect(parseSupabaseStorageUrl(url)).toEqual({
+      bucket: "store-images",
+      path: "temp/file.png",
+    });
+  });
+
+  it("decodifica caracteres especiales en las rutas (espacios, acentos)", () => {
+    const url =
+      "https://abcxyz.supabase.co/storage/v1/object/public/store-images/productos/zapatilla%20edici%C3%B3n%20especial.webp";
+    expect(parseSupabaseStorageUrl(url)).toEqual({
+      bucket: "store-images",
+      path: "productos/zapatilla edición especial.webp",
+    });
+  });
+
+  it("retorna null para imágenes externas (Yupoo, Google Drive, etc.)", () => {
+    expect(parseSupabaseStorageUrl("https://photo.yupoo.com/seller/123/big.jpg")).toBeNull();
+    expect(
+      parseSupabaseStorageUrl("https://drive.google.com/uc?export=download&id=abc12345"),
+    ).toBeNull();
+    expect(parseSupabaseStorageUrl("")).toBeNull();
+    expect(parseSupabaseStorageUrl(null)).toBeNull();
+    expect(parseSupabaseStorageUrl(undefined)).toBeNull();
   });
 });
