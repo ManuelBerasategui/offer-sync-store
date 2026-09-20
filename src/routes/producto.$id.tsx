@@ -343,7 +343,7 @@ function JerseyProductUI({
         </div>
         <p className="mt-1.5 text-[11px] text-muted-foreground">
           {version === "player"
-            ? "✏️ Versión Jugador — incluye estampa de nombre y número personalizado"
+            ? "✏️ Versión Jugador — luego de mandar el comprobante indicanos cómo la querés personalizar"
             : "👕 Versión Fan — camiseta lisa sin personalización"}
         </p>
       </div>
