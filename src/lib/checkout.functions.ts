@@ -30,6 +30,7 @@ import {
   normCat,
   checkCategoryMins,
   isCamiseta,
+  isLongSleeve,
   parseJerseyItem,
   calcJerseyUnitPrice,
 } from "./store";
@@ -139,6 +140,7 @@ async function revalidateOrderItems(
           isExtraSize,
           badge,
           usdRate,
+          isLongSleeve: isLongSleeve(item.nombre) || (prod ? isLongSleeve(prod.nombre) : false),
         });
         return {
           nombre: item.nombre,

@@ -33,8 +33,7 @@ import {
   type BannerInput,
   type YupooAlbumPreview,
 } from "@/lib/products.functions";
-import type { Product, Banner } from "@/lib/store";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, waOnlyReasonOf, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
+import { money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 import { SafeImage } from "@/components/SafeImage";
 
@@ -821,6 +820,27 @@ function ProductModal({
   const set = (field: keyof ProductInput, value: unknown) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  // ── Auto-configuración Camisetas ──────────────────────────────────────────
+  // Cuando el admin escribe "Camisetas" en el campo de categoría, se aplican
+  // automáticamente los defaults necesarios para que el producto use la UI
+  // especial (talles S-4XL, escala Fan/Jugador, MOQ 10 u., precio en USD).
+  useEffect(() => {
+    if (!isCamiseta(form.categoria, form.nombre)) return;
+    setForm((prev) => ({
+      ...prev,
+      // Solo sobreescribe si el campo está en blanco o en el default vacío
+      moq_group: prev.moq_group || "camisetas",
+      tipo_talles: prev.tipo_talles === "NINGUNO" || !prev.tipo_talles ? "ROPA" : prev.tipo_talles,
+      talles_disponibles:
+        !prev.talles_disponibles || prev.talles_disponibles.length === 0
+          ? ["S", "M", "L", "XL", "2XL", "3XL", "4XL"]
+          : prev.talles_disponibles,
+      moneda_base: prev.moneda_base || "USD",
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.categoria, form.nombre]);
+  // ─────────────────────────────────────────────────────────────────────────
+
   const handlePriceUsdChange = (val: string) => {
     const numUsd = Number(val.replace(/[^\d.-]/g, ""));
     const calculatedArs =
@@ -1030,7 +1050,41 @@ function ProductModal({
             </div>
             <div>
               <label className="label-sm">Categoría</label>
-              <input className="input-base" value={form.categoria} onChange={(e) => set("categoria", e.target.value)} placeholder="Ej: Suplementos" />
+              <input
+                className="input-base"
+                list="admin-categories-datalist"
+                value={form.categoria}
+                onChange={(e) => set("categoria", e.target.value)}
+                placeholder="Ej: Camisetas, Suplementos..."
+              />
+              <datalist id="admin-categories-datalist">
+                {Array.from(new Set(["Camisetas", "Zapatillas", "Tecnología", "Perfumes Árabes", "Perfumes Diseñador", "Bazar", "Mates", "Suplementos"])).map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+              {isCamiseta(form.categoria, form.nombre) && (
+                <div className="mt-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-2.5 space-y-1">
+                  <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                    <span>👕</span> Categoría <strong>Camisetas</strong> detectada — configuración automática aplicada:
+                  </p>
+                  <ul className="text-[10px] text-emerald-700 dark:text-emerald-400 space-y-0.5 pl-4 list-disc">
+                    <li>Talles: <strong>S · M · L · XL · 2XL · 3XL · 4XL</strong> (tipo Ropa)</li>
+                    <li>Mínimo de compra: <strong>10 unidades</strong></li>
+                    <li>Precio en: <strong>USD</strong> (recargo 7% aplicado automáticamente)</li>
+                    <li>UI especial: <strong>selector Fan / Jugador + escala 10–500 u.</strong></li>
+                  </ul>
+                  {isLongSleeve(form.nombre) && (
+                    <div className="mt-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5">
+                      <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                        <span>🧤</span> <strong>Manga Larga</strong> detectada — se usará la escala de precios ML:
+                      </p>
+                      <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5 pl-3">
+                        Jugador: $24.50 → $18.00 · Fan: $22.50 → $16.00 (según cantidad)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             {!form.whatsapp_only_reason && (
               <div>
@@ -1231,6 +1285,7 @@ function ProductModal({
               >
                 <option value="">Automático (por categoría)</option>
                 <option value="none">Sin mínimo de compra</option>
+                <option value="camisetas">Camisetas — mín. 10 unidades</option>
                 <option value="mates">Mates — mín. 10 unidades</option>
                 <option value="perfumes arabes">Perfumes Árabes — mín. 5 u.</option>
                 <option value="perfumes disenador">Perfumes Diseñador — mín. 3 u.</option>

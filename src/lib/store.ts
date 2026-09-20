@@ -345,6 +345,15 @@ export function isCamiseta(categoria?: string | null, nombre?: string | null): b
   return normNom.startsWith("camiseta") || normNom.includes(" camiseta");
 }
 
+/** Detecta si un producto/ítem es camiseta manga larga por su nombre. */
+export function isLongSleeve(nombre?: string | null): boolean {
+  const norm = String(nombre ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return norm.includes("manga larga") || norm.includes("mangalarga") || norm.includes("long sleeve");
+}
+
 /** Tramos de precio para Versión Jugador (Customized Name & Number). Precios en USD. */
 export const JERSEY_PLAYER_TIERS = [
   { qty: 10,  unitUsd: 20.50 },
@@ -365,6 +374,28 @@ export const JERSEY_FAN_TIERS = [
   { qty: 100, unitUsd: 14.00 },
   { qty: 250, unitUsd: 13.50 },
   { qty: 500, unitUsd: 12.00 },
+];
+
+/** Tramos de precio para Versión Jugador MANGA LARGA (Con Envío Incluido). Precios en USD. */
+export const JERSEY_PLAYER_ML_TIERS = [
+  { qty: 10,  unitUsd: 24.50 },
+  { qty: 20,  unitUsd: 23.75 },
+  { qty: 50,  unitUsd: 23.00 },
+  { qty: 80,  unitUsd: 20.75 },
+  { qty: 100, unitUsd: 19.60 },
+  { qty: 250, unitUsd: 19.50 },
+  { qty: 500, unitUsd: 18.00 },
+];
+
+/** Tramos de precio para Versión Fan MANGA LARGA (Con Envío Incluido). Precios en USD. */
+export const JERSEY_FAN_ML_TIERS = [
+  { qty: 10,  unitUsd: 22.50 },
+  { qty: 20,  unitUsd: 21.75 },
+  { qty: 50,  unitUsd: 21.00 },
+  { qty: 80,  unitUsd: 18.75 },
+  { qty: 100, unitUsd: 17.60 },
+  { qty: 250, unitUsd: 17.50 },
+  { qty: 500, unitUsd: 16.00 },
 ];
 
 /** Parsea los atributos de variante de un ítem de camiseta desde su ID o nombre. */
@@ -411,16 +442,22 @@ export function calcJerseyUnitPrice({
   isExtraSize,
   badge,
   usdRate,
+  isLongSleeve: longSleeve = false,
 }: {
   qty: number;
   version: "fan" | "player";
   isExtraSize: boolean;
   badge: "yes" | "no";
   usdRate: number;
+  /** Si es camiseta manga larga, usa los tiers ML con precio mayor. */
+  isLongSleeve?: boolean;
 }): { unitArs: number; baseArs: number } {
   if (!usdRate || usdRate <= 0) return { unitArs: 0, baseArs: 0 };
 
-  const tiers = version === "player" ? JERSEY_PLAYER_TIERS : JERSEY_FAN_TIERS;
+  const tiers = longSleeve
+    ? version === "player" ? JERSEY_PLAYER_ML_TIERS : JERSEY_FAN_ML_TIERS
+    : version === "player" ? JERSEY_PLAYER_TIERS    : JERSEY_FAN_TIERS;
+
   const baseTier = tiers[0]!;
 
   const activeTier =

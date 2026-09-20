@@ -14,6 +14,7 @@ import {
   findRuleForCat,
   normCat,
   isCamiseta,
+  isLongSleeve,
   parseJerseyItem,
   calcJerseyUnitPrice,
   type ComboQuantityTier,
@@ -267,6 +268,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           isExtraSize,
           badge,
           usdRate,
+          isLongSleeve: isLongSleeve(item.nombre),
         });
 
         if (unitArs > 0) {
@@ -293,6 +295,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           isExtraSize,
           badge,
           usdRate,
+          isLongSleeve: isLongSleeve(item.nombre) || isLongSleeve(product.nombre),
         });
 
         if (unitArs > 0) {

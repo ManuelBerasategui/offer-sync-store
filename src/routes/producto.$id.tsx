@@ -52,8 +52,11 @@ import {
   categoryDiscountForUnits,
   checkCategoryMins,
   isCamiseta,
+  isLongSleeve,
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
+  JERSEY_PLAYER_ML_TIERS,
+  JERSEY_FAN_ML_TIERS,
   calcJerseyUnitPrice,
   type Product,
   type ProductVariant,
@@ -109,7 +112,12 @@ function JerseyProductUI({
   const [showCheckout, setShowCheckout] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
 
-  const tiers = version === "player" ? JERSEY_PLAYER_TIERS : JERSEY_FAN_TIERS;
+  // Detección manga larga: usa los tiers ML si el nombre del producto lo incluye
+  const isML = isLongSleeve(productName);
+
+  const tiers = isML
+    ? (version === "player" ? JERSEY_PLAYER_ML_TIERS : JERSEY_FAN_ML_TIERS)
+    : (version === "player" ? JERSEY_PLAYER_TIERS    : JERSEY_FAN_TIERS);
 
   // Determinar dinámicamente qué tramo mayorista aplica según la cantidad elegida
   const activeTier = [...tiers]
@@ -205,6 +213,7 @@ function JerseyProductUI({
       isExtraSize,
       badge,
       usdRate,
+      isLongSleeve: isML,
     });
     const finalUnit = calculatedUnit > 0 ? calculatedUnit : (unitArs ?? 0);
     const finalBase = calculatedBase > 0 ? calculatedBase : (unitArs ?? 0);
