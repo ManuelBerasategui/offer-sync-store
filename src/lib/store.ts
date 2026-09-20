@@ -345,6 +345,101 @@ export function isCamiseta(categoria?: string | null, nombre?: string | null): b
   return normNom.startsWith("camiseta") || normNom.includes(" camiseta");
 }
 
+/** Tramos de precio para Versión Jugador (Customized Name & Number). Precios en USD. */
+export const JERSEY_PLAYER_TIERS = [
+  { qty: 10,  unitUsd: 20.50 },
+  { qty: 20,  unitUsd: 19.75 },
+  { qty: 50,  unitUsd: 19.00 },
+  { qty: 80,  unitUsd: 16.75 },
+  { qty: 100, unitUsd: 16.00 },
+  { qty: 250, unitUsd: 15.50 },
+  { qty: 500, unitUsd: 14.00 },
+];
+
+/** Tramos de precio para Versión Fan (NO Name & Number). Precios en USD. */
+export const JERSEY_FAN_TIERS = [
+  { qty: 10,  unitUsd: 18.50 },
+  { qty: 20,  unitUsd: 17.75 },
+  { qty: 50,  unitUsd: 17.00 },
+  { qty: 80,  unitUsd: 14.75 },
+  { qty: 100, unitUsd: 14.00 },
+  { qty: 250, unitUsd: 13.50 },
+  { qty: 500, unitUsd: 12.00 },
+];
+
+/** Parsea los atributos de variante de un ítem de camiseta desde su ID o nombre. */
+export function parseJerseyItem(item: { id?: string; nombre?: string }): {
+  version: "player" | "fan";
+  talle: string;
+  badge: "yes" | "no";
+  isExtraSize: boolean;
+} {
+  const idStr = String(item.id ?? "");
+  const nomStr = String(item.nombre ?? "");
+
+  const isPlayer =
+    idStr.includes("-player-") ||
+    /Versi[oó]n Jugador|Personalizado/i.test(nomStr);
+  const version: "player" | "fan" = isPlayer ? "player" : "fan";
+
+  const hasBadge =
+    idStr.endsWith("-yes") ||
+    idStr.includes("-yes-") ||
+    /Con Badge/i.test(nomStr);
+  const badge: "yes" | "no" = hasBadge ? "yes" : "no";
+
+  let talle = "S";
+  const m = nomStr.match(/Talle:\s*([A-Za-z0-9]+)/i);
+  if (m?.[1]) {
+    talle = m[1].trim();
+  } else {
+    const idMatch = idStr.match(/-(fan|player)-([^-]+)-(yes|no)$/i);
+    if (idMatch?.[2]) {
+      talle = idMatch[2].trim();
+    }
+  }
+
+  const isExtraSize = talle.toUpperCase() === "3XL" || talle.toUpperCase() === "4XL";
+
+  return { version, talle, badge, isExtraSize };
+}
+
+/** Calcula el precio unitario y precio base (tramo 10 u.) en ARS para camisetas según cantidad. */
+export function calcJerseyUnitPrice({
+  qty,
+  version,
+  isExtraSize,
+  badge,
+  usdRate,
+}: {
+  qty: number;
+  version: "fan" | "player";
+  isExtraSize: boolean;
+  badge: "yes" | "no";
+  usdRate: number;
+}): { unitArs: number; baseArs: number } {
+  if (!usdRate || usdRate <= 0) return { unitArs: 0, baseArs: 0 };
+
+  const tiers = version === "player" ? JERSEY_PLAYER_TIERS : JERSEY_FAN_TIERS;
+  const baseTier = tiers[0]!;
+
+  const activeTier =
+    [...tiers]
+      .sort((a, b) => b.qty - a.qty)
+      .find((t) => qty >= t.qty) ?? baseTier;
+
+  const badgeExtraArs = badge === "yes" ? Math.round(1 * 1.07 * usdRate) : 0;
+  const extraSizeArs = isExtraSize ? Math.round(1 * 1.07 * usdRate) : 0;
+
+  const unitArs =
+    Math.round(activeTier.unitUsd * 1.07 * usdRate) + extraSizeArs + badgeExtraArs;
+
+  const baseArs =
+    Math.round(baseTier.unitUsd * 1.07 * usdRate) + extraSizeArs + badgeExtraArs;
+
+  return { unitArs, baseArs };
+}
+
 /** Lee la columna "Whatsapp" de la planilla, sin importar mayúsculas ni espacios. */
 export function isWhatsappOnly(p: Product) {
   if (priceOf(p) > 0) return false;

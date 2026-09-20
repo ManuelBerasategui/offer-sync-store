@@ -14,6 +14,8 @@ import {
   findRuleForCat,
   normCat,
   isCamiseta,
+  parseJerseyItem,
+  calcJerseyUnitPrice,
   type ComboQuantityTier,
 } from "./store";
 
@@ -204,6 +206,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       catTotals[key] = (catTotals[key] ?? 0) + item.qty;
     }
 
+    const totalJerseyUnits = items
+      .filter((i) => isCamiseta(i.categoria, i.nombre))
+      .reduce((sum, i) => sum + i.qty, 0);
+    const usdRate = Number(config["dolar_cotizacion"] ?? 0);
+
     return items.map((item) => {
       // ── Ítems de combo: calcular precio según quantity_tiers del banner ──
       if (item.id.startsWith("combo-")) {
@@ -250,7 +257,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return { ...item, basePrice: rBase, unitPrice: rBase };
       }
 
-      if (isCamiseta(item.categoria, item.nombre)) return item;
+      // ── Ítems de camisetas: recalcular según tramos mayoristas ──
+      if (isCamiseta(item.categoria, item.nombre)) {
+        const { version, isExtraSize, badge } = parseJerseyItem(item);
+        const effectiveQty = Math.max(item.qty, totalJerseyUnits);
+        const { unitArs, baseArs } = calcJerseyUnitPrice({
+          qty: effectiveQty,
+          version,
+          isExtraSize,
+          badge,
+          usdRate,
+        });
+
+        if (unitArs > 0) {
+          if (item.unitPrice === unitArs && item.basePrice === baseArs) return item;
+          return { ...item, basePrice: baseArs, unitPrice: unitArs };
+        }
+        return item;
+      }
 
       const product =
         (item.productId ? findProduct(products, item.productId) : undefined) ??
@@ -260,7 +284,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
         products.find((p) => item.nombre && p.nombre && item.nombre.toLowerCase().startsWith(p.nombre.toLowerCase()));
       if (!product) return item;
 
-      if (isCamiseta(product.categoria, product.nombre)) return item;
+      if (isCamiseta(product.categoria, product.nombre)) {
+        const { version, isExtraSize, badge } = parseJerseyItem(item);
+        const effectiveQty = Math.max(item.qty, totalJerseyUnits);
+        const { unitArs, baseArs } = calcJerseyUnitPrice({
+          qty: effectiveQty,
+          version,
+          isExtraSize,
+          badge,
+          usdRate,
+        });
+
+        if (unitArs > 0) {
+          if (item.unitPrice === unitArs && item.basePrice === baseArs) return item;
+          return { ...item, categoria: product.categoria ?? "Camisetas", basePrice: baseArs, unitPrice: unitArs };
+        }
+        return item;
+      }
 
       const catNorm = normCat(item.categoria ?? "");
       const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;

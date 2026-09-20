@@ -52,6 +52,9 @@ import {
   categoryDiscountForUnits,
   checkCategoryMins,
   isCamiseta,
+  JERSEY_PLAYER_TIERS,
+  JERSEY_FAN_TIERS,
+  calcJerseyUnitPrice,
   type Product,
   type ProductVariant,
   type SiteConfig,
@@ -83,27 +86,6 @@ function sanitizeText(raw: string): string {
     .slice(0, 200); // hard max 200 chars
 }
 
-/** Tramos de precio para Versión Jugador (Customized Name & Number). Precios en USD. */
-const JERSEY_PLAYER_TIERS = [
-  { qty: 10,  unitUsd: 20.50 },
-  { qty: 20,  unitUsd: 19.75 },
-  { qty: 50,  unitUsd: 19.00 },
-  { qty: 80,  unitUsd: 16.75 },
-  { qty: 100, unitUsd: 16.00 },
-  { qty: 250, unitUsd: 15.50 },
-  { qty: 500, unitUsd: 14.00 },
-];
-
-/** Tramos de precio para Versión Fan (NO Name & Number). Precios en USD. */
-const JERSEY_FAN_TIERS = [
-  { qty: 10,  unitUsd: 18.50 },
-  { qty: 20,  unitUsd: 17.75 },
-  { qty: 50,  unitUsd: 17.00 },
-  { qty: 80,  unitUsd: 14.75 },
-  { qty: 100, unitUsd: 14.00 },
-  { qty: 250, unitUsd: 13.50 },
-  { qty: 500, unitUsd: 12.00 },
-];
 
 function JerseyProductUI({
   product,
@@ -217,12 +199,22 @@ function JerseyProductUI({
     const currentQty = Math.max(10, parseInt(qtyStr, 10) || qty || 10);
     const fullItem = `${productName} (Talle: ${talleToUse} - ${version === "player" ? "Versión Jugador (Personalizado Nombre y Número)" : "Versión Fan (Sin personalizar)"}${badge === "yes" ? " - Con Badge" : ""})`;
 
+    const { unitArs: calculatedUnit, baseArs: calculatedBase } = calcJerseyUnitPrice({
+      qty: currentQty,
+      version,
+      isExtraSize,
+      badge,
+      usdRate,
+    });
+    const finalUnit = calculatedUnit > 0 ? calculatedUnit : (unitArs ?? 0);
+    const finalBase = calculatedBase > 0 ? calculatedBase : (unitArs ?? 0);
+
     cart.add({
       id: `${product.id}-${version}-${talleToUse}-${badge}`,
       productId: String(product.id),
       nombre: fullItem,
-      unitPrice: unitArs ?? 0,
-      basePrice: unitArs ?? 0,
+      unitPrice: finalUnit,
+      basePrice: finalBase,
       qty: currentQty,
       imagen: product.imagen_url ? imageUrl(product.imagen_url) : undefined,
       categoria: product.categoria ?? "Camisetas",

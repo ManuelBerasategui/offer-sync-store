@@ -11,6 +11,10 @@ import {
   galleryImages,
   waOnlyReasonOf,
   normCat,
+  parseJerseyItem,
+  calcJerseyUnitPrice,
+  JERSEY_PLAYER_TIERS,
+  JERSEY_FAN_TIERS,
 } from "./store";
 
 /* ══════════════════════════════════════════════════════════════════
@@ -643,3 +647,84 @@ describe("checkCategoryMins & hasMoq — Camisetas mínimo 10 unidades", () => {
     expect(v).toHaveLength(0);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   parseJerseyItem & calcJerseyUnitPrice (Camisetas dynamic pricing)
+══════════════════════════════════════════════════════════════════ */
+describe("parseJerseyItem", () => {
+  it("parses Fan version without badge", () => {
+    const res = parseJerseyItem({
+      id: "prod-fan-M-no",
+      nombre: "Camiseta Boca Juniors (Talle: M - Versión Fan (Sin personalizar))",
+    });
+    expect(res.version).toBe("fan");
+    expect(res.talle).toBe("M");
+    expect(res.badge).toBe("no");
+    expect(res.isExtraSize).toBe(false);
+  });
+
+  it("parses Player version with badge and 3XL extra size", () => {
+    const res = parseJerseyItem({
+      id: "prod-player-3XL-yes",
+      nombre: "Camiseta Argentina (Talle: 3XL - Versión Jugador (Personalizado Nombre y Número) - Con Badge)",
+    });
+    expect(res.version).toBe("player");
+    expect(res.talle).toBe("3XL");
+    expect(res.badge).toBe("yes");
+    expect(res.isExtraSize).toBe(true);
+  });
+
+  it("detects 4XL as extra size", () => {
+    const res = parseJerseyItem({
+      nombre: "Camiseta Real Madrid (Talle: 4XL - Versión Fan (Sin personalizar))",
+    });
+    expect(res.talle).toBe("4XL");
+    expect(res.isExtraSize).toBe(true);
+  });
+});
+
+describe("calcJerseyUnitPrice", () => {
+  const usdRate = 1500;
+
+  it("returns base 10-unit tier when qty is 10 (Fan)", () => {
+    const { unitArs, baseArs } = calcJerseyUnitPrice({
+      qty: 10,
+      version: "fan",
+      isExtraSize: false,
+      badge: "no",
+      usdRate,
+    });
+    // 18.50 * 1.07 * 1500 = 29692.5 -> 29693
+    expect(unitArs).toBe(Math.round(18.50 * 1.07 * usdRate));
+    expect(baseArs).toBe(unitArs);
+  });
+
+  it("applies lower unit price when qty increases to 20 or 50 (Fan)", () => {
+    const tier10 = calcJerseyUnitPrice({ qty: 10, version: "fan", isExtraSize: false, badge: "no", usdRate });
+    const tier20 = calcJerseyUnitPrice({ qty: 20, version: "fan", isExtraSize: false, badge: "no", usdRate });
+    const tier50 = calcJerseyUnitPrice({ qty: 50, version: "fan", isExtraSize: false, badge: "no", usdRate });
+
+    expect(tier20.unitArs).toBeLessThan(tier10.unitArs);
+    expect(tier50.unitArs).toBeLessThan(tier20.unitArs);
+    // Base price remains the 10-unit tier price
+    expect(tier20.baseArs).toBe(tier10.unitArs);
+    expect(tier50.baseArs).toBe(tier10.unitArs);
+  });
+
+  it("adds extras for extra size (3XL/4XL) and badge (+1 USD * 1.07 * rate each)", () => {
+    const standard = calcJerseyUnitPrice({ qty: 10, version: "player", isExtraSize: false, badge: "no", usdRate });
+    const withExtras = calcJerseyUnitPrice({ qty: 10, version: "player", isExtraSize: true, badge: "yes", usdRate });
+
+    const extraSizeArs = Math.round(1 * 1.07 * usdRate);
+    const badgeExtraArs = Math.round(1 * 1.07 * usdRate);
+
+    expect(withExtras.unitArs).toBe(standard.unitArs + extraSizeArs + badgeExtraArs);
+  });
+
+  it("handles qty < 10 by falling back to base 10 tier", () => {
+    const tier5 = calcJerseyUnitPrice({ qty: 5, version: "fan", isExtraSize: false, badge: "no", usdRate });
+    const tier10 = calcJerseyUnitPrice({ qty: 10, version: "fan", isExtraSize: false, badge: "no", usdRate });
+    expect(tier5.unitArs).toBe(tier10.unitArs);
+  });
+});
+

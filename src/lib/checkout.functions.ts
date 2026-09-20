@@ -29,6 +29,9 @@ import {
   findRuleForCat,
   normCat,
   checkCategoryMins,
+  isCamiseta,
+  parseJerseyItem,
+  calcJerseyUnitPrice,
 } from "./store";
 
 type CheckoutItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
@@ -116,8 +119,35 @@ async function revalidateOrderItems(
       };
     }
 
+    const totalJerseyUnits = rawItems
+      .filter((i) => {
+        const prod = findProduct(dbProducts, i.nombre);
+        return isCamiseta(prod?.categoria, prod?.nombre) || isCamiseta(undefined, i.nombre);
+      })
+      .reduce((sum, i) => sum + i.qty, 0);
+    const usdRate = Number(config["dolar_cotizacion"] ?? 0);
+
     const validatedItems: CheckoutItem[] = rawItems.map((item) => {
       const prod = findProduct(dbProducts, item.nombre);
+
+      if ((prod && isCamiseta(prod.categoria, prod.nombre)) || isCamiseta(undefined, item.nombre)) {
+        const { version, isExtraSize, badge } = parseJerseyItem(item);
+        const effectiveQty = Math.max(item.qty, totalJerseyUnits);
+        const { unitArs } = calcJerseyUnitPrice({
+          qty: effectiveQty,
+          version,
+          isExtraSize,
+          badge,
+          usdRate,
+        });
+        return {
+          nombre: item.nombre,
+          qty: item.qty,
+          unitPrice: unitArs > 0 ? unitArs : item.unitPrice,
+          ...(item.productId ? { productId: item.productId } : {}),
+        };
+      }
+
       if (!prod) return item;
 
       const catNorm = normCat(prod.categoria ?? "");
