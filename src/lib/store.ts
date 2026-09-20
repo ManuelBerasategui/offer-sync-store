@@ -327,14 +327,22 @@ export function categoriesOf(products: Product[]) {
   return [...new Set(products.map((p) => (p.categoria ?? "").trim()).filter(Boolean))];
 }
 
-/** Returns true when the product's category is "Camisetas" (accent-insensitive). */
-export function isCamiseta(categoria?: string | null): boolean {
-  const norm = String(categoria ?? "")
+/** Returns true when the product's category or name matches "Camisetas" (accent-insensitive). */
+export function isCamiseta(categoria?: string | null, nombre?: string | null): boolean {
+  const normCat = String(categoria ?? "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-  return norm === "camisetas" || norm === "camiseta";
+  if (normCat === "camisetas" || normCat === "camiseta" || normCat.includes("camiseta")) {
+    return true;
+  }
+  const normNom = String(nombre ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return normNom.startsWith("camiseta") || normNom.includes(" camiseta");
 }
 
 /** Lee la columna "Whatsapp" de la planilla, sin importar mayúsculas ni espacios. */

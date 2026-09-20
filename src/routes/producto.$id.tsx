@@ -105,22 +105,26 @@ const JERSEY_FAN_TIERS = [
 ];
 
 function JerseyProductUI({
-  productName,
+  product,
   talles,
   config,
 }: {
-  productName: string;
+  product: Product;
   talles: string[];
   config: SiteConfig;
 }) {
+  const productName = product.nombre ?? "Camiseta";
+  const cart = useCart();
   const [selectedTalle, setSelectedTalle] = useState("");
   const [talleError, setTalleError] = useState(false);
   const [version, setVersion] = useState<"fan" | "player">("fan");
   const [badge, setBadge] = useState<"no" | "yes">("no");
   const [tierIdx, setTierIdx] = useState(0);
-  // Parche deseado — texto libre sanitizado
+  // Parche deseado — texto libre sanitizado contra XSS y ReDoS
   const [parcheRaw, setParcheRaw] = useState("");
   const parcheClean = sanitizeText(parcheRaw);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [addedToCart, setAddedToCart] = useState(false);
 
   const tiers = version === "player" ? JERSEY_PLAYER_TIERS : JERSEY_FAN_TIERS;
   const selectedTier = tiers[tierIdx] ?? tiers[0]!;
@@ -128,21 +132,44 @@ function JerseyProductUI({
   // Tipo de cambio USD→ARS desde la clave real del config en Supabase
   const usdRate = Number(config["dolar_cotizacion"] ?? 0);
 
+  // Costo adicional por talle extra (3XL / 4XL) convertido a ARS
+  const isExtraSize = selectedTalle === "3XL" || selectedTalle === "4XL";
+  const extraSizeArs = isExtraSize ? (usdRate > 0 ? Math.round(1 * usdRate) : 0) : 0;
+
   const unitArs = usdRate > 0
-    ? Math.round(selectedTier.unitUsd * usdRate)
+    ? Math.round(selectedTier.unitUsd * usdRate) + extraSizeArs
     : null;
 
   const totalArs = unitArs !== null ? unitArs * selectedTier.qty : null;
 
-  /** Arma el mensaje de WhatsApp con todos los datos del pedido. */
+  // Nombre completo y enriquecido con opciones para el carrito, orden y mails de compra/venta
+  const fullItemName = `${productName} (Talle: ${selectedTalle || "S"} - ${version === "player" ? "Versión Jugador (Customized Name & Number)" : "Versión Fan"}${badge === "yes" ? " - Con Badge" : ""}${parcheClean ? ` - Parche: ${parcheClean}` : ""})`;
+
+  const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "5493418051515").replace(/\D/g, "");
+
+  /** Abre WhatsApp para coordinar el badge deseado */
+  function handleBadgeWhatsApp() {
+    const msg = `Hola! Quiero que tenga el siguiente badge para la camiseta: ${productName}`;
+    const href = sanitizeUrl(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
+    if (href) window.open(href, "_blank", "noopener,noreferrer");
+  }
+
+  /** Selecciona badge y ofrece derivación a WhatsApp */
+  function handleSelectBadgeYes() {
+    setBadge("yes");
+    handleBadgeWhatsApp();
+  }
+
+  /** Arma el mensaje de WhatsApp con todos los datos del pedido */
   function buildWaMessage() {
     const talleStr = selectedTalle || "(sin talle seleccionado)";
     const versionStr = version === "player" ? "Jugador (Customized Name & Number)" : "Fan (NO Name & Number)";
     const badgeStr = badge === "yes" ? "Sí (con badge)" : "No";
     const qtyStr = String(selectedTier.qty);
     const priceStr = unitArs !== null ? ` — $${unitArs.toLocaleString("es-AR")} c/u` : "";
+    const totalStr = totalArs !== null ? ` — Total: $${totalArs.toLocaleString("es-AR")}` : "";
     const parcheStr = parcheClean ? `\n🧵 Parche deseado: ${parcheClean}` : "";
-    return `Hola! Quiero hacer un pedido de camisetas:\n🏷️ Producto: ${productName}\n📐 Talle: ${talleStr}\n⚽ Versión: ${versionStr}\n🏅 Badge: ${badgeStr}${parcheStr}\n📦 Cantidad: ${qtyStr} unidades${priceStr}`;
+    return `Hola! Quiero hacer un pedido de camisetas:\n🏷️ Producto: ${productName}\n📐 Talle: ${talleStr}\n⚽ Versión: ${versionStr}\n🏅 Badge: ${badgeStr}${parcheStr}\n📦 Cantidad: ${qtyStr} unidades${priceStr}${totalStr}`;
   }
 
   function handleWhatsApp() {
@@ -151,9 +178,61 @@ function JerseyProductUI({
       return;
     }
     const msg = buildWaMessage();
-    const phone = (config["whatsapp_individual"] ?? "").replace(/\D/g, "");
     const href = sanitizeUrl(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
     if (href) window.open(href, "_blank", "noopener,noreferrer");
+  }
+
+  function handleBuyNow() {
+    if (!selectedTalle) {
+      setTalleError(true);
+      return;
+    }
+    setShowCheckout(true);
+  }
+
+  function handleAddToCart() {
+    if (!selectedTalle) {
+      setTalleError(true);
+      return;
+    }
+    cart.add({
+      id: `${product.id}-${version}-${selectedTalle}-${badge}-${encodeURIComponent(parcheClean || "base")}`,
+      nombre: fullItemName,
+      unitPrice: unitArs ?? 0,
+      basePrice: unitArs ?? 0,
+      qty: selectedTier.qty,
+      imagen: product.imagen_url ? imageUrl(product.imagen_url) : undefined,
+      categoria: product.categoria ?? "Camisetas",
+    });
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 3000);
+  }
+
+  if (showCheckout) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm font-bold text-foreground">Completar compra de camisetas</p>
+          <button
+            type="button"
+            onClick={() => setShowCheckout(false)}
+            className="text-xs text-muted-foreground hover:text-foreground font-semibold"
+          >
+            ← Volver a opciones
+          </button>
+        </div>
+        <CheckoutFlow
+          items={[{
+            nombre: fullItemName,
+            qty: selectedTier.qty,
+            unitPrice: unitArs ?? 0,
+            productId: product.id,
+          }]}
+          total={totalArs ?? 0}
+          onBack={() => setShowCheckout(false)}
+        />
+      </div>
+    );
   }
 
   return (
@@ -175,6 +254,7 @@ function JerseyProductUI({
             {talles.map((t) => {
               const isXtra = t === "3XL" || t === "4XL";
               const isSelected = selectedTalle === t;
+              const extraLabel = usdRate > 0 ? `(+$${Math.round(usdRate).toLocaleString("es-AR")})` : "(+1 USD)";
               return (
                 <button
                   key={t}
@@ -190,7 +270,7 @@ function JerseyProductUI({
                 >
                   {t}
                   {isXtra && (
-                    <span className="ml-1 text-[10px] font-normal text-red-500">(+$1 USD)</span>
+                    <span className="ml-1 text-[10px] font-normal text-red-500">{extraLabel}</span>
                   )}
                 </button>
               );
@@ -263,11 +343,11 @@ function JerseyProductUI({
             <span className="text-lg">🚫</span>
             <span className="mt-0.5 leading-tight text-center">NO<br/>Badge</span>
           </button>
-          {/* Badge */}
+          {/* Agregar Badge */}
           <button
             type="button"
             id="jersey-badge-yes"
-            onClick={() => setBadge("yes")}
+            onClick={handleSelectBadgeYes}
             className={[
               "flex h-14 items-center gap-2 rounded-xl border-2 px-3 font-bold transition-all",
               badge === "yes"
@@ -276,28 +356,40 @@ function JerseyProductUI({
             ].join(" ")}
           >
             <span className="text-2xl">🏆</span>
-            <span className="text-[11px] font-semibold">Badge</span>
+            <span className="text-[11px] font-semibold">Agregar badge</span>
           </button>
         </div>
+        {badge === "yes" && (
+          <div className="mt-2 flex items-center gap-2 text-xs">
+            <span className="text-emerald-600 font-semibold">✓ Badge seleccionado</span>
+            <button
+              type="button"
+              onClick={handleBadgeWhatsApp}
+              className="text-xs text-primary underline hover:opacity-80"
+            >
+              Coordinar modelo de badge por WhatsApp →
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* ── Parche Deseado ── */}
+      {/* ── Parche Deseado (Sanitizado para Snyk) ── */}
       <div>
         <label
           htmlFor="jersey-parche"
           className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-1.5"
         >
-          Parche deseado <span className="font-normal normal-case text-muted-foreground">(opcional)</span>
+          Ingresar parche deseado <span className="font-normal normal-case text-muted-foreground">(opcional)</span>
         </label>
         <input
           id="jersey-parche"
           type="text"
           autoComplete="off"
           maxLength={200}
-          placeholder="Ej: escudo de tu equipo, logo, etc."
+          placeholder="Ej: Champions League, Parche Campeón, Liga Profesional, etc."
           value={parcheRaw}
           onChange={(e) => {
-            // Recortar a 200 chars para proteger contra payloads XSS por longitud
+            // Recortar a 200 chars para proteger contra payloads por longitud
             setParcheRaw(e.target.value.slice(0, 200));
           }}
           className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/60"
@@ -308,7 +400,7 @@ function JerseyProductUI({
           </p>
         )}
         <p className="mt-0.5 text-[10px] text-muted-foreground/70">
-          Máx. 200 caracteres. El texto se enviará por WhatsApp y en la confirmación de tu pedido.
+          Máx. 200 caracteres. Este texto se incluirá en tu orden y en el email de compra/venta.
         </p>
       </div>
 
@@ -330,7 +422,7 @@ function JerseyProductUI({
           <div className="flex flex-col gap-px bg-border">
             {tiers.map((tier, i) => {
               const isSelected = i === tierIdx;
-              const arsUnit = usdRate > 0 ? Math.round(tier.unitUsd * usdRate) : null;
+              const arsUnit = usdRate > 0 ? Math.round(tier.unitUsd * usdRate) + extraSizeArs : null;
               const arsTotal = arsUnit !== null ? arsUnit * tier.qty : null;
               return (
                 <button
@@ -391,19 +483,42 @@ function JerseyProductUI({
         </div>
       )}
 
-      {/* ── CTA WhatsApp ── */}
-      <button
-        type="button"
-        id="btn-jersey-whatsapp"
-        onClick={handleWhatsApp}
-        className="btn-base w-full bg-whatsapp text-whatsapp-foreground flex items-center justify-center gap-2 font-semibold"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-        </svg>
-        Consultar por WhatsApp
-      </button>
-      <p className="text-center text-xs text-muted-foreground -mt-2">
+      {/* ── Acciones de Compra y Contacto ── */}
+      <div className="flex flex-col gap-2.5">
+        {/* Comprar ya */}
+        <button
+          type="button"
+          id="btn-jersey-comprar-ya"
+          onClick={handleBuyNow}
+          className="btn-base w-full grad-urgente text-primary-foreground font-semibold hover:shadow-md transition-all text-base py-3"
+        >
+          {selectedTalle ? "Comprar ya" : "Elegí tu talle para comprar"}
+        </button>
+
+        {/* Agregar al carrito */}
+        <button
+          type="button"
+          id="btn-jersey-add-cart"
+          onClick={handleAddToCart}
+          className="btn-base w-full border border-primary text-primary hover:bg-primary/10 font-semibold transition py-2.5"
+        >
+          {addedToCart ? "✓ ¡Agregado al carrito!" : "🛒 Agregar al carrito"}
+        </button>
+
+        {/* CTA WhatsApp */}
+        <button
+          type="button"
+          id="btn-jersey-whatsapp"
+          onClick={handleWhatsApp}
+          className="btn-base w-full bg-whatsapp text-whatsapp-foreground flex items-center justify-center gap-2 font-semibold hover:opacity-90 transition-opacity py-2.5"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+          </svg>
+          Consultar / Pedir por WhatsApp
+        </button>
+      </div>
+      <p className="text-center text-xs text-muted-foreground -mt-3">
         Te confirmamos disponibilidad y precio final en ARS.
       </p>
     </div>
@@ -660,7 +775,7 @@ function ProductoPage() {
   const [talleError, setTalleError] = useState(false);
 
   // Detección de categoría camisetas
-  const isCamisetaProd = isCamiseta(product?.categoria);
+  const isCamisetaProd = isCamiseta(product?.categoria, product?.nombre);
 
   if (!product) {
     return (
@@ -860,7 +975,7 @@ function ProductoPage() {
               {displayName}
             </h1>
 
-            {(consultar || (waOnlyReason && (WA_ONLY_CONFIG[waOnlyReason]?.hidePrice || unit <= 0)) || unit <= 0) ? (
+            {!isCamisetaProd && ((consultar || (waOnlyReason && (WA_ONLY_CONFIG[waOnlyReason]?.hidePrice || unit <= 0)) || unit <= 0) ? (
               <p className="mt-4 text-sm font-semibold text-muted-foreground">
                 Consultá el precio y disponibilidad por WhatsApp.
               </p>
@@ -1063,7 +1178,7 @@ function ProductoPage() {
                   return null;
                 })()}
               </>
-            )}
+            ))}
 
             {/* ── Bloque estándar de colores/talle/cantidad: solo para productos NO camiseta ── */}
             {!isCamisetaProd && !consultar && !waOnlyReason && usesColors && (
@@ -1143,10 +1258,10 @@ function ProductoPage() {
             )}
 
             {/* ── UI especial Camisetas ── */}
-            {isCamisetaProd && !consultar && !waOnlyReason && (
+            {isCamisetaProd && (
               <div className="mt-6">
                 <JerseyProductUI
-                  productName={product.nombre ?? "Camiseta"}
+                  product={product}
                   talles={availableTalles.length > 0 ? availableTalles : ["S", "M", "L", "XL", "XXL", "3XL", "4XL"]}
                   config={config}
                 />
