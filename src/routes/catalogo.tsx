@@ -6,7 +6,16 @@ import { Search, ArrowDownUp, X, Loader2 } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
-import { categoriesOf, isYes, priceOf } from "@/lib/store";
+import {
+  categoriesOf,
+  isYes,
+  priceOf,
+  isCamiseta,
+  isLongSleeve,
+  JERSEY_FAN_TIERS,
+  JERSEY_FAN_ML_TIERS,
+  type Product,
+} from "@/lib/store";
 
 type Sort = "destacado" | "precio_asc" | "precio_desc" | "nombre";
 
@@ -110,16 +119,26 @@ function Catalogo() {
       return true;
     });
 
+    const usdRate = Number(config?.["dolar_cotizacion"] ?? 0);
+    const getSortPrice = (p: Product) => {
+      if (isCamiseta(p.categoria, p.nombre) && usdRate > 0) {
+        const isML = isLongSleeve(p.nombre);
+        const tiers = isML ? JERSEY_FAN_ML_TIERS : JERSEY_FAN_TIERS;
+        return Math.round(tiers[0].unitUsd * 1.07 * usdRate);
+      }
+      return priceOf(p);
+    };
+
     return [...filtered].sort((a, b) => {
-      if (sort === "precio_asc") return priceOf(a) - priceOf(b);
-      if (sort === "precio_desc") return priceOf(b) - priceOf(a);
+      if (sort === "precio_asc") return getSortPrice(a) - getSortPrice(b);
+      if (sort === "precio_desc") return getSortPrice(b) - getSortPrice(a);
       if (sort === "nombre") return (a.nombre ?? "").localeCompare(b.nombre ?? "");
       // "destacado": ordena por ventas semanales reales, luego por flag destacado como desempate
       const ventasB = (b.ventas_semana ?? 0) - (a.ventas_semana ?? 0);
       if (ventasB !== 0) return ventasB;
       return (isYes(b.destacado) ? 1 : 0) - (isYes(a.destacado) ? 1 : 0);
     });
-  }, [products, search, cat, sort, onlyTop, onlyOffers]);
+  }, [products, search, cat, sort, onlyTop, onlyOffers, config]);
 
   const visibleProducts = useMemo(() => {
     return list.slice(0, visibleCount);

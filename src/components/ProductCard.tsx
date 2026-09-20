@@ -18,14 +18,23 @@ import {
   toNumber,
   waLink,
   isCamiseta,
+  isLongSleeve,
+  JERSEY_FAN_TIERS,
+  JERSEY_FAN_ML_TIERS,
 } from "@/lib/store";
 import type { Product, SiteConfig } from "@/lib/store";
 
 export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) {
   const isCamisetaProd = isCamiseta(p.categoria, p.nombre);
+  const isML = isCamisetaProd && isLongSleeve(p.nombre);
   const usdRate = Number(config?.["dolar_cotizacion"] ?? 0);
-  const minJerseyArs = usdRate > 0 ? Math.round(12 * 1.07 * usdRate) : null;
-  const baseJerseyArs = usdRate > 0 ? Math.round(18.5 * 1.07 * usdRate) : null;
+
+  const fanTiers = isML ? JERSEY_FAN_ML_TIERS : JERSEY_FAN_TIERS;
+  const minJerseyUsd = fanTiers[fanTiers.length - 1]?.unitUsd ?? (isML ? 16 : 12);
+  const baseJerseyUsd = fanTiers[0]?.unitUsd ?? (isML ? 22.5 : 18.5);
+
+  const minJerseyArs = usdRate > 0 ? Math.round(minJerseyUsd * 1.07 * usdRate) : null;
+  const baseJerseyArs = usdRate > 0 ? Math.round(baseJerseyUsd * 1.07 * usdRate) : null;
 
   const offer = hasOffer(p);
   const offerPct = offer ? offerDiscountPct(p) : 0;
@@ -94,6 +103,11 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
                   <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
                     Mayorista
                   </span>
+                  {isML && (
+                    <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                      Manga Larga
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   {baseJerseyArs ? `10 u. a ${money(baseJerseyArs)} c/u` : "Venta desde 10 u."}

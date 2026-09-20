@@ -3749,6 +3749,8 @@ function AdminProductosPage() {
                           {paginatedFiltered.map((p) => {
                             const pid = String(p.id ?? "");
                             const isOffer = String(p.oferta ?? "").trim().toUpperCase() === "SI";
+                            const isCamisetaProd = isCamiseta(p.categoria, p.nombre);
+                            const isML = isCamisetaProd && isLongSleeve(p.nombre);
                             const effPrice = priceOf(p);
                             const origPrice = originalPriceOf(p);
                             const isDiscounted = isOffer && origPrice > effPrice && effPrice > 0;
@@ -3789,6 +3791,11 @@ function AdminProductosPage() {
                                             <Flame className="h-3 w-3 fill-primary" /> Oferta
                                           </span>
                                         )}
+                                        {isML && (
+                                          <span className="rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 text-[10px] font-bold border border-amber-500/30 shrink-0">
+                                            🧤 Manga Larga
+                                          </span>
+                                        )}
                                       </div>
 
                                       {/* Precio en Celular */}
@@ -3797,6 +3804,11 @@ function AdminProductosPage() {
                                           <span className="flex items-center gap-1">
                                             <span>{money(effPrice)}</span>
                                             <span className="line-through text-[10px] text-muted-foreground font-normal">{money(origPrice)}</span>
+                                          </span>
+                                        ) : isCamisetaProd && effPrice <= 0 ? (
+                                          <span className="flex items-center gap-1">
+                                            <span>{dolarRate > 0 ? money(Math.round((isML ? 22.5 : 18.5) * 1.07 * dolarRate)) : `u$d ${isML ? "22.50" : "18.50"}`}</span>
+                                            <span className="text-[10px] text-muted-foreground font-normal">({isML ? "Manga Larga" : "Mayorista"})</span>
                                           </span>
                                         ) : (
                                           <span>{money(origPrice || effPrice)}</span>
@@ -3836,6 +3848,10 @@ function AdminProductosPage() {
                                             <span className="font-semibold text-foreground text-xs underline decoration-dotted decoration-primary/50 group-hover/pb:text-primary">
                                               {bCurr === "ARS" ? money(bVal) : `u$d ${bVal.toFixed(2)}`}
                                             </span>
+                                          ) : isCamisetaProd ? (
+                                            <span className="font-semibold text-foreground text-xs underline decoration-dotted decoration-primary/50 group-hover/pb:text-primary">
+                                              u$d {isML ? "22.50" : "18.50"}
+                                            </span>
                                           ) : (
                                             <span className="text-[11px] text-muted-foreground/80 italic group-hover/pb:text-primary">
                                               Sin base
@@ -3850,6 +3866,13 @@ function AdminProductosPage() {
                                       <div className="flex flex-col items-end">
                                         <span className="font-bold text-primary">{money(effPrice)}</span>
                                         <span className="line-through text-[11px] text-muted-foreground">{money(origPrice)}</span>
+                                      </div>
+                                    ) : isCamisetaProd && effPrice <= 0 ? (
+                                      <div className="flex flex-col items-end">
+                                        <span className="font-bold text-foreground text-xs">
+                                          {dolarRate > 0 ? money(Math.round((isML ? 22.5 : 18.5) * 1.07 * dolarRate)) : `u$d ${isML ? "22.50" : "18.50"}`}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground">Escala {isML ? "Manga Larga" : "Mayorista"}</span>
                                       </div>
                                     ) : (
                                       money(origPrice || effPrice)
