@@ -201,6 +201,7 @@ function JerseyProductUI({
   }
 
   function handleBuyNow() {
+    if (qty < 10) return; // mínimo 10 unidades
     const talleToUse = selectedTalle || talles[0] || "S";
     if (!selectedTalle) {
       setSelectedTalle(talleToUse);
@@ -597,22 +598,45 @@ function JerseyProductUI({
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
+          {/* Aviso de mínimo cuando qty < 10 */}
+          {qty < 10 && (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs">
+              <p className="font-bold text-destructive">⚠️ Mínimo 10 unidades</p>
+              <p className="mt-0.5 text-muted-foreground">
+                Llevás {qty} {qty === 1 ? "unidad" : "unidades"}. Necesitás al menos {10 - qty} más para poder comprar.
+              </p>
+            </div>
+          )}
+
           {/* Comprar ya */}
           <button
             type="button"
             id="btn-jersey-comprar-ya"
+            disabled={qty < 10}
             onClick={handleBuyNow}
-            className="btn-base w-full grad-urgente text-primary-foreground font-semibold hover:shadow-md transition-all text-base py-3"
+            className={`btn-base w-full font-semibold transition-all text-base py-3 ${
+              qty < 10
+                ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground border border-border"
+                : "grad-urgente text-primary-foreground hover:shadow-md"
+            }`}
           >
-            Comprar ya ({qty} u. — ${(totalArs ?? 0).toLocaleString("es-AR")})
+            {qty < 10
+              ? `Mínimo 10 unidades para comprar (tenés ${qty})`
+              : `Comprar ya (${qty} u. — $${(totalArs ?? 0).toLocaleString("es-AR")})`
+            }
           </button>
 
           {/* Agregar al carrito */}
           <button
             type="button"
             id="btn-jersey-add-cart"
-            onClick={handleAddToCart}
-            className="btn-base w-full border border-primary text-primary hover:bg-primary/10 font-semibold transition py-2.5"
+            disabled={qty < 10}
+            onClick={qty < 10 ? undefined : handleAddToCart}
+            className={`btn-base w-full font-semibold transition py-2.5 ${
+              qty < 10
+                ? "opacity-40 cursor-not-allowed border border-border text-muted-foreground"
+                : "border border-primary text-primary hover:bg-primary/10"
+            }`}
           >
             {addedToCart ? "✓ ¡Agregado al carrito!" : `🛒 Agregar al carrito (${qty} u.)`}
           </button>
