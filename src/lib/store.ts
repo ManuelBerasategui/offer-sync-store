@@ -363,7 +363,7 @@ const slug = (v?: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-/** Busca el producto por id (tolerando espacios y formato compuesto id:var:talle) o por nombre. */
+/** Busca el producto por id (tolerando espacios y formato compuesto id:var:talle o id-var-talle) o por nombre. */
 export function findProduct(products: Product[], key: string) {
   const rawKey = String(key ?? "").trim();
   if (!rawKey) return undefined;
@@ -372,6 +372,7 @@ export function findProduct(products: Product[], key: string) {
   return (
     products.find((p) => String(p.id ?? "").trim() === rawKey) ??
     products.find((p) => String(p.id ?? "").trim() === baseId) ??
+    products.find((p) => p.id && rawKey.startsWith(`${p.id}-`)) ??
     products.find((p) => slug(p.id) === slug(baseId)) ??
     products.find((p) => slug(p.nombre) === slug(rawKey)) ??
     products.find((p) => slug(p.nombre) === slug(cleanName)) ??

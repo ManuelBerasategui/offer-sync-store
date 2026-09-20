@@ -190,7 +190,12 @@ function CarritoPage() {
   // Garantizar que la categoría y la imagen estén resueltas para cada ítem (usando el producto o banner como fallback)
   const cartItemsWithCat = useMemo(() => {
     return cart.items.map((i) => {
-      const prod = findProduct(products, i.productId || i.id || i.nombre);
+      const prod =
+        (i.productId ? findProduct(products, i.productId) : undefined) ??
+        findProduct(products, i.id) ??
+        findProduct(products, i.nombre) ??
+        products.find((p) => i.id && String(i.id).startsWith(String(p.id) + "-")) ??
+        products.find((p) => i.nombre && p.nombre && i.nombre.toLowerCase().startsWith(p.nombre.toLowerCase()));
       const cat = i.categoria || prod?.categoria || "";
       const isCombo = i.id.startsWith("combo-");
       const rawComboIdx = isCombo ? i.id.replace("combo-", "") : null;
@@ -213,7 +218,9 @@ function CarritoPage() {
   const catRules = parseCategoryRules(config);
   const matesRuleMatch = findRuleForCat(normCat("Mates"), catRules);
   const matesUnits = cartItemsWithCat.reduce((sum, item) => {
-    const prod = item.productId ? findProduct(products, item.productId) : undefined;
+    const prod = item.productId
+      ? findProduct(products, item.productId)
+      : (findProduct(products, item.id) ?? findProduct(products, item.nombre));
     const mg = prod ? moqGroupOf(prod as Record<string, unknown>) : null;
     return sum + (mg === "mates" ? item.qty : 0);
   }, 0);
@@ -227,7 +234,9 @@ function CarritoPage() {
       if (i.id.startsWith("combo-")) {
         return { nombre: i.nombre, categoria: i.categoria, moq_group: "none", qty: i.qty, unitPrice: i.unitPrice };
       }
-      const prod = i.productId ? findProduct(products, i.productId) : undefined;
+      const prod = i.productId
+        ? findProduct(products, i.productId)
+        : (findProduct(products, i.id) ?? findProduct(products, i.nombre));
       const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
       return { nombre: i.nombre, categoria: i.categoria, moq_group, qty: i.qty, unitPrice: i.unitPrice };
     }),
@@ -274,7 +283,12 @@ function CarritoPage() {
           <>
             <ul className="mt-6 divide-y divide-border rounded-xl border border-border bg-card">
               {cartItemsWithCat.map((i) => {
-                const prod = findProduct(products, i.productId || i.id || i.nombre);
+                const prod =
+                  (i.productId ? findProduct(products, i.productId) : undefined) ??
+                  findProduct(products, i.id) ??
+                  findProduct(products, i.nombre) ??
+                  products.find((p) => i.id && String(i.id).startsWith(String(p.id) + "-")) ??
+                  products.find((p) => i.nombre && p.nombre && i.nombre.toLowerCase().startsWith(p.nombre.toLowerCase()));
                 const isSupp = isSuplemento(i.categoria, i.nombre);
                 const isCombo = i.id.startsWith("combo-");
                 const rawComboIndex = isCombo ? i.id.replace("combo-", "") : null;

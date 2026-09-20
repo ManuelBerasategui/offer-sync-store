@@ -52,6 +52,7 @@ import {
   categoryDiscountForUnits,
   checkCategoryMins,
   isCamiseta,
+  type Product,
   type ProductVariant,
   type SiteConfig,
 } from "@/lib/store";
@@ -143,16 +144,16 @@ function JerseyProductUI({
   // Tipo de cambio USD→ARS desde la clave real del config en Supabase
   const usdRate = Number(config["dolar_cotizacion"] ?? 0);
 
-  // Aumento por badge (+1 USD por unidad convertido a ARS)
-  const badgeExtraArs = badge === "yes" ? (usdRate > 0 ? Math.round(1 * usdRate) : 0) : 0;
+  // Aumento por badge (+1 USD por unidad convertido a ARS) con recargo del 7% (+7% estándar de la tienda)
+  const badgeExtraArs = badge === "yes" ? (usdRate > 0 ? Math.round(1 * 1.07 * usdRate) : 0) : 0;
 
-  // Costo adicional por talle extra (3XL / 4XL) (+1 USD por unidad convertido a ARS)
+  // Costo adicional por talle extra (3XL / 4XL) (+1 USD por unidad convertido a ARS) con recargo del 7%
   const isExtraSize = selectedTalle === "3XL" || selectedTalle === "4XL";
-  const extraSizeArs = isExtraSize ? (usdRate > 0 ? Math.round(1 * usdRate) : 0) : 0;
+  const extraSizeArs = isExtraSize ? (usdRate > 0 ? Math.round(1 * 1.07 * usdRate) : 0) : 0;
 
-  // Precio unitario final en ARS con todos los extras aplicados
+  // Precio unitario final en ARS con todos los extras aplicados (+7% estándar de lista de la tienda)
   const unitArs = usdRate > 0
-    ? Math.round(activeTier.unitUsd * usdRate) + extraSizeArs + badgeExtraArs
+    ? Math.round(activeTier.unitUsd * 1.07 * usdRate) + extraSizeArs + badgeExtraArs
     : null;
 
   // Total final para la cantidad exacta solicitada
@@ -213,6 +214,7 @@ function JerseyProductUI({
     }
     cart.add({
       id: `${product.id}-${version}-${selectedTalle}-${badge}-${encodeURIComponent(parcheClean || "base")}`,
+      productId: String(product.id),
       nombre: fullItemName,
       unitPrice: unitArs ?? 0,
       basePrice: unitArs ?? 0,
@@ -382,7 +384,7 @@ function JerseyProductUI({
         </div>
         {badge === "yes" && (
           <div className="mt-2 flex items-center gap-2 text-xs">
-            <span className="text-emerald-600 font-semibold">✓ Badge seleccionado (+{usdRate > 0 ? money(Math.round(usdRate)) : "US$1.00"} c/u)</span>
+            <span className="text-emerald-600 font-semibold">✓ Badge seleccionado (+{usdRate > 0 ? money(Math.round(1 * 1.07 * usdRate)) : "US$1.00"} c/u)</span>
             <button
               type="button"
               onClick={handleBadgeWhatsApp}
@@ -518,7 +520,7 @@ function JerseyProductUI({
           <div className="flex flex-col gap-px bg-border">
             {tiers.map((tier) => {
               const isTierActive = activeTier.qty === tier.qty;
-              const arsBaseUnit = usdRate > 0 ? Math.round(tier.unitUsd * usdRate) : null;
+              const arsBaseUnit = usdRate > 0 ? Math.round(tier.unitUsd * 1.07 * usdRate) : null;
               const arsUnitWithExtras = arsBaseUnit !== null ? arsBaseUnit + extraSizeArs + badgeExtraArs : null;
               const arsTotalForTier = arsUnitWithExtras !== null ? arsUnitWithExtras * tier.qty : null;
               return (

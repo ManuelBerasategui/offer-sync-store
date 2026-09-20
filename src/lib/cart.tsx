@@ -13,6 +13,7 @@ import {
   categoryDiscountForUnits,
   findRuleForCat,
   normCat,
+  isCamiseta,
   type ComboQuantityTier,
 } from "./store";
 
@@ -249,8 +250,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return { ...item, basePrice: rBase, unitPrice: rBase };
       }
 
-      const product = findProduct(products, item.productId || item.id || item.nombre);
+      if (isCamiseta(item.categoria, item.nombre)) return item;
+
+      const product =
+        (item.productId ? findProduct(products, item.productId) : undefined) ??
+        findProduct(products, item.id) ??
+        findProduct(products, item.nombre) ??
+        products.find((p) => item.id && String(item.id).startsWith(String(p.id) + "-")) ??
+        products.find((p) => item.nombre && p.nombre && item.nombre.toLowerCase().startsWith(p.nombre.toLowerCase()));
       if (!product) return item;
+
+      if (isCamiseta(product.categoria, product.nombre)) return item;
 
       const catNorm = normCat(item.categoria ?? "");
       const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;

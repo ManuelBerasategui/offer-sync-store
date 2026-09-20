@@ -24,8 +24,8 @@ import type { Product, SiteConfig } from "@/lib/store";
 export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) {
   const isCamisetaProd = isCamiseta(p.categoria, p.nombre);
   const usdRate = Number(config?.["dolar_cotizacion"] ?? 0);
-  const minJerseyArs = usdRate > 0 ? Math.round(12 * usdRate) : null;
-  const baseJerseyArs = usdRate > 0 ? Math.round(18.5 * usdRate) : null;
+  const minJerseyArs = usdRate > 0 ? Math.round(12 * 1.07 * usdRate) : null;
+  const baseJerseyArs = usdRate > 0 ? Math.round(18.5 * 1.07 * usdRate) : null;
 
   const offer = hasOffer(p);
   const offerPct = offer ? offerDiscountPct(p) : 0;
