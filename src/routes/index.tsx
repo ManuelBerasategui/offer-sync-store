@@ -414,6 +414,7 @@ function Home() {
           { key: "perfumes disenador", label: "Perfumes Diseñador", defaultDesc: "3 unidades", icon: "💎" },
           { key: "bazar", label: "Bazar", defaultDesc: "5 unidades", icon: "🏪" },
           { key: "mates", label: "Mates", defaultDesc: "10 unidades", icon: "🧉" },
+          { key: "camisetas", label: "Camisetas", defaultDesc: "10 unidades", icon: "👕" },
           { key: "suplementos", label: "Suplementación", defaultDesc: "$250.000", icon: "⚡" },
           { key: "zapatillas", label: "Zapatillas", defaultDesc: "3 unidades", icon: "👟" },
         ];
@@ -462,7 +463,7 @@ function Home() {
                     Para ciertas categorías aplicamos un mínimo de compra. Podés combinar productos de la misma categoría para llegar al mínimo.
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-4">
                   {minItems.map((it) => (
                     <div key={it.label} className="flex items-center gap-2.5 rounded-xl border border-border bg-card/70 px-3 py-2.5 shadow-2xs">
                       <span className="text-xl shrink-0">{it.icon}</span>

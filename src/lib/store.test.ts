@@ -10,6 +10,7 @@ import {
   sanitizeImageUrl,
   galleryImages,
   waOnlyReasonOf,
+  normCat,
 } from "./store";
 
 /* ══════════════════════════════════════════════════════════════════
@@ -590,5 +591,55 @@ describe("waOnlyReasonOf with Yupoo and custom categories", () => {
       precio: 25000,
     };
     expect(waOnlyReasonOf(normalProduct)).toBeNull();
+  });
+});
+
+describe("checkCategoryMins & hasMoq — Camisetas mínimo 10 unidades", () => {
+  const rules = parseCategoryRules({});
+
+  it("parseCategoryRules includes default 10 units minimum for camisetas", () => {
+    expect(rules["camisetas"]).toBeDefined();
+    expect(rules["camisetas"]!.minUnits).toBe(10);
+  });
+
+  it("normCat normalizes 'Camiseta' and 'Camisetas' to 'camisetas'", () => {
+    expect(normCat("Camiseta")).toBe("camisetas");
+    expect(normCat("Camisetas")).toBe("camisetas");
+    expect(normCat("CAMISETA")).toBe("camisetas");
+  });
+
+  it("hasMoq detects 10 units minimum for camisetas by category or name", () => {
+    const p1 = makeProduct("Camiseta Argentina 2024", "Camisetas");
+    const info1 = hasMoq(p1, rules);
+    expect(info1).not.toBeNull();
+    expect(info1!.group).toBe("camisetas");
+    expect(info1!.minUnits).toBe(10);
+
+    const p2 = makeProduct("Camiseta Real Madrid", "Indumentaria");
+    const info2 = hasMoq(p2, rules);
+    expect(info2).not.toBeNull();
+    expect(info2!.group).toBe("camisetas");
+    expect(info2!.minUnits).toBe(10);
+  });
+
+  it("checkCategoryMins generates violation when camisetas total < 10", () => {
+    const items = [
+      item("Camiseta Boca 2024", "Camisetas", 4, 25000),
+      item("Camiseta River 2024", "Camisetas", 3, 25000),
+    ];
+    const v = checkCategoryMins(items, rules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.category).toBe("Camisetas");
+    expect(v[0]!.min).toBe(10);
+    expect(v[0]!.current).toBe(7);
+  });
+
+  it("checkCategoryMins passes when camisetas total >= 10 (surtido)", () => {
+    const items = [
+      item("Camiseta Boca 2024", "Camisetas", 6, 25000),
+      item("Camiseta River 2024", "Camisetas", 4, 25000),
+    ];
+    const v = checkCategoryMins(items, rules);
+    expect(v).toHaveLength(0);
   });
 });

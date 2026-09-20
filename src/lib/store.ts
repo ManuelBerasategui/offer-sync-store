@@ -507,6 +507,7 @@ export const normCat = (s: string) => {
     return "perfumes disenador";
   if (norm === "mate") return "mates";
   if (norm === "zapatilla") return "zapatillas";
+  if (norm === "camiseta" || norm === "camisetas") return "camisetas";
   return norm;
 };
 
@@ -625,6 +626,17 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     rules["zapatillas"] = {
       ...rules["zapatillas"],
       minUnits: 3,
+    };
+  }
+
+  // 8. Camisetas: mínimo 10 unidades
+  if (!rules["camisetas"]?.minUnits) {
+    rules["camisetas"] = {
+      ...rules["camisetas"],
+      minUnits: 10,
+      discountTiers: rules["camisetas"]?.discountTiers?.length
+        ? rules["camisetas"].discountTiers
+        : [],
     };
   }
 
@@ -747,6 +759,12 @@ export function hasMoq(
       return { group: "mates", minUnits: matesRule.minUnits, minAmount: matesRule.minAmount };
     }
   }
+  if (isCamiseta(categoria, nombre)) {
+    const camisetasRule = catRules["camisetas"];
+    if (camisetasRule && (camisetasRule.minUnits || camisetasRule.minAmount)) {
+      return { group: "camisetas", minUnits: camisetasRule.minUnits, minAmount: camisetasRule.minAmount };
+    }
+  }
   const catNorm = normCat(categoria);
   if (!catNorm) return null;
   const match = findRuleForCat(catNorm, catRules);
@@ -816,6 +834,11 @@ export function checkCategoryMins(
         const matesRule = rules["mates"];
         if (matesRule && (matesRule.minUnits || matesRule.minAmount)) {
           minRuleKey = "mates";
+        }
+      } else if (isCamiseta(item.categoria, item.nombre)) {
+        const camisetasRule = rules["camisetas"];
+        if (camisetasRule && (camisetasRule.minUnits || camisetasRule.minAmount)) {
+          minRuleKey = "camisetas";
         }
       }
 
