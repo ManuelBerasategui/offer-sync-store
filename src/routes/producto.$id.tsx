@@ -116,7 +116,8 @@ function JerseyProductUI({
 }) {
   const productName = product.nombre ?? "Camiseta";
   const cart = useCart();
-  const [selectedTalle, setSelectedTalle] = useState("");
+  const navigate = useNavigate();
+  const [selectedTalle, setSelectedTalle] = useState(talles[0] ?? "S");
   const [talleError, setTalleError] = useState(false);
   const [version, setVersion] = useState<"fan" | "player">("fan");
   const [badge, setBadge] = useState<"no" | "yes">("no");
@@ -179,7 +180,7 @@ function JerseyProductUI({
 
   /** Arma el mensaje de WhatsApp con todos los datos del pedido */
   function buildWaMessage() {
-    const talleStr = selectedTalle || "(sin talle seleccionado)";
+    const talleStr = selectedTalle || talles[0] || "S";
     const versionStr = version === "player" ? "Jugador (Customized Name & Number)" : "Fan (NO Name & Number)";
     const badgeStr = badge === "yes" ? "Sí (con badge +1 USD)" : "No";
     const qtyStr = String(qty);
@@ -190,9 +191,9 @@ function JerseyProductUI({
   }
 
   function handleWhatsApp() {
+    const talleToUse = selectedTalle || talles[0] || "S";
     if (!selectedTalle) {
-      setTalleError(true);
-      return;
+      setSelectedTalle(talleToUse);
     }
     const msg = buildWaMessage();
     const href = sanitizeUrl(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
@@ -200,30 +201,33 @@ function JerseyProductUI({
   }
 
   function handleBuyNow() {
+    const talleToUse = selectedTalle || talles[0] || "S";
     if (!selectedTalle) {
-      setTalleError(true);
-      return;
+      setSelectedTalle(talleToUse);
     }
     setShowCheckout(true);
   }
 
   function handleAddToCart() {
+    const talleToUse = selectedTalle || talles[0] || "S";
     if (!selectedTalle) {
-      setTalleError(true);
-      return;
+      setSelectedTalle(talleToUse);
     }
+    const currentQty = Math.max(10, parseInt(qtyStr, 10) || qty || 10);
+    const fullItem = `${productName} (Talle: ${talleToUse} - ${version === "player" ? "Versión Jugador (Customized Name & Number)" : "Versión Fan"}${badge === "yes" ? " - Con Badge" : ""}${parcheClean ? ` - Parche: ${parcheClean}` : ""})`;
+
     cart.add({
-      id: `${product.id}-${version}-${selectedTalle}-${badge}-${encodeURIComponent(parcheClean || "base")}`,
+      id: `${product.id}-${version}-${talleToUse}-${badge}-${encodeURIComponent(parcheClean || "base")}`,
       productId: String(product.id),
-      nombre: fullItemName,
+      nombre: fullItem,
       unitPrice: unitArs ?? 0,
       basePrice: unitArs ?? 0,
-      qty: qty,
+      qty: currentQty,
       imagen: product.imagen_url ? imageUrl(product.imagen_url) : undefined,
       categoria: product.categoria ?? "Camisetas",
     });
     setAddedToCart(true);
-    setTimeout(() => setAddedToCart(false), 3000);
+    void navigate({ to: "/carrito" });
   }
 
   if (showCheckout) {
