@@ -51,8 +51,307 @@ import {
   transferDiscountPct,
   categoryDiscountForUnits,
   checkCategoryMins,
+  isCamiseta,
   type ProductVariant,
+  type SiteConfig,
 } from "@/lib/store";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JERSEY PRODUCT UI — UI especial para categoría Camisetas
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Tramos de precio para Versión Jugador (Customized Name & Number). Precios en USD. */
+const JERSEY_PLAYER_TIERS = [
+  { qty: 10,  unitUsd: 20.50 },
+  { qty: 20,  unitUsd: 19.75 },
+  { qty: 50,  unitUsd: 19.00 },
+  { qty: 80,  unitUsd: 16.75 },
+  { qty: 100, unitUsd: 16.00 },
+  { qty: 250, unitUsd: 15.50 },
+  { qty: 500, unitUsd: 14.00 },
+];
+
+/** Tramos de precio para Versión Fan (NO Name & Number). Precios en USD. */
+const JERSEY_FAN_TIERS = [
+  { qty: 10,  unitUsd: 18.50 },
+  { qty: 20,  unitUsd: 17.75 },
+  { qty: 50,  unitUsd: 17.00 },
+  { qty: 80,  unitUsd: 14.75 },
+  { qty: 100, unitUsd: 14.00 },
+  { qty: 250, unitUsd: 13.50 },
+  { qty: 500, unitUsd: 12.00 },
+];
+
+function JerseyProductUI({
+  productName,
+  talles,
+  config,
+  waPhoneOverride,
+}: {
+  productName: string;
+  talles: string[];
+  config: SiteConfig;
+  waPhoneOverride?: string;
+}) {
+  const [selectedTalle, setSelectedTalle] = useState("");
+  const [talleError, setTalleError] = useState(false);
+  const [version, setVersion] = useState<"fan" | "player">("fan");
+  const [badge, setBadge] = useState<"no" | "yes">("no");
+  const [tierIdx, setTierIdx] = useState(0);
+
+  const tiers = version === "player" ? JERSEY_PLAYER_TIERS : JERSEY_FAN_TIERS;
+  const selectedTier = tiers[tierIdx] ?? tiers[0]!;
+
+  // Obtener tipo de cambio USD desde config si está disponible, si no default
+  const usdRate = Number(config["usd_rate"] ?? config["tipo_cambio_usd"] ?? 0);
+
+  const unitArs = usdRate > 0
+    ? Math.round(selectedTier.unitUsd * usdRate)
+    : null;
+
+  const totalArs = unitArs !== null ? unitArs * selectedTier.qty : null;
+
+  // Armar mensaje de WhatsApp
+  function buildWaMessage() {
+    const talleStr = selectedTalle || "(sin talle seleccionado)";
+    const versionStr = version === "player" ? "Jugador (Customized Name & Number)" : "Fan (NO Name & Number)";
+    const badgeStr = badge === "yes" ? "Sí" : "No";
+    const qtyStr = String(selectedTier.qty);
+    const priceStr = unitArs !== null ? ` — $${unitArs.toLocaleString("es-AR")} c/u` : "";
+    return `Hola! Quiero hacer un pedido de camisetas:\n🏷️ Producto: ${productName}\n📐 Talle: ${talleStr}\n⚽ Versión: ${versionStr}\n🏅 Badge: ${badgeStr}\n📦 Cantidad: ${qtyStr} unidades${priceStr}`;
+  }
+
+  function handleWhatsApp() {
+    if (!selectedTalle) {
+      setTalleError(true);
+      return;
+    }
+    const msg = buildWaMessage();
+    const phone = (config["whatsapp_individual"] ?? "").replace(/\D/g, "");
+    const href = sanitizeUrl(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
+    if (href) window.open(href, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* ── Selector de Talle ── */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+            Size *
+          </label>
+          {selectedTalle && (
+            <span className="text-xs font-bold text-emerald-600">Talle: {selectedTalle}</span>
+          )}
+        </div>
+        {talles.length === 0 ? (
+          <p className="text-xs font-semibold text-destructive">Sin talles disponibles en este momento.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {talles.map((t) => {
+              const isXtra = t === "3XL" || t === "4XL";
+              const isSelected = selectedTalle === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => { setSelectedTalle(t); setTalleError(false); }}
+                  className={[
+                    "h-10 min-w-[52px] rounded-lg px-3 text-xs font-bold transition-all border",
+                    isSelected
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm scale-105"
+                      : "bg-background text-foreground border-border hover:border-primary/50",
+                    isXtra ? "pr-2" : "",
+                  ].join(" ")}
+                >
+                  {t}
+                  {isXtra && (
+                    <span className="ml-1 text-[10px] font-normal text-red-500">(+US$1.00)</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {talleError && (
+          <p className="mt-2 text-xs font-semibold text-destructive">⚠️ Por favor elegí tu talle antes de continuar.</p>
+        )}
+      </div>
+
+      {/* ── Selector Name & Number ── */}
+      <div>
+        <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
+          Name and Number
+        </label>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            id="jersey-version-fan"
+            onClick={() => { setVersion("fan"); setTierIdx(0); }}
+            className={[
+              "w-full max-w-[280px] h-10 rounded-lg px-4 text-sm font-semibold border text-left transition-all",
+              version === "fan"
+                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                : "bg-background text-foreground border-border hover:border-primary/50",
+            ].join(" ")}
+          >
+            NO Name and Number
+          </button>
+          <button
+            type="button"
+            id="jersey-version-player"
+            onClick={() => { setVersion("player"); setTierIdx(0); }}
+            className={[
+              "w-full max-w-[280px] h-10 rounded-lg px-4 text-sm font-semibold border text-left transition-all",
+              version === "player"
+                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                : "bg-background text-foreground border-border hover:border-primary/50",
+            ].join(" ")}
+          >
+            Customized Name and Number
+          </button>
+        </div>
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          {version === "player"
+            ? "✏️ Versión Jugador — con nombre y número personalizado"
+            : "👕 Versión Fan — sin personalización"}
+        </p>
+      </div>
+
+      {/* ── Selector Badge ── */}
+      <div>
+        <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
+          Badge
+        </label>
+        <div className="flex gap-3">
+          {/* NO Badge */}
+          <button
+            type="button"
+            id="jersey-badge-no"
+            onClick={() => setBadge("no")}
+            className={[
+              "flex h-14 w-14 flex-col items-center justify-center rounded-xl border-2 text-[10px] font-bold transition-all",
+              badge === "no"
+                ? "border-primary bg-primary/10 text-primary shadow-sm"
+                : "border-border bg-background text-foreground hover:border-primary/50",
+            ].join(" ")}
+          >
+            <span className="text-lg">🚫</span>
+            <span className="mt-0.5 leading-tight text-center">NO<br/>Badge</span>
+          </button>
+          {/* Badge */}
+          <button
+            type="button"
+            id="jersey-badge-yes"
+            onClick={() => setBadge("yes")}
+            className={[
+              "flex h-14 items-center gap-2 rounded-xl border-2 px-3 text-sm font-bold transition-all",
+              badge === "yes"
+                ? "border-primary bg-primary/10 text-primary shadow-sm"
+                : "border-border bg-background text-foreground hover:border-primary/50",
+            ].join(" ")}
+          >
+            <span className="text-2xl">🏆</span>
+            <span className="text-[11px] text-red-500 font-bold">(+US$1.00)</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Selector de Cantidad / Tramos ── */}
+      <div>
+        <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
+          Cantidad
+        </label>
+        <div className="rounded-xl border border-border bg-surface overflow-hidden">
+          <div className="grid grid-cols-4 gap-px bg-border">
+            {["Cantidad", "Precio c/u (USD)", "ARS c/u", "Total ARS"].map((h) => (
+              <div key={h} className="bg-muted px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+                {h}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-px bg-border">
+            {tiers.map((tier, i) => {
+              const isSelected = i === tierIdx;
+              const arsUnit = usdRate > 0 ? Math.round(tier.unitUsd * usdRate) : null;
+              const arsTotal = arsUnit !== null ? arsUnit * tier.qty : null;
+              return (
+                <button
+                  key={tier.qty}
+                  type="button"
+                  id={`jersey-tier-${i}`}
+                  onClick={() => setTierIdx(i)}
+                  className={[
+                    "grid grid-cols-4 gap-0 text-left transition-all",
+                    isSelected
+                      ? "bg-primary/10 ring-1 ring-inset ring-primary"
+                      : "bg-background hover:bg-muted",
+                  ].join(" ")}
+                >
+                  <div className={`px-2 py-2 text-xs font-bold ${isSelected ? "text-primary" : "text-foreground"}`}>
+                    {tier.qty} u.
+                  </div>
+                  <div className={`px-2 py-2 text-xs tabular-nums ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
+                    ${tier.unitUsd.toFixed(2)}
+                  </div>
+                  <div className={`px-2 py-2 text-xs tabular-nums font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>
+                    {arsUnit !== null ? `$${arsUnit.toLocaleString("es-AR")}` : "—"}
+                  </div>
+                  <div className={`px-2 py-2 text-xs tabular-nums font-bold ${isSelected ? "text-primary" : "text-foreground"}`}>
+                    {arsTotal !== null ? `$${arsTotal.toLocaleString("es-AR")}` : "—"}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {usdRate <= 0 && (
+          <p className="mt-1.5 text-[11px] text-amber-600 font-semibold">
+            ⚠️ Tipo de cambio no configurado. Consultá el precio en ARS por WhatsApp.
+          </p>
+        )}
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          Seleccioná el tramo de cantidad que necesitás.
+        </p>
+      </div>
+
+      {/* ── Resumen seleccionado ── */}
+      {selectedTalle && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs">
+          <p className="font-bold text-primary text-sm mb-1">📋 Tu pedido:</p>
+          <ul className="space-y-0.5 text-foreground">
+            <li>• Talle: <span className="font-semibold">{selectedTalle}</span></li>
+            <li>• Versión: <span className="font-semibold">{version === "player" ? "Jugador (Customized Name & Number)" : "Fan (NO Name & Number)"}</span></li>
+            <li>• Badge: <span className="font-semibold">{badge === "yes" ? "Sí 🏆" : "No"}</span></li>
+            <li>• Cantidad: <span className="font-semibold">{selectedTier.qty} unidades</span></li>
+            {unitArs !== null && (
+              <li>• Precio c/u: <span className="font-bold text-primary">${unitArs.toLocaleString("es-AR")} ARS</span></li>
+            )}
+            {totalArs !== null && (
+              <li>• Total estimado: <span className="font-bold text-primary text-sm">${totalArs.toLocaleString("es-AR")} ARS</span></li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {/* ── CTA WhatsApp ── */}
+      <button
+        type="button"
+        id="btn-jersey-whatsapp"
+        onClick={handleWhatsApp}
+        className="btn-base w-full bg-whatsapp text-whatsapp-foreground flex items-center justify-center gap-2 font-semibold"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+        </svg>
+        Consultar por WhatsApp
+      </button>
+      <p className="text-center text-xs text-muted-foreground -mt-2">
+        Te vamos a confirmar disponibilidad y precio final en ARS.
+      </p>
+    </div>
+  );
+}
 
 /** Galería de imágenes interactiva con miniaturas clickeables. */
 function ProductGallery({
@@ -62,7 +361,7 @@ function ProductGallery({
 }: {
   images: string[];
   productName: string;
-  selectedVariantImage?: string | null;
+  selectedVariantImage?: string | null | undefined;
 }) {
   // Si hay imagen de variante, la ponemos primero; si no, usamos las del producto
   const allImages = selectedVariantImage
@@ -302,6 +601,9 @@ function ProductoPage() {
   const [selectedVariantId, setSelectedVariantId] = useState("");
   const [selectedTalle, setSelectedTalle] = useState("");
   const [talleError, setTalleError] = useState(false);
+
+  // Detección de categoría camisetas
+  const isCamisetaProd = isCamiseta(product?.categoria);
 
   if (!product) {
     return (
@@ -706,7 +1008,8 @@ function ProductoPage() {
               </>
             )}
 
-            {!consultar && !waOnlyReason && usesColors && (
+            {/* ── Bloque estándar de colores/talle/cantidad: solo para productos NO camiseta ── */}
+            {!isCamisetaProd && !consultar && !waOnlyReason && usesColors && (
               <div className="mt-6">
                 <label
                   htmlFor="color"
@@ -737,8 +1040,8 @@ function ProductoPage() {
               </div>
             )}
 
-            {/* Selector de Talle */}
-            {!consultar && !waOnlyReason && hasTalles && (
+            {/* Selector de Talle (productos estándar) */}
+            {!isCamisetaProd && !consultar && !waOnlyReason && hasTalles && (
               <div className="mt-6">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
@@ -782,8 +1085,19 @@ function ProductoPage() {
               </div>
             )}
 
-            {/* Cantidad */}
-            {!consultar && !waOnlyReason && (
+            {/* ── UI especial Camisetas ── */}
+            {isCamisetaProd && !consultar && !waOnlyReason && (
+              <div className="mt-6">
+                <JerseyProductUI
+                  productName={product.nombre ?? "Camiseta"}
+                  talles={availableTalles.length > 0 ? availableTalles : ["S", "M", "L", "XL", "XXL", "3XL", "4XL"]}
+                  config={config}
+                />
+              </div>
+            )}
+
+            {/* Cantidad (solo productos estándar) */}
+            {!isCamisetaProd && !consultar && !waOnlyReason && (
               <div className="mt-6">
                 {tiers.length > 0 && (
                   <p className="mb-1 text-xs font-semibold text-muted-foreground">
@@ -856,109 +1170,112 @@ function ProductoPage() {
               </div>
             )}
 
-            <div className="mt-6 flex flex-col gap-3">
-              {consultar || waOnlyReason ? (
-                <a
-                  className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
-                  href={waOnlyReason
-                    ? sanitizeUrl(`https://wa.me/5493418051515?text=${encodeURIComponent(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""))}`)
-                    : waLink(config, product.nombre)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {waOnlyReason ? WA_ONLY_CONFIG[waOnlyReason].btnText : "Consultar por WhatsApp"}
-                </a>
-              ) : showCheckout ? (
-                <CheckoutFlow
-                  items={[{ nombre: cartItem.nombre, qty, unitPrice: cartItem.unitPrice }]}
-                  total={total}
-                  onBack={() => setShowCheckout(false)}
-                />
-              ) : (
-                <>
-                  {/* Mensaje de progreso de MOQ (reactivo al qty) */}
-                  {moqInfo && !moqMet && moqInfo.minUnits && (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs">
-                      <p className="font-bold text-amber-700 dark:text-amber-400">
-                         Compra mínima de {moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
-                      </p>
-                      <p className="mt-0.5 text-muted-foreground">
-                        Llevás {qty} unidad{qty !== 1 ? "es" : ""}. Te falta{moqMissing !== 1 ? "n" : ""}
-                        {" "}{moqMissing} para alcanzar el mínimo de {moqInfo.minUnits}.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* "Comprar ya": requiere cumplir el mínimo completo de la categoría */}
-                  {(() => {
-                    const moqBlocked = moqInfo != null && !moqMet;
-                    const disabled = moqBlocked || bloqueaCompra;
-                    return (
-                      <button
-                        type="button"
-                        id="btn-comprar-ya"
-                        disabled={disabled}
-                        onClick={() => {
-                          if (hasTalles && !selectedTalle) {
-                            setTalleError(true);
-                            return;
-                          }
-                          if (bloqueaCompra) {
-                            setShowMin(true);
-                            return;
-                          }
-                          setShowCheckout(true);
-                        }}
-                        className={`btn-base w-full transition-all font-semibold ${
-                          disabled
-                            ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground border border-border"
-                            : "grad-urgente text-primary-foreground hover:shadow-md"
-                        }`}
-                      >
-                        {hasTalles && !selectedTalle
-                          ? "Elegí tu talle para comprar"
-                          : moqInfo && !moqMet && moqInfo.minUnits
-                          ? `Mínimo ${moqInfo.minUnits} unidades para comprar ya`
-                          : bloqueaCompra
-                          ? `Mínimo requerido para compra directa`
-                          : "Comprar ya"}
-                      </button>
-                    );
-                  })()}
-
-                  {existingInCart && (
-                    <div className="rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-center text-xs font-semibold text-primary">
-                      ✓ Ya tenés {existingInCart.qty} {existingInCart.qty === 1 ? "unidad" : "unidades"} en tu carrito
-                    </div>
-                  )}
-
-                  {/* "Agregar al carrito": permite armar el surtido en el carrito */}
-                  <button
-                    type="button"
-                    id="btn-agregar-carrito"
-                    onClick={() => {
-                      if (hasTalles && !selectedTalle) {
-                        setTalleError(true);
-                        return;
-                      }
-                      if (existingInCart) {
-                        cart.setQty(existingInCart.id, qty);
-                      } else {
-                        cart.add(cartItem);
-                      }
-                      navigate({ to: "/carrito" });
-                    }}
-                    className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary transition-colors font-semibold"
+            {/* ── Botones de acción: solo para productos NO camiseta ── */}
+            {!isCamisetaProd && (
+              <div className="mt-6 flex flex-col gap-3">
+                {consultar || waOnlyReason ? (
+                  <a
+                    className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
+                    href={waOnlyReason
+                      ? sanitizeUrl(`https://wa.me/5493418051515?text=${encodeURIComponent(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""))}`)
+                      : waLink(config, product.nombre)}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                    {existingInCart ? "Actualizar cantidad en carrito" : "Agregar al carrito (armar surtido)"}
-                  </button>
+                    {waOnlyReason ? WA_ONLY_CONFIG[waOnlyReason].btnText : "Consultar por WhatsApp"}
+                  </a>
+                ) : showCheckout ? (
+                  <CheckoutFlow
+                    items={[{ nombre: cartItem.nombre, qty, unitPrice: cartItem.unitPrice }]}
+                    total={total}
+                    onBack={() => setShowCheckout(false)}
+                  />
+                ) : (
+                  <>
+                    {/* Mensaje de progreso de MOQ (reactivo al qty) */}
+                    {moqInfo && !moqMet && moqInfo.minUnits && (
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs">
+                        <p className="font-bold text-amber-700 dark:text-amber-400">
+                           Compra mínima de {moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
+                        </p>
+                        <p className="mt-0.5 text-muted-foreground">
+                          Llevás {qty} unidad{qty !== 1 ? "es" : ""}. Te falta{moqMissing !== 1 ? "n" : ""}
+                          {" "}{moqMissing} para alcanzar el mínimo de {moqInfo.minUnits}.
+                        </p>
+                      </div>
+                    )}
 
-                  <p className="text-center text-xs text-muted-foreground">
-                    Pagá con transferencia o con Mercado Pago.
-                  </p>
-                </>
-              )}
-            </div>
+                    {/* "Comprar ya": requiere cumplir el mínimo completo de la categoría */}
+                    {(() => {
+                      const moqBlocked = moqInfo != null && !moqMet;
+                      const disabled = moqBlocked || bloqueaCompra;
+                      return (
+                        <button
+                          type="button"
+                          id="btn-comprar-ya"
+                          disabled={disabled}
+                          onClick={() => {
+                            if (hasTalles && !selectedTalle) {
+                              setTalleError(true);
+                              return;
+                            }
+                            if (bloqueaCompra) {
+                              setShowMin(true);
+                              return;
+                            }
+                            setShowCheckout(true);
+                          }}
+                          className={`btn-base w-full transition-all font-semibold ${
+                            disabled
+                              ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground border border-border"
+                              : "grad-urgente text-primary-foreground hover:shadow-md"
+                          }`}
+                        >
+                          {hasTalles && !selectedTalle
+                            ? "Elegí tu talle para comprar"
+                            : moqInfo && !moqMet && moqInfo.minUnits
+                            ? `Mínimo ${moqInfo.minUnits} unidades para comprar ya`
+                            : bloqueaCompra
+                            ? `Mínimo requerido para compra directa`
+                            : "Comprar ya"}
+                        </button>
+                      );
+                    })()}
+
+                    {existingInCart && (
+                      <div className="rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-center text-xs font-semibold text-primary">
+                        ✓ Ya tenés {existingInCart.qty} {existingInCart.qty === 1 ? "unidad" : "unidades"} en tu carrito
+                      </div>
+                    )}
+
+                    {/* "Agregar al carrito": permite armar el surtido en el carrito */}
+                    <button
+                      type="button"
+                      id="btn-agregar-carrito"
+                      onClick={() => {
+                        if (hasTalles && !selectedTalle) {
+                          setTalleError(true);
+                          return;
+                        }
+                        if (existingInCart) {
+                          cart.setQty(existingInCart.id, qty);
+                        } else {
+                          cart.add(cartItem);
+                        }
+                        navigate({ to: "/carrito" });
+                      }}
+                      className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary transition-colors font-semibold"
+                    >
+                      {existingInCart ? "Actualizar cantidad en carrito" : "Agregar al carrito (armar surtido)"}
+                    </button>
+
+                    <p className="text-center text-xs text-muted-foreground">
+                      Pagá con transferencia o con Mercado Pago.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
