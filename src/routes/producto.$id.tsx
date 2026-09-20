@@ -161,7 +161,7 @@ function JerseyProductUI({
   const totalArs = unitArs !== null ? unitArs * qty : null;
 
   // Nombre enriquecido con opciones para el carrito, orden y mails de compra/venta
-  const fullItemName = `${productName} (Talle: ${selectedTalle || "S"} - ${version === "player" ? "Versión Jugador (Customized Name & Number)" : "Versión Fan"}${badge === "yes" ? " - Con Badge" : ""}${parcheClean ? ` - Parche: ${parcheClean}` : ""})`;
+  const fullItemName = `${productName} (Talle: ${selectedTalle || "S"} - ${version === "player" ? "Versión Jugador (Personalizado Nombre y Número)" : "Versión Fan (Sin personalizar)"}${badge === "yes" ? " - Con Badge" : ""}${parcheClean ? ` - Parche: ${parcheClean}` : ""})`;
 
   const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "5493418051515").replace(/\D/g, "");
 
@@ -181,8 +181,8 @@ function JerseyProductUI({
   /** Arma el mensaje de WhatsApp con todos los datos del pedido */
   function buildWaMessage() {
     const talleStr = selectedTalle || talles[0] || "S";
-    const versionStr = version === "player" ? "Jugador (Customized Name & Number)" : "Fan (NO Name & Number)";
-    const badgeStr = badge === "yes" ? "Sí (con badge +1 USD)" : "No";
+    const versionStr = version === "player" ? "Jugador (Personalizado Nombre y Número)" : "Fan (Sin personalizar)";
+    const badgeStr = badge === "yes" ? "Sí (con badge oficial)" : "No";
     const qtyStr = String(qty);
     const priceStr = unitArs !== null ? ` — $${unitArs.toLocaleString("es-AR")} c/u` : "";
     const totalStr = totalArs !== null ? ` — Total: $${totalArs.toLocaleString("es-AR")}` : "";
@@ -214,7 +214,7 @@ function JerseyProductUI({
       setSelectedTalle(talleToUse);
     }
     const currentQty = Math.max(10, parseInt(qtyStr, 10) || qty || 10);
-    const fullItem = `${productName} (Talle: ${talleToUse} - ${version === "player" ? "Versión Jugador (Customized Name & Number)" : "Versión Fan"}${badge === "yes" ? " - Con Badge" : ""}${parcheClean ? ` - Parche: ${parcheClean}` : ""})`;
+    const fullItem = `${productName} (Talle: ${talleToUse} - ${version === "player" ? "Versión Jugador (Personalizado Nombre y Número)" : "Versión Fan (Sin personalizar)"}${badge === "yes" ? " - Con Badge" : ""}${parcheClean ? ` - Parche: ${parcheClean}` : ""})`;
 
     cart.add({
       id: `${product.id}-${version}-${talleToUse}-${badge}-${encodeURIComponent(parcheClean || "base")}`,
@@ -263,7 +263,7 @@ function JerseyProductUI({
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
-            Size *
+            Talle *
           </label>
           {selectedTalle && (
             <span className="text-xs font-bold text-emerald-600">Talle: {selectedTalle}</span>
@@ -276,7 +276,8 @@ function JerseyProductUI({
             {talles.map((t) => {
               const isXtra = t === "3XL" || t === "4XL";
               const isSelected = selectedTalle === t;
-              const extraLabel = usdRate > 0 ? `(+$${Math.round(usdRate).toLocaleString("es-AR")})` : "(+1 USD)";
+              const extraPrice = usdRate > 0 ? Math.round(1 * 1.07 * usdRate) : 0;
+              const extraLabel = extraPrice > 0 ? `(+$${extraPrice.toLocaleString("es-AR")})` : "(+1 USD)";
               return (
                 <button
                   key={t}
@@ -304,10 +305,10 @@ function JerseyProductUI({
         )}
       </div>
 
-      {/* ── Selector Name & Number ── */}
+      {/* ── Selector Nombre y Número ── */}
       <div>
         <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
-          Name and Number
+          Nombre y Número
         </label>
         <div className="flex flex-col gap-2">
           <button
@@ -315,57 +316,59 @@ function JerseyProductUI({
             id="jersey-version-fan"
             onClick={() => setVersion("fan")}
             className={[
-              "w-full max-w-[280px] h-10 rounded-lg px-4 text-sm font-semibold border text-left transition-all",
+              "w-full max-w-[320px] h-11 rounded-lg px-4 text-sm font-semibold border text-left transition-all flex items-center justify-between",
               version === "fan"
                 ? "bg-primary text-primary-foreground border-primary shadow-sm"
                 : "bg-background text-foreground border-border hover:border-primary/50",
             ].join(" ")}
           >
-            NO Name and Number
+            <span>Sin nombre ni número</span>
+            <span className={`text-[11px] font-medium opacity-80 ${version === "fan" ? "text-primary-foreground" : "text-muted-foreground"}`}>Versión Fan</span>
           </button>
           <button
             type="button"
             id="jersey-version-player"
             onClick={() => setVersion("player")}
             className={[
-              "w-full max-w-[280px] h-10 rounded-lg px-4 text-sm font-semibold border text-left transition-all",
+              "w-full max-w-[320px] h-11 rounded-lg px-4 text-sm font-semibold border text-left transition-all flex items-center justify-between",
               version === "player"
                 ? "bg-primary text-primary-foreground border-primary shadow-sm"
                 : "bg-background text-foreground border-border hover:border-primary/50",
             ].join(" ")}
           >
-            Customized Name and Number
+            <span>Personalizado (Nombre y Número)</span>
+            <span className={`text-[11px] font-medium opacity-80 ${version === "player" ? "text-primary-foreground" : "text-muted-foreground"}`}>Versión Jugador</span>
           </button>
         </div>
         <p className="mt-1.5 text-[11px] text-muted-foreground">
           {version === "player"
-            ? "✏️ Versión Jugador — con nombre y número personalizado"
-            : "👕 Versión Fan — sin personalización"}
+            ? "✏️ Versión Jugador — incluye estampa de nombre y número personalizado"
+            : "👕 Versión Fan — camiseta lisa sin personalización"}
         </p>
       </div>
 
-      {/* ── Selector Badge (Aumenta precio +1 USD en ARS) ── */}
+      {/* ── Selector Badge ── */}
       <div>
         <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
-          Badge
+          Badge / Parche Oficial
         </label>
         <div className="flex gap-3">
-          {/* NO Badge */}
+          {/* Sin Badge */}
           <button
             type="button"
             id="jersey-badge-no"
             onClick={() => setBadge("no")}
             className={[
-              "flex h-14 w-16 flex-col items-center justify-center rounded-xl border-2 text-[10px] font-bold transition-all",
+              "flex h-14 w-20 flex-col items-center justify-center rounded-xl border-2 text-[11px] font-bold transition-all",
               badge === "no"
                 ? "border-primary bg-primary/10 text-primary shadow-sm"
                 : "border-border bg-background text-foreground hover:border-primary/50",
             ].join(" ")}
           >
             <span className="text-lg">🚫</span>
-            <span className="mt-0.5 leading-tight text-center">NO<br/>Badge</span>
+            <span className="mt-0.5 leading-tight text-center">Sin<br/>Badge</span>
           </button>
-          {/* Agregar Badge con precio adicional */}
+          {/* Agregar Badge */}
           <button
             type="button"
             id="jersey-badge-yes"
@@ -381,7 +384,7 @@ function JerseyProductUI({
             <div className="flex flex-col text-left">
               <span className="text-xs font-bold leading-tight">Agregar badge</span>
               <span className="text-[11px] font-bold text-red-500">
-                {usdRate > 0 ? `(+${money(Math.round(usdRate))})` : "(+US$1.00)"}
+                {usdRate > 0 ? `(+${money(Math.round(1 * 1.07 * usdRate))})` : "(+US$1.00)"}
               </span>
             </div>
           </button>
@@ -574,9 +577,9 @@ function JerseyProductUI({
         <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs">
           <p className="font-bold text-primary text-sm mb-1">📋 Tu pedido:</p>
           <ul className="space-y-0.5 text-foreground">
-            <li>• Talle: <span className="font-semibold">{selectedTalle}</span>{isExtraSize && <span className="text-red-500 font-bold ml-1">(+1 USD talle extra)</span>}</li>
-            <li>• Versión: <span className="font-semibold">{version === "player" ? "Jugador (Customized Name & Number)" : "Fan (NO Name & Number)"}</span></li>
-            <li>• Badge: <span className="font-semibold">{badge === "yes" ? "Sí 🏆 (+1 USD c/u)" : "No"}</span></li>
+            <li>• Talle: <span className="font-semibold">{selectedTalle}</span>{isExtraSize && <span className="text-red-500 font-bold ml-1">{extraSizeArs > 0 ? `(+${money(extraSizeArs)} talle extra)` : "(talle extra)"}</span>}</li>
+            <li>• Versión: <span className="font-semibold">{version === "player" ? "Jugador (Personalizado Nombre y Número)" : "Fan (Sin nombre ni número)"}</span></li>
+            <li>• Badge: <span className="font-semibold">{badge === "yes" ? `Sí 🏆 (${badgeExtraArs > 0 ? `+${money(badgeExtraArs)}` : "+US$1.00"} c/u)` : "No"}</span></li>
             {parcheClean && (
               <li>• Parche: <span className="font-semibold">{parcheClean}</span></li>
             )}
