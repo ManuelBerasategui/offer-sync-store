@@ -17,10 +17,16 @@ import {
   transferDiscountPct,
   toNumber,
   waLink,
+  isCamiseta,
 } from "@/lib/store";
 import type { Product, SiteConfig } from "@/lib/store";
 
 export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) {
+  const isCamisetaProd = isCamiseta(p.categoria, p.nombre);
+  const usdRate = Number(config?.["dolar_cotizacion"] ?? 0);
+  const minJerseyArs = usdRate > 0 ? Math.round(12 * usdRate) : null;
+  const baseJerseyArs = usdRate > 0 ? Math.round(18.5 * usdRate) : null;
+
   const offer = hasOffer(p);
   const offerPct = offer ? offerDiscountPct(p) : 0;
   const consultar = isWhatsappOnly(p);
@@ -75,7 +81,26 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
         </Link>
 
         <div className="mt-auto pt-2">
-          {(hidePrice || consultar) ? (
+          {isCamisetaProd ? (
+            <div>
+              <div className="flex flex-col">
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Desde
+                  </span>
+                  <span className="tabular-nums text-lg font-bold text-foreground">
+                    {minJerseyArs ? money(minJerseyArs) : "Ver escala"}
+                  </span>
+                  <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                    Mayorista
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {baseJerseyArs ? `10 u. a ${money(baseJerseyArs)} c/u` : "Venta desde 10 u."}
+                </p>
+              </div>
+            </div>
+          ) : (hidePrice || consultar) ? (
             <span className="text-sm font-semibold text-muted-foreground">
               {waOnlyReason === "china" || waOnlyReason === "whatsapp_only"
                 ? "Consultar por WhatsApp"
@@ -119,7 +144,7 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
           params={{ id: String(p.id ?? p.nombre ?? "") }}
           className="btn-base mt-2 w-full bg-foreground px-3 py-2.5 text-[11px] text-background"
         >
-          Ver producto
+          {isCamisetaProd ? "Ver opciones y precios" : "Ver producto"}
         </Link>
       </div>
     </div>
