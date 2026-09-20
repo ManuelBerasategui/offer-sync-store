@@ -119,7 +119,9 @@ function JerseyProductUI({
   const [talleError, setTalleError] = useState(false);
   const [version, setVersion] = useState<"fan" | "player">("fan");
   const [badge, setBadge] = useState<"no" | "yes">("no");
-  const [tierIdx, setTierIdx] = useState(0);
+  // Cantidad personalizada (mínimo 10 u. según la escala mayorista)
+  const [qty, setQty] = useState(10);
+  const [qtyStr, setQtyStr] = useState("10");
   // Parche deseado — texto libre sanitizado contra XSS y ReDoS
   const [parcheRaw, setParcheRaw] = useState("");
   const parcheClean = sanitizeText(parcheRaw);
@@ -127,22 +129,36 @@ function JerseyProductUI({
   const [addedToCart, setAddedToCart] = useState(false);
 
   const tiers = version === "player" ? JERSEY_PLAYER_TIERS : JERSEY_FAN_TIERS;
-  const selectedTier = tiers[tierIdx] ?? tiers[0]!;
+
+  // Determinar dinámicamente qué tramo mayorista aplica según la cantidad elegida
+  const activeTier = [...tiers]
+    .sort((a, b) => b.qty - a.qty)
+    .find((t) => qty >= t.qty) ?? tiers[0]!;
+
+  // Siguiente tramo para informar al usuario cuánto le falta para ahorrar más
+  const nextTier = [...tiers]
+    .sort((a, b) => a.qty - b.qty)
+    .find((t) => t.qty > qty);
 
   // Tipo de cambio USD→ARS desde la clave real del config en Supabase
   const usdRate = Number(config["dolar_cotizacion"] ?? 0);
 
-  // Costo adicional por talle extra (3XL / 4XL) convertido a ARS
+  // Aumento por badge (+1 USD por unidad convertido a ARS)
+  const badgeExtraArs = badge === "yes" ? (usdRate > 0 ? Math.round(1 * usdRate) : 0) : 0;
+
+  // Costo adicional por talle extra (3XL / 4XL) (+1 USD por unidad convertido a ARS)
   const isExtraSize = selectedTalle === "3XL" || selectedTalle === "4XL";
   const extraSizeArs = isExtraSize ? (usdRate > 0 ? Math.round(1 * usdRate) : 0) : 0;
 
+  // Precio unitario final en ARS con todos los extras aplicados
   const unitArs = usdRate > 0
-    ? Math.round(selectedTier.unitUsd * usdRate) + extraSizeArs
+    ? Math.round(activeTier.unitUsd * usdRate) + extraSizeArs + badgeExtraArs
     : null;
 
-  const totalArs = unitArs !== null ? unitArs * selectedTier.qty : null;
+  // Total final para la cantidad exacta solicitada
+  const totalArs = unitArs !== null ? unitArs * qty : null;
 
-  // Nombre completo y enriquecido con opciones para el carrito, orden y mails de compra/venta
+  // Nombre enriquecido con opciones para el carrito, orden y mails de compra/venta
   const fullItemName = `${productName} (Talle: ${selectedTalle || "S"} - ${version === "player" ? "Versión Jugador (Customized Name & Number)" : "Versión Fan"}${badge === "yes" ? " - Con Badge" : ""}${parcheClean ? ` - Parche: ${parcheClean}` : ""})`;
 
   const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "5493418051515").replace(/\D/g, "");
@@ -164,8 +180,8 @@ function JerseyProductUI({
   function buildWaMessage() {
     const talleStr = selectedTalle || "(sin talle seleccionado)";
     const versionStr = version === "player" ? "Jugador (Customized Name & Number)" : "Fan (NO Name & Number)";
-    const badgeStr = badge === "yes" ? "Sí (con badge)" : "No";
-    const qtyStr = String(selectedTier.qty);
+    const badgeStr = badge === "yes" ? "Sí (con badge +1 USD)" : "No";
+    const qtyStr = String(qty);
     const priceStr = unitArs !== null ? ` — $${unitArs.toLocaleString("es-AR")} c/u` : "";
     const totalStr = totalArs !== null ? ` — Total: $${totalArs.toLocaleString("es-AR")}` : "";
     const parcheStr = parcheClean ? `\n🧵 Parche deseado: ${parcheClean}` : "";
@@ -200,7 +216,7 @@ function JerseyProductUI({
       nombre: fullItemName,
       unitPrice: unitArs ?? 0,
       basePrice: unitArs ?? 0,
-      qty: selectedTier.qty,
+      qty: qty,
       imagen: product.imagen_url ? imageUrl(product.imagen_url) : undefined,
       categoria: product.categoria ?? "Camisetas",
     });
@@ -224,7 +240,7 @@ function JerseyProductUI({
         <CheckoutFlow
           items={[{
             nombre: fullItemName,
-            qty: selectedTier.qty,
+            qty: qty,
             unitPrice: unitArs ?? 0,
             productId: product.id,
           }]}
@@ -291,7 +307,7 @@ function JerseyProductUI({
           <button
             type="button"
             id="jersey-version-fan"
-            onClick={() => { setVersion("fan"); setTierIdx(0); }}
+            onClick={() => setVersion("fan")}
             className={[
               "w-full max-w-[280px] h-10 rounded-lg px-4 text-sm font-semibold border text-left transition-all",
               version === "fan"
@@ -304,7 +320,7 @@ function JerseyProductUI({
           <button
             type="button"
             id="jersey-version-player"
-            onClick={() => { setVersion("player"); setTierIdx(0); }}
+            onClick={() => setVersion("player")}
             className={[
               "w-full max-w-[280px] h-10 rounded-lg px-4 text-sm font-semibold border text-left transition-all",
               version === "player"
@@ -322,7 +338,7 @@ function JerseyProductUI({
         </p>
       </div>
 
-      {/* ── Selector Badge ── */}
+      {/* ── Selector Badge (Aumenta precio +1 USD en ARS) ── */}
       <div>
         <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
           Badge
@@ -334,7 +350,7 @@ function JerseyProductUI({
             id="jersey-badge-no"
             onClick={() => setBadge("no")}
             className={[
-              "flex h-14 w-14 flex-col items-center justify-center rounded-xl border-2 text-[10px] font-bold transition-all",
+              "flex h-14 w-16 flex-col items-center justify-center rounded-xl border-2 text-[10px] font-bold transition-all",
               badge === "no"
                 ? "border-primary bg-primary/10 text-primary shadow-sm"
                 : "border-border bg-background text-foreground hover:border-primary/50",
@@ -343,25 +359,30 @@ function JerseyProductUI({
             <span className="text-lg">🚫</span>
             <span className="mt-0.5 leading-tight text-center">NO<br/>Badge</span>
           </button>
-          {/* Agregar Badge */}
+          {/* Agregar Badge con precio adicional */}
           <button
             type="button"
             id="jersey-badge-yes"
             onClick={handleSelectBadgeYes}
             className={[
-              "flex h-14 items-center gap-2 rounded-xl border-2 px-3 font-bold transition-all",
+              "flex h-14 items-center gap-2.5 rounded-xl border-2 px-3.5 font-bold transition-all",
               badge === "yes"
                 ? "border-primary bg-primary/10 text-primary shadow-sm"
                 : "border-border bg-background text-foreground hover:border-primary/50",
             ].join(" ")}
           >
             <span className="text-2xl">🏆</span>
-            <span className="text-[11px] font-semibold">Agregar badge</span>
+            <div className="flex flex-col text-left">
+              <span className="text-xs font-bold leading-tight">Agregar badge</span>
+              <span className="text-[11px] font-bold text-red-500">
+                {usdRate > 0 ? `(+${money(Math.round(usdRate))})` : "(+US$1.00)"}
+              </span>
+            </div>
           </button>
         </div>
         {badge === "yes" && (
           <div className="mt-2 flex items-center gap-2 text-xs">
-            <span className="text-emerald-600 font-semibold">✓ Badge seleccionado</span>
+            <span className="text-emerald-600 font-semibold">✓ Badge seleccionado (+{usdRate > 0 ? money(Math.round(usdRate)) : "US$1.00"} c/u)</span>
             <button
               type="button"
               onClick={handleBadgeWhatsApp}
@@ -404,47 +425,131 @@ function JerseyProductUI({
         </p>
       </div>
 
-      {/* ── Selector de Cantidad / Tramos (solo ARS) ── */}
+      {/* ── Selector de Cantidad interactivo (permite ej: 15 u.) ── */}
       <div>
-        <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
-          Cantidad
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="jersey-qty-input" className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+            Cantidad a pedir
+          </label>
+          <span className="text-xs text-muted-foreground font-medium">
+            Mínimo 10 u.
+          </span>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            id="jersey-qty-minus"
+            onClick={() => {
+              const next = Math.max(10, qty - 1);
+              setQty(next);
+              setQtyStr(String(next));
+            }}
+            disabled={qty <= 10}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-background text-lg font-bold hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition active:scale-95"
+          >
+            -
+          </button>
+          <input
+            id="jersey-qty-input"
+            type="number"
+            min={10}
+            max={5000}
+            value={qtyStr}
+            onChange={(e) => {
+              const val = e.target.value;
+              setQtyStr(val);
+              const num = parseInt(val, 10);
+              if (!isNaN(num) && num >= 1) {
+                setQty(num);
+              }
+            }}
+            onBlur={() => {
+              const num = parseInt(qtyStr, 10);
+              const valid = isNaN(num) || num < 10 ? 10 : num;
+              setQty(valid);
+              setQtyStr(String(valid));
+            }}
+            className="h-10 w-24 rounded-lg border border-input bg-background text-center text-base font-bold focus:border-primary outline-none"
+          />
+          <button
+            type="button"
+            id="jersey-qty-plus"
+            onClick={() => {
+              const next = qty + 1;
+              setQty(next);
+              setQtyStr(String(next));
+            }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-background text-lg font-bold hover:bg-muted transition active:scale-95"
+          >
+            +
+          </button>
+          <div className="text-sm font-bold text-foreground ml-1">
+            {qty} {qty === 1 ? "unidad" : "unidades"}
+          </div>
+        </div>
+        {nextTier && (
+          <p className="mt-2 text-xs text-muted-foreground bg-primary/5 border border-primary/20 rounded-lg p-2.5">
+            💡 Llevás <span className="font-bold text-foreground">{qty} u.</span> con precio de tramo <span className="font-bold text-foreground">{activeTier.qty}+ u.</span>
+            {" — "}¡Agregando <span className="font-bold text-primary">{nextTier.qty - qty} u. más</span> accedés al precio de {nextTier.qty} u.!
+          </p>
+        )}
+      </div>
+
+      {/* ── Tabla de Precios por Tramo ── */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
+            Escala de precios por volumen
+          </label>
+          <span className="text-[11px] text-muted-foreground">
+            Hacé clic en cualquier tramo para seleccionarlo
+          </span>
+        </div>
         <div className="rounded-xl border border-border overflow-hidden">
           {/* Header */}
           <div className="grid grid-cols-3 gap-px bg-border">
-            {["Cantidad", "Precio c/u", "Total"].map((h) => (
-              <div key={h} className="bg-muted px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+            {["Tramo", "Precio c/u", "Total tramo"].map((h) => (
+              <div key={h} className="bg-muted px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
                 {h}
               </div>
             ))}
           </div>
           {/* Filas */}
           <div className="flex flex-col gap-px bg-border">
-            {tiers.map((tier, i) => {
-              const isSelected = i === tierIdx;
-              const arsUnit = usdRate > 0 ? Math.round(tier.unitUsd * usdRate) + extraSizeArs : null;
-              const arsTotal = arsUnit !== null ? arsUnit * tier.qty : null;
+            {tiers.map((tier) => {
+              const isTierActive = activeTier.qty === tier.qty;
+              const arsBaseUnit = usdRate > 0 ? Math.round(tier.unitUsd * usdRate) : null;
+              const arsUnitWithExtras = arsBaseUnit !== null ? arsBaseUnit + extraSizeArs + badgeExtraArs : null;
+              const arsTotalForTier = arsUnitWithExtras !== null ? arsUnitWithExtras * tier.qty : null;
               return (
                 <button
                   key={tier.qty}
                   type="button"
-                  id={`jersey-tier-${i}`}
-                  onClick={() => setTierIdx(i)}
+                  id={`jersey-tier-${tier.qty}`}
+                  onClick={() => {
+                    setQty(tier.qty);
+                    setQtyStr(String(tier.qty));
+                  }}
                   className={[
-                    "grid grid-cols-3 gap-0 text-left transition-all",
-                    isSelected
+                    "grid grid-cols-3 gap-0 text-left transition-all items-center",
+                    isTierActive
                       ? "bg-primary/10 ring-1 ring-inset ring-primary"
                       : "bg-background hover:bg-muted",
                   ].join(" ")}
                 >
-                  <div className={`px-3 py-2.5 text-sm font-bold ${isSelected ? "text-primary" : "text-foreground"}`}>
-                    {tier.qty} u.
+                  <div className={`px-3 py-2.5 text-sm font-bold flex items-center gap-1.5 ${isTierActive ? "text-primary" : "text-foreground"}`}>
+                    <span>{tier.qty} u.</span>
+                    {isTierActive && (
+                      <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded font-semibold">
+                        Aplicado
+                      </span>
+                    )}
                   </div>
-                  <div className={`px-3 py-2.5 text-sm tabular-nums font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>
-                    {arsUnit !== null ? `$${arsUnit.toLocaleString("es-AR")}` : "—"}
+                  <div className={`px-3 py-2.5 text-sm tabular-nums font-semibold ${isTierActive ? "text-primary" : "text-foreground"}`}>
+                    {arsUnitWithExtras !== null ? `$${arsUnitWithExtras.toLocaleString("es-AR")}` : "—"}
                   </div>
-                  <div className={`px-3 py-2.5 text-sm tabular-nums font-bold ${isSelected ? "text-primary" : "text-foreground"}`}>
-                    {arsTotal !== null ? `$${arsTotal.toLocaleString("es-AR")}` : "—"}
+                  <div className={`px-3 py-2.5 text-sm tabular-nums font-bold ${isTierActive ? "text-primary" : "text-foreground"}`}>
+                    {arsTotalForTier !== null ? `$${arsTotalForTier.toLocaleString("es-AR")}` : "—"}
                   </div>
                 </button>
               );
@@ -456,9 +561,6 @@ function JerseyProductUI({
             ⚠️ Consultá el precio en ARS por WhatsApp.
           </p>
         )}
-        <p className="mt-1.5 text-[11px] text-muted-foreground">
-          Seleccioná el tramo de cantidad que necesitás.
-        </p>
       </div>
 
       {/* ── Resumen seleccionado ── */}
@@ -466,13 +568,13 @@ function JerseyProductUI({
         <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs">
           <p className="font-bold text-primary text-sm mb-1">📋 Tu pedido:</p>
           <ul className="space-y-0.5 text-foreground">
-            <li>• Talle: <span className="font-semibold">{selectedTalle}</span></li>
+            <li>• Talle: <span className="font-semibold">{selectedTalle}</span>{isExtraSize && <span className="text-red-500 font-bold ml-1">(+1 USD talle extra)</span>}</li>
             <li>• Versión: <span className="font-semibold">{version === "player" ? "Jugador (Customized Name & Number)" : "Fan (NO Name & Number)"}</span></li>
-            <li>• Badge: <span className="font-semibold">{badge === "yes" ? "Sí 🏆" : "No"}</span></li>
+            <li>• Badge: <span className="font-semibold">{badge === "yes" ? "Sí 🏆 (+1 USD c/u)" : "No"}</span></li>
             {parcheClean && (
               <li>• Parche: <span className="font-semibold">{parcheClean}</span></li>
             )}
-            <li>• Cantidad: <span className="font-semibold">{selectedTier.qty} unidades</span></li>
+            <li>• Cantidad: <span className="font-semibold">{qty} unidades</span> <span className="text-muted-foreground text-[11px]">(tramo {activeTier.qty}+ u.)</span></li>
             {unitArs !== null && (
               <li>• Precio c/u: <span className="font-bold text-primary">${unitArs.toLocaleString("es-AR")} ARS</span></li>
             )}
@@ -492,7 +594,7 @@ function JerseyProductUI({
           onClick={handleBuyNow}
           className="btn-base w-full grad-urgente text-primary-foreground font-semibold hover:shadow-md transition-all text-base py-3"
         >
-          {selectedTalle ? "Comprar ya" : "Elegí tu talle para comprar"}
+          {selectedTalle ? `Comprar ya (${qty} u. — $${(totalArs ?? 0).toLocaleString("es-AR")})` : "Elegí tu talle para comprar"}
         </button>
 
         {/* Agregar al carrito */}
@@ -502,7 +604,7 @@ function JerseyProductUI({
           onClick={handleAddToCart}
           className="btn-base w-full border border-primary text-primary hover:bg-primary/10 font-semibold transition py-2.5"
         >
-          {addedToCart ? "✓ ¡Agregado al carrito!" : "🛒 Agregar al carrito"}
+          {addedToCart ? "✓ ¡Agregado al carrito!" : `🛒 Agregar al carrito (${qty} u.)`}
         </button>
 
         {/* CTA WhatsApp */}
