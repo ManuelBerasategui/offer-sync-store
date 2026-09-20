@@ -57,8 +57,30 @@ import {
 } from "@/lib/store";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// JERSEY PRODUCT UI — UI especial para categoría Camisetas
+// Sanitización segura de texto libre (CWE-79 / Snyk XSS)
+// Elimina cualquier tag HTML y caracteres de control sin usar new RegExp dinámico.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Strip HTML tags and control characters from a user-supplied string (XSS-safe). */
+function sanitizeText(raw: string): string {
+  // Static literal pattern — no dynamic RegExp construction (avoids ReDoS, CWE-400)
+  return raw
+    .replace(/<[^>]*>/g, "")          // strip HTML tags
+    .replace(/[&<>"'`]/g, (c) => {    // escape remaining HTML special chars
+      switch (c) {
+        case "&": return "&amp;";
+        case "<": return "&lt;";
+        case ">": return "&gt;";
+        case '"': return "&quot;";
+        case "'": return "&#x27;";
+        case "`": return "&#x60;";
+        default:  return c;
+      }
+    })
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "") // strip control chars
+    .trim()
+    .slice(0, 200); // hard max 200 chars
+}
 
 /** Tramos de precio para Versión Jugador (Customized Name & Number). Precios en USD. */
 const JERSEY_PLAYER_TIERS = [
@@ -86,24 +108,25 @@ function JerseyProductUI({
   productName,
   talles,
   config,
-  waPhoneOverride,
 }: {
   productName: string;
   talles: string[];
   config: SiteConfig;
-  waPhoneOverride?: string;
 }) {
   const [selectedTalle, setSelectedTalle] = useState("");
   const [talleError, setTalleError] = useState(false);
   const [version, setVersion] = useState<"fan" | "player">("fan");
   const [badge, setBadge] = useState<"no" | "yes">("no");
   const [tierIdx, setTierIdx] = useState(0);
+  // Parche deseado — texto libre sanitizado
+  const [parcheRaw, setParcheRaw] = useState("");
+  const parcheClean = sanitizeText(parcheRaw);
 
   const tiers = version === "player" ? JERSEY_PLAYER_TIERS : JERSEY_FAN_TIERS;
   const selectedTier = tiers[tierIdx] ?? tiers[0]!;
 
-  // Obtener tipo de cambio USD desde config si está disponible, si no default
-  const usdRate = Number(config["usd_rate"] ?? config["tipo_cambio_usd"] ?? 0);
+  // Tipo de cambio USD→ARS desde la clave real del config en Supabase
+  const usdRate = Number(config["dolar_cotizacion"] ?? 0);
 
   const unitArs = usdRate > 0
     ? Math.round(selectedTier.unitUsd * usdRate)
@@ -111,14 +134,15 @@ function JerseyProductUI({
 
   const totalArs = unitArs !== null ? unitArs * selectedTier.qty : null;
 
-  // Armar mensaje de WhatsApp
+  /** Arma el mensaje de WhatsApp con todos los datos del pedido. */
   function buildWaMessage() {
     const talleStr = selectedTalle || "(sin talle seleccionado)";
     const versionStr = version === "player" ? "Jugador (Customized Name & Number)" : "Fan (NO Name & Number)";
-    const badgeStr = badge === "yes" ? "Sí" : "No";
+    const badgeStr = badge === "yes" ? "Sí (con badge)" : "No";
     const qtyStr = String(selectedTier.qty);
     const priceStr = unitArs !== null ? ` — $${unitArs.toLocaleString("es-AR")} c/u` : "";
-    return `Hola! Quiero hacer un pedido de camisetas:\n🏷️ Producto: ${productName}\n📐 Talle: ${talleStr}\n⚽ Versión: ${versionStr}\n🏅 Badge: ${badgeStr}\n📦 Cantidad: ${qtyStr} unidades${priceStr}`;
+    const parcheStr = parcheClean ? `\n🧵 Parche deseado: ${parcheClean}` : "";
+    return `Hola! Quiero hacer un pedido de camisetas:\n🏷️ Producto: ${productName}\n📐 Talle: ${talleStr}\n⚽ Versión: ${versionStr}\n🏅 Badge: ${badgeStr}${parcheStr}\n📦 Cantidad: ${qtyStr} unidades${priceStr}`;
   }
 
   function handleWhatsApp() {
@@ -166,7 +190,7 @@ function JerseyProductUI({
                 >
                   {t}
                   {isXtra && (
-                    <span className="ml-1 text-[10px] font-normal text-red-500">(+US$1.00)</span>
+                    <span className="ml-1 text-[10px] font-normal text-red-500">(+$1 USD)</span>
                   )}
                 </button>
               );
@@ -245,31 +269,64 @@ function JerseyProductUI({
             id="jersey-badge-yes"
             onClick={() => setBadge("yes")}
             className={[
-              "flex h-14 items-center gap-2 rounded-xl border-2 px-3 text-sm font-bold transition-all",
+              "flex h-14 items-center gap-2 rounded-xl border-2 px-3 font-bold transition-all",
               badge === "yes"
                 ? "border-primary bg-primary/10 text-primary shadow-sm"
                 : "border-border bg-background text-foreground hover:border-primary/50",
             ].join(" ")}
           >
             <span className="text-2xl">🏆</span>
-            <span className="text-[11px] text-red-500 font-bold">(+US$1.00)</span>
+            <span className="text-[11px] font-semibold">Badge</span>
           </button>
         </div>
       </div>
 
-      {/* ── Selector de Cantidad / Tramos ── */}
+      {/* ── Parche Deseado ── */}
+      <div>
+        <label
+          htmlFor="jersey-parche"
+          className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-1.5"
+        >
+          Parche deseado <span className="font-normal normal-case text-muted-foreground">(opcional)</span>
+        </label>
+        <input
+          id="jersey-parche"
+          type="text"
+          autoComplete="off"
+          maxLength={200}
+          placeholder="Ej: escudo de tu equipo, logo, etc."
+          value={parcheRaw}
+          onChange={(e) => {
+            // Recortar a 200 chars para proteger contra payloads XSS por longitud
+            setParcheRaw(e.target.value.slice(0, 200));
+          }}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/60"
+        />
+        {parcheClean && (
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Vista previa: <span className="font-semibold text-foreground">{parcheClean}</span>
+          </p>
+        )}
+        <p className="mt-0.5 text-[10px] text-muted-foreground/70">
+          Máx. 200 caracteres. El texto se enviará por WhatsApp y en la confirmación de tu pedido.
+        </p>
+      </div>
+
+      {/* ── Selector de Cantidad / Tramos (solo ARS) ── */}
       <div>
         <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
           Cantidad
         </label>
-        <div className="rounded-xl border border-border bg-surface overflow-hidden">
-          <div className="grid grid-cols-4 gap-px bg-border">
-            {["Cantidad", "Precio c/u (USD)", "ARS c/u", "Total ARS"].map((h) => (
+        <div className="rounded-xl border border-border overflow-hidden">
+          {/* Header */}
+          <div className="grid grid-cols-3 gap-px bg-border">
+            {["Cantidad", "Precio c/u", "Total"].map((h) => (
               <div key={h} className="bg-muted px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
                 {h}
               </div>
             ))}
           </div>
+          {/* Filas */}
           <div className="flex flex-col gap-px bg-border">
             {tiers.map((tier, i) => {
               const isSelected = i === tierIdx;
@@ -282,22 +339,19 @@ function JerseyProductUI({
                   id={`jersey-tier-${i}`}
                   onClick={() => setTierIdx(i)}
                   className={[
-                    "grid grid-cols-4 gap-0 text-left transition-all",
+                    "grid grid-cols-3 gap-0 text-left transition-all",
                     isSelected
                       ? "bg-primary/10 ring-1 ring-inset ring-primary"
                       : "bg-background hover:bg-muted",
                   ].join(" ")}
                 >
-                  <div className={`px-2 py-2 text-xs font-bold ${isSelected ? "text-primary" : "text-foreground"}`}>
+                  <div className={`px-3 py-2.5 text-sm font-bold ${isSelected ? "text-primary" : "text-foreground"}`}>
                     {tier.qty} u.
                   </div>
-                  <div className={`px-2 py-2 text-xs tabular-nums ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
-                    ${tier.unitUsd.toFixed(2)}
-                  </div>
-                  <div className={`px-2 py-2 text-xs tabular-nums font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>
+                  <div className={`px-3 py-2.5 text-sm tabular-nums font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>
                     {arsUnit !== null ? `$${arsUnit.toLocaleString("es-AR")}` : "—"}
                   </div>
-                  <div className={`px-2 py-2 text-xs tabular-nums font-bold ${isSelected ? "text-primary" : "text-foreground"}`}>
+                  <div className={`px-3 py-2.5 text-sm tabular-nums font-bold ${isSelected ? "text-primary" : "text-foreground"}`}>
                     {arsTotal !== null ? `$${arsTotal.toLocaleString("es-AR")}` : "—"}
                   </div>
                 </button>
@@ -307,7 +361,7 @@ function JerseyProductUI({
         </div>
         {usdRate <= 0 && (
           <p className="mt-1.5 text-[11px] text-amber-600 font-semibold">
-            ⚠️ Tipo de cambio no configurado. Consultá el precio en ARS por WhatsApp.
+            ⚠️ Consultá el precio en ARS por WhatsApp.
           </p>
         )}
         <p className="mt-1.5 text-[11px] text-muted-foreground">
@@ -323,6 +377,9 @@ function JerseyProductUI({
             <li>• Talle: <span className="font-semibold">{selectedTalle}</span></li>
             <li>• Versión: <span className="font-semibold">{version === "player" ? "Jugador (Customized Name & Number)" : "Fan (NO Name & Number)"}</span></li>
             <li>• Badge: <span className="font-semibold">{badge === "yes" ? "Sí 🏆" : "No"}</span></li>
+            {parcheClean && (
+              <li>• Parche: <span className="font-semibold">{parcheClean}</span></li>
+            )}
             <li>• Cantidad: <span className="font-semibold">{selectedTier.qty} unidades</span></li>
             {unitArs !== null && (
               <li>• Precio c/u: <span className="font-bold text-primary">${unitArs.toLocaleString("es-AR")} ARS</span></li>
@@ -347,7 +404,7 @@ function JerseyProductUI({
         Consultar por WhatsApp
       </button>
       <p className="text-center text-xs text-muted-foreground -mt-2">
-        Te vamos a confirmar disponibilidad y precio final en ARS.
+        Te confirmamos disponibilidad y precio final en ARS.
       </p>
     </div>
   );
