@@ -10,20 +10,20 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md print:hidden">
-      <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3">
+      <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-1.5 px-2.5 py-2 sm:px-6 sm:py-3 min-w-0 w-full">
         <Link
           to="/"
           aria-label="Ir al inicio"
-          className="flex shrink-0 items-center min-w-0"
+          className="flex shrink items-center min-w-0"
         >
           <img
             src="/businessicon-header.jpg?v=3"
             alt="Te Importamos"
-            className="h-8 w-auto max-w-[150px] object-contain object-left xs:max-w-[170px] sm:h-10 sm:max-w-none"
+            className="h-7 w-auto max-w-[125px] object-contain object-left xs:max-w-[155px] sm:h-10 sm:max-w-none"
           />
         </Link>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           <nav className="mr-1 hidden items-center gap-6 text-sm font-semibold md:flex">
             <Link to="/" hash="ofertas" className="text-muted-foreground hover:text-primary">
               Ofertas
@@ -44,23 +44,24 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
           <Link
             to="/catalogo"
             aria-label="Ver catálogo"
-            className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
+            className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
           >
             <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
-            <span>Catálogo</span>
+            <span className="hidden xs:inline">Catálogo</span>
           </Link>
           <Link
             to="/calculadora"
             aria-label="Calculadora de importaciones"
-            className="inline-flex items-center rounded-full border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
+            className="inline-flex items-center rounded-full border border-border px-2 py-1 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
           >
-            <span>Calculadora</span>
+            <span className="hidden xs:inline">Calculadora</span>
+            <span className="xs:hidden">Calc</span>
           </Link>
           <HeaderAuth />
           <Link
             to="/carrito"
             aria-label="Carrito"
-            className="relative rounded-full border border-border p-2 text-foreground hover:border-primary hover:text-primary sm:p-2.5"
+            className="relative rounded-full border border-border p-1.5 text-foreground hover:border-primary hover:text-primary sm:p-2.5"
           >
             <ShoppingCart className="h-4 w-4" />
             {cart.count > 0 && (

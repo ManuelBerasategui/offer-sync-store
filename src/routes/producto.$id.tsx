@@ -260,23 +260,23 @@ function JerseyProductUI({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5 sm:gap-6 min-w-0 w-full max-w-full">
       {/* ── Header de Precio y Mínimo Mayorista ── */}
-      <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4 sm:p-5 shadow-sm">
+      <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-3.5 sm:p-5 shadow-sm min-w-0 w-full">
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap mb-1.5">
-              <span className="rounded-full bg-primary/20 text-primary px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide border border-primary/30">
+          <div className="min-w-0 w-full">
+            <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+              <span className="rounded-full bg-primary/20 text-primary px-2.5 py-0.5 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wide border border-primary/30">
                 ⚡ Mínimo 10 u. Mayorista
               </span>
               {activeTier.qty > 10 && (
-                <span className="rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[11px] font-bold">
+                <span className="rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold">
                   🔥 Tramo {activeTier.qty}+ u. aplicado
                 </span>
               )}
             </div>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl sm:text-4xl font-black text-foreground tracking-tight tabular-nums">
+            <div className="flex items-baseline gap-2 mt-1 flex-wrap">
+              <span className="text-2xl sm:text-4xl font-black text-foreground tracking-tight tabular-nums">
                 {unitArs !== null ? `$${unitArs.toLocaleString("es-AR")}` : "—"}
               </span>
               <span className="text-xs sm:text-sm font-semibold text-muted-foreground">/ unidad</span>
@@ -291,13 +291,13 @@ function JerseyProductUI({
       </div>
 
       {/* ── Selector de Talle ── */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
+      <div className="min-w-0 w-full">
+        <div className="flex items-center justify-between gap-2 mb-2">
           <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
             Talle *
           </label>
           {selectedTalle && (
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+            <span className="text-[11px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 truncate max-w-[170px]">
               Seleccionado: {selectedTalle}
             </span>
           )}
@@ -305,7 +305,7 @@ function JerseyProductUI({
         {talles.length === 0 ? (
           <p className="text-xs font-semibold text-destructive">Sin talles disponibles en este momento.</p>
         ) : (
-          <div className="grid grid-cols-4 sm:flex sm:flex-wrap gap-2">
+          <div className="grid grid-cols-4 sm:flex sm:flex-wrap gap-1.5 sm:gap-2 min-w-0 w-full">
             {talles.map((t) => {
               const isXtra = t === "3XL" || t === "4XL";
               const isSelected = selectedTalle === t;
@@ -317,15 +317,15 @@ function JerseyProductUI({
                   type="button"
                   onClick={() => { setSelectedTalle(t); setTalleError(false); }}
                   className={[
-                    "h-12 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center relative active:scale-95",
+                    "h-11 sm:h-12 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center relative active:scale-95 px-1 min-w-0",
                     isSelected
                       ? "bg-primary text-primary-foreground border-primary shadow-md ring-2 ring-primary/30"
                       : "bg-background text-foreground border-border hover:border-primary/50 hover:bg-muted/50",
                   ].join(" ")}
                 >
-                  <span className="text-sm font-black">{t}</span>
+                  <span className="text-xs sm:text-sm font-black leading-tight">{t}</span>
                   {isXtra && (
-                    <span className={`text-[9px] font-semibold leading-none mt-0.5 ${isSelected ? "text-primary-foreground/90" : "text-amber-600 dark:text-amber-400"}`}>
+                    <span className={`text-[8px] sm:text-[9px] font-semibold leading-none mt-0.5 truncate max-w-full ${isSelected ? "text-primary-foreground/90" : "text-amber-600 dark:text-amber-400"}`}>
                       {extraLabel}
                     </span>
                   )}
@@ -340,26 +340,26 @@ function JerseyProductUI({
       </div>
 
       {/* ── Selector Nombre y Número ── */}
-      <div>
+      <div className="min-w-0 w-full">
         <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
           Personalización (Nombre y Número)
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 min-w-0 w-full">
           {/* Fan */}
           <button
             type="button"
             id="jersey-version-fan"
             onClick={() => setVersion("fan")}
             className={[
-              "w-full rounded-xl p-3.5 text-left transition-all border flex items-start justify-between gap-3 active:scale-[0.99]",
+              "w-full rounded-xl p-3 sm:p-3.5 text-left transition-all border flex items-start justify-between gap-2.5 active:scale-[0.99] min-w-0",
               version === "fan"
                 ? "bg-primary/10 border-primary shadow-sm ring-1 ring-primary"
                 : "bg-background border-border hover:border-primary/40",
             ].join(" ")}
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xl">👕</span>
+                <span className="text-xl shrink-0">👕</span>
                 <span className="text-sm font-bold text-foreground">Versión Fan</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">Sin nombre ni número (lisa)</p>
@@ -376,15 +376,15 @@ function JerseyProductUI({
             id="jersey-version-player"
             onClick={() => setVersion("player")}
             className={[
-              "w-full rounded-xl p-3.5 text-left transition-all border flex items-start justify-between gap-3 active:scale-[0.99]",
+              "w-full rounded-xl p-3 sm:p-3.5 text-left transition-all border flex items-start justify-between gap-2.5 active:scale-[0.99] min-w-0",
               version === "player"
                 ? "bg-primary/10 border-primary shadow-sm ring-1 ring-primary"
                 : "bg-background border-border hover:border-primary/40",
             ].join(" ")}
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xl">✏️</span>
+                <span className="text-xl shrink-0">✏️</span>
                 <span className="text-sm font-bold text-foreground">Versión Jugador</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">Personalizado (Nombre y Número)</p>
@@ -403,27 +403,27 @@ function JerseyProductUI({
       </div>
 
       {/* ── Selector Badge ── */}
-      <div>
+      <div className="min-w-0 w-full">
         <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
           Badge / Parche Oficial
         </label>
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 gap-2 sm:gap-2.5 min-w-0 w-full">
           {/* Sin Badge */}
           <button
             type="button"
             id="jersey-badge-no"
             onClick={() => setBadge("no")}
             className={[
-              "h-16 rounded-xl border-2 p-2.5 font-bold transition-all flex items-center gap-2.5 active:scale-[0.98]",
+              "h-16 rounded-xl border-2 p-2 sm:p-2.5 font-bold transition-all flex items-center gap-2 active:scale-[0.98] min-w-0",
               badge === "no"
                 ? "border-primary bg-primary/10 text-primary shadow-sm"
                 : "border-border bg-background text-foreground hover:border-primary/40",
             ].join(" ")}
           >
-            <span className="text-2xl shrink-0">🚫</span>
-            <div className="text-left">
-              <span className="block text-xs font-bold leading-tight">Sin Badge</span>
-              <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">Versión lisa</span>
+            <span className="text-xl sm:text-2xl shrink-0">🚫</span>
+            <div className="text-left min-w-0 flex-1">
+              <span className="block text-xs font-bold leading-tight truncate">Sin Badge</span>
+              <span className="block text-[10px] font-normal text-muted-foreground mt-0.5 truncate">Versión lisa</span>
             </div>
           </button>
 
@@ -433,23 +433,23 @@ function JerseyProductUI({
             id="jersey-badge-yes"
             onClick={handleSelectBadgeYes}
             className={[
-              "h-16 rounded-xl border-2 p-2.5 font-bold transition-all flex items-center gap-2.5 active:scale-[0.98]",
+              "h-16 rounded-xl border-2 p-2 sm:p-2.5 font-bold transition-all flex items-center gap-2 active:scale-[0.98] min-w-0",
               badge === "yes"
                 ? "border-primary bg-primary/10 text-primary shadow-sm"
                 : "border-border bg-background text-foreground hover:border-primary/40",
             ].join(" ")}
           >
-            <span className="text-2xl shrink-0">🏆</span>
-            <div className="text-left">
-              <span className="block text-xs font-bold leading-tight">Con Badge</span>
-              <span className="block text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+            <span className="text-xl sm:text-2xl shrink-0">🏆</span>
+            <div className="text-left min-w-0 flex-1">
+              <span className="block text-xs font-bold leading-tight truncate">Con Badge</span>
+              <span className="block text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-0.5 truncate">
                 {usdRate > 0 ? `+${money(Math.round(1 * 1.07 * usdRate))}` : "+US$1.00"}
               </span>
             </div>
           </button>
         </div>
         {badge === "yes" && (
-          <div className="mt-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-300">
+          <div className="mt-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-300 min-w-0">
             <p className="font-bold flex items-center gap-1.5">
               <span>✓</span> Badge seleccionado (+{usdRate > 0 ? money(Math.round(1 * 1.07 * usdRate)) : "US$1.00"} c/u)
             </p>
@@ -468,7 +468,7 @@ function JerseyProductUI({
       </div>
 
       {/* ── Selector de Cantidad interactivo (permite ej: 15 u.) ── */}
-      <div>
+      <div className="min-w-0 w-full">
         <div className="flex items-center justify-between mb-2">
           <label htmlFor="jersey-qty-input" className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
             Cantidad a pedir
@@ -479,7 +479,7 @@ function JerseyProductUI({
         </div>
 
         {/* Quick select pills */}
-        <div className="grid grid-cols-4 gap-1.5 mb-2.5">
+        <div className="grid grid-cols-4 gap-1.5 mb-2.5 min-w-0 w-full">
           {[10, 20, 50, 100].map((quickQty) => (
             <button
               key={quickQty}
@@ -499,7 +499,7 @@ function JerseyProductUI({
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             id="jersey-qty-minus"
@@ -533,7 +533,7 @@ function JerseyProductUI({
               setQty(valid);
               setQtyStr(String(valid));
             }}
-            className="h-11 flex-1 rounded-xl border border-input bg-background text-center text-lg font-black focus:border-primary outline-none"
+            className="h-11 flex-1 min-w-0 rounded-xl border border-input bg-background text-center text-lg font-black focus:border-primary outline-none"
           />
           <button
             type="button"
@@ -557,7 +557,7 @@ function JerseyProductUI({
       </div>
 
       {/* ── Escala de Precios por Tramo (Mobile Friendly) ── */}
-      <div>
+      <div className="min-w-0 w-full">
         <div className="flex items-center justify-between mb-2">
           <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
             Escala de precios por volumen
@@ -566,9 +566,9 @@ function JerseyProductUI({
             Tocá cualquier tramo para seleccionarlo
           </span>
         </div>
-        <div className="rounded-2xl border border-border overflow-hidden divide-y divide-border bg-card shadow-sm">
+        <div className="rounded-2xl border border-border overflow-hidden divide-y divide-border bg-card shadow-sm min-w-0 w-full">
           {/* Header */}
-          <div className="grid grid-cols-3 bg-muted/60 px-3.5 py-2 text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">
+          <div className="grid grid-cols-3 bg-muted/60 px-2.5 sm:px-3.5 py-2 text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider">
             <span>Tramo</span>
             <span className="text-center">Precio c/u</span>
             <span className="text-right">Total tramo</span>
@@ -589,18 +589,18 @@ function JerseyProductUI({
                   setQtyStr(String(tier.qty));
                 }}
                 className={[
-                  "w-full grid grid-cols-3 px-3.5 py-2.5 text-left transition-colors items-center active:bg-muted",
+                  "w-full grid grid-cols-3 px-2.5 sm:px-3.5 py-2.5 text-left transition-colors items-center active:bg-muted text-xs sm:text-sm",
                   isTierActive
                     ? "bg-primary/10 font-bold"
                     : "hover:bg-muted/40",
                 ].join(" ")}
               >
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 min-w-0">
                   <span className={`text-xs sm:text-sm font-bold ${isTierActive ? "text-primary" : "text-foreground"}`}>
                     {tier.qty} u.
                   </span>
                   {isTierActive && (
-                    <span className="text-[9px] sm:text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold leading-none">
+                    <span className="text-[9px] sm:text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold leading-none shrink-0">
                       ✓
                     </span>
                   )}
@@ -624,36 +624,36 @@ function JerseyProductUI({
 
       {/* ── Resumen de Selección (Order Summary Card) ── */}
       {selectedTalle && (
-        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-xs shadow-sm">
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 sm:p-4 text-xs shadow-sm min-w-0 w-full">
           <p className="font-extrabold text-primary text-xs uppercase tracking-wider mb-2.5">
             📋 Resumen de tu selección:
           </p>
-          <div className="grid grid-cols-2 gap-2 text-foreground mb-3">
-            <div className="bg-background/80 rounded-lg p-2 border border-border/50">
+          <div className="grid grid-cols-2 gap-2 text-foreground mb-3 min-w-0">
+            <div className="bg-background/80 rounded-lg p-2 border border-border/50 min-w-0">
               <span className="text-[10px] text-muted-foreground block">Talle</span>
-              <span className="font-bold text-xs">{selectedTalle} {isExtraSize && "(+1 USD)"}</span>
+              <span className="font-bold text-xs truncate block">{selectedTalle} {isExtraSize && "(+1 USD)"}</span>
             </div>
-            <div className="bg-background/80 rounded-lg p-2 border border-border/50">
+            <div className="bg-background/80 rounded-lg p-2 border border-border/50 min-w-0">
               <span className="text-[10px] text-muted-foreground block">Versión</span>
-              <span className="font-bold text-xs">{version === "player" ? "Jugador (Personalizado)" : "Fan"}</span>
+              <span className="font-bold text-xs truncate block">{version === "player" ? "Jugador (Personalizado)" : "Fan"}</span>
             </div>
-            <div className="bg-background/80 rounded-lg p-2 border border-border/50">
+            <div className="bg-background/80 rounded-lg p-2 border border-border/50 min-w-0">
               <span className="text-[10px] text-muted-foreground block">Badge</span>
-              <span className="font-bold text-xs">{badge === "yes" ? "Con Badge 🏆" : "Sin Badge"}</span>
+              <span className="font-bold text-xs truncate block">{badge === "yes" ? "Con Badge 🏆" : "Sin Badge"}</span>
             </div>
-            <div className="bg-background/80 rounded-lg p-2 border border-border/50">
+            <div className="bg-background/80 rounded-lg p-2 border border-border/50 min-w-0">
               <span className="text-[10px] text-muted-foreground block">Cantidad</span>
-              <span className="font-bold text-xs">{qty} unidades</span>
+              <span className="font-bold text-xs truncate block">{qty} unidades</span>
             </div>
           </div>
-          <div className="flex items-center justify-between pt-2 border-t border-primary/20">
-            <div>
+          <div className="flex items-center justify-between pt-2 border-t border-primary/20 gap-2">
+            <div className="min-w-0">
               <span className="text-[11px] text-muted-foreground block">Precio unitario</span>
               <span className="font-bold text-sm text-foreground">
                 {unitArs !== null ? `$${unitArs.toLocaleString("es-AR")}` : "—"}
               </span>
             </div>
-            <div className="text-right">
+            <div className="text-right min-w-0">
               <span className="text-[11px] text-muted-foreground block">Total estimado</span>
               <span className="font-black text-base sm:text-lg text-primary">
                 {totalArs !== null ? `$${totalArs.toLocaleString("es-AR")}` : "—"}
@@ -665,8 +665,8 @@ function JerseyProductUI({
 
       {/* ── Acciones de Compra y Contacto ── */}
       {badge === "yes" ? (
-        <div className="flex flex-col gap-2.5">
-          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-emerald-800 dark:text-emerald-300">
+        <div className="flex flex-col gap-2.5 min-w-0 w-full">
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 sm:p-4 text-xs text-emerald-800 dark:text-emerald-300 min-w-0">
             <p className="font-bold flex items-center gap-1.5 text-sm text-emerald-900 dark:text-emerald-200">
               <span>💬</span> Los pedidos con Badge se coordinan y cierran por WhatsApp
             </p>
@@ -678,12 +678,12 @@ function JerseyProductUI({
             type="button"
             id="btn-jersey-whatsapp-badge"
             onClick={handleBadgeWhatsApp}
-            className="btn-base w-full bg-whatsapp text-whatsapp-foreground flex items-center justify-center gap-2 font-bold hover:opacity-90 transition-opacity py-3.5 text-base shadow-md active:scale-[0.98]"
+            className="btn-base w-full bg-whatsapp text-whatsapp-foreground flex items-center justify-center gap-2 font-bold hover:opacity-90 transition-opacity py-3.5 px-3 text-sm sm:text-base shadow-md active:scale-[0.98] text-center"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
             </svg>
-            Coordinar pedido con Badge por WhatsApp
+            <span className="truncate">Coordinar con Badge por WhatsApp</span>
           </button>
           <button
             type="button"
@@ -694,10 +694,10 @@ function JerseyProductUI({
           </button>
         </div>
       ) : (
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2.5 min-w-0 w-full">
           {/* Aviso de mínimo cuando qty < 10 */}
           {qty < 10 && (
-            <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3.5 py-3 text-xs">
+            <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3.5 py-3 text-xs min-w-0">
               <p className="font-bold text-destructive">⚠️ Mínimo 10 unidades</p>
               <p className="mt-0.5 text-muted-foreground">
                 Llevás {qty} {qty === 1 ? "unidad" : "unidades"}. Necesitás al menos {10 - qty} más para poder comprar.
@@ -711,7 +711,7 @@ function JerseyProductUI({
             id="btn-jersey-comprar-ya"
             disabled={qty < 10}
             onClick={handleBuyNow}
-            className={`btn-base w-full font-bold transition-all text-base py-3.5 shadow-sm active:scale-[0.98] ${
+            className={`btn-base w-full font-bold transition-all text-sm sm:text-base py-3.5 px-3 shadow-sm active:scale-[0.98] text-center ${
               qty < 10
                 ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground border border-border"
                 : "grad-urgente text-primary-foreground hover:shadow-md"
@@ -729,7 +729,7 @@ function JerseyProductUI({
             id="btn-jersey-add-cart"
             disabled={qty < 10}
             onClick={qty < 10 ? undefined : handleAddToCart}
-            className={`btn-base w-full font-bold transition py-3 active:scale-[0.98] ${
+            className={`btn-base w-full font-bold transition py-3 px-3 text-sm sm:text-base active:scale-[0.98] text-center ${
               qty < 10
                 ? "opacity-40 cursor-not-allowed border border-border text-muted-foreground"
                 : "border-2 border-primary text-primary hover:bg-primary/10"
@@ -743,7 +743,7 @@ function JerseyProductUI({
             type="button"
             id="btn-jersey-whatsapp"
             onClick={handleWhatsApp}
-            className="btn-base w-full bg-whatsapp text-whatsapp-foreground flex items-center justify-center gap-2 font-semibold hover:opacity-90 transition-opacity py-3 active:scale-[0.98]"
+            className="btn-base w-full bg-whatsapp text-whatsapp-foreground flex items-center justify-center gap-2 font-semibold hover:opacity-90 transition-opacity py-3 px-3 text-sm sm:text-base active:scale-[0.98] text-center"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
@@ -781,7 +781,7 @@ function ProductGallery({
   const current = allImages[activeIdx] ?? allImages[0] ?? "";
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 min-w-0 w-full max-w-full">
       {/* Imagen principal */}
       <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-2xl border border-border bg-surface lg:sticky lg:top-24">
         <img
@@ -796,7 +796,7 @@ function ProductGallery({
       </div>
       {/* Strip de miniaturas (solo si hay más de 1 foto) */}
       {allImages.length > 1 && (
-        <div className="mx-auto flex max-w-[460px] gap-2 overflow-x-auto pb-1">
+        <div className="mx-auto flex w-full max-w-[460px] gap-2 overflow-x-auto pb-1 no-scrollbar min-w-0">
           {allImages.map((url, i) => (
             <button
               key={url + i}
@@ -804,7 +804,7 @@ function ProductGallery({
               onClick={() => setActiveIdx(i)}
               aria-label={`Ver foto ${i + 1}`}
               className={[
-                "shrink-0 h-16 w-16 rounded-lg border-2 overflow-hidden bg-surface transition-all",
+                "shrink-0 h-14 w-14 sm:h-16 sm:w-16 rounded-lg border-2 overflow-hidden bg-surface transition-all",
                 i === activeIdx
                   ? "border-primary shadow-md scale-105"
                   : "border-border opacity-60 hover:opacity-100 hover:border-primary/50",
@@ -1173,10 +1173,10 @@ function ProductoPage() {
   const isOutOfStock = String(product.stock ?? "SI").trim().toUpperCase() === "NO";
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden">
       <SiteHeader config={config} />
 
-      <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6 sm:py-12">
+      <main className="mx-auto max-w-[1180px] w-full px-4 py-8 sm:px-6 sm:py-12 overflow-x-hidden min-w-0">
         <div className="flex items-center justify-between gap-4">
           <Link
             to="/catalogo"
@@ -1194,18 +1194,18 @@ function ProductoPage() {
           )}
         </div>
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-2 lg:items-start">
+        <div className="mt-6 grid gap-8 lg:grid-cols-2 lg:items-start min-w-0 w-full max-w-full">
           <ProductGallery
             images={galleryImages(product)}
             productName={product.nombre ?? "Producto"}
             selectedVariantImage={selectedVariant?.imagen_url}
           />
 
-          <div>
+          <div className="min-w-0 w-full max-w-full">
             <p className="text-[11px] font-semibold uppercase tracking-[2px] text-muted-foreground">
               {product.categoria || "General"}
             </p>
-            <h1 className="mt-2 font-sans text-[clamp(24px,6vw,36px)] font-bold normal-case tracking-tight">
+            <h1 className="mt-2 font-sans text-[clamp(20px,5vw,36px)] font-bold normal-case tracking-tight break-words">
               {displayName}
             </h1>
 
