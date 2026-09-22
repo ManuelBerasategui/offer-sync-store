@@ -1381,6 +1381,7 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
       calculatorRates?: {
         fleteKg?: number;
         handling?: number;
+        honorarios?: number;
         impuestosPct?: number;
         aereoFijo?: number;
         aereoDesde?: number;
@@ -1495,6 +1496,7 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         const calcRows = [
           { clave: "calc_flete_kg", valor: String(data.calculatorRates.fleteKg ?? 22) },
           { clave: "calc_handling", valor: String(data.calculatorRates.handling ?? 30) },
+          { clave: "calc_honorarios", valor: String(data.calculatorRates.honorarios ?? 220) },
           { clave: "calc_impuestos_pct", valor: String(data.calculatorRates.impuestosPct ?? 70) },
           { clave: "calc_aereo_fijo", valor: String(data.calculatorRates.aereoFijo ?? 950) },
           { clave: "calc_aereo_desde", valor: String(data.calculatorRates.aereoDesde ?? 50) },

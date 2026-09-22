@@ -95,6 +95,7 @@ function AdminConfiguracionPage() {
   // Estado para Tarifas de Calculadora de Importaciones (solo admin)
   const [calcFleteKg, setCalcFleteKg] = useState<string>(config["calc_flete_kg"] ?? "22");
   const [calcHandling, setCalcHandling] = useState<string>(config["calc_handling"] ?? "30");
+  const [calcHonorarios, setCalcHonorarios] = useState<string>(config["calc_honorarios"] ?? "220");
   const [calcImpuestosPct, setCalcImpuestosPct] = useState<string>(config["calc_impuestos_pct"] ?? "70");
   const [calcAereoFijo, setCalcAereoFijo] = useState<string>(config["calc_aereo_fijo"] ?? "950");
   const [calcAereoDesde, setCalcAereoDesde] = useState<string>(config["calc_aereo_desde"] ?? "50");
@@ -345,6 +346,7 @@ function AdminConfiguracionPage() {
           calculatorRates: {
             fleteKg: Number(calcFleteKg) || 22,
             handling: Number(calcHandling) || 30,
+            honorarios: Number(calcHonorarios) || 220,
             impuestosPct: Number(calcImpuestosPct) || 70,
             aereoFijo: Number(calcAereoFijo) || 950,
             aereoDesde: Number(calcAereoDesde) || 50,
@@ -1077,7 +1079,7 @@ function AdminConfiguracionPage() {
             Configuración de las tarifas base utilizadas por la <strong>Calculadora de Importaciones</strong> para cotizaciones de clientes. Los clientes nunca verán estos costos internos ni porcentajes, únicamente verán "Flete" e "Impuestos".
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4">
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-muted-foreground uppercase">Flete USD/kg (menor a 50kg)</label>
               <div className="flex items-center gap-1.5">
@@ -1104,6 +1106,21 @@ function AdminConfiguracionPage() {
                   value={calcHandling}
                   onChange={(e) => setCalcHandling(e.target.value)}
                   placeholder="30"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Honorarios fijos por envío</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-muted-foreground">u$d</span>
+                <input
+                  type="number"
+                  step="1"
+                  className="input-base text-xs font-bold"
+                  value={calcHonorarios}
+                  onChange={(e) => setCalcHonorarios(e.target.value)}
+                  placeholder="220"
                 />
               </div>
             </div>

@@ -35,6 +35,7 @@ type QuoteResult = {
     fobTotal: number;
     freightCost: number;
     handling: number;
+    honorarios: number;
     base: number;
     tax: number;
     total: number;
@@ -44,11 +45,13 @@ type QuoteResult = {
   totalFOB: number;
   freightTotal: number;
   handlingTotal: number;
+  honorariosTotal: number;
   taxesTotal: number;
   grandTotal: number;
   rates: {
     fleteKg: number;
     handling: number;
+    honorarios: number;
     impuestosPct: number;
     aereoFijo: number;
     aereoDesde: number;
@@ -70,6 +73,7 @@ export function CalculadoraPage() {
   const rates = {
     fleteKg: Number(config["calc_flete_kg"]) || 22,
     handling: Number(config["calc_handling"]) || 30,
+    honorarios: Number(config["calc_honorarios"]) || 220,
     impuestosPct: Number(config["calc_impuestos_pct"]) || 70,
     aereoFijo: Number(config["calc_aereo_fijo"]) || 950,
     aereoDesde: Number(config["calc_aereo_desde"]) || 50,
@@ -139,11 +143,12 @@ export function CalculadoraPage() {
       const fobTotal = i.cantidad * i.fob;
       const freightCost = calcFreightCost(weight);
       const handling = rates.handling;
+      const honorarios = rates.honorarios;
       const base = fobTotal + freightCost + handling;
       const tax = base * (rates.impuestosPct / 100);
-      const total = base + tax;
+      const total = base + tax + honorarios;
       const unitPrice = i.cantidad > 0 ? total / i.cantidad : 0;
-      return { ...i, weight, fobTotal, freightCost, handling, base, tax, total, unitPrice };
+      return { ...i, weight, fobTotal, freightCost, handling, honorarios, base, tax, total, unitPrice };
     });
 
     // Cálculo combinado (todos juntos)
@@ -151,9 +156,10 @@ export function CalculadoraPage() {
     const totalFOB = validItems.reduce((s, i) => s + i.cantidad * i.fob, 0);
     const freightTotal = calcFreightCost(totalWeight);
     const handlingTotal = rates.handling;
+    const honorariosTotal = rates.honorarios;
     const baseTotal = totalFOB + freightTotal + handlingTotal;
     const taxesTotal = baseTotal * (rates.impuestosPct / 100);
-    const grandTotal = baseTotal + taxesTotal;
+    const grandTotal = baseTotal + taxesTotal + honorariosTotal;
 
     const res: QuoteResult = {
       client: clientName,
@@ -163,6 +169,7 @@ export function CalculadoraPage() {
       totalFOB,
       freightTotal,
       handlingTotal,
+      honorariosTotal,
       taxesTotal,
       grandTotal,
       rates,
@@ -191,13 +198,16 @@ export function CalculadoraPage() {
       });
       msg += `• Flete: ${fmt(quote.freightTotal)}\n`;
       msg += `• Handling: ${fmt(quote.handlingTotal)}\n`;
+      msg += `• Honorarios: ${fmt(quote.honorariosTotal)}\n`;
       msg += `• Impuestos: ${fmt(quote.taxesTotal)}\n`;
       msg += `\n*Total trayendo todo: ${fmt(quote.grandTotal)}*\n`;
     } else {
       const i = quote.itemsIsolated[0];
-      msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u puesto en Argentina\n`;
+      if (i) {
+        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u puesto en Argentina\n`;
+      }
       msg += `\n*Total puesto en Argentina: ${fmt(quote.grandTotal)}*\n`;
-      msg += `_(incluye flete, handling e impuestos)_\n`;
+      msg += `_(incluye flete, handling, honorarios e impuestos)_\n`;
     }
 
     msg += `\n*Nota:* El precio final es estimativo. Me gustaría confirmar el pedido y obtener el valor definitivo.`;
@@ -248,7 +258,7 @@ export function CalculadoraPage() {
                 Calculadora de Importaciones
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-                Producto puesto en Argentina con flete internacional, handling y gestión integral de aduana.
+                Producto puesto en Argentina con flete internacional, handling, honorarios y gestión integral de aduana.
               </p>
             </div>
 
@@ -475,6 +485,10 @@ export function CalculadoraPage() {
                       <span className="text-foreground">Handling</span>
                       <span className="font-mono text-foreground">{fmt(quote.handlingTotal)}</span>
                     </div>
+                    <div className="flex justify-between py-2 text-sm">
+                      <span className="text-foreground">Honorarios</span>
+                      <span className="font-mono text-foreground">{fmt(quote.honorariosTotal)}</span>
+                    </div>
                     <div className="flex justify-between py-2 text-sm font-medium">
                       <span className="text-foreground">Impuestos</span>
                       <span className="font-mono text-foreground">{fmt(quote.taxesTotal)}</span>
@@ -508,6 +522,10 @@ export function CalculadoraPage() {
                     <div className="flex justify-between">
                       <span>Handling</span>
                       <span>{fmt(quote.handlingTotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Honorarios</span>
+                      <span>{fmt(quote.honorariosTotal)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Impuestos</span>
