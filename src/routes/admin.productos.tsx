@@ -32,8 +32,9 @@ import {
   type VariantInput,
   type BannerInput,
   type YupooAlbumPreview,
+  type GetAdminProductsResult,
 } from "@/lib/products.functions";
-import { money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
+import { type Product, type Banner, money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 import { SafeImage } from "@/components/SafeImage";
 
@@ -2710,16 +2711,39 @@ function OfertasDelDiaPanel({
     );
   }, [activeOffers, search]);
 
-  const candidateProducts = useMemo(() => {
-    const nonOffers = products.filter((p) => String(p.oferta ?? "").trim().toUpperCase() !== "SI");
-    if (!search.trim()) return nonOffers;
-    const q = search.toLowerCase();
-    return nonOffers.filter(
-      (p) =>
-        String(p.nombre ?? "").toLowerCase().includes(q) ||
-        String(p.categoria ?? "").toLowerCase().includes(q)
-    );
-  }, [products, search]);
+  const [candidates, setCandidates] = useState<Product[]>([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+
+  useEffect(() => {
+    if (subTab !== "agregar") return;
+    let cancelled = false;
+    setLoadingCandidates(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = (await getAdminProducts({
+          data: {
+            email: userEmail,
+            token: userToken,
+            search: search.trim() || undefined,
+            pageSize: 30,
+          },
+        })) as GetAdminProductsResult;
+        if (!cancelled && res.products) {
+          setCandidates(res.products.filter((p) => String(p.oferta ?? "").trim().toUpperCase() !== "SI"));
+        }
+      } catch {
+        // error handling
+      } finally {
+        if (!cancelled) setLoadingCandidates(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [subTab, search, userEmail, userToken]);
+
+  const candidateProducts = subTab === "agregar" ? candidates : [];
 
   async function handleClearAllOffers() {
     if (activeOffers.length === 0) return;
@@ -3363,15 +3387,30 @@ function AdminProductosPage() {
   const [roundingIncrement, setRoundingIncrement] = useState<number>(10);
   const [markupPercentage, setMarkupPercentage] = useState<number>(0);
 
+  const [totalProductsCount, setTotalProductsCount] = useState<number>(0);
+  const [adminTotalPages, setAdminTotalPages] = useState<number>(1);
+  const [activeOffersCount, setActiveOffersCount] = useState<number>(0);
+  const [categoriesList, setCategoriesList] = useState<string[]>([]);
+  const [offersProducts, setOffersProducts] = useState<Product[]>([]);
+  const isFirstMount = useRef(true);
+
   const existingCategories = useMemo(() => {
+    if (categoriesList.length > 0) return categoriesList;
     return Array.from(new Set(products.map((p) => String(p.categoria ?? "").trim()).filter(Boolean))).sort();
-  }, [products]);
+  }, [categoriesList, products]);
 
   const userEmail = user?.email ?? "";
   const userToken = session?.access_token ?? "";
   const userId = user?.id;
 
-  async function loadProducts(isInitial = false) {
+  const ADMIN_PAGE_SIZE = 20;
+  const [adminPage, setAdminPage] = useState(1);
+
+  async function loadProducts(opts?: { isInitial?: boolean; page?: number; search?: string }) {
+    const isInitial = opts?.isInitial ?? false;
+    const targetPage = opts?.page ?? adminPage;
+    const targetSearch = opts?.search !== undefined ? opts.search : search;
+
     if (isInitial || products.length === 0) {
       setLoading(true);
     }
@@ -3379,7 +3418,15 @@ function AdminProductosPage() {
     try {
       const email = user?.email ?? "";
       const token = session?.access_token ?? "";
-      const res = await getAdminProducts({ data: { email, token } });
+      const res = (await getAdminProducts({
+        data: {
+          email,
+          token,
+          page: targetPage,
+          pageSize: ADMIN_PAGE_SIZE,
+          search: targetSearch.trim() || undefined,
+        },
+      })) as GetAdminProductsResult;
       if (res.error) {
         if (products.length === 0) {
           setError(res.error);
@@ -3393,6 +3440,10 @@ function AdminProductosPage() {
       } else {
         setIsAuthorized(true);
         setProducts(res.products);
+        if (typeof res.totalCount === "number") setTotalProductsCount(res.totalCount);
+        if (typeof res.totalPages === "number") setAdminTotalPages(res.totalPages);
+        if (typeof res.activeOffersCount === "number") setActiveOffersCount(res.activeOffersCount);
+        if (Array.isArray(res.existingCategories)) setCategoriesList(res.existingCategories);
         if (res.dolarRate) setDolarRate(res.dolarRate);
         if (res.roundingIncrement) setRoundingIncrement(res.roundingIncrement);
         if (res.markupPercentage !== undefined) setMarkupPercentage(res.markupPercentage);
@@ -3409,15 +3460,54 @@ function AdminProductosPage() {
     }
   }
 
+  async function loadOffers() {
+    try {
+      const email = user?.email ?? "";
+      const token = session?.access_token ?? "";
+      const res = (await getAdminProducts({
+        data: { email, token, offerOnly: true, fetchAll: true },
+      })) as GetAdminProductsResult;
+      if (!res.error) {
+        setOffersProducts(res.products);
+        if (typeof res.activeOffersCount === "number") setActiveOffersCount(res.activeOffersCount);
+      }
+    } catch {}
+  }
+
   useEffect(() => {
     if (!authLoading) {
       if (!userId) {
         void navigate({ to: "/", replace: true });
       } else {
-        void loadProducts(true);
+        void loadProducts({ isInitial: true, page: 1 });
+        void loadOffers();
       }
     }
   }, [authLoading, userId]);
+
+  useEffect(() => {
+    if (activeTab === "ofertas" && userId) {
+      void loadOffers();
+    }
+  }, [activeTab, userId]);
+
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      setAdminPage(1);
+      void loadProducts({ page: 1, search });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const handlePageChange = (newPage: number) => {
+    const p = Math.max(1, Math.min(adminTotalPages, newPage));
+    setAdminPage(p);
+    void loadProducts({ page: p, search });
+  };
 
   async function handleDelete(id: string) {
     if (!confirm("¿Seguro que querés eliminar este producto? Se borrarán también sus variantes.")) return;
@@ -3425,32 +3515,19 @@ function AdminProductosPage() {
     try {
       const res = await deleteAdminProduct({ data: { email: userEmail, token: userToken, productId: id } });
       if (res.error) alert(res.error);
-      else setProducts((prev) => prev.filter((p) => String(p.id) !== id));
+      else {
+        await loadProducts({ page: adminPage, search });
+      }
     } finally {
       setDeletingId(null);
     }
   }
 
-  const filtered = products.filter((p) => {
-    if (!search.trim()) return true;
-    const term = search.toLowerCase();
-    return (
-      String(p.nombre ?? "").toLowerCase().includes(term) ||
-      String(p.categoria ?? "").toLowerCase().includes(term)
-    );
-  });
-
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [expandedVariants, setExpandedVariants] = useState<Record<string, boolean>>({});
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
-  const ADMIN_PAGE_SIZE = 20;
-  const [adminPage, setAdminPage] = useState(1);
-  // Resetear página al cambiar el buscador
-  useEffect(() => { setAdminPage(1); }, [search]);
-
-  const adminTotalPages = Math.max(1, Math.ceil(filtered.length / ADMIN_PAGE_SIZE));
-  const paginatedFiltered = filtered.slice((adminPage - 1) * ADMIN_PAGE_SIZE, adminPage * ADMIN_PAGE_SIZE);
+  const paginatedFiltered = products;
 
   const toggleSelectAll = () => {
     const allFilteredIds = paginatedFiltered.map((p) => String(p.id ?? ""));
@@ -3539,10 +3616,6 @@ function AdminProductosPage() {
     }
   }
 
-  const activeOffersCount = products.filter(
-    (p) => String(p.oferta ?? "").trim().toUpperCase() === "SI"
-  ).length;
-
   if (!authLoading && (!user || isAuthorized === false)) {
     if (typeof window !== "undefined") {
       window.location.replace("/");
@@ -3601,7 +3674,7 @@ function AdminProductosPage() {
             <PackagePlus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             <span>Catálogo General</span>
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] sm:text-xs font-semibold">
-              {products.length}
+              {totalProductsCount}
             </span>
           </button>
           <button
@@ -3661,10 +3734,10 @@ function AdminProductosPage() {
               </ComboPanelBoundary>
             ) : activeTab === "ofertas" ? (
               <OfertasDelDiaPanel
-                products={products}
+                products={offersProducts}
                 userEmail={userEmail}
                 userToken={userToken}
-                onRefresh={loadProducts}
+                onRefresh={loadOffers}
                 dolarRate={dolarRate}
                 roundingIncrement={roundingIncrement}
                 markupPercentage={markupPercentage}
@@ -3692,9 +3765,9 @@ function AdminProductosPage() {
                         <span>Eliminar {selectedIds.length} de la DB</span>
                       </button>
                     )}
-                    {filtered.length > 0 && (
+                    {totalProductsCount > 0 && (
                       <p className="text-xs text-muted-foreground shrink-0">
-                        {filtered.length} producto{filtered.length !== 1 ? "s" : ""}
+                        {totalProductsCount} producto{totalProductsCount !== 1 ? "s" : ""}
                         {adminTotalPages > 1 && (
                           <span className="ml-1 text-muted-foreground/70">
                             — pág. {adminPage}/{adminTotalPages}
@@ -3707,7 +3780,7 @@ function AdminProductosPage() {
 
                 {/* Tabla de productos */}
                 <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-                  {filtered.length === 0 ? (
+                  {products.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 py-16 text-center">
                       <PackagePlus className="h-10 w-10 text-muted-foreground/40" />
                       <p className="text-sm text-muted-foreground">
@@ -3969,7 +4042,7 @@ function AdminProductosPage() {
                       {adminTotalPages > 1 && (
                         <div className="flex items-center justify-center gap-1.5 flex-wrap border-t border-border px-4 py-3 bg-muted/20">
                           <button
-                            onClick={() => setAdminPage((p) => Math.max(1, p - 1))}
+                            onClick={() => handlePageChange(adminPage - 1)}
                             disabled={adminPage === 1}
                             className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           >
@@ -3988,7 +4061,7 @@ function AdminProductosPage() {
                               ) : (
                                 <button
                                   key={item}
-                                  onClick={() => setAdminPage(item as number)}
+                                  onClick={() => handlePageChange(item as number)}
                                   className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${adminPage === item
                                     ? "border-primary bg-primary text-primary-foreground"
                                     : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -3999,7 +4072,7 @@ function AdminProductosPage() {
                               )
                             )}
                           <button
-                            onClick={() => setAdminPage((p) => Math.min(adminTotalPages, p + 1))}
+                            onClick={() => handlePageChange(adminPage + 1)}
                             disabled={adminPage === adminTotalPages}
                             className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           >

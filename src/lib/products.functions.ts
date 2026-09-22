@@ -117,40 +117,119 @@ export function calcArsFromUsd(
   return Math.round(baseUsdWithSurcharge * rate * (1 + markup));
 }
 
-/* ─── Listar todos los productos (admin, con variantes) ── */
+/* ─── Listar todos los productos (admin, con variantes y paginación real) ── */
+
+export type GetAdminProductsResult = {
+  products: Product[];
+  totalCount?: number;
+  totalPages?: number;
+  page?: number;
+  pageSize?: number;
+  activeOffersCount?: number;
+  existingCategories?: string[];
+  dolarRate?: number;
+  roundingIncrement?: number;
+  markupPercentage?: number;
+  error?: string;
+};
 
 export const getAdminProducts = createServerFn({ method: "POST" })
-  .validator((data: { email?: string; token?: string }) => ({
-    email: str(data?.email, 160).toLowerCase(),
-    token: str(data?.token, 2000),
-  }))
+  .validator(
+    (data?: {
+      email?: string | undefined;
+      token?: string | undefined;
+      page?: number | undefined;
+      pageSize?: number | undefined;
+      search?: string | undefined;
+      category?: string | undefined;
+      offerOnly?: boolean | undefined;
+      fetchAll?: boolean | undefined;
+    }) => ({
+      email: str(data?.email, 160).toLowerCase(),
+      token: str(data?.token, 2000),
+      page: data?.page ? Math.max(1, Number(data.page)) : undefined,
+      pageSize: data?.pageSize ? Math.max(1, Math.min(100, Number(data.pageSize))) : undefined,
+      search: typeof data?.search === "string" ? str(data.search, 100).trim() : undefined,
+      category: typeof data?.category === "string" ? str(data.category, 100).trim() : undefined,
+      offerOnly: Boolean(data?.offerOnly),
+      fetchAll: Boolean(data?.fetchAll),
+    }),
+  )
   .handler(
     async ({
       data,
-    }): Promise<{
-      products: Product[];
-      dolarRate?: number;
-      roundingIncrement?: number;
-      markupPercentage?: number;
-      error?: string;
-    }> => {
+    }): Promise<GetAdminProductsResult> => {
       try {
         const supabaseAdmin = await assertAdmin(data.email, data.token);
 
-        const [productsRes, variantsRes, pricingRes] = await Promise.all([
-          (supabaseAdmin as any).from("products").select("*").order("nombre"),
-          (supabaseAdmin as any).from("product_variants").select("*"),
+        let query = (supabaseAdmin as any)
+          .from("products")
+          .select("*", { count: "exact" })
+          .order("nombre");
+
+        if (data.search) {
+          const sanitizedSearch = data.search.replace(/[,()]/g, " ").trim();
+          if (sanitizedSearch) {
+            query = query.or(`nombre.ilike.%${sanitizedSearch}%,categoria.ilike.%${sanitizedSearch}%`);
+          }
+        }
+
+        if (data.category) {
+          query = query.eq("categoria", data.category);
+        }
+
+        if (data.offerOnly) {
+          query = query.eq("oferta", "SI");
+        }
+
+        const isPaginated = !data.fetchAll && (data.page !== undefined || data.pageSize !== undefined);
+        const page = isPaginated ? (data.page ?? 1) : 1;
+        const pageSize = isPaginated ? (data.pageSize ?? 20) : undefined;
+
+        if (isPaginated && pageSize) {
+          const from = (page - 1) * pageSize;
+          const to = from + pageSize - 1;
+          query = query.range(from, to);
+        }
+
+        const [productsRes, pricingRes, offersCountRes, catsRes] = await Promise.all([
+          query,
           (supabaseAdmin as any)
             .from("pricing_settings")
             .select("last_rate, markup_percentage, rounding_increment")
             .eq("id", true)
             .maybeSingle(),
+          (supabaseAdmin as any)
+            .from("products")
+            .select("id", { count: "exact", head: true })
+            .eq("oferta", "SI"),
+          (supabaseAdmin as any)
+            .from("products")
+            .select("categoria")
+            .not("categoria", "is", null),
         ]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const productsResTyped = productsRes as { data: any[] | null; error: any };
-        const variantsResTyped = variantsRes as { data: any[] | null; error: any };
 
+        const productsResTyped = productsRes as { data: any[] | null; count: number | null; error: any };
         if (productsResTyped.error) throw productsResTyped.error;
+
+        const totalCount = productsResTyped.count ?? (productsResTyped.data ?? []).length;
+        const totalPages = pageSize ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
+        const activeOffersCount = offersCountRes?.count ?? 0;
+        const existingCategories = Array.from(
+          new Set((catsRes?.data ?? []).map((r: any) => String(r.categoria ?? "").trim()).filter(Boolean)),
+        ).sort();
+
+        // Optimized variant fetching: ONLY fetch variants for products on the current page!
+        const productIds = (productsResTyped.data ?? []).map((p: any) => p.id).filter(Boolean);
+        let variantsData: any[] = [];
+        if (productIds.length > 0) {
+          const variantsRes = await (supabaseAdmin as any)
+            .from("product_variants")
+            .select("*")
+            .in("product_id", productIds);
+          if (variantsRes.error) throw variantsRes.error;
+          variantsData = variantsRes.data ?? [];
+        }
 
         let dolarRate = 0;
         let roundingIncrement = 10;
@@ -186,7 +265,7 @@ export const getAdminProducts = createServerFn({ method: "POST" })
         }
 
         const variantsByProduct = new Map<string, ProductVariant[]>();
-        for (const v of variantsResTyped.data ?? []) {
+        for (const v of variantsData) {
           const pid = String(v.product_id ?? "");
           if (!pid) continue;
           const list = variantsByProduct.get(pid) ?? [];
@@ -218,10 +297,23 @@ export const getAdminProducts = createServerFn({ method: "POST" })
           return { ...meta, ...rest, variants } as Product;
         });
 
-        return { products, dolarRate, roundingIncrement, markupPercentage };
+        return {
+          products,
+          totalCount,
+          totalPages,
+          page,
+          pageSize,
+          activeOffersCount,
+          existingCategories,
+          dolarRate,
+          roundingIncrement,
+          markupPercentage,
+        };
       } catch (err) {
         return {
           products: [],
+          totalCount: 0,
+          totalPages: 1,
           error: err instanceof Error ? err.message : "Error al cargar productos.",
         };
       }
