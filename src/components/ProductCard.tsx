@@ -67,7 +67,7 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
           </span>
         )}
         <img
-          src={imageUrl(p.imagen_url) || FALLBACK_IMAGE}
+          src={imageUrl(p.imagen_url, 600) || FALLBACK_IMAGE}
           alt={p.nombre ?? "Producto"}
           loading="lazy"
           decoding="async"

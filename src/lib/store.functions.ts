@@ -6,16 +6,17 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
   async (): Promise<StoreData> => {
     try {
       const [productsResult, variantsResult, bannersResult, configResult] = await Promise.all([
+        // Solo columnas necesarias para el frontend — reduce egress de Supabase DB.
         // La consulta principal no depende de la tabla opcional de variantes.
         // Así, un error de relación/caché de Supabase nunca deja el catálogo vacío.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any).from('products').select('*').neq('stock', 'NO'),
+        (supabase as any).from('products').select('id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,imagen_url,descripcion,destacado,oferta,stock,descuento,color_predeterminado,es_zapatilla,ventas_semana,metadata').neq('stock', 'NO'),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any).from('product_variants').select('*'),
+        (supabase as any).from('product_variants').select('id,product_id,color,precio,precio_usd,precio_base,moneda_base,stock,imagen_url,talles_disponibles'),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any).from('banners').select('*').eq('activo', 'SI'),
+        (supabase as any).from('banners').select('id,titulo,subtitulo,imagen_url,link,activo,precio,precio_usd,precio_base,moneda_base,precio_actualizado_en,quantity_tiers').eq('activo', 'SI'),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any).from('site_config').select('*'),
+        (supabase as any).from('site_config').select('clave,valor'),
       ]);
 
       if (productsResult.error) throw productsResult.error;
