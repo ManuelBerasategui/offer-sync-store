@@ -12,9 +12,9 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any).from('products').select('id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,imagen_url,descripcion,destacado,oferta,stock,descuento,color_predeterminado,metadata').neq('stock', 'NO'),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any).from('product_variants').select('id,product_id,color,precio,precio_usd,precio_base,moneda_base,stock,imagen_url,talles_disponibles'),
+        (supabase as any).from('product_variants').select('id,product_id,color,precio,precio_usd,precio_base,moneda_base,stock,imagen_url'),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any).from('banners').select('id,titulo,subtitulo,imagen_url,link,activo,precio,precio_usd,precio_base,moneda_base,precio_actualizado_en,quantity_tiers').eq('activo', 'SI'),
+        (supabase as any).from('banners').select('*').eq('activo', 'SI'),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any).from('site_config').select('clave,valor'),
       ]);
@@ -22,6 +22,9 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
       if (productsResult.error) throw productsResult.error;
       if (variantsResult.error) {
         console.warn("No se pudieron cargar las variantes de color:", variantsResult.error.message);
+      }
+      if (bannersResult.error) {
+        console.warn("No se pudieron cargar los banners:", bannersResult.error.message);
       }
       const productsRaw = productsResult.data;
       const bannersRaw = bannersResult.data;

@@ -2060,6 +2060,12 @@ function ComboBuilderPanel({
     }
   }, [userEmail, userToken]);
 
+  useEffect(() => {
+    if (initialBanners && initialBanners.length > 0 && banners.length === 0) {
+      setBanners(initialBanners);
+    }
+  }, [initialBanners]);
+
   function resetForm() {
     setComboTitle("");
     setComboSubtitle("");
