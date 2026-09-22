@@ -3718,21 +3718,26 @@ function AdminProductosPage() {
           <div className="mt-6 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
         )}
 
-        {(!loading || products.length > 0) && (
+        {/* Combos siempre visible — no depende del estado de productos */}
+        {activeTab === "combos" && (
           <div className="mt-6">
-            {activeTab === "combos" ? (
-              <ComboPanelBoundary>
-                <ComboBuilderPanel
-                  initialBanners={initialBanners}
-                  userEmail={userEmail}
-                  userToken={userToken}
-                  onRefresh={loadProducts}
-                  dolarRate={dolarRate}
-                  roundingIncrement={roundingIncrement}
-                  markupPercentage={markupPercentage}
-                />
-              </ComboPanelBoundary>
-            ) : activeTab === "ofertas" ? (
+            <ComboPanelBoundary>
+              <ComboBuilderPanel
+                initialBanners={initialBanners}
+                userEmail={userEmail}
+                userToken={userToken}
+                onRefresh={loadProducts}
+                dolarRate={dolarRate}
+                roundingIncrement={roundingIncrement}
+                markupPercentage={markupPercentage}
+              />
+            </ComboPanelBoundary>
+          </div>
+        )}
+
+        {(!loading || products.length > 0) && activeTab !== "combos" && (
+          <div className="mt-6">
+            {activeTab === "ofertas" ? (
               <OfertasDelDiaPanel
                 products={offersProducts}
                 userEmail={userEmail}
