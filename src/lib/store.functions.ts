@@ -10,7 +10,7 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
         // La consulta principal no depende de la tabla opcional de variantes.
         // Así, un error de relación/caché de Supabase nunca deja el catálogo vacío.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any).from('products').select('id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,imagen_url,descripcion,destacado,oferta,stock,descuento,color_predeterminado,es_zapatilla,ventas_semana,metadata').neq('stock', 'NO'),
+        (supabase as any).from('products').select('id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,imagen_url,descripcion,destacado,oferta,stock,descuento,color_predeterminado,metadata').neq('stock', 'NO'),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any).from('product_variants').select('id,product_id,color,precio,precio_usd,precio_base,moneda_base,stock,imagen_url,talles_disponibles'),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
