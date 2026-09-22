@@ -47,15 +47,14 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
             className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
           >
             <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
-            <span className="hidden xs:inline">Catálogo</span>
+            <span>Catálogo</span>
           </Link>
           <Link
             to="/calculadora"
             aria-label="Calculadora de importaciones"
             className="inline-flex items-center rounded-full border border-border px-2 py-1 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
           >
-            <span className="hidden xs:inline">Calculadora</span>
-            <span className="xs:hidden">Calc</span>
+            <span>Calculadora</span>
           </Link>
           <HeaderAuth />
           <Link
