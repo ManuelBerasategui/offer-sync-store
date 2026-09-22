@@ -104,9 +104,6 @@ export async function handleImageProxy(request: Request): Promise<Response> {
 
   const reqUrl = new URL(request.url);
   const targetUrlStr = reqUrl.searchParams.get("url");
-  // Parámetro de ancho opcional para Supabase Image Transformation (reduce egress)
-  const widthParam = reqUrl.searchParams.get("w");
-  const requestedWidth = widthParam ? parseInt(widthParam, 10) : null;
 
   if (!targetUrlStr) {
     return new Response("Missing url parameter", { status: 400 });
@@ -129,18 +126,6 @@ export async function handleImageProxy(request: Request): Promise<Response> {
     return new Response("Untrusted host", { status: 403 });
   }
 
-  // 3. Si se pide un ancho válido, usar Supabase Image Transformation para reducir egress.
-  //    Solo anchos razonables (32–2400px) para evitar abuso del endpoint.
-  let fetchUrl = safeUrl.href;
-  if (requestedWidth && requestedWidth >= 32 && requestedWidth <= 2400) {
-    // Supabase Image Transformation: agregar render=image&width=N&quality=80
-    // La URL ya está validada contra allowlist, solo añadimos querystring
-    const transformUrl = new URL(safeUrl.href);
-    transformUrl.searchParams.set("width", String(requestedWidth));
-    transformUrl.searchParams.set("quality", "80");
-    fetchUrl = transformUrl.href;
-  }
-
   try {
     const upstreamHeaders = new Headers();
     // Reenviar encabezados condicionales si existen
@@ -150,9 +135,8 @@ export async function handleImageProxy(request: Request): Promise<Response> {
     const ifModifiedSince = request.headers.get("if-modified-since");
     if (ifModifiedSince) upstreamHeaders.set("if-modified-since", ifModifiedSince);
 
-    // 4. Fetch usando fetchUrl (puede incluir width/quality para Supabase Image Transformation).
-    //    La URL base siempre fue validada contra allowlist en isAllowedProxyUrl (anti-SSRF / CWE-918).
-    const upstreamRes = await fetch(fetchUrl, {
+    // 3. Ejecutar fetch utilizando safeUrl.href verificado contra allowlist (anti-SSRF / CWE-918)
+    const upstreamRes = await fetch(safeUrl.href, {
       method: request.method,
       headers: upstreamHeaders,
       signal: AbortSignal.timeout(10000),

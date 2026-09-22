@@ -144,7 +144,7 @@ const ALLOWED_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
  * URL exclusively from `URL`-parsed parts — the original string is never
  * returned to the caller and therefore never reaches a DOM sink.
  */
-export function imageUrl(raw?: string | null, width?: number): string {
+export function imageUrl(raw?: string | null): string {
   const url = (raw ?? "").trim();
   if (!url) return "";
   // /api/img? proxy paths are constructed server-side — always safe
@@ -159,23 +159,20 @@ export function imageUrl(raw?: string | null, width?: number): string {
     url.match(/\/d\/([-\w]+)/);
   if (url.includes("drive.google.com") && m) {
     // Only the captured alphanumeric ID is interpolated — no raw tainted value
-    const driveWidth = width ?? 1200;
-    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(m[1]!)}=w${driveWidth}`;
+    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(m[1]!)}=w1200`;
   }
 
   try {
     const parsed = new URL(url);
     if (!ALLOWED_IMAGE_PROTOCOLS.has(parsed.protocol)) return "";
-    // Supabase Storage → serve through Edge Cache proxy + optional Image Transformation
+    // Supabase Storage → serve through Vercel CDN Edge Cache proxy (1 year immutable).
+    // El proxy cachea cada imagen para siempre en el CDN — no requiere Pro de Supabase.
     if (
       parsed.hostname.toLowerCase().endsWith(".supabase.co") &&
       parsed.pathname.startsWith("/storage/v1/object/public/")
     ) {
       // Use parsed.href (already reconstructed by the URL API) — not raw `url`
-      // Append width for Supabase Image Transformation when specified (reduces egress)
-      const proxyParams = new URLSearchParams({ url: parsed.href });
-      if (width && width > 0) proxyParams.set("w", String(width));
-      return `/api/img?${proxyParams.toString()}`;
+      return `/api/img?url=${encodeURIComponent(parsed.href)}`;
     }
     // Reconstruct from parsed parts — never propagate the tainted `url` string
     return (
