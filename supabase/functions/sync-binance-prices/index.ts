@@ -94,26 +94,15 @@ Deno.serve(async (request) => {
       return [{ id: product.id, precio: String(price), precio_usd: Number(baseUsd.toFixed(6)), precio_actualizado_en: now, ...offerUpdate }];
     });
     if (updates.length) {
-      // No usamos upsert: Postgres valida las columnas NOT NULL antes de resolver
-      // el conflicto y products.nombre no forma parte de esta actualización.
-      for (let offset = 0; offset < updates.length; offset += 20) {
-        const batch = updates.slice(offset, offset + 20);
-        const results = await Promise.all(
-          batch.map((product) =>
-            supabase
-              .from("products")
-              .update({
-                precio: product.precio,
-                precio_usd: product.precio_usd,
-                ...(product.precio_oferta ? { precio_oferta: product.precio_oferta } : {}),
-                ...(product.precio_oferta_usd ? { precio_oferta_usd: product.precio_oferta_usd } : {}),
-                precio_actualizado_en: product.precio_actualizado_en,
-              })
-              .eq("id", product.id),
-          ),
-        );
-        const updateError = results.find((result) => result.error)?.error;
-        if (updateError) throw new Error(`No se pudieron actualizar los precios: ${updateError.message}`);
+      // Upsert masivo: N productos → ceil(N/100) queries en lugar de N.
+      // onConflict:"id" + ignoreDuplicates:false hace MERGE sin tocar columnas
+      // NOT NULL ausentes del payload (ej: nombre), resolviendo el problema original.
+      for (let offset = 0; offset < updates.length; offset += 100) {
+        const batch = updates.slice(offset, offset + 100);
+        const { error: upsertError } = await supabase
+          .from("products")
+          .upsert(batch, { onConflict: "id", ignoreDuplicates: false });
+        if (upsertError) throw new Error(`No se pudieron actualizar los precios: ${upsertError.message}`);
       }
     }
 
@@ -131,22 +120,14 @@ Deno.serve(async (request) => {
         },
       ];
     });
-    for (let offset = 0; offset < variantUpdates.length; offset += 20) {
-      const batch = variantUpdates.slice(offset, offset + 20);
-      const results = await Promise.all(
-        batch.map((variant) =>
-          supabase
-            .from("product_variants")
-            .update({
-              precio: variant.precio,
-              precio_usd: variant.precio_usd,
-              precio_actualizado_en: variant.precio_actualizado_en,
-            })
-            .eq("id", variant.id),
-        ),
-      );
-      const updateError = results.find((result) => result.error)?.error;
-      if (updateError) throw new Error(`No se pudieron actualizar los precios por color: ${updateError.message}`);
+    if (variantUpdates.length) {
+      for (let offset = 0; offset < variantUpdates.length; offset += 100) {
+        const batch = variantUpdates.slice(offset, offset + 100);
+        const { error: upsertError } = await supabase
+          .from("product_variants")
+          .upsert(batch, { onConflict: "id", ignoreDuplicates: false });
+        if (upsertError) throw new Error(`No se pudieron actualizar los precios por color: ${upsertError.message}`);
+      }
     }
 
     const bannerUpdates = (banners ?? []).flatMap((b) => {
@@ -163,20 +144,13 @@ Deno.serve(async (request) => {
         },
       ];
     });
-    for (let offset = 0; offset < bannerUpdates.length; offset += 20) {
-      const batch = bannerUpdates.slice(offset, offset + 20);
-      await Promise.all(
-        batch.map((b) =>
-          supabase
-            .from("banners")
-            .update({
-              precio: b.precio,
-              precio_usd: b.precio_usd,
-              precio_actualizado_en: b.precio_actualizado_en,
-            })
-            .eq("id", b.id),
-        ),
-      );
+    if (bannerUpdates.length) {
+      for (let offset = 0; offset < bannerUpdates.length; offset += 100) {
+        const batch = bannerUpdates.slice(offset, offset + 100);
+        await supabase
+          .from("banners")
+          .upsert(batch, { onConflict: "id", ignoreDuplicates: false });
+      }
     }
 
     const { error: saveError } = await supabase.from("pricing_settings").update({

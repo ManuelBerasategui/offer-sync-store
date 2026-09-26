@@ -127,7 +127,6 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
           if (mpRes.ok) {
             const mpJson = (await mpRes.json()) as { status?: string; external_reference?: string };
             mpStatus = mpJson.status;
-            console.log(`MP payment ${data.paymentId} status: ${mpStatus}`);
           } else {
             console.error(`MP payment lookup failed [${mpRes.status}]: ${await mpRes.text()}`);
           }
@@ -139,11 +138,9 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       // Fallback 1: confiar en el status de la URL (MP lo incluye en el redirect)
       if (!mpStatus) {
         mpStatus = data.status?.toLowerCase();
-        if (mpStatus) console.log(`Usando status de URL como fallback: ${mpStatus}`);
       }
 
       if (mpStatus === "pending" || mpStatus === "in_process" || mpStatus === "authorized") {
-        console.log(`Pago aún pendiente, estado de Mercado Pago: ${mpStatus}`);
         return {
           ...(order?.order_code ? { orderCode: order.order_code } : {}),
           estado: "pendiente",
@@ -153,7 +150,6 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       }
 
       if (mpStatus !== "approved") {
-        console.log(`Pago no aprobado, estado final: ${mpStatus}`);
         return { estado: "rechazado", metodoPago: order?.metodo_pago ?? undefined };
       }
 
@@ -167,8 +163,6 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
 
         if (updErr) {
           console.error("Error al actualizar orden a pagado:", updErr);
-        } else {
-          console.log(`Orden ${order.order_code} actualizada a pagado.`);
         }
 
         // Actualizar perfil si corresponde

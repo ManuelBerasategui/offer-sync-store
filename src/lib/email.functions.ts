@@ -443,7 +443,6 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
       console.error("[email] Error al enviar notificación a admins:", resAdmin.status, body);
     } else {
       adminSuccess = true;
-      console.log(`[email] Notificación a admins enviada para orden: ${order.orderCode}`);
     }
 
     // 2. Enviar confirmación al comprador si tiene email válido
@@ -497,7 +496,6 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
         }
       } else {
         customerSuccess = true;
-        console.log(`[email] Confirmación enviada al cliente: ${customerEmail}`);
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           await (supabaseAdmin as any).from("site_config").upsert(

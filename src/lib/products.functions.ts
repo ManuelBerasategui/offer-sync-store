@@ -1024,7 +1024,6 @@ export async function optimizeImageOnServer(
       .getPublicUrl(filename);
 
     if (pubData?.publicUrl) {
-      console.log("[Optimize] Imagen optimizada exitosamente a WebP:", filename);
 
       // Si la imagen anterior estaba en nuestros buckets pero era un formato pesado (png/jpg),
       // limpiar el archivo viejo para no acumular huérfanos
@@ -1147,12 +1146,6 @@ async function deleteImagesFromStorage(
       for (const p of pathSet) {
         if (!activeKeys.has(`${bucket}::${p}`)) {
           pathsToDelete.push(p);
-        } else {
-          console.log(
-            "[Storage] Imagen protegida porque sigue referenciada por otro producto:",
-            bucket,
-            p,
-          );
         }
       }
 
@@ -1168,11 +1161,7 @@ async function deleteImagesFromStorage(
               error.message,
             );
           } else {
-            console.log(
-              "[Storage] Eliminadas exitosamente fotos del bucket:",
-              bucket,
-              batch.length,
-            );
+            // eliminadas exitosamente
           }
         }
       }
