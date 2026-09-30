@@ -400,6 +400,16 @@ function Home() {
               </div>
             </div>
           )}
+
+          <div className="mt-8 flex justify-center">
+            <Link
+              to="/catalogo"
+              className="btn-base grad-urgente group inline-flex w-full items-center justify-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:w-auto sm:px-12"
+            >
+              Ver más
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+            </Link>
+          </div>
         </div>
       </section>
 
