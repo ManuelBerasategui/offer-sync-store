@@ -3775,21 +3775,21 @@ function AdminProductosPage() {
             ) : (
               <div className="space-y-6">
                 {/* Buscador y Acciones */}
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2.5 flex-wrap flex-1 max-w-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2.5">
                     <input
-                      className="input-base w-full sm:max-w-xs"
+                      className="input-base w-full sm:w-64 md:w-80"
                       placeholder="Buscar por nombre o categoría..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                     />
-                    <div className="inline-flex items-center rounded-xl border border-border bg-muted/40 p-1 text-xs shrink-0">
+                    <div className="inline-flex items-center rounded-xl border border-border bg-muted/50 p-1 text-xs shrink-0 shadow-xs">
                       <button
                         type="button"
                         onClick={() => setStockFilter("TODOS")}
-                        className={`rounded-lg px-2.5 py-1.5 font-medium transition-all ${
+                        className={`rounded-lg px-3 py-1.5 font-medium transition-all ${
                           stockFilter === "TODOS"
-                            ? "bg-background text-foreground shadow-xs font-semibold"
+                            ? "bg-background text-foreground shadow-xs font-bold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
@@ -3798,24 +3798,24 @@ function AdminProductosPage() {
                       <button
                         type="button"
                         onClick={() => setStockFilter("CON_STOCK")}
-                        className={`rounded-lg px-2.5 py-1.5 font-medium transition-all ${
+                        className={`rounded-lg px-3 py-1.5 font-medium transition-all ${
                           stockFilter === "CON_STOCK"
-                            ? "bg-background text-emerald-600 dark:text-emerald-400 shadow-xs font-semibold"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-xs font-bold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        Con stock
+                        🟢 Con stock
                       </button>
                       <button
                         type="button"
                         onClick={() => setStockFilter("SIN_STOCK")}
-                        className={`rounded-lg px-2.5 py-1.5 font-medium transition-all ${
+                        className={`rounded-lg px-3 py-1.5 font-medium transition-all ${
                           stockFilter === "SIN_STOCK"
-                            ? "bg-background text-red-500 shadow-xs font-semibold"
+                            ? "bg-red-500/10 text-red-500 border border-red-500/20 shadow-xs font-bold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        Sin stock
+                        🔴 Sin stock
                       </button>
                     </div>
                   </div>
