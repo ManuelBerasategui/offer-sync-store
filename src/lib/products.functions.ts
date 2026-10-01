@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Banner, Product, ProductVariant } from "@/lib/store";
+import { invalidateStoreCache } from "./store.functions";
 
 const str = (v: unknown, max = 2000) => String(v ?? "").slice(0, max);
 
@@ -651,6 +652,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         }
       }
 
+      await invalidateStoreCache();
       return { id: productId };
     } catch (err) {
       console.error("Error in upsertAdminProduct:", err);
@@ -852,6 +854,7 @@ export const updateProductPrice = createServerFn({ method: "POST" })
           }
         }
 
+        await invalidateStoreCache();
         return { success: true };
       } catch (err) {
         console.error("Error in updateProductPrice:", err);
@@ -1204,6 +1207,7 @@ export const deleteAdminProduct = createServerFn({ method: "POST" })
         await deleteImagesFromStorage(supabaseAdmin, imageUrls);
       }
 
+      await invalidateStoreCache();
       return {};
     } catch (err) {
       return { error: err instanceof Error ? err.message : "Error al eliminar el producto." };
@@ -1252,6 +1256,7 @@ export const bulkDeleteAdminProducts = createServerFn({ method: "POST" })
         await deleteImagesFromStorage(supabaseAdmin, imageUrls);
       }
 
+      await invalidateStoreCache();
       return { success: true, count: data.productIds.length };
     } catch (err) {
       console.error("Error in bulkDeleteAdminProducts:", err);
@@ -1503,6 +1508,7 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         if (insErr) throw insErr;
       }
 
+      await invalidateStoreCache();
       return {};
     } catch (err) {
       console.error("Error in upsertCategoryRules:", err);
@@ -1850,6 +1856,7 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
             .eq("id", b.id);
           if (retry.error) throw retry.error;
         }
+        await invalidateStoreCache();
         return { id: b.id };
       } else {
         const newId = crypto.randomUUID();
@@ -1888,6 +1895,7 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
         }
 
         if (error) throw error;
+        await invalidateStoreCache();
         return { id: String(ins?.id ?? newId) };
       }
     } catch (err) {
@@ -1911,6 +1919,7 @@ export const deleteAdminBanner = createServerFn({ method: "POST" })
         .delete()
         .eq("id", data.bannerId);
       if (error) throw error;
+      await invalidateStoreCache();
       return {};
     } catch (err) {
       return { error: err instanceof Error ? err.message : "Error al eliminar el combo." };
@@ -1975,6 +1984,7 @@ export const bulkUpdateAdminStock = createServerFn({ method: "POST" })
         .update({ stock: data.stock })
         .in("product_id", data.productIds);
 
+      await invalidateStoreCache();
       return { success: true };
     } catch (err) {
       return { error: err instanceof Error ? err.message : "Error al actualizar stock masivo." };
@@ -1997,6 +2007,7 @@ export const updateVariantStock = createServerFn({ method: "POST" })
         .eq("id", data.variantId);
 
       if (error) throw error;
+      await invalidateStoreCache();
       return { success: true };
     } catch (err) {
       return {
@@ -2733,6 +2744,7 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
 
         if (insertErr) throw insertErr;
 
+        await invalidateStoreCache();
         return {
           productId: String(inserted.id),
           nombre: title,
