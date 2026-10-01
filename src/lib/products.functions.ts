@@ -145,7 +145,6 @@ export const getAdminProducts = createServerFn({ method: "POST" })
       category?: string | undefined;
       offerOnly?: boolean | undefined;
       fetchAll?: boolean | undefined;
-      stockFilter?: string | undefined;
     }) => ({
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
@@ -155,7 +154,6 @@ export const getAdminProducts = createServerFn({ method: "POST" })
       category: typeof data?.category === "string" ? str(data.category, 100).trim() : undefined,
       offerOnly: Boolean(data?.offerOnly),
       fetchAll: Boolean(data?.fetchAll),
-      stockFilter: typeof data?.stockFilter === "string" ? str(data.stockFilter, 20) : undefined,
     }),
   )
   .handler(
@@ -183,12 +181,6 @@ export const getAdminProducts = createServerFn({ method: "POST" })
 
         if (data.offerOnly) {
           query = query.eq("oferta", "SI");
-        }
-
-        if (data.stockFilter === "SIN_STOCK") {
-          query = query.eq("stock", "NO");
-        } else if (data.stockFilter === "CON_STOCK") {
-          query = query.neq("stock", "NO");
         }
 
         const isPaginated = !data.fetchAll && (data.page !== undefined || data.pageSize !== undefined);
