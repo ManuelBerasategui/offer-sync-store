@@ -59,8 +59,8 @@ async function revalidateOrderItems(
 }> {
   try {
     const [{ data: dbProducts }, { data: dbConfigRows }] = await Promise.all([
-      supabaseAdmin.from("products").select("*"),
-      supabaseAdmin.from("site_config").select("*"),
+      supabaseAdmin.from("products").select("id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,oferta,stock,descuento"),
+      supabaseAdmin.from("site_config").select("clave,valor"),
     ]);
 
     if (!dbProducts || dbProducts.length === 0) {
@@ -267,7 +267,7 @@ export const createCheckout = createServerFn({ method: "POST" })
 
       // Revalidación segura del cupón en el servidor
       if (data.couponCode && data.userId) {
-        const { data: dbConfigRows } = await supabaseAdmin.from("site_config").select("*");
+        const { data: dbConfigRows } = await supabaseAdmin.from("site_config").select("clave,valor");
         const configObj: Record<string, string> = {};
         for (const row of dbConfigRows ?? []) {
           if (row.clave && row.valor !== undefined) configObj[row.clave] = String(row.valor);

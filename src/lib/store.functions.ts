@@ -13,7 +13,7 @@ interface ModuleCache {
   expiresAt: number;
 }
 let _moduleCache: ModuleCache | null = null;
-const MODULE_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos (invalida al guardar en admin)
+const MODULE_CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 horas (invalida al guardar en admin)
 
 /**
  * CAPA 2: Cloudflare Cache API.
@@ -21,7 +21,7 @@ const MODULE_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos (invalida al guardar e
  * Impacto adicional: elimina fetches redundantes entre instancias paralelas.
  */
 const CF_CACHE_KEY = "https://teimportamosarg.com/__store_data_v1__";
-const CF_CACHE_TTL_SECONDS = 600; // 10 minutos
+const CF_CACHE_TTL_SECONDS = 7200; // 2 horas
 
 /** Intenta leer de Cloudflare Cache API. Retorna null si no está disponible o expiró. */
 async function readCfCache(): Promise<StoreData | null> {
@@ -64,7 +64,7 @@ async function fetchFromSupabase(): Promise<StoreData> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).from('products').select('id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,imagen_url,descripcion,destacado,oferta,stock,descuento,color_predeterminado,metadata').neq('stock', 'NO'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('product_variants').select('id,product_id,color,precio,precio_usd,precio_base,moneda_base,stock,imagen_url'),
+    (supabase as any).from('product_variants').select('id,product_id,color,precio,precio_usd,precio_base,moneda_base,stock,imagen_url').neq('stock', 'NO'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).from('banners').select('*').eq('activo', 'SI'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

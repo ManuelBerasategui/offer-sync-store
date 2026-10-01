@@ -587,8 +587,8 @@ export const createTransferOrder = createServerFn({ method: "POST" })
 
     try {
       const [{ data: dbProducts }, { data: dbConfig }] = await Promise.all([
-        supabaseAdmin.from("products").select("*"),
-        supabaseAdmin.from("site_config").select("*"),
+        supabaseAdmin.from("products").select("id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,oferta,stock,descuento"),
+        supabaseAdmin.from("site_config").select("clave,valor"),
       ]);
 
       const configMap: Record<string, string> = {};

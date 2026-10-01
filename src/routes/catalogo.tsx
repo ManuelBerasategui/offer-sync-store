@@ -274,13 +274,13 @@ function Catalogo() {
               href={waUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mb-5 flex items-center gap-3 rounded-2xl border border-whatsapp/30 bg-whatsapp/8 px-4 py-3.5 transition-all hover:bg-whatsapp/14 hover:border-whatsapp/50 hover:shadow-sm sm:gap-4 sm:px-5 sm:py-4"
+              className="mb-5 flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/8 px-4 py-3.5 transition-all hover:bg-primary/14 hover:border-primary/50 hover:shadow-sm sm:gap-4 sm:px-5 sm:py-4"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-whatsapp/15 text-whatsapp sm:h-10 sm:w-10">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary sm:h-10 sm:w-10">
                 <MessageCircle className="h-4.5 w-4.5 sm:h-5 sm:w-5" fill="currentColor" />
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-whatsapp sm:text-xs">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-primary sm:text-xs">
                   ¿No encontrás lo que buscás?
                 </p>
                 <p className="mt-0.5 text-xs text-foreground/80 sm:text-[13px]">
@@ -288,7 +288,7 @@ function Catalogo() {
                   <span className="font-semibold text-foreground">Consultanos por WhatsApp</span> y lo conseguimos.
                 </p>
               </div>
-              <span className="shrink-0 rounded-xl bg-whatsapp px-3 py-1.5 text-[11px] font-bold text-whatsapp-foreground shadow-sm transition-opacity hover:opacity-90 sm:px-4 sm:py-2 sm:text-xs">
+              <span className="shrink-0 rounded-xl bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 sm:px-4 sm:py-2 sm:text-xs">
                 Escribir →
               </span>
             </a>
