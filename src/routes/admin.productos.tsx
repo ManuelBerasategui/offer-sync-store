@@ -3411,11 +3411,19 @@ function AdminProductosPage() {
 
   const ADMIN_PAGE_SIZE = 20;
   const [adminPage, setAdminPage] = useState(1);
+  const [stockFilter, setStockFilter] = useState<"TODOS" | "CON_STOCK" | "SIN_STOCK">("TODOS");
+  const isStockFilterMount = useRef(true);
 
-  async function loadProducts(opts?: { isInitial?: boolean; page?: number; search?: string }) {
+  async function loadProducts(opts?: {
+    isInitial?: boolean;
+    page?: number;
+    search?: string;
+    stockFilter?: "TODOS" | "CON_STOCK" | "SIN_STOCK";
+  }) {
     const isInitial = opts?.isInitial ?? false;
     const targetPage = opts?.page ?? adminPage;
     const targetSearch = opts?.search !== undefined ? opts.search : search;
+    const targetStockFilter = opts?.stockFilter !== undefined ? opts.stockFilter : stockFilter;
 
     if (isInitial || products.length === 0) {
       setLoading(true);
@@ -3431,6 +3439,7 @@ function AdminProductosPage() {
           page: targetPage,
           pageSize: ADMIN_PAGE_SIZE,
           search: targetSearch.trim() || undefined,
+          stockFilter: targetStockFilter !== "TODOS" ? targetStockFilter : undefined,
         },
       })) as GetAdminProductsResult;
       if (res.error) {
@@ -3504,15 +3513,25 @@ function AdminProductosPage() {
     }
     const timer = setTimeout(() => {
       setAdminPage(1);
-      void loadProducts({ page: 1, search });
+      void loadProducts({ page: 1, search, stockFilter });
     }, 350);
     return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    if (isStockFilterMount.current) {
+      isStockFilterMount.current = false;
+      return;
+    }
+    setAdminPage(1);
+    setSelectedIds([]);
+    void loadProducts({ page: 1, search, stockFilter });
+  }, [stockFilter]);
+
   const handlePageChange = (newPage: number) => {
     const p = Math.max(1, Math.min(adminTotalPages, newPage));
     setAdminPage(p);
-    void loadProducts({ page: p, search });
+    void loadProducts({ page: p, search, stockFilter });
   };
 
   async function handleDelete(id: string) {
@@ -3522,7 +3541,7 @@ function AdminProductosPage() {
       const res = await deleteAdminProduct({ data: { email: userEmail, token: userToken, productId: id } });
       if (res.error) alert(res.error);
       else {
-        await loadProducts({ page: adminPage, search });
+        await loadProducts({ page: adminPage, search, stockFilter });
       }
     } finally {
       setDeletingId(null);
@@ -3757,12 +3776,49 @@ function AdminProductosPage() {
               <div className="space-y-6">
                 {/* Buscador y Acciones */}
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <input
-                    className="input-base w-full max-w-sm"
-                    placeholder="Buscar por nombre o categoría..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
+                  <div className="flex items-center gap-2.5 flex-wrap flex-1 max-w-xl">
+                    <input
+                      className="input-base w-full sm:max-w-xs"
+                      placeholder="Buscar por nombre o categoría..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                    <div className="inline-flex items-center rounded-xl border border-border bg-muted/40 p-1 text-xs shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setStockFilter("TODOS")}
+                        className={`rounded-lg px-2.5 py-1.5 font-medium transition-all ${
+                          stockFilter === "TODOS"
+                            ? "bg-background text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Todos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStockFilter("CON_STOCK")}
+                        className={`rounded-lg px-2.5 py-1.5 font-medium transition-all ${
+                          stockFilter === "CON_STOCK"
+                            ? "bg-background text-emerald-600 dark:text-emerald-400 shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Con stock
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStockFilter("SIN_STOCK")}
+                        className={`rounded-lg px-2.5 py-1.5 font-medium transition-all ${
+                          stockFilter === "SIN_STOCK"
+                            ? "bg-background text-red-500 shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Sin stock
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2">
                     {selectedIds.length > 0 && (
                       <button
@@ -3795,9 +3851,11 @@ function AdminProductosPage() {
                     <div className="flex flex-col items-center gap-3 py-16 text-center">
                       <PackagePlus className="h-10 w-10 text-muted-foreground/40" />
                       <p className="text-sm text-muted-foreground">
-                        {search ? "Ningún producto coincide con la búsqueda." : "Todavía no hay productos cargados."}
+                        {search || stockFilter !== "TODOS"
+                          ? "Ningún producto coincide con los filtros aplicados."
+                          : "Todavía no hay productos cargados."}
                       </p>
-                      {!search && (
+                      {!search && stockFilter === "TODOS" && (
                         <button
                           onClick={() => setModal(emptyProduct())}
                           className="btn-base bg-primary text-primary-foreground hover:opacity-90 mt-2"
