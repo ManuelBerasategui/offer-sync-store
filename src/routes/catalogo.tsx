@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, ArrowDownUp, X, Loader2 } from "lucide-react";
+import { Search, ArrowDownUp, X, Loader2, MessageCircle } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
@@ -261,6 +261,39 @@ function Catalogo() {
             {list.length ? `Mostrando ${visibleProducts.length} de ${list.length} ${list.length === 1 ? "producto" : "productos"}` : "0 productos"}
           </span>
         </div>
+
+        {/* Banner WhatsApp para camisetas */}
+        {cat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes("camiseta") && (() => {
+          const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "").replace(/\D/g, "");
+          if (!phone) return null;
+          const msg = encodeURIComponent("Hola! Estaba viendo las camisetas en el catálogo y no encontré el modelo que buscaba. ¿Me podés ayudar?");
+          const waUrl = `https://wa.me/${phone}?text=${msg}`;
+          return (
+            <a
+              id="banner-camisetas-whatsapp"
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-5 flex items-center gap-3 rounded-2xl border border-[#25D366]/30 bg-[#25D366]/8 px-4 py-3.5 transition-all hover:bg-[#25D366]/14 hover:border-[#25D366]/50 hover:shadow-sm sm:gap-4 sm:px-5 sm:py-4"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#25D366]/15 text-[#25D366] sm:h-10 sm:w-10">
+                <MessageCircle className="h-4.5 w-4.5 sm:h-5 sm:w-5" fill="currentColor" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#25D366] sm:text-xs">
+                  ¿No encontrás lo que buscás?
+                </p>
+                <p className="mt-0.5 text-xs text-foreground/80 sm:text-[13px]">
+                  Tenemos modelos que no siempre están en el catálogo online.{" "}
+                  <span className="font-semibold text-foreground">Consultanos por WhatsApp</span> y lo conseguimos.
+                </p>
+              </div>
+              <span className="shrink-0 rounded-xl bg-[#25D366] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-opacity hover:opacity-90 sm:px-4 sm:py-2 sm:text-xs">
+                Escribir →
+              </span>
+            </a>
+          );
+        })()}
 
         {list.length ? (
           <>
