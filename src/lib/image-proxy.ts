@@ -18,9 +18,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
  * Solo se permiten peticiones a la instancia oficial del proyecto y entornos autorizados.
  */
 // Solo el proyecto de producción real — SSRF: nunca añadir dominios no controlados aquí
-export const ALLOWED_DOMAINS: string[] = [
-  "dybzgnmghisqapdzgknv.supabase.co",
-];
+export const ALLOWED_DOMAINS: string[] = ["dybzgnmghisqapdzgknv.supabase.co"];
 
 // Si hay una URL en variables de entorno, incorporar su hostname al allowlist
 try {
@@ -87,17 +85,12 @@ export function isAllowedProxyUrl(targetUrlStr: string): URL | null {
   return new URL(`https://${hostname}${pathname}`);
 }
 
-/** ExecutionContext de Cloudflare Workers — permite waitUntil no bloqueante. */
-interface CloudflareCtx {
-  waitUntil(promise: Promise<unknown>): void;
-}
-
 /**
- * Maneja la petición al proxy de imágenes aplicando Edge Caching para Vercel / CDN.
- * @param ctx - ExecutionContext de Cloudflare Workers (opcional). Si se pasa, el
- *              guardado en caché ocurre de forma no bloqueante con ctx.waitUntil().
+ * Maneja la petición al proxy de imágenes aplicando Edge Caching para Vercel CDN.
+ * Las cabeceras de respuesta Cache-Control instruyen al CDN de Vercel a cachear
+ * cada imagen por 1 año de forma inmutable (X-Vercel-Cache: HIT).
  */
-export async function handleImageProxy(request: Request, ctx?: CloudflareCtx): Promise<Response> {
+export async function handleImageProxy(request: Request, _ctx?: unknown): Promise<Response> {
   // Solo permitir métodos de lectura seguros
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method not allowed", {
@@ -128,22 +121,6 @@ export async function handleImageProxy(request: Request, ctx?: CloudflareCtx): P
   const targetHost = safeUrl.hostname.toLowerCase();
   if (!ALLOWED_DOMAINS.includes(targetHost)) {
     return new Response("Untrusted host", { status: 403 });
-  }
-
-  // 0. Cloudflare Edge Cache API: verificar si la imagen ya está en caché del CDN
-  let cfCache: Cache | null = null;
-  try {
-    if (typeof caches !== "undefined" && caches.default) {
-      cfCache = caches.default;
-      if (request.method === "GET") {
-        const cached = await cfCache.match(request.url);
-        if (cached) {
-          return cached;
-        }
-      }
-    }
-  } catch {
-    // ignorar si caches API no está disponible en el entorno
   }
 
   try {
@@ -211,26 +188,10 @@ export async function handleImageProxy(request: Request, ctx?: CloudflareCtx): P
     const lastModified = upstreamRes.headers.get("last-modified");
     if (lastModified) resHeaders.set("Last-Modified", lastModified);
 
-    const finalResponse = new Response(upstreamRes.body, {
+    return new Response(upstreamRes.body, {
       status: 200,
       headers: resHeaders,
     });
-
-    if (cfCache && request.method === "GET") {
-      // Clonar antes de consumir el body
-      const putPromise = cfCache.put(request.url, finalResponse.clone()).catch(() => {
-        // Silenciar errores de escritura en caché — no deben bloquear la respuesta
-      });
-      if (ctx?.waitUntil) {
-        // Cloudflare Workers: no-bloquea la respuesta; el runtime lo resuelve en background
-        ctx.waitUntil(putPromise);
-      } else {
-        // Node / Vercel: await normal — sin impacto perceptible fuera de CF edge
-        await putPromise;
-      }
-    }
-
-    return finalResponse;
   } catch (err) {
     console.error("Image proxy fetch failed:", err);
     return new Response("Image proxy failed", { status: 502 });
