@@ -8,10 +8,11 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { HowItWorks, ReviewsCarousel } from "@/components/Social";
 import { storeQueryOptions } from "@/lib/store-query";
 import {
-  FALLBACK_IMAGE, imageUrl, hasOffer,
+  FALLBACK_IMAGE, imageUrl, thumbnailUrl, hasOffer,
   onImageError, isYes, money, toNumber, waLink, sanitizeUrl, type SiteConfig,
   parseCategoryRules, normCat, transferPrice, transferDiscountPct,
 } from "@/lib/store";
+import { SITE_URL } from "@/lib/constants";
 
 export const Route = createFileRoute("/")({
   loader: ({ context }) => {
@@ -31,13 +32,13 @@ export const Route = createFileRoute("/")({
         content:
           "Ofertas del día en productos importados originales. Comprá online, ideal para revender.",
       },
-      { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:url", content: "https://teimportamosarg.com/" },
+      { property: "og:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:image:secure_url", content: `${SITE_URL}/businessicon.jpg` },
+      { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:url", content: `${SITE_URL}/` },
     ],
     links: [
-      { rel: "canonical", href: "https://teimportamosarg.com/" },
+      { rel: "canonical", href: `${SITE_URL}/` },
     ],
   }),
   component: Home,
@@ -190,7 +191,7 @@ function Home() {
                         : "w-[72vw] max-w-[280px] sm:w-[260px]"
                       }`}
                   >
-                    <ProductCard p={p} config={config} />
+                    <ProductCard p={p} config={config} index={i} />
                   </div>
                 ))}
               </div>
@@ -319,8 +320,12 @@ function Home() {
                         {/* Contenedor de la foto adaptado a la imagen */}
                         <div className="relative aspect-square w-full overflow-hidden bg-surface flex items-center justify-center">
                           <img
-                            src={imageUrl(b.imagen_url) || FALLBACK_IMAGE}
+                            src={thumbnailUrl(b.imagen_url, "md") || FALLBACK_IMAGE}
                             alt={b.titulo ?? ""}
+                            width={380}
+                            height={380}
+                            loading="lazy"
+                            decoding="async"
                             referrerPolicy="no-referrer"
                             className="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-105"
                             onError={onImageError(b.imagen_url)}
@@ -390,7 +395,7 @@ function Home() {
                           : "w-[72vw] max-w-[280px] sm:w-[260px]"
                         }`}
                     >
-                      <ProductCard p={p} config={config} />
+                      <ProductCard p={p} config={config} index={i} />
                     </div>
                   ))}
                 </div>

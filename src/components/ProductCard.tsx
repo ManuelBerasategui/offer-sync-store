@@ -6,6 +6,7 @@ import {
   originalPriceOf,
   priceOf,
   imageUrl,
+  thumbnailUrl,
   onImageError,
   isWhatsappOnly,
   waOnlyReasonOf,
@@ -24,7 +25,16 @@ import {
 } from "@/lib/store";
 import type { Product, SiteConfig } from "@/lib/store";
 
-export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) {
+export function ProductCard({
+  p,
+  config,
+  index = 0,
+}: {
+  p: Product;
+  config?: SiteConfig;
+  /** Position in the grid (0-based). Cards ≥ 6 are lazy-loaded. */
+  index?: number;
+}) {
   const isCamisetaProd = isCamiseta(p.categoria, p.nombre);
   const isML = isCamisetaProd && isLongSleeve(p.nombre);
   const usdRate = Number(config?.["dolar_cotizacion"] ?? 0);
@@ -67,10 +77,13 @@ export function ProductCard({ p, config }: { p: Product; config?: SiteConfig }) 
           </span>
         )}
         <img
-          src={imageUrl(p.imagen_url) || FALLBACK_IMAGE}
+          src={thumbnailUrl(p.imagen_url, "md") || FALLBACK_IMAGE}
           alt={p.nombre ?? "Producto"}
-          loading="lazy"
-          decoding="async"
+          width={320}
+          height={320}
+          loading={index < 6 ? undefined : "lazy"}
+          decoding={index < 6 ? undefined : "async"}
+          fetchPriority={index < 6 ? "high" : undefined}
           referrerPolicy="no-referrer"
           className="h-full w-full object-contain p-2"
           onError={onImageError(p.imagen_url)}
