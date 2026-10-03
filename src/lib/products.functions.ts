@@ -1330,7 +1330,7 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
         ? `${folder}/${baseName}`
         : `${folder}/${crypto.randomUUID()}_${baseName || "image.webp"}`;
       let cType = data.contentType || "image/webp";
-
+      let uploadBuffer = buffer;
       try {
         const sharp = (await import("sharp")).default;
         uploadBuffer = await sharp(buffer)
@@ -2715,6 +2715,9 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
             if (buffer.byteLength === 0) continue;
 
             // Detectar content-type de la respuesta
+            const rawCt = imgRes.headers.get("content-type") ?? "image/jpeg";
+            const ct = rawCt.split(";")[0]?.trim() || "image/jpeg";
+            const ext = ct === "image/webp" ? "webp" : ct === "image/png" ? "png" : "jpg";
             const fileId = crypto.randomUUID();
             const filename = `yupoo/${fileId}.${ext}`;
             const thumbFilename = `yupoo/thumbnails/${fileId}.webp`;
