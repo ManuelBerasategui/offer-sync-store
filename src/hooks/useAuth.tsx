@@ -50,20 +50,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { data } = await supabase
       .from("profiles")
-      .select("nombre, dni, telefono, provincia, ciudad, codigo_postal, transporte, sucursal_correo")
+      .select(
+        "nombre, dni, telefono, provincia, ciudad, codigo_postal, transporte, sucursal_correo",
+      )
       .eq("id", userId)
       .maybeSingle();
     setProfile(data ? { ...EMPTY_SHIPPING, ...data } : null);
   }, []);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    let initialLoaded = false;
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === "INITIAL_SESSION" && initialLoaded) return;
+      initialLoaded = true;
       setSession(next);
       setLoading(false);
       void loadProfile(next?.user?.id);
     });
 
     void supabase.auth.getSession().then(({ data }) => {
+      if (initialLoaded) return;
+      initialLoaded = true;
       setSession(data.session);
       setLoading(false);
       void loadProfile(data.session?.user?.id);
@@ -86,9 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userEmail = session?.user?.email?.toLowerCase().trim();
   const isAdmin = Boolean(
     userEmail &&
-      (adminEmails.length > 0
-        ? adminEmails.includes(userEmail)
-        : defaultAdmins.includes(userEmail)),
+    (adminEmails.length > 0 ? adminEmails.includes(userEmail) : defaultAdmins.includes(userEmail)),
   );
 
   const value = useMemo<AuthCtx>(
