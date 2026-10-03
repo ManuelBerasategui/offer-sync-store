@@ -2722,12 +2722,9 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
             if (buffer.byteLength === 0) continue;
 
             // Detectar content-type de la respuesta
-<<<<<<< HEAD
-=======
             const rawCt = imgRes.headers.get("content-type") ?? "image/jpeg";
             const ct = rawCt.split(";")[0]?.trim() || "image/jpeg";
             const ext = ct === "image/webp" ? "webp" : ct === "image/png" ? "png" : "jpg";
->>>>>>> origin/main
             const fileId = crypto.randomUUID();
             const filename = `yupoo/${fileId}.${ext}`;
             const thumbFilename = `yupoo/thumbnails/${fileId}.webp`;
