@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { NotifyOrderInput } from "@/lib/email.functions";
-import type { Product } from "./store";
 
 export type OrderItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
 
@@ -619,8 +618,6 @@ export const createTransferOrder = createServerFn({ method: "POST" })
           unitPriceFor,
           categoryDiscountForUnits,
           checkCategoryMins,
-          moqGroupOf,
-          isNfcGoogle,
           transferPrice,
           transferDiscountPct,
         } = await import("./store");
@@ -628,27 +625,18 @@ export const createTransferOrder = createServerFn({ method: "POST" })
         const catRules = parseCategoryRules(configMap);
         const catTotals: Record<string, number> = {};
 
-        const itemsWithCat = data.items.map((item) => {
-          const prod = findProduct((dbProducts ?? []) as Product[], item.nombre);
-          const isNfc = isNfcGoogle(item.nombre, item.productId || prod?.id);
-          const cat = prod?.categoria ?? "";
-          if (prod && !isNfc) {
-            const catNorm = normCat(cat);
+        for (const item of data.items) {
+          const prod = findProduct(dbProducts as any, item.nombre);
+          if (prod) {
+            const catNorm = normCat(prod.categoria ?? "");
             const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
             if (match) {
               catTotals[match.key] = (catTotals[match.key] ?? 0) + item.qty;
             }
           }
-          return {
-            nombre: item.nombre,
-            categoria: cat,
-            moq_group: prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined,
-            qty: item.qty,
-            unitPrice: item.unitPrice,
-          };
-        });
+        }
 
-        const minViolations = checkCategoryMins(itemsWithCat, catRules);
+        const minViolations = checkCategoryMins(data.items as any, dbProducts as any, catRules);
         if (minViolations.length > 0) {
           const v = minViolations[0]!;
           const msg =
@@ -659,18 +647,8 @@ export const createTransferOrder = createServerFn({ method: "POST" })
         }
 
         items = data.items.map((item) => {
-          const prod = findProduct((dbProducts ?? []) as Product[], item.nombre);
+          const prod = findProduct(dbProducts as any, item.nombre);
           if (!prod) return item;
-
-          if (isNfcGoogle(item.nombre, item.productId || prod.id)) {
-            const base = priceOf(prod);
-            return {
-              nombre: item.nombre,
-              qty: item.qty,
-              unitPrice: base > 0 ? base : item.unitPrice,
-              ...(item.productId ? { productId: item.productId } : {}),
-            };
-          }
 
           const catNorm = normCat(prod.categoria ?? "");
           const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;

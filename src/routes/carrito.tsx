@@ -17,7 +17,6 @@ import {
   SUPLEMENTOS_MIN,
   isSuplemento,
   isMate,
-  isNfcGoogle,
   moqGroupOf,
   findProduct,
   money,
@@ -312,14 +311,13 @@ function CarritoPage() {
                 const prodHasOffer = prod ? hasOffer(prod) : false;
                 const prodOrigPrice = prod && prodHasOffer ? originalPriceOf(prod) : 0;
                 const prodOfferPct = prod && prodHasOffer ? offerDiscountPct(prod) : 0;
-                const isNfc = isNfcGoogle(i.nombre, i.productId || prod?.id);
-                const displayOrigPrice = isNfc
-                  ? 0
-                  : (i.basePrice && i.unitPrice < i.basePrice)
-                  ? i.basePrice
-                  : (prodHasOffer && prodOrigPrice > i.unitPrice)
-                  ? prodOrigPrice
-                  : 0;
+                // Precio "original" para mostrar: si hay descuento por cantidad O oferta individual
+                const displayOrigPrice =
+                  (i.basePrice && i.unitPrice < i.basePrice)
+                    ? i.basePrice
+                    : (prodHasOffer && prodOrigPrice > i.unitPrice)
+                    ? prodOrigPrice
+                    : 0;
                 const displayDiscountPct =
                   displayOrigPrice > 0
                     ? Math.round(((displayOrigPrice - i.unitPrice) / displayOrigPrice) * 100)
@@ -361,17 +359,6 @@ function CarritoPage() {
                                   : "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
                               }`}>
                                 {isOfferDiscount ? `🔥 -${displayDiscountPct}% OFF` : `${displayDiscountPct}% OFF x cantidad`}
-                              </span>
-                            )}
-                            {isNfc && (
-                              <span
-                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                  i.qty < 50
-                                    ? "text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20"
-                                    : "text-muted-foreground bg-muted"
-                                }`}
-                              >
-                                {i.qty < 50 ? `Mínimo 50 u. (llevás ${i.qty})` : "Mín. 50 u. cumplido • Sin descuento por cantidad"}
                               </span>
                             )}
                           </div>

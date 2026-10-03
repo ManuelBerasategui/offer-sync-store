@@ -572,28 +572,9 @@ export function findProduct(products: Product[], key: string) {
 
 /* ---------- Descuentos por cantidad ---------- */
 
-/* ---------- NFC para Reseñas de Google: compra mínima 50 u. y sin descuento por cantidad ---------- */
-
-export const NFC_GOOGLE_ID = "d3ffb11d-3bea-471f-94b0-6b6e0df8d484";
-export const NFC_GOOGLE_MIN = 50;
-
-/**
- * Detecta si el producto corresponde a "NFC PARA RESEÑAS DE GOOGLE".
- * Aplica compra mínima obligatoria de 50 unidades y ningún descuento por cantidad.
- */
-export function isNfcGoogle(nombre?: string | null, id?: string | null): boolean {
-  if (id && String(id).trim() === NFC_GOOGLE_ID) return true;
-  const nom = String(nombre ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-  return nom.includes("nfc") && (nom.includes("resena") || nom.includes("google"));
-}
-
 export type Tier = { units: number; percent: number };
 
 export function tiersOf(p: Product): Tier[] {
-  if (isNfcGoogle(p.nombre, p.id)) return [];
   if (!isYes(p.descuento)) return [];
   const tiers: Tier[] = [];
   for (const [key, value] of Object.entries(p)) {
@@ -612,7 +593,6 @@ export function tiersOf(p: Product): Tier[] {
 }
 
 export function discountFor(p: Product, qty: number) {
-  if (isNfcGoogle(p.nombre, p.id)) return 0;
   const tiers = tiersOf(p);
   let percent = 0;
   for (const t of tiers) if (qty >= t.units) percent = t.percent;
@@ -622,7 +602,6 @@ export function discountFor(p: Product, qty: number) {
 }
 
 export function unitPriceFor(p: Product, qty: number, basePrice = priceOf(p)) {
-  if (isNfcGoogle(p.nombre, p.id)) return basePrice;
   return basePrice * (1 - discountFor(p, qty) / 100);
 }
 
@@ -851,12 +830,6 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     };
   }
 
-  // 9. NFC para Reseñas de Google: mínimo 50 unidades, sin descuento por volumen
-  rules["nfc_google"] = {
-    minUnits: 50,
-    discountTiers: [],
-  };
-
   // Eliminar categorías genéricas obsoletas o duplicadas si existen subcategorías específicas
   if (rules["perfumes arabes"]?.minUnits || rules["perfumes disenador"]?.minUnits) {
     delete rules["perfumes"];
@@ -954,12 +927,6 @@ export function hasMoq(
   product: Record<string, unknown>,
   catRules: Record<string, CategoryRule>,
 ): MoqInfo | null {
-  const nombre = String(product["nombre"] ?? "");
-  const id = product["id"] ? String(product["id"]) : undefined;
-  if (isNfcGoogle(nombre, id)) {
-    return { group: "nfc_google", minUnits: 50 };
-  }
-
   const mg = moqGroupOf(product);
 
   // Explícito "none" → nunca tiene MOQ
@@ -974,6 +941,7 @@ export function hasMoq(
   }
 
   // Sin moq_group explícito → isMate fallback + match por categoría
+  const nombre = String(product["nombre"] ?? "");
   const categoria = String(product["categoria"] ?? "");
   if (isMate(nombre, categoria)) {
     const matesRule = catRules["mates"];
@@ -1037,14 +1005,12 @@ export function checkCategoryMins(
   for (const item of items) {
     const mg = item.moq_group ?? null;
 
+    // moq_group explícito "none" → ignorar
+    if (mg === "none") continue;
+
     let minRuleKey: string | undefined;
 
-    if (isNfcGoogle(item.nombre)) {
-      minRuleKey = "nfc_google";
-    } else if (mg === "none") {
-      // moq_group explícito "none" → ignorar
-      continue;
-    } else if (mg && mg !== "") {
+    if (mg && mg !== "") {
       // moq_group explícito con clave → usa directamente si la regla tiene mínimo
       const rule = rules[mg];
       if (rule && (rule.minUnits || rule.minAmount)) {
@@ -1106,10 +1072,7 @@ export function checkCategoryMins(
   for (const [key, rule] of Object.entries(rules)) {
     const units = catUnits[key] ?? 0;
     if (units === 0) continue;
-    const display =
-      key === "nfc_google"
-        ? "NFC para Reseñas de Google"
-        : key.charAt(0).toUpperCase() + key.slice(1);
+    const display = key.charAt(0).toUpperCase() + key.slice(1);
     if (rule.minUnits && units < rule.minUnits) {
       violations.push({ category: display, type: "units", min: rule.minUnits, current: units });
     }

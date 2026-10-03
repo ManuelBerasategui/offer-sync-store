@@ -16,11 +16,6 @@ import {
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
   thumbnailUrl,
-  isNfcGoogle,
-  NFC_GOOGLE_ID,
-  discountFor,
-  unitPriceFor,
-  tiersOf,
 } from "./store";
 
 /* ══════════════════════════════════════════════════════════════════
@@ -463,6 +458,8 @@ describe("checkCategoryMins — Bazar mínimo 5 unidades", () => {
    discountFor — tercer tramo global (20+ → 12%)
 ══════════════════════════════════════════════════════════════════ */
 
+import { discountFor } from "./store";
+
 // Producto con descuento activo y tiers 5→5%, 10→10% (como en DB existente)
 function makeTieredProduct(qty_field?: boolean) {
   return {
@@ -773,83 +770,5 @@ describe("thumbnailUrl helper", () => {
     expect(decodeURIComponent(thumbnailUrl(alreadyMd, "md"))).not.toContain("/thumbnails-md/thumbnails-md/");
   });
 });
-
-/* ══════════════════════════════════════════════════════════════════
-   NFC PARA RESEÑAS DE GOOGLE (MOQ 50 u. y 0% descuento por cantidad)
-══════════════════════════════════════════════════════════════════ */
-describe("NFC para Reseñas de Google — regla MOQ 50 u. y sin descuento por cantidad", () => {
-  const rules = parseCategoryRules({});
-
-  it("isNfcGoogle identifies variations of NFC Google reviews product", () => {
-    expect(isNfcGoogle("NFC PARA RESEÑAS DE GOOGLE")).toBe(true);
-    expect(isNfcGoogle("NFC para Reseñas de Google")).toBe(true);
-    expect(isNfcGoogle("nfc resenas google")).toBe(true);
-    expect(isNfcGoogle("Tarjeta NFC Google")).toBe(true);
-    expect(isNfcGoogle(null, NFC_GOOGLE_ID)).toBe(true);
-    expect(isNfcGoogle("Camiseta Boca 2024")).toBe(false);
-    expect(isNfcGoogle("Auriculares Bluetooth")).toBe(false);
-  });
-
-  it("parseCategoryRules includes default 50 units minimum for nfc_google", () => {
-    expect(rules["nfc_google"]).toBeDefined();
-    expect(rules["nfc_google"]!.minUnits).toBe(50);
-    expect(rules["nfc_google"]!.discountTiers).toHaveLength(0);
-  });
-
-  it("hasMoq detects 50 units minimum for NFC Google product", () => {
-    const p = makeProduct("NFC PARA RESEÑAS DE GOOGLE", "Tecnología");
-    const info = hasMoq(p, rules);
-    expect(info).not.toBeNull();
-    expect(info!.group).toBe("nfc_google");
-    expect(info!.minUnits).toBe(50);
-    expect(meetsMoq(info, 49)).toBe(false);
-    expect(meetsMoq(info, 50)).toBe(true);
-  });
-
-  it("checkCategoryMins flags violation when NFC Google units < 50", () => {
-    const items = [item("NFC PARA RESEÑAS DE GOOGLE", "Tecnología", 49, 10000)];
-    const v = checkCategoryMins(items, rules);
-    expect(v.length).toBe(1);
-    expect(v[0]!.category).toBe("NFC para Reseñas de Google");
-    expect(v[0]!.min).toBe(50);
-    expect(v[0]!.current).toBe(49);
-  });
-
-  it("checkCategoryMins passes when NFC Google units >= 50", () => {
-    const items = [item("NFC PARA RESEÑAS DE GOOGLE", "Tecnología", 50, 10000)];
-    const v = checkCategoryMins(items, rules);
-    expect(v).toHaveLength(0);
-  });
-
-  it("NFC Google does NOT satisfy or mix with general tecnología MOQ", () => {
-    // 3 NFC and 2 other tech items
-    const items = [
-      item("NFC PARA RESEÑAS DE GOOGLE", "Tecnología", 3, 10000),
-      item("Smartwatch T900", "Tecnología", 2, 15000),
-    ];
-    const v = checkCategoryMins(items, rules);
-    // NFC is short of 50, and Smartwatch (2 u.) is short of 5 technology items
-    expect(v.some((x) => x.category === "NFC para Reseñas de Google" && x.min === 50)).toBe(true);
-    expect(v.some((x) => x.category === "Tecnologia" && x.min === 5)).toBe(true);
-  });
-
-  it("does not apply any quantity discount or tiers to NFC Google", () => {
-    const p = {
-      nombre: "NFC PARA RESEÑAS DE GOOGLE",
-      categoria: "Tecnología",
-      precio: "10000",
-      descuento: "SI",
-      "5 unidades": "10%",
-      "10 unidades": "15%",
-      "20 unidades": "20%",
-    };
-    expect(tiersOf(p)).toHaveLength(0);
-    expect(discountFor(p, 1)).toBe(0);
-    expect(discountFor(p, 50)).toBe(0);
-    expect(discountFor(p, 100)).toBe(0);
-    expect(unitPriceFor(p, 50, 10000)).toBe(10000);
-  });
-});
-
 
 
