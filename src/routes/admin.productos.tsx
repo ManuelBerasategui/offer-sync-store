@@ -3486,16 +3486,15 @@ function AdminProductosPage() {
         void navigate({ to: "/", replace: true });
       } else {
         void loadProducts({ isInitial: true, page: 1 });
-        void loadOffers();
       }
     }
   }, [authLoading, userId]);
 
   useEffect(() => {
-    if (activeTab === "ofertas" && userId) {
+    if (activeTab === "ofertas" && userId && !authLoading) {
       void loadOffers();
     }
-  }, [activeTab, userId]);
+  }, [activeTab, userId, authLoading]);
 
   useEffect(() => {
     if (isFirstMount.current) {

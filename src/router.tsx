@@ -18,7 +18,7 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
-    defaultPreloadStaleTime: 0,
+    defaultPreloadStaleTime: 1000 * 60 * 5, // 5 minutos para evitar re-validaciones continuas en hover de enlaces
   });
 
   return router;
