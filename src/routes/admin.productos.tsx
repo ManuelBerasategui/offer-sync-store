@@ -196,7 +196,7 @@ function ImageDropzone({
       const { error: clientErr } = await supabase.storage.from(bucket).upload(filename, compressed.file, {
         contentType: "image/webp",
         cacheControl: "31536000",
-        upsert: true,
+        upsert: false,
       });
 
       if (!clientErr) {

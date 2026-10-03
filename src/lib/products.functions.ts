@@ -1296,8 +1296,13 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
       const buffer = Buffer.from(base64Data, "base64");
       const bucketName = data.bucket || "storage-images";
 
-      let uploadBuffer = buffer;
-      let filename = data.filename;
+      let cleanFilename = (data.filename || "").trim().replace(/^\/+/, "");
+      const folder = cleanFilename.includes("/") ? cleanFilename.substring(0, cleanFilename.lastIndexOf("/")) : "products";
+      const baseName = cleanFilename.includes("/") ? cleanFilename.substring(cleanFilename.lastIndexOf("/") + 1) : cleanFilename;
+      const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+      let filename = uuidRegex.test(baseName)
+        ? `${folder}/${baseName}`
+        : `${folder}/${crypto.randomUUID()}_${baseName || "image.webp"}`;
       let cType = data.contentType || "image/webp";
 
       try {
@@ -1334,7 +1339,7 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
         .upload(filename, uploadBuffer, {
           contentType: cType,
           cacheControl: "31536000",
-          upsert: true,
+          upsert: false,
         });
 
       if (uploadErr) throw uploadErr;
