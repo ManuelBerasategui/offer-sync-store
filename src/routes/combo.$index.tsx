@@ -18,6 +18,7 @@ import {
   transferDiscountPct,
 } from "@/lib/store";
 import type { ComboQuantityTier } from "@/lib/store";
+import { SITE_URL } from "@/lib/constants";
 
 export const Route = createFileRoute("/combo/$index")({
   loader: ({ context }) => {
@@ -36,13 +37,13 @@ export const Route = createFileRoute("/combo/$index")({
         property: "og:description",
         content: "Pack completo para revender, con pago online por MercadoPago.",
       },
-      { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:url", content: "https://teimportamosarg.com/" },
+      { property: "og:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:image:secure_url", content: `${SITE_URL}/businessicon.jpg` },
+      { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:url", content: `${SITE_URL}/` },
     ],
     links: [
-      { rel: "canonical", href: "https://teimportamosarg.com/" },
+      { rel: "canonical", href: `${SITE_URL}/` },
     ],
   }),
   component: ComboPage,

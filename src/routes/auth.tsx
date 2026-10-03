@@ -8,6 +8,7 @@ import { storeQueryOptions } from "@/lib/store-query";
 import { supabase } from "@/integrations/supabase/client";
 import { EMPTY_SHIPPING, useAuth, type ShippingData } from "@/hooks/useAuth";
 import { syncNewUserSubscriber } from "@/lib/newsletter.functions";
+import { SITE_URL } from "@/lib/constants";
 
 const authSearchSchema = z.object({
   mode: z.enum(["login", "register", "forgot"]).optional(),
@@ -41,10 +42,10 @@ export const Route = createFileRoute("/auth")({
         property: "og:description",
         content: "Tu cuenta para comprar productos importados con envío a todo el país.",
       },
-      { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:url", content: "https://teimportamosarg.com/auth" },
+      { property: "og:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:image:secure_url", content: `${SITE_URL}/businessicon.jpg` },
+      { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:url", content: `${SITE_URL}/auth` },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),

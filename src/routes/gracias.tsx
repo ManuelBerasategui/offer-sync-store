@@ -8,6 +8,7 @@ import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
 import { money, waLink, getBankInfo } from "@/lib/store";
 import { verifyOrderPayment } from "@/lib/orders.functions";
+import { SITE_URL } from "@/lib/constants";
 
 const graciasSearchSchema = z
   .object({
@@ -38,9 +39,9 @@ export const Route = createFileRoute("/gracias")({
         property: "og:description",
         content: "Confirmación de pedido y seguimiento de envío.",
       },
-      { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { property: "og:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:image:secure_url", content: `${SITE_URL}/businessicon.jpg` },
+      { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
       { name: "robots", content: "noindex" },
     ],
   }),
