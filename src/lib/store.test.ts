@@ -15,6 +15,7 @@ import {
   calcJerseyUnitPrice,
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
+  thumbnailUrl,
 } from "./store";
 
 /* ══════════════════════════════════════════════════════════════════
@@ -727,4 +728,25 @@ describe("calcJerseyUnitPrice", () => {
     expect(tier5.unitArs).toBe(tier10.unitArs);
   });
 });
+
+describe("thumbnailUrl helper", () => {
+  it("maps Supabase Storage URLs to /thumbnails/ subfolder through image proxy", () => {
+    const raw = "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/store-images/products/photo.webp";
+    const thumb = thumbnailUrl(raw);
+    expect(thumb).toContain("/api/img?url=");
+    expect(decodeURIComponent(thumb)).toContain("/store-images/products/thumbnails/photo.webp");
+  });
+
+  it("handles Google Drive URLs with reduced width parameter", () => {
+    const drive = "https://drive.google.com/file/d/12345ABCD/view";
+    expect(thumbnailUrl(drive)).toBe("https://lh3.googleusercontent.com/d/12345ABCD=w200");
+  });
+
+  it("falls back gracefully for local or invalid paths", () => {
+    expect(thumbnailUrl("/placeholder.svg")).toBe("/placeholder.svg");
+    expect(thumbnailUrl("")).toBe("");
+    expect(thumbnailUrl(null)).toBe("");
+  });
+});
+
 

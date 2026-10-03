@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { imageUrl, FALLBACK_IMAGE } from "@/lib/store";
+import { imageUrl, thumbnailUrl, FALLBACK_IMAGE } from "@/lib/store";
 
 interface SafeImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src" | "alt"> {
   rawSrc?: string | null | undefined;
   src?: string | null | undefined;
   fallback?: string | undefined;
   alt?: string | null | undefined;
+  thumb?: boolean;
 }
 
-function resolveSafeImageUrl(raw?: string | null, fallback = FALLBACK_IMAGE): string {
+function resolveSafeImageUrl(raw?: string | null, fallback = FALLBACK_IMAGE, isThumb = false): string {
   if (!raw || typeof raw !== "string") return fallback;
-  const processed = imageUrl(raw);
+  const processed = isThumb ? thumbnailUrl(raw) : imageUrl(raw);
   if (!processed) return fallback;
   if (processed.startsWith("data:image/")) return processed;
   if (processed.startsWith("/api/img?")) return processed;
@@ -31,17 +32,19 @@ export function SafeImage({
   src,
   fallback = FALLBACK_IMAGE,
   alt = "",
+  thumb = false,
   className,
   onError,
   ...rest
 }: SafeImageProps) {
+  const targetRaw = rawSrc || src;
   const [resolvedSrc, setResolvedSrc] = useState<string>(() =>
-    resolveSafeImageUrl(rawSrc || src, fallback),
+    resolveSafeImageUrl(targetRaw, fallback, thumb),
   );
 
   useEffect(() => {
-    setResolvedSrc(resolveSafeImageUrl(rawSrc || src, fallback));
-  }, [rawSrc, src, fallback]);
+    setResolvedSrc(resolveSafeImageUrl(targetRaw, fallback, thumb));
+  }, [targetRaw, fallback, thumb]);
 
   return (
     <img
@@ -49,6 +52,14 @@ export function SafeImage({
       alt={alt ?? undefined}
       className={className}
       onError={(e) => {
+        // Si falló la miniatura, intentar con la imagen de tamaño completo antes del fallback
+        if (thumb) {
+          const fullSafe = resolveSafeImageUrl(targetRaw, fallback, false);
+          if (resolvedSrc !== fullSafe) {
+            setResolvedSrc(fullSafe);
+            return;
+          }
+        }
         if (resolvedSrc !== fallback) {
           setResolvedSrc(fallback);
         }
