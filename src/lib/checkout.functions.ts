@@ -64,8 +64,7 @@ async function revalidateOrderItems(
     ]);
 
     if (!dbProducts || dbProducts.length === 0) {
-      const total = rawItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-      return { validatedItems: rawItems, total };
+      return { validatedItems: [], total: 0, error: "No se pudieron obtener los productos de la base de datos." };
     }
 
     const configObj: Record<string, string> = {};
@@ -238,8 +237,8 @@ export const createCheckout = createServerFn({ method: "POST" })
       return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
     }
 
-    let items = data.items;
-    let total = data.items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+    let items: CheckoutItem[] = [];
+    let total = 0;
     let couponDiscountAmount = 0;
     let validCouponApplied: string | null = null;
 
@@ -322,6 +321,13 @@ export const createCheckout = createServerFn({ method: "POST" })
       }
     } catch (err) {
       console.error("Error al revalidar la orden:", err);
+      return {
+        error: "No pudimos validar los precios de tu carrito. Por favor recargá la página e intentalo nuevamente.",
+      };
+    }
+
+    if (items.length === 0 || total <= 0) {
+      return { error: "No se pudieron calcular los totales de tu orden. Por favor recargá la página." };
     }
 
     // Generamos el código de orden
