@@ -288,7 +288,7 @@ function ImageDropzone({
         ) : value ? (
           <div className="relative group w-full flex flex-col items-center gap-2">
             <img
-              src={value}
+              src={imageUrl(value)}
               alt="Vista previa"
               className="h-28 max-w-full rounded-lg object-contain border border-border shadow-xs"
               onError={(e) => {

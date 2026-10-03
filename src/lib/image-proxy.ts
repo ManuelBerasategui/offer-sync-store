@@ -126,6 +126,22 @@ export async function handleImageProxy(request: Request): Promise<Response> {
     return new Response("Untrusted host", { status: 403 });
   }
 
+  // 0. Cloudflare Edge Cache API: verificar si la imagen ya está en caché del CDN
+  let cfCache: Cache | null = null;
+  try {
+    if (typeof caches !== "undefined" && caches.default) {
+      cfCache = caches.default;
+      if (request.method === "GET") {
+        const cached = await cfCache.match(request.url);
+        if (cached) {
+          return cached;
+        }
+      }
+    }
+  } catch {
+    // ignorar si caches API no está disponible en el entorno
+  }
+
   try {
     const upstreamHeaders = new Headers();
     // Reenviar encabezados condicionales si existen
@@ -140,6 +156,8 @@ export async function handleImageProxy(request: Request): Promise<Response> {
       method: request.method,
       headers: upstreamHeaders,
       signal: AbortSignal.timeout(10000),
+      // @ts-expect-error Instrucción específica de Cloudflare Workers para forzar edge cache
+      cf: { cacheEverything: true, cacheTtl: 31536000 },
     });
 
     if (upstreamRes.status === 304) {
@@ -189,10 +207,20 @@ export async function handleImageProxy(request: Request): Promise<Response> {
     const lastModified = upstreamRes.headers.get("last-modified");
     if (lastModified) resHeaders.set("Last-Modified", lastModified);
 
-    return new Response(upstreamRes.body, {
+    const finalResponse = new Response(upstreamRes.body, {
       status: 200,
       headers: resHeaders,
     });
+
+    if (cfCache && request.method === "GET") {
+      try {
+        await cfCache.put(request.url, finalResponse.clone());
+      } catch {
+        // No bloquear la respuesta si el guardado en cache falla
+      }
+    }
+
+    return finalResponse;
   } catch (err) {
     console.error("Image proxy fetch failed:", err);
     return new Response("Image proxy failed", { status: 502 });
