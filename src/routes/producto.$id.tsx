@@ -54,6 +54,7 @@ import {
   checkCategoryMins,
   isCamiseta,
   isLongSleeve,
+  isNfcGoogle,
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
   JERSEY_PLAYER_ML_TIERS,
@@ -997,21 +998,21 @@ function ProductoPage() {
 
   const product = findProduct(products, id);
 
-  const [qty, setQty] = useState(1);
+  const isCamisetaProd = isCamiseta(product?.categoria, product?.nombre);
+  const isNfcGoogleProd = isNfcGoogle(product?.nombre, product?.id);
+
+  const [qty, setQty] = useState(() => (product && isNfcGoogle(product.nombre, product.id) ? 50 : 1));
   // qtyStr: valor de display del input — permite borrar y reescribir en mobile sin que
   // el campo salte a 1 en cada keystroke. Se sincroniza con qty en onBlur.
-  const [qtyStr, setQtyStr] = useState("1");
+  const [qtyStr, setQtyStr] = useState(() => (product && isNfcGoogle(product.nombre, product.id) ? "50" : "1"));
   const [custom, setCustom] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showMin, setShowMin] = useState(false);
-  const tiers = useMemo(() => (product ? tiersOf(product) : []), [product]);
+  const tiers = useMemo(() => (product && !isNfcGoogle(product.nombre, product.id) ? tiersOf(product) : []), [product]);
   const variants = product?.variants ?? [];
   const [selectedVariantId, setSelectedVariantId] = useState("");
   const [selectedTalle, setSelectedTalle] = useState("");
   const [talleError, setTalleError] = useState(false);
-
-  // Detección de categoría camisetas
-  const isCamisetaProd = isCamiseta(product?.categoria, product?.nombre);
 
   if (!product) {
     return (
@@ -1100,14 +1101,17 @@ function ProductoPage() {
   const selectedImage = selectedVariant?.imagen_url || product.imagen_url;
   const catRules = useMemo(() => parseCategoryRules(config), [config]);
   const categoryRuleMatch = useMemo(() => {
+    if (isNfcGoogleProd) return undefined;
     const category = normCat(product.categoria ?? "");
     return category ? findRuleForCat(category, catRules) : undefined;
-  }, [product.categoria, catRules]);
-  const categoryPercent = categoryRuleMatch?.rule.discountTiers?.length
+  }, [product.categoria, catRules, isNfcGoogleProd]);
+  const categoryPercent = (!isNfcGoogleProd && categoryRuleMatch?.rule.discountTiers?.length)
     ? categoryDiscountForUnits(categoryRuleMatch.rule.discountTiers, qty)
     : 0;
-  const percent = categoryPercent || discountFor(product, qty);
-  const unit = categoryPercent > 0
+  const percent = isNfcGoogleProd ? 0 : (categoryPercent || discountFor(product, qty));
+  const unit = isNfcGoogleProd
+    ? basePrice
+    : categoryPercent > 0
     ? Math.round(basePrice * (1 - categoryPercent / 100))
     : unitPriceFor(product, qty, basePrice);
   const total = unit * qty;
@@ -1259,10 +1263,15 @@ function ProductoPage() {
                   const moqDisplay = hasMoq(product as Record<string, unknown>, catRules);
 
                   if (moqDisplay?.minUnits) {
-                    const groupLabel = moqDisplay.group.charAt(0).toUpperCase() + moqDisplay.group.slice(1);
+                    const groupLabel =
+                      moqDisplay.group === "nfc_google"
+                        ? "este producto"
+                        : moqDisplay.group.charAt(0).toUpperCase() + moqDisplay.group.slice(1);
                     const minText = `${moqDisplay.minUnits} unidades`;
                     const mixMsg =
-                      moqDisplay.group === "mates"
+                      moqDisplay.group === "nfc_google"
+                        ? "La compra mínima de este producto es de 50 unidades. No aplica descuento por cantidad."
+                        : moqDisplay.group === "mates"
                         ? "Podés combinar distintos modelos de Mates en tu carrito hasta alcanzar el mínimo."
                         : "Podés armar surtido con distintos productos de esta categoría para alcanzar el mínimo.";
                     return (
@@ -1324,6 +1333,7 @@ function ProductoPage() {
 
                 {/* AVISO DE DESCUENTOS POR CANTIDAD (Categoría o Producto) */}
                 {(() => {
+                  if (isNfcGoogleProd) return null;
                   const catNorm = normCat(product.categoria ?? "");
                   const ruleMatch = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
                   const rule = ruleMatch?.rule;
@@ -1516,7 +1526,7 @@ function ProductoPage() {
                   htmlFor="qty-input"
                   className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground"
                 >
-                  Cantidad
+                  Cantidad {isNfcGoogleProd ? "(mínimo 50 unidades)" : ""}
                 </label>
                 <div className="mt-2 flex items-center gap-2">
                   {/* Botón – */}
@@ -1604,7 +1614,7 @@ function ProductoPage() {
                     {moqInfo && !moqMet && moqInfo.minUnits && (
                       <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs">
                         <p className="font-bold text-amber-700 dark:text-amber-400">
-                           Compra mínima de {moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
+                           Compra mínima de {isNfcGoogleProd ? "este producto" : moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
                         </p>
                         <p className="mt-0.5 text-muted-foreground">
                           Llevás {qty} unidad{qty !== 1 ? "es" : ""}. Te falta{moqMissing !== 1 ? "n" : ""}
@@ -1613,9 +1623,9 @@ function ProductoPage() {
                       </div>
                     )}
 
-                    {/* "Comprar ya": requiere cumplir el mínimo completo de la categoría */}
+                    {/* "Comprar ya": bloqueada para NFC Google (compra mínima de 50 u. gestionada en carrito) */}
                     {(() => {
-                      const moqBlocked = moqInfo != null && !moqMet;
+                      const moqBlocked = isNfcGoogleProd || (moqInfo != null && !moqMet);
                       const disabled = moqBlocked || bloqueaCompra;
                       return (
                         <button
@@ -1623,6 +1633,7 @@ function ProductoPage() {
                           id="btn-comprar-ya"
                           disabled={disabled}
                           onClick={() => {
+                            if (isNfcGoogleProd) return;
                             if (hasTalles && !selectedTalle) {
                               setTalleError(true);
                               return;
@@ -1639,7 +1650,9 @@ function ProductoPage() {
                               : "grad-urgente text-primary-foreground hover:shadow-md"
                           }`}
                         >
-                          {hasTalles && !selectedTalle
+                          {isNfcGoogleProd
+                            ? "Comprar ya no disponible (mínimo 50 u. en carrito)"
+                            : hasTalles && !selectedTalle
                             ? "Elegí tu talle para comprar"
                             : moqInfo && !moqMet && moqInfo.minUnits
                             ? `Mínimo ${moqInfo.minUnits} unidades para comprar ya`

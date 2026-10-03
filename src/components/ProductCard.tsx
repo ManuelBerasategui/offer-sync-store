@@ -20,6 +20,7 @@ import {
   waLink,
   isCamiseta,
   isLongSleeve,
+  isNfcGoogle,
   JERSEY_FAN_TIERS,
   JERSEY_FAN_ML_TIERS,
 } from "@/lib/store";
@@ -55,11 +56,11 @@ export function ProductCard({
   const origPrice = originalPriceOf(p);
   const isDiscounted = offer && origPrice > basePrice;
   const hidePrice = isWaPriceHidden || basePrice <= 0 || isNaN(basePrice);
-  const tiers = tiersOf(p);
+  const isNfc = isNfcGoogle(p.nombre, p.id);
+  const tiers = isNfc ? [] : tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
-  // El tercer tramo global (20+ u → 12%) aplica a TODOS los productos con precio.
-  // maxPercent es 12 como mínimo universal; más si hay tiers propios por encima de 12%.
-  const maxPercent = (!hidePrice && !consultar) ? Math.max(maxTier?.percent ?? 12, 12) : null;
+  // El tercer tramo global (20+ u → 12%) aplica a TODOS los productos con precio, SALVO NFC Google.
+  const maxPercent = (!hidePrice && !consultar && !isNfc) ? Math.max(maxTier?.percent ?? 12, 12) : null;
 
   const discPct = transferDiscountPct(config);
   const tPrice = transferPrice(basePrice, discPct);
@@ -160,6 +161,12 @@ export function ProductCard({
               {maxPercent !== null && (
                 <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
                   🎁 Hasta {maxPercent}% OFF x mayor
+                </span>
+              )}
+
+              {isNfc && (
+                <span className="mt-1.5 inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                  ℹ️ Compra mínima: 50 u.
                 </span>
               )}
             </div>

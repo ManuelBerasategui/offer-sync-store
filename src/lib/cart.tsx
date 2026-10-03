@@ -17,6 +17,7 @@ import {
   isLongSleeve,
   parseJerseyItem,
   calcJerseyUnitPrice,
+  isNfcGoogle,
   type ComboQuantityTier,
 } from "./store";
 
@@ -200,6 +201,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Agrupa por clave de regla (no categoría exacta) — subcategorías quedan juntas
     const catTotals: Record<string, number> = {};
     for (const item of items) {
+      if (isNfcGoogle(item.nombre, item.productId || item.id)) continue;
       const catNorm = normCat(item.categoria ?? "");
       if (!catNorm) continue;
       const match = findRuleForCat(catNorm, catRules);
@@ -278,6 +280,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return item;
       }
 
+      // ── Ítems de NFC para Reseñas de Google: sin descuento por cantidad ──
+      if (isNfcGoogle(item.nombre, item.productId || item.id)) {
+        const product =
+          (item.productId ? findProduct(products, item.productId) : undefined) ??
+          findProduct(products, item.id) ??
+          findProduct(products, item.nombre);
+        const base =
+          item.basePrice && item.basePrice > 0
+            ? item.basePrice
+            : product
+            ? priceOf(product)
+            : item.unitPrice;
+        const rBase = Math.round(base);
+        if (item.unitPrice === rBase && item.basePrice === rBase) return item;
+        return { ...item, basePrice: rBase, unitPrice: rBase };
+      }
+
       const product =
         (item.productId ? findProduct(products, item.productId) : undefined) ??
         findProduct(products, item.id) ??
@@ -285,6 +304,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         products.find((p) => item.id && String(item.id).startsWith(String(p.id) + "-")) ??
         products.find((p) => item.nombre && p.nombre && item.nombre.toLowerCase().startsWith(p.nombre.toLowerCase()));
       if (!product) return item;
+
+      if (isNfcGoogle(product.nombre, product.id)) {
+        const base = item.basePrice && item.basePrice > 0 ? item.basePrice : priceOf(product);
+        const rBase = Math.round(base);
+        if (item.unitPrice === rBase && item.basePrice === rBase) return item;
+        return { ...item, basePrice: rBase, unitPrice: rBase };
+      }
 
       if (isCamiseta(product.categoria, product.nombre)) {
         const { version, isExtraSize, badge } = parseJerseyItem(item);

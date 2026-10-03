@@ -29,8 +29,10 @@ import {
   findRuleForCat,
   normCat,
   checkCategoryMins,
+  moqGroupOf,
   isCamiseta,
   isLongSleeve,
+  isNfcGoogle,
   parseJerseyItem,
   calcJerseyUnitPrice,
 } from "./store";
@@ -77,19 +79,21 @@ async function revalidateOrderItems(
     const catRules = parseCategoryRules(configObj);
 
     const catTotals: Record<string, number> = {};
-    const itemsWithCat: { categoria?: string; qty: number; unitPrice: number }[] = [];
+    const itemsWithCat: { categoria?: string; nombre?: string; moq_group?: string | null; qty: number; unitPrice: number }[] = [];
 
     for (const item of rawItems) {
       const prod = findProduct(dbProducts, item.nombre);
+      const isNfc = isNfcGoogle(item.nombre, item.productId || prod?.id);
       const cat = prod?.categoria ?? "";
       const catNorm = normCat(cat);
-      if (catNorm) {
+      if (catNorm && !isNfc) {
         const match = findRuleForCat(catNorm, catRules);
         const key = match?.key ?? catNorm;
         catTotals[key] = (catTotals[key] ?? 0) + item.qty;
       }
       const baseP = prod ? priceOf(prod) : item.unitPrice;
-      itemsWithCat.push({ categoria: cat, qty: item.qty, unitPrice: baseP });
+      const mg = prod ? moqGroupOf(prod as Record<string, unknown>) : undefined;
+      itemsWithCat.push({ categoria: cat, nombre: item.nombre, moq_group: mg, qty: item.qty, unitPrice: baseP });
     }
 
     const violations = checkCategoryMins(itemsWithCat, catRules);
@@ -150,6 +154,16 @@ async function revalidateOrderItems(
       }
 
       if (!prod) return item;
+
+      if (isNfcGoogle(item.nombre, item.productId || prod.id)) {
+        const base = priceOf(prod);
+        return {
+          nombre: item.nombre,
+          qty: item.qty,
+          unitPrice: base > 0 ? base : item.unitPrice,
+          ...(item.productId ? { productId: item.productId } : {}),
+        };
+      }
 
       const catNorm = normCat(prod.categoria ?? "");
       const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
