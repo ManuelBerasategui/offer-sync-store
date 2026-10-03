@@ -31,6 +31,7 @@ import {
   normCat,
   findRuleForCat,
 } from "@/lib/store";
+import { SITE_URL } from "@/lib/constants";
 
 /**
  * Input de cantidad para el carrito con buffer de display.
@@ -118,8 +119,8 @@ export const Route = createFileRoute("/carrito")({
         name: "description",
         content: "Revisá tu pedido mayorista antes de finalizar la compra.",
       },
-      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:url", content: "https://teimportamosarg.com/carrito" },
+      { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:url", content: `${SITE_URL}/carrito` },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
