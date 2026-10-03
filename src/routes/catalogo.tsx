@@ -16,6 +16,7 @@ import {
   JERSEY_FAN_ML_TIERS,
   type Product,
 } from "@/lib/store";
+import { SITE_URL } from "@/lib/constants";
 
 type Sort = "destacado" | "precio_asc" | "precio_desc" | "nombre";
 
@@ -37,13 +38,13 @@ export const Route = createFileRoute("/catalogo")({
         content:
           "Todo el stock de productos importados con búsqueda, filtros por categoría y orden por precio.",
       },
-      { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:url", content: "https://teimportamosarg.com/catalogo" },
+      { property: "og:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:image:secure_url", content: `${SITE_URL}/businessicon.jpg` },
+      { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:url", content: `${SITE_URL}/catalogo` },
     ],
     links: [
-      { rel: "canonical", href: "https://teimportamosarg.com/catalogo" },
+      { rel: "canonical", href: `${SITE_URL}/catalogo` },
     ],
     scripts: [
       {
@@ -56,13 +57,13 @@ export const Route = createFileRoute("/catalogo")({
               "@type": "ListItem",
               position: 1,
               name: "Inicio",
-              item: "https://teimportamosarg.com/",
+              item: `${SITE_URL}/`,
             },
             {
               "@type": "ListItem",
               position: 2,
               name: "Catálogo",
-              item: "https://teimportamosarg.com/catalogo",
+              item: `${SITE_URL}/catalogo`,
             },
           ],
         }),
@@ -299,7 +300,7 @@ function Catalogo() {
           <>
             <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
               {visibleProducts.map((p, i) => (
-                <ProductCard key={p.id ?? i} p={p} config={config} />
+                <ProductCard key={p.id ?? i} p={p} config={config} index={i} />
               ))}
             </div>
 
