@@ -5,13 +5,13 @@ import { imageUrl } from "./store";
 describe("isAllowedProxyUrl (SSRF Prevention — CWE-918)", () => {
   it("returns a URL object for valid Supabase Storage public URLs", () => {
     const url1 = isAllowedProxyUrl(
-      "https://xyzcompany.supabase.co/storage/v1/object/public/storage-images/productos/test.webp",
+      "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/storage-images/productos/test.webp",
     );
     expect(url1).toBeInstanceOf(URL);
-    expect(url1?.hostname).toBe("xyzcompany.supabase.co");
+    expect(url1?.hostname).toBe("dybzgnmghisqapdzgknv.supabase.co");
 
     const url2 = isAllowedProxyUrl(
-      "https://app-12345.supabase.co/storage/v1/object/public/banners/promo.png",
+      "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/banners/promo.png",
     );
     expect(url2).toBeInstanceOf(URL);
   });
@@ -39,7 +39,7 @@ describe("isAllowedProxyUrl (SSRF Prevention — CWE-918)", () => {
   });
 
   it("the returned URL href is normalized (taint flow is broken)", () => {
-    const rawInput = "https://myproj.supabase.co/storage/v1/object/public/storage-images/photo.webp";
+    const rawInput = "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/storage-images/photo.webp";
     const result = isAllowedProxyUrl(rawInput);
     // El fetch debe usar result.href, NUNCA el string crudo del usuario
     expect(result?.href).toBe(rawInput);
@@ -49,7 +49,7 @@ describe("isAllowedProxyUrl (SSRF Prevention — CWE-918)", () => {
 
 describe("imageUrl helper with Edge CDN proxying", () => {
   it("routes Supabase Storage URLs through /api/img proxy", () => {
-    const original = "https://test.supabase.co/storage/v1/object/public/storage-images/prod.webp";
+    const original = "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/storage-images/prod.webp";
     const proxied = imageUrl(original);
     expect(proxied).toBe(`/api/img?url=${encodeURIComponent(original)}`);
   });
@@ -105,7 +105,7 @@ describe("handleImageProxy request processing", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     const targetUrl =
-      "https://myproj.supabase.co/storage/v1/object/public/storage-images/photo.webp";
+      "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/storage-images/photo.webp";
     const req = new Request(`https://myshop.com/api/img?url=${encodeURIComponent(targetUrl)}`, {
       method: "GET",
     });
@@ -136,7 +136,7 @@ describe("handleImageProxy request processing", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     const targetUrl =
-      "https://myproj.supabase.co/storage/v1/object/public/storage-images/photo.webp";
+      "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/storage-images/photo.webp";
     const doubleEncoded = encodeURI(encodeURIComponent(targetUrl));
     const req = new Request(`https://myshop.com/api/img?url=${doubleEncoded}`, {
       method: "GET",

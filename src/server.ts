@@ -51,7 +51,7 @@ export default {
     try {
       const url = new URL(request.url);
       if (url.pathname === "/api/img") {
-        return await handleImageProxy(request);
+        return await handleImageProxy(request, ctx as { waitUntil(p: Promise<unknown>): void });
       }
 
       const handler = await getServerEntry();

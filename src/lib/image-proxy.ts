@@ -17,12 +17,9 @@ const ALLOWED_CONTENT_TYPES = new Set([
  * Allowlist estricta de dominios de Supabase Storage permitidos (anti-SSRF / CWE-918).
  * Solo se permiten peticiones a la instancia oficial del proyecto y entornos autorizados.
  */
+// Solo el proyecto de producción real — SSRF: nunca añadir dominios no controlados aquí
 export const ALLOWED_DOMAINS: string[] = [
   "dybzgnmghisqapdzgknv.supabase.co",
-  "xyzcompany.supabase.co",
-  "app-12345.supabase.co",
-  "test.supabase.co",
-  "myproj.supabase.co",
 ];
 
 // Si hay una URL en variables de entorno, incorporar su hostname al allowlist
@@ -90,10 +87,17 @@ export function isAllowedProxyUrl(targetUrlStr: string): URL | null {
   return new URL(`https://${hostname}${pathname}`);
 }
 
+/** ExecutionContext de Cloudflare Workers — permite waitUntil no bloqueante. */
+interface CloudflareCtx {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
 /**
  * Maneja la petición al proxy de imágenes aplicando Edge Caching para Vercel / CDN.
+ * @param ctx - ExecutionContext de Cloudflare Workers (opcional). Si se pasa, el
+ *              guardado en caché ocurre de forma no bloqueante con ctx.waitUntil().
  */
-export async function handleImageProxy(request: Request): Promise<Response> {
+export async function handleImageProxy(request: Request, ctx?: CloudflareCtx): Promise<Response> {
   // Solo permitir métodos de lectura seguros
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method not allowed", {
@@ -213,10 +217,16 @@ export async function handleImageProxy(request: Request): Promise<Response> {
     });
 
     if (cfCache && request.method === "GET") {
-      try {
-        await cfCache.put(request.url, finalResponse.clone());
-      } catch {
-        // No bloquear la respuesta si el guardado en cache falla
+      // Clonar antes de consumir el body
+      const putPromise = cfCache.put(request.url, finalResponse.clone()).catch(() => {
+        // Silenciar errores de escritura en caché — no deben bloquear la respuesta
+      });
+      if (ctx?.waitUntil) {
+        // Cloudflare Workers: no-bloquea la respuesta; el runtime lo resuelve en background
+        ctx.waitUntil(putPromise);
+      } else {
+        // Node / Vercel: await normal — sin impacto perceptible fuera de CF edge
+        await putPromise;
       }
     }
 
