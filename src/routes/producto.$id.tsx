@@ -23,6 +23,7 @@ import {
   discountFor,
   findProduct,
   imageUrl,
+  thumbnailUrl,
   galleryImages,
   isSuplemento,
   onImageError,
@@ -811,7 +812,7 @@ function ProductGallery({
               ].join(" ")}
             >
               <img
-                src={imageUrl(url) || FALLBACK_IMAGE}
+                src={thumbnailUrl(url) || FALLBACK_IMAGE}
                 alt={`Miniatura ${i + 1}`}
                 loading="lazy"
                 referrerPolicy="no-referrer"

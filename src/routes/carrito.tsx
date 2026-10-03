@@ -12,6 +12,7 @@ import { validatePromoCoupon } from "@/lib/products.functions";
 import {
   FALLBACK_IMAGE,
   imageUrl,
+  thumbnailUrl,
   onImageError,
   SUPLEMENTOS_MIN,
   isSuplemento,
@@ -303,7 +304,7 @@ function CarritoPage() {
                     ? String(banners.indexOf(comboBanner))
                     : null;
                 const rawImg = i.imagen || comboBanner?.imagen_url || prod?.imagen_url;
-                const itemImage = imageUrl(rawImg) || FALLBACK_IMAGE;
+                const itemImage = thumbnailUrl(rawImg) || FALLBACK_IMAGE;
 
                 // Precios de oferta: si el producto tiene oferta individual, mostrar el precio original tachado
                 const prodHasOffer = prod ? hasOffer(prod) : false;

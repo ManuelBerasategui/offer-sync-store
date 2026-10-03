@@ -189,6 +189,52 @@ export function imageUrl(raw?: string | null): string {
   return "";
 }
 
+/**
+ * Retorna la URL de miniatura (160px) optimizada para vistas pequeñas (carrito, tablas, thumbnails).
+ * Si es Supabase Storage: apunta a la subcarpeta /thumbnails/ del mismo bucket.
+ * Si es Google Drive: usa el parámetro de ancho reducido "=w200".
+ * Si no aplica: retorna imageUrl(raw).
+ */
+export function thumbnailUrl(raw?: string | null): string {
+  const url = (raw ?? "").trim();
+  if (!url) return "";
+
+  // 1. Google Drive: usar parámetro de ancho reducido (w200)
+  const m =
+    url.match(/\/file\/d\/([-\w]+)/) ||
+    url.match(/[?&]id=([-\w]+)/) ||
+    url.match(/\/d\/([-\w]+)/);
+  if (url.includes("drive.google.com") && m) {
+    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(m[1]!)}=w200`;
+  }
+
+  // 2. Supabase Storage: mapear a la subcarpeta /thumbnails/
+  try {
+    const marker = "/storage/v1/object/public/";
+    if (url.includes(marker)) {
+      const parsed = new URL(url);
+      if (
+        parsed.hostname.toLowerCase().endsWith(".supabase.co") &&
+        parsed.pathname.startsWith(marker)
+      ) {
+        const afterMarker = parsed.pathname.substring(marker.length);
+        const parts = afterMarker.split("/");
+        // Formato esperado: [bucket, folder, filename]
+        if (parts.length >= 3 && !parts.includes("thumbnails")) {
+          const fileName = parts.pop()!;
+          const thumbPath = `${marker}${parts.join("/")}/thumbnails/${fileName}`;
+          const thumbUrl = `https://${parsed.host}${thumbPath}`;
+          return `/api/img?url=${encodeURIComponent(thumbUrl)}`;
+        }
+      }
+    }
+  } catch {
+    // Fallback silencioso
+  }
+
+  return imageUrl(raw);
+}
+
 /** Extrae el id de un archivo de Google Drive, si el link es de Drive. */
 export function driveId(raw?: string) {
   const url = (raw ?? "").trim();
