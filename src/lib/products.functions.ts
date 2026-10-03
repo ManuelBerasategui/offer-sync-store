@@ -213,6 +213,11 @@ export const getAdminProducts = createServerFn({ method: "POST" })
         const productsResTyped = productsRes as { data: any[] | null; count: number | null; error: any };
         if (productsResTyped.error) throw productsResTyped.error;
 
+        if (productsResTyped.data) {
+          const b = JSON.stringify(productsResTyped.data).length;
+          console.info(`[AdminProducts] Products query size: ${(b / 1024).toFixed(2)} KB (${b} B, ${productsResTyped.data.length} rows, isPaginated: ${isPaginated})`);
+        }
+
         const totalCount = productsResTyped.count ?? (productsResTyped.data ?? []).length;
         const totalPages = pageSize ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
         const activeOffersCount = offersCountRes?.count ?? 0;
@@ -230,6 +235,8 @@ export const getAdminProducts = createServerFn({ method: "POST" })
             .in("product_id", productIds);
           if (variantsRes.error) throw variantsRes.error;
           variantsData = variantsRes.data ?? [];
+          const vb = JSON.stringify(variantsData).length;
+          console.info(`[AdminProducts] Variants query size: ${(vb / 1024).toFixed(2)} KB (${vb} B, ${variantsData.length} rows)`);
         }
 
         let dolarRate = 0;

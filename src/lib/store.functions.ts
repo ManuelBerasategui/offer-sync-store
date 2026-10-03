@@ -152,19 +152,24 @@ export const getStoreData = createServerFn({ method: "GET" }).handler(
 
       // Capa 1: in-memory cache del módulo (mismo isolate, acceso instantáneo)
       if (_moduleCache && _moduleCache.expiresAt > now) {
+        console.info("[StoreCache] HIT_L1 (memory isolate)");
         return _moduleCache.data;
       }
 
       // Capa 2: Cloudflare Cache API (compartida entre isolates del datacenter)
       const cfCached = await readCfCache();
       if (cfCached) {
+        console.info("[StoreCache] HIT_L2 (Cloudflare Cache API)");
         // Refrescar también el module cache para evitar llamadas repetidas a CF Cache
         _moduleCache = { data: cfCached, expiresAt: now + MODULE_CACHE_TTL_MS };
         return cfCached;
       }
 
       // Cache miss: ir a Supabase
+      console.warn("[StoreCache] MISS -> fetching Supabase DB");
       const data = await fetchFromSupabase();
+      const rawBytes = JSON.stringify(data).length;
+      console.info(`[StoreCache] Supabase payload: ${(rawBytes / 1024).toFixed(1)} KB (${rawBytes} B, ${data.products.length} products)`);
 
       // Guardar en ambas capas de caché
       _moduleCache = { data, expiresAt: now + MODULE_CACHE_TTL_MS };
