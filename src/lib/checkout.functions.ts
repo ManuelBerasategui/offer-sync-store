@@ -126,7 +126,7 @@ async function revalidateOrderItems(
         return isCamiseta(prod?.categoria, prod?.nombre) || isCamiseta(undefined, i.nombre);
       })
       .reduce((sum, i) => sum + i.qty, 0);
-    const usdRate = Number(config["dolar_cotizacion"] ?? 0);
+    const usdRate = Number(configObj["dolar_cotizacion"] ?? 0);
 
     const validatedItems: CheckoutItem[] = rawItems.map((item) => {
       const prod = findProduct(dbProducts, item.nombre);
