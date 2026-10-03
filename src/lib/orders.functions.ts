@@ -675,7 +675,6 @@ export const createTransferOrder = createServerFn({ method: "POST" })
         const listTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
         const discPct = transferDiscountPct(configMap);
         total = transferPrice(listTotal, discPct);
-      }
 
       // Revalidación segura del cupón en el servidor
       if (data.couponCode && data.userId) {
