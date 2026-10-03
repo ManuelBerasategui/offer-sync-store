@@ -189,6 +189,63 @@ export function imageUrl(raw?: string | null): string {
   return "";
 }
 
+/**
+ * Retorna la URL de miniatura optimizada para vistas pequeñas.
+ *
+ * @param raw  - URL original del producto (Supabase Storage o Google Drive).
+ * @param size - "sm" (default) → /thumbnails/ (160px, carrito/admin/galería strip).
+ *               "md"           → /thumbnails-md/ (320px, product cards y banners).
+ *
+ * Fallback: si la variante pedida no existe aún, SafeImage reintentará con
+ * la imagen de tamaño completo a través del proxy.
+ */
+export function thumbnailUrl(raw?: string | null, size: "sm" | "md" = "sm"): string {
+  const url = (raw ?? "").trim();
+  if (!url) return "";
+
+  // 1. Google Drive: usar parámetro de ancho reducido
+  const m =
+    url.match(/\/file\/d\/([-\w]+)/) ||
+    url.match(/[?&]id=([-\w]+)/) ||
+    url.match(/\/d\/([-\w]+)/);
+  if (url.includes("drive.google.com") && m) {
+    const w = size === "md" ? 400 : 200;
+    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(m[1]!)}=w${w}`;
+  }
+
+  // 2. Supabase Storage: mapear a la subcarpeta de miniatura correspondiente
+  const thumbFolder = size === "md" ? "thumbnails-md" : "thumbnails";
+  try {
+    const marker = "/storage/v1/object/public/";
+    if (url.includes(marker)) {
+      const parsed = new URL(url);
+      if (
+        parsed.hostname.toLowerCase().endsWith(".supabase.co") &&
+        parsed.pathname.startsWith(marker)
+      ) {
+        const afterMarker = parsed.pathname.substring(marker.length);
+        const parts = afterMarker.split("/");
+        // Formato esperado: [bucket, ...folder(s), filename]
+        // No re-procesar si ya apunta a una carpeta de miniaturas
+        if (
+          parts.length >= 3 &&
+          !parts.includes("thumbnails") &&
+          !parts.includes("thumbnails-md")
+        ) {
+          const fileName = parts.pop()!;
+          const thumbPath = `${marker}${parts.join("/")}/${thumbFolder}/${fileName}`;
+          const thumbUrl = `https://${parsed.host}${thumbPath}`;
+          return `/api/img?url=${encodeURIComponent(thumbUrl)}`;
+        }
+      }
+    }
+  } catch {
+    // Fallback silencioso
+  }
+
+  return imageUrl(raw);
+}
+
 /** Extrae el id de un archivo de Google Drive, si el link es de Drive. */
 export function driveId(raw?: string) {
   const url = (raw ?? "").trim();

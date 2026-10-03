@@ -15,6 +15,7 @@ import {
   calcJerseyUnitPrice,
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
+  thumbnailUrl,
 } from "./store";
 
 /* ══════════════════════════════════════════════════════════════════
@@ -727,4 +728,47 @@ describe("calcJerseyUnitPrice", () => {
     expect(tier5.unitArs).toBe(tier10.unitArs);
   });
 });
+
+describe("thumbnailUrl helper", () => {
+  it("maps Supabase Storage URLs to /thumbnails/ subfolder through image proxy", () => {
+    const raw = "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/store-images/products/photo.webp";
+    const thumb = thumbnailUrl(raw);
+    expect(thumb).toContain("/api/img?url=");
+    expect(decodeURIComponent(thumb)).toContain("/store-images/products/thumbnails/photo.webp");
+  });
+
+  it("handles Google Drive URLs with reduced width parameter", () => {
+    const drive = "https://drive.google.com/file/d/12345ABCD/view";
+    expect(thumbnailUrl(drive)).toBe("https://lh3.googleusercontent.com/d/12345ABCD=w200");
+  });
+
+  it("falls back gracefully for local or invalid paths", () => {
+    expect(thumbnailUrl("/placeholder.svg")).toBe("/placeholder.svg");
+    expect(thumbnailUrl("")).toBe("");
+    expect(thumbnailUrl(null)).toBe("");
+  });
+
+  it('size="md": maps Supabase Storage URLs to /thumbnails-md/ subfolder (320px)', () => {
+    const raw = "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/store-images/products/photo.webp";
+    const thumb = thumbnailUrl(raw, "md");
+    expect(thumb).toContain("/api/img?url=");
+    expect(decodeURIComponent(thumb)).toContain("/store-images/products/thumbnails-md/photo.webp");
+    // Must NOT produce thumbnails/ (sm variant)
+    expect(decodeURIComponent(thumb)).not.toContain("/thumbnails/");
+  });
+
+  it('size="md": Google Drive uses =w400 instead of =w200', () => {
+    const drive = "https://drive.google.com/file/d/12345ABCD/view";
+    expect(thumbnailUrl(drive, "md")).toBe("https://lh3.googleusercontent.com/d/12345ABCD=w400");
+  });
+
+  it("does not re-process URLs that already point to a thumbnail subfolder", () => {
+    const alreadySm = "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/store-images/products/thumbnails/photo.webp";
+    const alreadyMd = "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/store-images/products/thumbnails-md/photo.webp";
+    // Should go through proxy but NOT add another /thumbnails/ segment
+    expect(decodeURIComponent(thumbnailUrl(alreadySm))).not.toContain("/thumbnails/thumbnails/");
+    expect(decodeURIComponent(thumbnailUrl(alreadyMd, "md"))).not.toContain("/thumbnails-md/thumbnails-md/");
+  });
+});
+
 

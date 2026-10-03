@@ -1,16 +1,35 @@
 import React, { useState, useEffect } from "react";
-import { imageUrl, FALLBACK_IMAGE } from "@/lib/store";
+import { imageUrl, thumbnailUrl, FALLBACK_IMAGE } from "@/lib/store";
+
+/** thumb="sm"  → /thumbnails/ (160px)
+ *  thumb="md"  → /thumbnails-md/ (320px)
+ *  thumb=true  → same as "sm" (backward compat)
+ *  thumb=false → full image
+ */
+type ThumbSize = "sm" | "md" | boolean;
 
 interface SafeImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src" | "alt"> {
   rawSrc?: string | null | undefined;
   src?: string | null | undefined;
   fallback?: string | undefined;
   alt?: string | null | undefined;
+  thumb?: ThumbSize;
 }
 
-function resolveSafeImageUrl(raw?: string | null, fallback = FALLBACK_IMAGE): string {
+function resolveSafeImageUrl(
+  raw?: string | null,
+  fallback = FALLBACK_IMAGE,
+  thumb: ThumbSize = false,
+): string {
   if (!raw || typeof raw !== "string") return fallback;
-  const processed = imageUrl(raw);
+  let processed: string;
+  if (thumb === "md") {
+    processed = thumbnailUrl(raw, "md");
+  } else if (thumb === "sm" || thumb === true) {
+    processed = thumbnailUrl(raw, "sm");
+  } else {
+    processed = imageUrl(raw);
+  }
   if (!processed) return fallback;
   if (processed.startsWith("data:image/")) return processed;
   if (processed.startsWith("/api/img?")) return processed;
@@ -31,17 +50,19 @@ export function SafeImage({
   src,
   fallback = FALLBACK_IMAGE,
   alt = "",
+  thumb = false,
   className,
   onError,
   ...rest
 }: SafeImageProps) {
+  const targetRaw = rawSrc || src;
   const [resolvedSrc, setResolvedSrc] = useState<string>(() =>
-    resolveSafeImageUrl(rawSrc || src, fallback),
+    resolveSafeImageUrl(targetRaw, fallback, thumb),
   );
 
   useEffect(() => {
-    setResolvedSrc(resolveSafeImageUrl(rawSrc || src, fallback));
-  }, [rawSrc, src, fallback]);
+    setResolvedSrc(resolveSafeImageUrl(targetRaw, fallback, thumb));
+  }, [targetRaw, fallback, thumb]);
 
   return (
     <img
@@ -49,6 +70,14 @@ export function SafeImage({
       alt={alt ?? undefined}
       className={className}
       onError={(e) => {
+        // Si falló la miniatura, reintentar con imagen completa antes del fallback genérico
+        if (thumb) {
+          const fullSafe = resolveSafeImageUrl(targetRaw, fallback, false);
+          if (resolvedSrc !== fullSafe) {
+            setResolvedSrc(fullSafe);
+            return;
+          }
+        }
         if (resolvedSrc !== fallback) {
           setResolvedSrc(fallback);
         }

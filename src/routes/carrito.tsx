@@ -12,6 +12,7 @@ import { validatePromoCoupon } from "@/lib/products.functions";
 import {
   FALLBACK_IMAGE,
   imageUrl,
+  thumbnailUrl,
   onImageError,
   SUPLEMENTOS_MIN,
   isSuplemento,
@@ -30,6 +31,7 @@ import {
   normCat,
   findRuleForCat,
 } from "@/lib/store";
+import { SITE_URL } from "@/lib/constants";
 
 /**
  * Input de cantidad para el carrito con buffer de display.
@@ -117,8 +119,8 @@ export const Route = createFileRoute("/carrito")({
         name: "description",
         content: "Revisá tu pedido mayorista antes de finalizar la compra.",
       },
-      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:url", content: "https://teimportamosarg.com/carrito" },
+      { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:url", content: `${SITE_URL}/carrito` },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -303,7 +305,7 @@ function CarritoPage() {
                     ? String(banners.indexOf(comboBanner))
                     : null;
                 const rawImg = i.imagen || comboBanner?.imagen_url || prod?.imagen_url;
-                const itemImage = imageUrl(rawImg) || FALLBACK_IMAGE;
+                const itemImage = thumbnailUrl(rawImg) || FALLBACK_IMAGE;
 
                 // Precios de oferta: si el producto tiene oferta individual, mostrar el precio original tachado
                 const prodHasOffer = prod ? hasOffer(prod) : false;

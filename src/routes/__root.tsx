@@ -15,6 +15,7 @@ import { CartProvider } from "@/lib/cart";
 import { AuthProvider } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/react";
+import { SITE_URL } from "@/lib/constants";
 
 function NotFoundComponent() {
   return (
@@ -83,14 +84,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:site_name", content: "Te importamos" },
       { property: "og:type", content: "website" },
-      { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-      { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { property: "og:image", content: `${SITE_URL}/businessicon.jpg` },
+      { property: "og:image:secure_url", content: `${SITE_URL}/businessicon.jpg` },
       { property: "og:image:type", content: "image/jpeg" },
       { property: "og:image:width", content: "1000" },
       { property: "og:image:height", content: "1000" },
       { property: "og:image:alt", content: "Te importamos" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+      { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
       { name: "theme-color", content: "#ffffff" },
     ],
     links: [

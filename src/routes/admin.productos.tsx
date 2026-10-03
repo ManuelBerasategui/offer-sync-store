@@ -196,7 +196,7 @@ function ImageDropzone({
       const { error: clientErr } = await supabase.storage.from(bucket).upload(filename, compressed.file, {
         contentType: "image/webp",
         cacheControl: "31536000",
-        upsert: true,
+        upsert: false,
       });
 
       if (!clientErr) {
@@ -1709,6 +1709,7 @@ function ActiveOfferCard({
         <SafeImage
           rawSrc={product.imagen_url}
           alt={product.nombre ?? ""}
+          thumb
           className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover border border-border shadow-xs shrink-0"
           onError={onImageError(product.imagen_url)}
         />
@@ -1882,6 +1883,7 @@ function CandidateOfferCard({
         <SafeImage
           rawSrc={product.imagen_url}
           alt={product.nombre ?? ""}
+          thumb
           className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover border border-border shadow-xs shrink-0"
           onError={onImageError(product.imagen_url)}
         />
@@ -3861,6 +3863,7 @@ function AdminProductosPage() {
                                       <SafeImage
                                         rawSrc={p.imagen_url}
                                         alt={p.nombre}
+                                        thumb
                                         className="h-full w-full object-cover transition-transform duration-300 group-hover/img:scale-105"
                                         onError={onImageError(p.imagen_url)}
                                       />
@@ -4016,6 +4019,7 @@ function AdminProductosPage() {
                                                     <SafeImage
                                                       rawSrc={v.imagen_url}
                                                       alt={v.color}
+                                                      thumb
                                                       className="h-10 w-10 sm:h-11 sm:w-11 rounded-lg object-cover border border-border shrink-0"
                                                       onError={onImageError(v.imagen_url)}
                                                     />

@@ -996,8 +996,22 @@ export async function optimizeImageOnServer(
       .webp({ quality: 80, effort: 4 })
       .toBuffer();
 
+    // Generar variante miniatura liviana (160x160 WebP) para carrito y tablas (~2-3 KB)
+    let thumbBuffer: Buffer | null = null;
+    try {
+      thumbBuffer = await sharp(rawBuffer)
+        .rotate()
+        .resize({ width: 160, height: 160, fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 80, effort: 4 })
+        .toBuffer();
+    } catch {
+      // Ignorar fallo de miniatura
+    }
+
     const bucketName = "store-images";
-    const filename = `${folder}/${crypto.randomUUID()}.webp`;
+    const fileId = crypto.randomUUID();
+    const filename = `${folder}/${fileId}.webp`;
+    const thumbFilename = `${folder}/thumbnails/${fileId}.webp`;
 
     // Asegurar existencia del bucket si hiciera falta
     try {
@@ -1020,6 +1034,18 @@ export async function optimizeImageOnServer(
     if (upErr) {
       console.warn("[Optimize] Error al subir imagen optimizada al bucket:", bucketName, upErr.message);
       return trimmed;
+    }
+
+    // Subir miniatura si se generó
+    if (thumbBuffer) {
+      supabaseAdmin.storage
+        .from(bucketName)
+        .upload(thumbFilename, thumbBuffer, {
+          contentType: "image/webp",
+          cacheControl: "31536000",
+          upsert: false,
+        })
+        .catch(() => {});
     }
 
     const { data: pubData } = supabaseAdmin.storage
@@ -1296,10 +1322,15 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
       const buffer = Buffer.from(base64Data, "base64");
       const bucketName = data.bucket || "storage-images";
 
-      let uploadBuffer = buffer;
-      let filename = data.filename;
+      let cleanFilename = (data.filename || "").trim().replace(/^\/+/, "");
+      const folder = cleanFilename.includes("/") ? cleanFilename.substring(0, cleanFilename.lastIndexOf("/")) : "products";
+      const baseName = cleanFilename.includes("/") ? cleanFilename.substring(cleanFilename.lastIndexOf("/") + 1) : cleanFilename;
+      const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+      let filename = uuidRegex.test(baseName)
+        ? `${folder}/${baseName}`
+        : `${folder}/${crypto.randomUUID()}_${baseName || "image.webp"}`;
       let cType = data.contentType || "image/webp";
-
+      let uploadBuffer = buffer;
       try {
         const sharp = (await import("sharp")).default;
         uploadBuffer = await sharp(buffer)
@@ -1334,7 +1365,7 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
         .upload(filename, uploadBuffer, {
           contentType: cType,
           cacheControl: "31536000",
-          upsert: true,
+          upsert: false,
         });
 
       if (uploadErr) throw uploadErr;
@@ -2685,9 +2716,11 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
 
             // Detectar content-type de la respuesta
             const rawCt = imgRes.headers.get("content-type") ?? "image/jpeg";
-            const ct = rawCt.split(";")[0].trim();
+            const ct = rawCt.split(";")[0]?.trim() || "image/jpeg";
             const ext = ct === "image/webp" ? "webp" : ct === "image/png" ? "png" : "jpg";
-            const filename = `yupoo/${crypto.randomUUID()}.${ext}`;
+            const fileId = crypto.randomUUID();
+            const filename = `yupoo/${fileId}.${ext}`;
+            const thumbFilename = `yupoo/thumbnails/${fileId}.webp`;
 
             const { error: uploadErr } = await supabaseAdmin.storage
               .from(bucketName)
@@ -2698,6 +2731,26 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
               });
 
             if (uploadErr) continue;
+
+            // Generar y subir miniatura liviana 160x160 WebP
+            try {
+              const sharp = (await import("sharp")).default;
+              const thumbBuf = await sharp(Buffer.from(buffer))
+                .rotate()
+                .resize({ width: 160, height: 160, fit: "inside", withoutEnlargement: true })
+                .webp({ quality: 80, effort: 4 })
+                .toBuffer();
+              supabaseAdmin.storage
+                .from(bucketName)
+                .upload(thumbFilename, thumbBuf, {
+                  contentType: "image/webp",
+                  cacheControl: "31536000",
+                  upsert: false,
+                })
+                .catch(() => {});
+            } catch {
+              // no bloquear si la miniatura falla
+            }
 
             const { data: pubData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(filename);
             if (pubData.publicUrl) uploadedUrls.push(pubData.publicUrl);

@@ -23,6 +23,7 @@ import {
   discountFor,
   findProduct,
   imageUrl,
+  thumbnailUrl,
   galleryImages,
   isSuplemento,
   onImageError,
@@ -62,6 +63,7 @@ import {
   type ProductVariant,
   type SiteConfig,
 } from "@/lib/store";
+import { SITE_URL } from "@/lib/constants";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sanitización segura de texto libre (CWE-79 / Snyk XSS)
@@ -811,7 +813,7 @@ function ProductGallery({
               ].join(" ")}
             >
               <img
-                src={imageUrl(url) || FALLBACK_IMAGE}
+                src={thumbnailUrl(url) || FALLBACK_IMAGE}
                 alt={`Miniatura ${i + 1}`}
                 loading="lazy"
                 referrerPolicy="no-referrer"
@@ -842,8 +844,8 @@ export const Route = createFileRoute("/producto/$id")({
       : "Comprá online productos importados originales con descuentos por cantidad y envíos a todo el país.";
     const image = product?.imagen_url ? imageUrl(product.imagen_url) : undefined;
     const canonicalUrl = product?.id
-      ? `https://teimportamosarg.com/producto/${product.id}`
-      : "https://teimportamosarg.com/catalogo";
+      ? `${SITE_URL}/producto/${product.id}`
+      : `${SITE_URL}/catalogo`;
 
     // JSON-LD Product & Breadcrumb schema for Google Rich Results
     const price = product ? String(product.precio ?? "") : "";
@@ -887,13 +889,13 @@ export const Route = createFileRoute("/producto/$id")({
               "@type": "ListItem",
               position: 1,
               name: "Inicio",
-              item: "https://teimportamosarg.com/",
+              item: `${SITE_URL}/`,
             },
             {
               "@type": "ListItem",
               position: 2,
               name: "Catálogo",
-              item: "https://teimportamosarg.com/catalogo",
+              item: `${SITE_URL}/catalogo`,
             },
             ...(category
               ? [
@@ -901,7 +903,7 @@ export const Route = createFileRoute("/producto/$id")({
                     "@type": "ListItem",
                     position: 3,
                     name: category,
-                    item: `https://teimportamosarg.com/catalogo?categoria=${encodeURIComponent(category)}`,
+                    item: `${SITE_URL}/catalogo?categoria=${encodeURIComponent(category)}`,
                   },
                   {
                     "@type": "ListItem",
@@ -940,9 +942,9 @@ export const Route = createFileRoute("/producto/$id")({
               { name: "twitter:image", content: image },
             ]
           : [
-              { property: "og:image", content: "https://teimportamosarg.com/businessicon.jpg" },
-              { property: "og:image:secure_url", content: "https://teimportamosarg.com/businessicon.jpg" },
-              { name: "twitter:image", content: "https://teimportamosarg.com/businessicon.jpg" },
+              { property: "og:image", content: `${SITE_URL}/businessicon.jpg` },
+              { property: "og:image:secure_url", content: `${SITE_URL}/businessicon.jpg` },
+              { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
             ]),
       ],
       links: [
