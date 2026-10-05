@@ -642,7 +642,7 @@ export const createTransferOrder = createServerFn({ method: "POST" })
           const prod = findProduct(dbProducts as any, item.nombre);
           const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
           return {
-            nombre: item.nombre,
+            nombre: prod && isNfcGoogle(prod.nombre) ? prod.nombre : item.nombre,
             categoria: prod?.categoria ?? "",
             moq_group,
             qty: item.qty,

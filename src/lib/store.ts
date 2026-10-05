@@ -984,19 +984,19 @@ export function hasMoq(
 ): MoqInfo | null {
   const mg = moqGroupOf(product);
 
-  // Explícito "none" → nunca tiene MOQ
-  if (mg === "none") return null;
-
   const nombre = String(product["nombre"] ?? "");
   const categoria = String(product["categoria"] ?? "");
 
-  // NFC Google: 50 unidades mínimas (detección por nombre, prioridad máxima)
+  // NFC Google: 50 unidades mínimas (prioridad absoluta, ni siquiera moq_group "none" la anula)
   if (isNfcGoogle(nombre)) {
     const nfcRule = catRules["nfc_google"];
     if (nfcRule && nfcRule.minUnits) {
       return { group: "nfc_google", minUnits: nfcRule.minUnits };
     }
   }
+
+  // Explícito "none" → nunca tiene MOQ
+  if (mg === "none") return null;
 
   // Explícito con clave de regla → lookup directo (no usa nombre ni categoría)
   if (mg && mg !== "") {
@@ -1068,13 +1068,15 @@ export function checkCategoryMins(
   for (const item of items) {
     const mg = item.moq_group ?? null;
 
-    // moq_group explícito "none" → ignorar
-    if (mg === "none") continue;
+    const isNfc = isNfcGoogle(item.nombre);
+
+    // moq_group explícito "none" → ignorar (salvo NFC Google, cuyo mínimo no se puede anular)
+    if (mg === "none" && !isNfc) continue;
 
     let minRuleKey: string | undefined;
 
     // NFC Google: 50 unidades mínimas (prioridad absoluta por nombre)
-    if (isNfcGoogle(item.nombre)) {
+    if (isNfc) {
       const nfcRule = rules["nfc_google"];
       if (nfcRule && nfcRule.minUnits) {
         minRuleKey = "nfc_google";

@@ -93,7 +93,7 @@ async function revalidateOrderItems(
       }
       const baseP = prod ? priceOf(prod) : item.unitPrice;
       const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
-      itemsWithCat.push({ nombre: item.nombre, categoria: cat, moq_group, qty: item.qty, unitPrice: baseP });
+      itemsWithCat.push({ nombre: (isNfc && prod?.nombre) || item.nombre, categoria: cat, moq_group, qty: item.qty, unitPrice: baseP });
     }
 
     const violations = checkCategoryMins(itemsWithCat, catRules);

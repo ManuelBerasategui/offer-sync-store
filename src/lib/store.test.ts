@@ -837,6 +837,18 @@ describe("NFC Google — Reglas de compra mínima y descuentos", () => {
     expect(info2!.minUnits).toBe(50);
   });
 
+  it("moq_group 'none' no anula el mínimo de 50 unidades de NFC Google", () => {
+    const p = makeProduct("Llavero NFC Google", "Tecnología", "none");
+    expect(hasMoq(p, rules)?.minUnits).toBe(50);
+
+    const v = checkCategoryMins(
+      [{ nombre: "Llavero NFC Google", categoria: "Tecnología", moq_group: "none", qty: 10, unitPrice: 1500 }],
+      rules,
+    );
+    expect(v.length).toBe(1);
+    expect(v[0]!.min).toBe(50);
+  });
+
   it("checkCategoryMins genera infracción si NFC Google tiene menos de 50 unidades", () => {
     const items = [item("Llavero NFC Google", "Tecnología", 25, 1500)];
     const v = checkCategoryMins(items, rules);
