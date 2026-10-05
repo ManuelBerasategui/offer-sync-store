@@ -157,7 +157,7 @@ function JerseyProductUI({
   // Nombre enriquecido con opciones para el carrito, orden y mails de compra/venta
   const fullItemName = `${productName} (Talle: ${selectedTalle || "S"} - ${version === "player" ? "Versión Jugador (Personalizado Nombre y Número)" : "Versión Fan (Sin personalizar)"}${badge === "yes" ? " - Con Badge" : ""})`;
 
-  const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "5493412595936").replace(/\D/g, "");
+  const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "5493418051515").replace(/\D/g, "");
 
   /** Abre WhatsApp para coordinar el badge deseado y cerrar la venta */
   function handleBadgeWhatsApp() {
@@ -1639,7 +1639,7 @@ function ProductoPage() {
                   <a
                     className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
                     href={waOnlyReason
-                      ? sanitizeUrl(`https://wa.me/5493412595936?text=${encodeURIComponent(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""))}`)
+                      ? sanitizeUrl(`https://wa.me/5493418051515?text=${encodeURIComponent(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""))}`)
                       : waLink(config, product.nombre)}
                     target="_blank"
                     rel="noopener noreferrer"

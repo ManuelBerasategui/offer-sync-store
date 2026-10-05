@@ -203,7 +203,7 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
   const couponDiscount = order.couponDiscountAmount ?? 0;
   const transferDiscount = Math.max(0, discountAmount - couponDiscount);
 
-  const waLink = `https://wa.me/5493412595936?text=Hola%20Te%20Importamos%2C%20${encodeURIComponent(
+  const waLink = `https://wa.me/5493418051515?text=Hola%20Te%20Importamos%2C%20${encodeURIComponent(
     isTransfer
       ? `adjunto el comprobante de mi pedido #${order.orderCode}`
       : `tengo una consulta sobre mi pedido #${order.orderCode}`
@@ -335,7 +335,7 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
             ¿Tenés dudas sobre tu pedido?
           </p>
           <a href="${waLink}" target="_blank" style="display:inline-block;background:#25d366;color:#ffffff;font-weight:700;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:13px;margin-bottom:8px;">
-            💬 Escribinos por WhatsApp (+54 9 3412 59-5936)
+            💬 Escribinos por WhatsApp (+54 9 3418 05-1515)
           </a>
 
         </div>
@@ -470,7 +470,7 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
             ...order.items.map((i) => `- ${i.nombre} x${i.qty} = ${money(i.qty * i.unitPrice)}`),
             ``,
             order.metodoPago === "transferencia"
-              ? `Recordá enviar tu comprobante de transferencia por WhatsApp (+54 9 3412 59-5936) para reservar tu stock y despachar tu pedido.`
+              ? `Recordá enviar tu comprobante de transferencia por WhatsApp (+54 9 3418 05-1515) para reservar tu stock y despachar tu pedido.`
               : `Tu pago fue aprobado. Ya estamos preparando tu paquete para despacharlo.`,
             ``,
             `¡Gracias por confiar en Te Importamos!`,
