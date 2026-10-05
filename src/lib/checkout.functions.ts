@@ -29,6 +29,8 @@ import {
   findRuleForCat,
   normCat,
   checkCategoryMins,
+  moqGroupOf,
+  isNfcGoogle,
   isCamiseta,
   isLongSleeve,
   parseJerseyItem,
@@ -77,19 +79,21 @@ async function revalidateOrderItems(
     const catRules = parseCategoryRules(configObj);
 
     const catTotals: Record<string, number> = {};
-    const itemsWithCat: { categoria?: string; qty: number; unitPrice: number }[] = [];
+    const itemsWithCat: { nombre?: string; categoria?: string; moq_group?: string; qty: number; unitPrice: number }[] = [];
 
     for (const item of rawItems) {
       const prod = findProduct(dbProducts, item.nombre);
       const cat = prod?.categoria ?? "";
+      const isNfc = isNfcGoogle(item.nombre) || (prod ? isNfcGoogle(prod.nombre) : false);
       const catNorm = normCat(cat);
-      if (catNorm) {
+      if (catNorm && !isNfc) {
         const match = findRuleForCat(catNorm, catRules);
         const key = match?.key ?? catNorm;
         catTotals[key] = (catTotals[key] ?? 0) + item.qty;
       }
       const baseP = prod ? priceOf(prod) : item.unitPrice;
-      itemsWithCat.push({ categoria: cat, qty: item.qty, unitPrice: baseP });
+      const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
+      itemsWithCat.push({ nombre: item.nombre, categoria: cat, moq_group, qty: item.qty, unitPrice: baseP });
     }
 
     const violations = checkCategoryMins(itemsWithCat, catRules);
@@ -150,6 +154,17 @@ async function revalidateOrderItems(
       }
 
       if (!prod) return item;
+
+      // NFC Google: sin descuento por cantidad bajo ningún concepto
+      if (isNfcGoogle(item.nombre) || isNfcGoogle(prod.nombre)) {
+        const base = priceOf(prod);
+        return {
+          nombre: item.nombre,
+          qty: item.qty,
+          unitPrice: base,
+          ...(item.productId ? { productId: item.productId } : {}),
+        };
+      }
 
       const catNorm = normCat(prod.categoria ?? "");
       const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;

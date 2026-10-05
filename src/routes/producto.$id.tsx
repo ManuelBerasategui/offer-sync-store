@@ -54,6 +54,7 @@ import {
   checkCategoryMins,
   isCamiseta,
   isLongSleeve,
+  isNfcGoogle,
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
   JERSEY_PLAYER_ML_TIERS,
@@ -152,7 +153,7 @@ function JerseyProductUI({
   // Nombre enriquecido con opciones para el carrito, orden y mails de compra/venta
   const fullItemName = `${productName} (Talle: ${selectedTalle || "S"} - ${version === "player" ? "Versión Jugador (Personalizado Nombre y Número)" : "Versión Fan (Sin personalizar)"}${badge === "yes" ? " - Con Badge" : ""})`;
 
-  const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "5493418051515").replace(/\D/g, "");
+  const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "5493412595936").replace(/\D/g, "");
 
   /** Abre WhatsApp para coordinar el badge deseado y cerrar la venta */
   function handleBadgeWhatsApp() {
@@ -1103,9 +1104,16 @@ function ProductoPage() {
     const category = normCat(product.categoria ?? "");
     return category ? findRuleForCat(category, catRules) : undefined;
   }, [product.categoria, catRules]);
-  const categoryPercent = categoryRuleMatch?.rule.discountTiers?.length
-    ? categoryDiscountForUnits(categoryRuleMatch.rule.discountTiers, qty)
-    : 0;
+  // NFC Google no aplica ningún descuento por cantidad (ni por categoría ni global).
+  const isNfcGoogleProduct = isNfcGoogle(product.nombre);
+  const categoryPercent =
+    !isNfcGoogleProduct && categoryRuleMatch?.rule.discountTiers?.length
+      ? categoryDiscountForUnits(
+          categoryRuleMatch.rule.discountTiers,
+          qty,
+          isNfcGoogleProduct, // noGlobal12 = true para NFC Google (nunca se llega aquí, pero defensivo)
+        )
+      : 0;
   const percent = categoryPercent || discountFor(product, qty);
   const unit = categoryPercent > 0
     ? Math.round(basePrice * (1 - categoryPercent / 100))
@@ -1145,8 +1153,13 @@ function ProductoPage() {
       if (![1, 3, 5, 10].includes(existingInCart.qty)) {
         setCustom(true);
       }
+    } else if (!hasSyncedCartQty.current && isNfcGoogleProduct) {
+      hasSyncedCartQty.current = true;
+      setQty(50);
+      setQtyStr("50");
+      setCustom(true);
     }
-  }, [existingInCart]);
+  }, [existingInCart, isNfcGoogleProduct]);
 
   const suplemento = isSuplemento(product.categoria);
   const categoryMinViolation = checkCategoryMins(
@@ -1259,10 +1272,15 @@ function ProductoPage() {
                   const moqDisplay = hasMoq(product as Record<string, unknown>, catRules);
 
                   if (moqDisplay?.minUnits) {
-                    const groupLabel = moqDisplay.group.charAt(0).toUpperCase() + moqDisplay.group.slice(1);
+                    const groupLabel =
+                      moqDisplay.group === "nfc_google"
+                        ? "NFC Google"
+                        : moqDisplay.group.charAt(0).toUpperCase() + moqDisplay.group.slice(1);
                     const minText = `${moqDisplay.minUnits} unidades`;
                     const mixMsg =
-                      moqDisplay.group === "mates"
+                      moqDisplay.group === "nfc_google"
+                        ? "Este producto requiere una compra mínima de 50 unidades."
+                        : moqDisplay.group === "mates"
                         ? "Podés combinar distintos modelos de Mates en tu carrito hasta alcanzar el mínimo."
                         : "Podés armar surtido con distintos productos de esta categoría para alcanzar el mínimo.";
                     return (
@@ -1324,6 +1342,9 @@ function ProductoPage() {
 
                 {/* AVISO DE DESCUENTOS POR CANTIDAD (Categoría o Producto) */}
                 {(() => {
+                  // NFC Google: nunca mostrar descuentos por cantidad
+                  if (isNfcGoogleProduct) return null;
+
                   const catNorm = normCat(product.categoria ?? "");
                   const ruleMatch = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
                   const rule = ruleMatch?.rule;
@@ -1334,6 +1355,7 @@ function ProductoPage() {
                       ? rule.discountTiers
                       : [...rule.discountTiers, { units: 20, percent: 12 }];
                     const activeCatTier = [...allTiers].sort((a, b) => b.units - a.units).find(t => qty >= t.units);
+
                     const nextCatTier = [...allTiers].sort((a, b) => a.units - b.units).find(t => t.units > qty);
                     return (
                       <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 sm:p-3.5 text-xs text-foreground">
@@ -1585,7 +1607,7 @@ function ProductoPage() {
                   <a
                     className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
                     href={waOnlyReason
-                      ? sanitizeUrl(`https://wa.me/5493418051515?text=${encodeURIComponent(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""))}`)
+                      ? sanitizeUrl(`https://wa.me/5493412595936?text=${encodeURIComponent(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""))}`)
                       : waLink(config, product.nombre)}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -1604,7 +1626,7 @@ function ProductoPage() {
                     {moqInfo && !moqMet && moqInfo.minUnits && (
                       <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs">
                         <p className="font-bold text-amber-700 dark:text-amber-400">
-                           Compra mínima de {moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
+                          Compra mínima de {moqInfo.group === "nfc_google" ? "NFC Google" : moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
                         </p>
                         <p className="mt-0.5 text-muted-foreground">
                           Llevás {qty} unidad{qty !== 1 ? "es" : ""}. Te falta{moqMissing !== 1 ? "n" : ""}
@@ -1674,7 +1696,11 @@ function ProductoPage() {
                       }}
                       className="btn-base w-full border border-border text-foreground hover:border-primary hover:text-primary transition-colors font-semibold"
                     >
-                      {existingInCart ? "Actualizar cantidad en carrito" : "Agregar al carrito (armar surtido)"}
+                      {existingInCart
+                        ? "Actualizar cantidad en carrito"
+                        : isNfcGoogleProduct
+                        ? "Agregar al carrito"
+                        : "Agregar al carrito (armar surtido)"}
                     </button>
 
                     <p className="text-center text-xs text-muted-foreground">

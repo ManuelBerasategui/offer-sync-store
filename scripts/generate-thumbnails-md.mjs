@@ -167,15 +167,15 @@ async function run() {
         });
 
       if (upErr) {
-        console.warn(`[${processed}/${missing.length}] Error al subir ${img.thumbMdPath}:`, upErr.message);
+        console.warn("[%d/%d] Error al subir %s: %s", processed, missing.length, img.thumbMdPath, String(upErr.message));
         errors++;
       } else {
         if (processed % 25 === 0 || processed === missing.length) {
-          console.log(`[${processed}/${missing.length}] Generada: ${img.thumbMdPath} (${(thumbBuffer.length / 1024).toFixed(1)} KB)`);
+          console.log("[%d/%d] Generada: %s (%s KB)", processed, missing.length, img.thumbMdPath, (thumbBuffer.length / 1024).toFixed(1));
         }
       }
     } catch (e) {
-      console.error(`[${processed}/${missing.length}] Excepción procesando ${img.objectPath}:`, e.message);
+      console.error("[%d/%d] Excepción procesando %s: %s", processed, missing.length, img.objectPath, String(e.message));
       errors++;
     }
   }

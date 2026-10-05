@@ -20,6 +20,7 @@ import {
   waLink,
   isCamiseta,
   isLongSleeve,
+  isNfcGoogle,
   JERSEY_FAN_TIERS,
   JERSEY_FAN_ML_TIERS,
 } from "@/lib/store";
@@ -59,7 +60,9 @@ export function ProductCard({
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
   // El tercer tramo global (20+ u → 12%) aplica a TODOS los productos con precio.
   // maxPercent es 12 como mínimo universal; más si hay tiers propios por encima de 12%.
-  const maxPercent = (!hidePrice && !consultar) ? Math.max(maxTier?.percent ?? 12, 12) : null;
+  // NFC Google: sin descuento por cantidad; no mostrar badge de descuento mayorista
+  const isNfcGoogleProd = isNfcGoogle(p.nombre);
+  const maxPercent = (!hidePrice && !consultar && !isNfcGoogleProd) ? Math.max(maxTier?.percent ?? 12, 12) : null;
 
   const discPct = transferDiscountPct(config);
   const tPrice = transferPrice(basePrice, discPct);
@@ -160,6 +163,12 @@ export function ProductCard({
               {maxPercent !== null && (
                 <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
                   🎁 Hasta {maxPercent}% OFF x mayor
+                </span>
+              )}
+
+              {isNfcGoogleProd && (
+                <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                  ℹ️ Mínimo 50 unidades
                 </span>
               )}
             </div>

@@ -618,6 +618,8 @@ export const createTransferOrder = createServerFn({ method: "POST" })
           unitPriceFor,
           categoryDiscountForUnits,
           checkCategoryMins,
+          moqGroupOf,
+          isNfcGoogle,
           transferPrice,
           transferDiscountPct,
         } = await import("./store");
@@ -627,7 +629,7 @@ export const createTransferOrder = createServerFn({ method: "POST" })
 
         for (const item of data.items) {
           const prod = findProduct(dbProducts as any, item.nombre);
-          if (prod) {
+          if (prod && !isNfcGoogle(item.nombre) && !isNfcGoogle(prod.nombre)) {
             const catNorm = normCat(prod.categoria ?? "");
             const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
             if (match) {
@@ -636,7 +638,19 @@ export const createTransferOrder = createServerFn({ method: "POST" })
           }
         }
 
-        const minViolations = checkCategoryMins(data.items as any, dbProducts as any, catRules);
+        const itemsWithCat = data.items.map((item) => {
+          const prod = findProduct(dbProducts as any, item.nombre);
+          const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
+          return {
+            nombre: item.nombre,
+            categoria: prod?.categoria ?? "",
+            moq_group,
+            qty: item.qty,
+            unitPrice: item.unitPrice,
+          };
+        });
+
+        const minViolations = checkCategoryMins(itemsWithCat, catRules);
         if (minViolations.length > 0) {
           const v = minViolations[0]!;
           const msg =
@@ -649,6 +663,15 @@ export const createTransferOrder = createServerFn({ method: "POST" })
         items = data.items.map((item) => {
           const prod = findProduct(dbProducts as any, item.nombre);
           if (!prod) return item;
+
+          // NFC Google: sin descuento por cantidad bajo ningún concepto
+          if (isNfcGoogle(item.nombre) || isNfcGoogle(prod.nombre)) {
+            return {
+              nombre: item.nombre,
+              qty: item.qty,
+              unitPrice: priceOf(prod),
+            };
+          }
 
           const catNorm = normCat(prod.categoria ?? "");
           const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;

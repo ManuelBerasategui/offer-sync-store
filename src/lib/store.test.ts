@@ -16,6 +16,11 @@ import {
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
   thumbnailUrl,
+  isNfcGoogle,
+  tiersOf,
+  discountFor,
+  categoryDiscountForUnits,
+  type Product,
 } from "./store";
 
 /* ══════════════════════════════════════════════════════════════════
@@ -458,8 +463,6 @@ describe("checkCategoryMins — Bazar mínimo 5 unidades", () => {
    discountFor — tercer tramo global (20+ → 12%)
 ══════════════════════════════════════════════════════════════════ */
 
-import { discountFor } from "./store";
-
 // Producto con descuento activo y tiers 5→5%, 10→10% (como en DB existente)
 function makeTieredProduct(qty_field?: boolean) {
   return {
@@ -768,6 +771,89 @@ describe("thumbnailUrl helper", () => {
     // Should go through proxy but NOT add another /thumbnails/ segment
     expect(decodeURIComponent(thumbnailUrl(alreadySm))).not.toContain("/thumbnails/thumbnails/");
     expect(decodeURIComponent(thumbnailUrl(alreadyMd, "md"))).not.toContain("/thumbnails-md/thumbnails-md/");
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   NFC Google — Regla de Compra Mínima (50 u.) y 0% Descuentos
+══════════════════════════════════════════════════════════════════ */
+describe("NFC Google — Reglas de compra mínima y descuentos", () => {
+  const rules = makeRules();
+
+  it("isNfcGoogle detecta variantes del producto por nombre", () => {
+    expect(isNfcGoogle("NFC Google")).toBe(true);
+    expect(isNfcGoogle("Llavero NFC Google")).toBe(true);
+    expect(isNfcGoogle("Google NFC Tag")).toBe(true);
+    expect(isNfcGoogle("Llaveros NFC para Google Reviews")).toBe(true);
+    expect(isNfcGoogle("Sticker NFC GOOGLE")).toBe(true);
+
+    // Casos negativos
+    expect(isNfcGoogle("Google Pixel 8")).toBe(false);
+    expect(isNfcGoogle("Llavero NFC Apple")).toBe(false);
+    expect(isNfcGoogle("Auriculares Bluetooth")).toBe(false);
+    expect(isNfcGoogle("")).toBe(false);
+    expect(isNfcGoogle(undefined)).toBe(false);
+  });
+
+  it("tiersOf y discountFor retornan vacío y 0 para NFC Google (sin descuento por cantidad)", () => {
+    const nfcProd: Product = {
+      id: "nfc-1",
+      nombre: "Llavero NFC Google",
+      categoria: "Tecnología",
+      precio: "1500",
+      descuento: "SI",
+      descuento_5u: 5,
+      descuento_10u: 10,
+      descuento_20u: 12,
+    };
+
+    expect(tiersOf(nfcProd)).toEqual([]);
+    expect(discountFor(nfcProd, 1)).toBe(0);
+    expect(discountFor(nfcProd, 5)).toBe(0);
+    expect(discountFor(nfcProd, 10)).toBe(0);
+    expect(discountFor(nfcProd, 50)).toBe(0);
+    expect(discountFor(nfcProd, 100)).toBe(0);
+  });
+
+  it("categoryDiscountForUnits con noGlobal12=true no aplica el 12% global", () => {
+    const tiers = [{ units: 5, percent: 5 }, { units: 10, percent: 10 }];
+    expect(categoryDiscountForUnits(tiers, 25, false)).toBe(12);
+    expect(categoryDiscountForUnits(tiers, 25, true)).toBe(10);
+    expect(categoryDiscountForUnits([], 50, true)).toBe(0);
+  });
+
+  it("hasMoq asigna regla nfc_google con 50 unidades mínimas", () => {
+    const p1 = makeProduct("Llavero NFC Google", "Tecnología");
+    const info1 = hasMoq(p1, rules);
+    expect(info1).not.toBeNull();
+    expect(info1!.group).toBe("nfc_google");
+    expect(info1!.minUnits).toBe(50);
+
+    // Aunque tenga un moq_group residual en metadata, NFC Google debe tener prioridad
+    const p2 = makeProduct("Tarjeta NFC Google", "Tecnología", "tecnologia");
+    const info2 = hasMoq(p2, rules);
+    expect(info2).not.toBeNull();
+    expect(info2!.group).toBe("nfc_google");
+    expect(info2!.minUnits).toBe(50);
+  });
+
+  it("checkCategoryMins genera infracción si NFC Google tiene menos de 50 unidades", () => {
+    const items = [item("Llavero NFC Google", "Tecnología", 25, 1500)];
+    const v = checkCategoryMins(items, rules);
+    expect(v.length).toBe(1);
+    expect(v[0]!.category).toBe("NFC Google");
+    expect(v[0]!.min).toBe(50);
+    expect(v[0]!.current).toBe(25);
+    expect(v[0]!.type).toBe("units");
+  });
+
+  it("checkCategoryMins aprueba si NFC Google alcanza o supera 50 unidades", () => {
+    const items = [item("Llavero NFC Google", "Tecnología", 50, 1500)];
+    const v = checkCategoryMins(items, rules);
+    expect(v).toHaveLength(0);
+
+    const itemsMore = [item("Llavero NFC Google", "Tecnología", 75, 1500)];
+    expect(checkCategoryMins(itemsMore, rules)).toHaveLength(0);
   });
 });
 

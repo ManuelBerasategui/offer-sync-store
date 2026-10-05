@@ -203,7 +203,7 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
   const couponDiscount = order.couponDiscountAmount ?? 0;
   const transferDiscount = Math.max(0, discountAmount - couponDiscount);
 
-  const waLink = `https://wa.me/5493418051515?text=Hola%20Te%20Importamos%2C%20${encodeURIComponent(
+  const waLink = `https://wa.me/5493412595936?text=Hola%20Te%20Importamos%2C%20${encodeURIComponent(
     isTransfer
       ? `adjunto el comprobante de mi pedido #${order.orderCode}`
       : `tengo una consulta sobre mi pedido #${order.orderCode}`

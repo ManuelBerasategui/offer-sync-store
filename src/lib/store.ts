@@ -255,7 +255,13 @@ export function driveId(raw?: string) {
   return m ? m[1]! : "";
 }
 
-/** Maneja el error de carga probando otras variantes de URL de Drive de forma segura. */
+/**
+ * Maneja el error de carga probando otras variantes de URL de forma segura.
+ *
+ * Para Google Drive: reintenta con variantes alternativas de thumbnail.
+ * Para Supabase Storage: cuando falla la thumbnail (/thumbnails-md/ o /thumbnails/),
+ * reintenta con la imagen full-size antes de mostrar el placeholder genérico.
+ */
 export function onImageError(raw?: string) {
   return (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -275,6 +281,18 @@ export function onImageError(raw?: string) {
       img.src = variants[step]!;
       return;
     }
+
+    // Para Supabase Storage: si la thumbnail falló, intentar con la imagen full-size
+    // antes de mostrar el placeholder genérico (el thumbnail puede no existir aún)
+    if (!id && raw && img.dataset["fullsize"] !== "true") {
+      const fullUrl = imageUrl(raw);
+      if (fullUrl && fullUrl !== img.src && fullUrl !== FALLBACK_IMAGE) {
+        img.dataset["fullsize"] = "true";
+        img.src = fullUrl;
+        return;
+      }
+    }
+
     // Desconectar el handler antes de asignar el fallback final para garantizar 0 loops
     img.dataset["failed"] = "true";
     img.onerror = null;
@@ -574,7 +592,23 @@ export function findProduct(products: Product[], key: string) {
 
 export type Tier = { units: number; percent: number };
 
+/**
+ * Detecta si un producto es el "NFC Google" (llavero/etiqueta NFC de Google).
+ * Este producto tiene compra mínima de 50 unidades y NO aplica ningún descuento
+ * por cantidad (ni por categoría Tecnología ni global de 20+ u.).
+ */
+export function isNfcGoogle(nombre?: string): boolean {
+  const nom = String(nombre ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  // Acepta variantes: "NFC Google", "Google NFC", "llavero NFC Google", etc.
+  return nom.includes("nfc") && nom.includes("google");
+}
+
 export function tiersOf(p: Product): Tier[] {
+  // NFC Google no tiene descuentos por cantidad individuales
+  if (isNfcGoogle(p.nombre)) return [];
   if (!isYes(p.descuento)) return [];
   const tiers: Tier[] = [];
   for (const [key, value] of Object.entries(p)) {
@@ -593,6 +627,8 @@ export function tiersOf(p: Product): Tier[] {
 }
 
 export function discountFor(p: Product, qty: number) {
+  // NFC Google: sin descuento por cantidad bajo ningún concepto
+  if (isNfcGoogle(p.nombre)) return 0;
   const tiers = tiersOf(p);
   let percent = 0;
   for (const t of tiers) if (qty >= t.units) percent = t.percent;
@@ -830,6 +866,13 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
     };
   }
 
+  // 9. NFC Google: compra mínima de 50 unidades, SIN descuento por cantidad.
+  //    La regla se aplica por nombre en hasMoq y checkCategoryMins (no por categoría).
+  rules["nfc_google"] = {
+    discountTiers: [], // Sin descuento por cantidad
+    minUnits: 50,
+  };
+
   // Eliminar categorías genéricas obsoletas o duplicadas si existen subcategorías específicas
   if (rules["perfumes arabes"]?.minUnits || rules["perfumes disenador"]?.minUnits) {
     delete rules["perfumes"];
@@ -841,13 +884,25 @@ export function parseCategoryRules(config: SiteConfig): Record<string, CategoryR
   return rules;
 }
 
-export function categoryDiscountForUnits(tiers: CategoryTier[], totalUnits: number): number {
+/**
+ * Calcula el descuento por categoría para la cantidad dada.
+ *
+ * @param tiers        - Tramos de descuento de la regla de categoría.
+ * @param totalUnits   - Total de unidades acumuladas en esa categoría.
+ * @param noGlobal12   - Si true, omite el tramo global universal de 20+ u. → 12%.
+ *                       Usado para categorías/productos sin descuento (ej: NFC Google).
+ */
+export function categoryDiscountForUnits(
+  tiers: CategoryTier[],
+  totalUnits: number,
+  noGlobal12 = false,
+): number {
   let percent = 0;
   for (const tier of tiers ?? []) {
     if (totalUnits >= tier.units) percent = tier.percent;
   }
   // Tercer tramo global: 20+ unidades → mínimo 12% universal.
-  if (totalUnits >= 20) percent = Math.max(percent, 12);
+  if (!noGlobal12 && totalUnits >= 20) percent = Math.max(percent, 12);
   return percent;
 }
 
@@ -932,6 +987,17 @@ export function hasMoq(
   // Explícito "none" → nunca tiene MOQ
   if (mg === "none") return null;
 
+  const nombre = String(product["nombre"] ?? "");
+  const categoria = String(product["categoria"] ?? "");
+
+  // NFC Google: 50 unidades mínimas (detección por nombre, prioridad máxima)
+  if (isNfcGoogle(nombre)) {
+    const nfcRule = catRules["nfc_google"];
+    if (nfcRule && nfcRule.minUnits) {
+      return { group: "nfc_google", minUnits: nfcRule.minUnits };
+    }
+  }
+
   // Explícito con clave de regla → lookup directo (no usa nombre ni categoría)
   if (mg && mg !== "") {
     const rule = catRules[mg];
@@ -940,9 +1006,6 @@ export function hasMoq(
     return { group: mg, minUnits: rule.minUnits, minAmount: rule.minAmount };
   }
 
-  // Sin moq_group explícito → isMate fallback + match por categoría
-  const nombre = String(product["nombre"] ?? "");
-  const categoria = String(product["categoria"] ?? "");
   if (isMate(nombre, categoria)) {
     const matesRule = catRules["mates"];
     if (matesRule && (matesRule.minUnits || matesRule.minAmount)) {
@@ -1010,16 +1073,21 @@ export function checkCategoryMins(
 
     let minRuleKey: string | undefined;
 
-    if (mg && mg !== "") {
+    // NFC Google: 50 unidades mínimas (prioridad absoluta por nombre)
+    if (isNfcGoogle(item.nombre)) {
+      const nfcRule = rules["nfc_google"];
+      if (nfcRule && nfcRule.minUnits) {
+        minRuleKey = "nfc_google";
+      }
+    } else if (mg && mg !== "") {
       // moq_group explícito con clave → usa directamente si la regla tiene mínimo
       const rule = rules[mg];
       if (rule && (rule.minUnits || rule.minAmount)) {
         minRuleKey = mg;
       }
     } else {
-      // Sin asignación manual → match por nombre (isMate tiene PRIORIDAD) y luego por categoría.
-      // El fallback isMate se evalúa PRIMERO para que Mates en categoría Bazar queden bajo
-      // la regla "mates" (10 u.) y no bajo la regla "bazar" (5 u.).
+      // Sin asignación manual → match por nombre con prioridad, luego por categoría.
+      // Orden: isMate > isCamiseta > categoría.
       if (isMate(item.nombre ?? "", item.categoria ?? "")) {
         const matesRule = rules["mates"];
         if (matesRule && (matesRule.minUnits || matesRule.minAmount)) {
@@ -1072,7 +1140,7 @@ export function checkCategoryMins(
   for (const [key, rule] of Object.entries(rules)) {
     const units = catUnits[key] ?? 0;
     if (units === 0) continue;
-    const display = key.charAt(0).toUpperCase() + key.slice(1);
+    const display = key === "nfc_google" ? "NFC Google" : key.charAt(0).toUpperCase() + key.slice(1);
     if (rule.minUnits && units < rule.minUnits) {
       violations.push({ category: display, type: "units", min: rule.minUnits, current: units });
     }

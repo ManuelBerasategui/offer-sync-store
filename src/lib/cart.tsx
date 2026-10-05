@@ -15,6 +15,7 @@ import {
   normCat,
   isCamiseta,
   isLongSleeve,
+  isNfcGoogle,
   parseJerseyItem,
   calcJerseyUnitPrice,
   type ComboQuantityTier,
@@ -198,8 +199,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const catRules = parseCategoryRules(config);
 
     // Agrupa por clave de regla (no categoría exacta) — subcategorías quedan juntas
+    // NFC Google se excluye porque no tiene descuentos por cantidad
     const catTotals: Record<string, number> = {};
     for (const item of items) {
+      if (isNfcGoogle(item.nombre)) continue;
       const catNorm = normCat(item.categoria ?? "");
       if (!catNorm) continue;
       const match = findRuleForCat(catNorm, catRules);
@@ -311,6 +314,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const ruleKey = match?.key;
 
       const base = item.basePrice && item.basePrice > 0 ? item.basePrice : priceOf(product);
+      const rBase = Math.round(base);
+
+      // NFC Google: sin descuento por cantidad bajo ningún concepto
+      if (isNfcGoogle(item.nombre) || isNfcGoogle(product.nombre)) {
+        if (item.unitPrice === rBase && item.basePrice === rBase) {
+          return item;
+        }
+        return { ...item, basePrice: rBase, unitPrice: rBase };
+      }
+
       let unitPrice: number;
       if (Array.isArray(catRule?.discountTiers) && catRule.discountTiers.length > 0 && ruleKey) {
         // Descuento de categoría: reemplaza al individual del producto
