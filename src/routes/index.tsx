@@ -562,7 +562,7 @@ function Home() {
                 {config['whatsapp_individual'] && (
                   <p className="flex items-center gap-2">
                     <MessageCircle className="h-4 w-4 text-primary" />
-                    +{config['whatsapp_individual']}
+                    {config['whatsapp_individual']}
                   </p>
                 )}
                 {config['email'] && (
