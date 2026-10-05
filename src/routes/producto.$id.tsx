@@ -55,6 +55,10 @@ import {
   isCamiseta,
   isLongSleeve,
   isNfcGoogle,
+  isBlackviewGlasses,
+  blackviewUnitPrice,
+  BLACKVIEW_TIER_UNITS,
+  BLACKVIEW_TIER_USD,
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
   JERSEY_PLAYER_ML_TIERS,
@@ -1107,17 +1111,28 @@ function ProductoPage() {
   // NFC Google no aplica ningún descuento por cantidad (ni por categoría ni global).
   const isNfcGoogleProduct = isNfcGoogle(product.nombre);
   const categoryPercent =
-    !isNfcGoogleProduct && categoryRuleMatch?.rule.discountTiers?.length
+    !isNfcGoogleProduct && !isBlackviewGlasses(product.nombre) && categoryRuleMatch?.rule.discountTiers?.length
       ? categoryDiscountForUnits(
           categoryRuleMatch.rule.discountTiers,
           qty,
           isNfcGoogleProduct, // noGlobal12 = true para NFC Google (nunca se llega aquí, pero defensivo)
         )
       : 0;
-  const percent = categoryPercent || discountFor(product, qty);
-  const unit = categoryPercent > 0
-    ? Math.round(basePrice * (1 - categoryPercent / 100))
-    : unitPriceFor(product, qty, basePrice);
+  // Blackview BV100: precio fijo (US$100 + 7%) desde 3 unidades, sin descuentos porcentuales.
+  const isBlackviewProduct = isBlackviewGlasses(product.nombre);
+  const blackviewUnit = isBlackviewProduct
+    ? blackviewUnitPrice(basePrice, qty, Number(config["dolar_cotizacion"] ?? 0))
+    : null;
+  const percent =
+    blackviewUnit !== null
+      ? basePrice > 0 ? Math.round((1 - blackviewUnit / basePrice) * 100) : 0
+      : categoryPercent || discountFor(product, qty);
+  const unit =
+    blackviewUnit !== null
+      ? blackviewUnit
+      : categoryPercent > 0
+      ? Math.round(basePrice * (1 - categoryPercent / 100))
+      : unitPriceFor(product, qty, basePrice);
   const total = unit * qty;
 
   const cartItem = {
@@ -1344,6 +1359,23 @@ function ProductoPage() {
                 {(() => {
                   // NFC Google: nunca mostrar descuentos por cantidad
                   if (isNfcGoogleProduct) return null;
+
+                  // Blackview BV100: aviso del precio fijo a partir de 3 unidades
+                  if (isBlackviewProduct) {
+                    const usdRate = Number(config["dolar_cotizacion"] ?? 0);
+                    if (!(usdRate > 0)) return null;
+                    const tierPrice = Math.round(BLACKVIEW_TIER_USD * 1.07 * usdRate);
+                    return (
+                      <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 sm:p-3.5 text-xs text-foreground">
+                        <p className="font-bold text-primary text-xs sm:text-sm">
+                          🎁 Llevando {BLACKVIEW_TIER_UNITS} u. o más: {money(transferPrice(tierPrice, transferDiscountPct(config)))} c/u con Transferencia
+                        </p>
+                        <p className="mt-0.5 text-[11px] sm:text-xs text-muted-foreground">
+                          o {money(tierPrice)} c/u con Mercado Pago. Sin compra mínima.
+                        </p>
+                      </div>
+                    );
+                  }
 
                   const catNorm = normCat(product.categoria ?? "");
                   const ruleMatch = catNorm ? findRuleForCat(catNorm, catRules) : undefined;

@@ -31,6 +31,8 @@ import {
   checkCategoryMins,
   moqGroupOf,
   isNfcGoogle,
+  isBlackviewGlasses,
+  blackviewUnitPrice,
   isCamiseta,
   isLongSleeve,
   parseJerseyItem,
@@ -85,8 +87,9 @@ async function revalidateOrderItems(
       const prod = findProduct(dbProducts, item.nombre);
       const cat = prod?.categoria ?? "";
       const isNfc = isNfcGoogle(item.nombre) || (prod ? isNfcGoogle(prod.nombre) : false);
+      const isBv = isBlackviewGlasses(item.nombre) || (prod ? isBlackviewGlasses(prod.nombre) : false);
       const catNorm = normCat(cat);
-      if (catNorm && !isNfc) {
+      if (catNorm && !isNfc && !isBv) {
         const match = findRuleForCat(catNorm, catRules);
         const key = match?.key ?? catNorm;
         catTotals[key] = (catTotals[key] ?? 0) + item.qty;
@@ -154,6 +157,16 @@ async function revalidateOrderItems(
       }
 
       if (!prod) return item;
+
+      // Blackview BV100: precio fijo US$100 (+7%) desde 3 unidades, sin otros descuentos
+      if (isBlackviewGlasses(item.nombre) || isBlackviewGlasses(prod.nombre)) {
+        return {
+          nombre: item.nombre,
+          qty: item.qty,
+          unitPrice: blackviewUnitPrice(priceOf(prod), item.qty, usdRate),
+          ...(item.productId ? { productId: item.productId } : {}),
+        };
+      }
 
       // NFC Google: sin descuento por cantidad bajo ningún concepto
       if (isNfcGoogle(item.nombre) || isNfcGoogle(prod.nombre)) {

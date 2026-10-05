@@ -17,6 +17,8 @@ import {
   JERSEY_FAN_TIERS,
   thumbnailUrl,
   isNfcGoogle,
+  isBlackviewGlasses,
+  blackviewUnitPrice,
   tiersOf,
   discountFor,
   categoryDiscountForUnits,
@@ -835,6 +837,24 @@ describe("NFC Google — Reglas de compra mínima y descuentos", () => {
     expect(info2).not.toBeNull();
     expect(info2!.group).toBe("nfc_google");
     expect(info2!.minUnits).toBe(50);
+  });
+
+  it("Blackview BV100: sin mínimo, sin descuentos %, precio fijo US$100+7% desde 3 u.", () => {
+    const name = "Lente de Sol Blackview BV100 Smart Glasses Con IA / Camara / 8MP / 1080P / WiFi / Bluetooth - Sunglasses";
+    expect(isBlackviewGlasses(name)).toBe(true);
+    expect(isBlackviewGlasses("Blackview BV5300")).toBe(false);
+
+    expect(hasMoq(makeProduct(name, "Tecnología"), rules)).toBeNull();
+    expect(checkCategoryMins([item(name, "Tecnología", 1, 200000)], rules)).toEqual([]);
+
+    expect(tiersOf({ nombre: name, descuento: "SI", "5 unidades": "10" })).toEqual([]);
+    expect(discountFor({ nombre: name }, 30)).toBe(0);
+
+    // 100 * 1.07 * 1500 = 160500
+    expect(blackviewUnitPrice(200000, 2, 1500)).toBe(200000);
+    expect(blackviewUnitPrice(200000, 3, 1500)).toBe(160500);
+    expect(blackviewUnitPrice(150000, 3, 1500)).toBe(150000);
+    expect(blackviewUnitPrice(200000, 3, 0)).toBe(200000);
   });
 
   it("moq_group 'none' no anula el mínimo de 50 unidades de NFC Google", () => {

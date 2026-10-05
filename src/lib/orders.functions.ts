@@ -620,16 +620,20 @@ export const createTransferOrder = createServerFn({ method: "POST" })
           checkCategoryMins,
           moqGroupOf,
           isNfcGoogle,
+          isBlackviewGlasses,
+          blackviewUnitPrice,
           transferPrice,
           transferDiscountPct,
         } = await import("./store");
 
         const catRules = parseCategoryRules(configMap);
         const catTotals: Record<string, number> = {};
+        const usdRate = Number(configMap["dolar_cotizacion"] ?? 0);
 
         for (const item of data.items) {
           const prod = findProduct(dbProducts as any, item.nombre);
-          if (prod && !isNfcGoogle(item.nombre) && !isNfcGoogle(prod.nombre)) {
+          if (prod && !isNfcGoogle(item.nombre) && !isNfcGoogle(prod.nombre) &&
+              !isBlackviewGlasses(item.nombre) && !isBlackviewGlasses(prod.nombre)) {
             const catNorm = normCat(prod.categoria ?? "");
             const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
             if (match) {
@@ -663,6 +667,15 @@ export const createTransferOrder = createServerFn({ method: "POST" })
         items = data.items.map((item) => {
           const prod = findProduct(dbProducts as any, item.nombre);
           if (!prod) return item;
+
+          // Blackview BV100: precio fijo US$100 (+7%) desde 3 unidades, sin otros descuentos
+          if (isBlackviewGlasses(item.nombre) || isBlackviewGlasses(prod.nombre)) {
+            return {
+              nombre: item.nombre,
+              qty: item.qty,
+              unitPrice: blackviewUnitPrice(priceOf(prod), item.qty, usdRate),
+            };
+          }
 
           // NFC Google: sin descuento por cantidad bajo ningún concepto
           if (isNfcGoogle(item.nombre) || isNfcGoogle(prod.nombre)) {

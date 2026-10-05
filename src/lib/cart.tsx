@@ -16,6 +16,9 @@ import {
   isCamiseta,
   isLongSleeve,
   isNfcGoogle,
+  isBlackviewGlasses,
+  excludedFromQtyDiscount,
+  blackviewUnitPrice,
   parseJerseyItem,
   calcJerseyUnitPrice,
   type ComboQuantityTier,
@@ -202,7 +205,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // NFC Google se excluye porque no tiene descuentos por cantidad
     const catTotals: Record<string, number> = {};
     for (const item of items) {
-      if (isNfcGoogle(item.nombre)) continue;
+      if (excludedFromQtyDiscount(item.nombre)) continue;
       const catNorm = normCat(item.categoria ?? "");
       if (!catNorm) continue;
       const match = findRuleForCat(catNorm, catRules);
@@ -315,6 +318,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       const base = item.basePrice && item.basePrice > 0 ? item.basePrice : priceOf(product);
       const rBase = Math.round(base);
+
+      // Blackview BV100: precio fijo US$100 (+7%) desde 3 unidades, sin otros descuentos
+      if (isBlackviewGlasses(item.nombre) || isBlackviewGlasses(product.nombre)) {
+        const bvUnit = blackviewUnitPrice(rBase, item.qty, usdRate);
+        if (item.unitPrice === bvUnit && item.basePrice === rBase) return item;
+        return { ...item, basePrice: rBase, unitPrice: bvUnit };
+      }
 
       // NFC Google: sin descuento por cantidad bajo ningún concepto
       if (isNfcGoogle(item.nombre) || isNfcGoogle(product.nombre)) {

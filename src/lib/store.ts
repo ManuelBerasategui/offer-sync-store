@@ -606,9 +606,43 @@ export function isNfcGoogle(nombre?: string): boolean {
   return nom.includes("nfc") && nom.includes("google");
 }
 
+/**
+ * Detecta los lentes inteligentes "Blackview BV100 Smart Glasses".
+ * Producto sin compra mínima y con precio fijo a partir de 3 unidades
+ * (US$100 base + 7%, ver `blackviewUnitPrice`). No recibe descuentos porcentuales
+ * por cantidad ni de categoría Tecnología.
+ */
+export function isBlackviewGlasses(nombre?: string): boolean {
+  const nom = String(nombre ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, "");
+  return nom.includes("blackview") && nom.includes("bv100");
+}
+
+export const BLACKVIEW_TIER_UNITS = 3;
+export const BLACKVIEW_TIER_USD = 100;
+
+/** Productos que quedan fuera de todo descuento porcentual por cantidad. */
+export function excludedFromQtyDiscount(nombre?: string): boolean {
+  return isNfcGoogle(nombre) || isBlackviewGlasses(nombre);
+}
+
+/**
+ * Precio unitario de los lentes Blackview: desde 3 unidades, US$100 base (+7% como
+ * el resto del catálogo, que luego se descuenta en transferencia). Nunca sube el
+ * precio base si este ya fuera menor.
+ */
+export function blackviewUnitPrice(basePrice: number, qty: number, usdRate: number): number {
+  if (qty < BLACKVIEW_TIER_UNITS || !(usdRate > 0)) return basePrice;
+  const tierArs = Math.round(BLACKVIEW_TIER_USD * 1.07 * usdRate);
+  return basePrice > 0 ? Math.min(basePrice, tierArs) : tierArs;
+}
+
 export function tiersOf(p: Product): Tier[] {
-  // NFC Google no tiene descuentos por cantidad individuales
-  if (isNfcGoogle(p.nombre)) return [];
+  // NFC Google / Blackview no tienen descuentos por cantidad individuales
+  if (excludedFromQtyDiscount(p.nombre)) return [];
   if (!isYes(p.descuento)) return [];
   const tiers: Tier[] = [];
   for (const [key, value] of Object.entries(p)) {
@@ -627,8 +661,8 @@ export function tiersOf(p: Product): Tier[] {
 }
 
 export function discountFor(p: Product, qty: number) {
-  // NFC Google: sin descuento por cantidad bajo ningún concepto
-  if (isNfcGoogle(p.nombre)) return 0;
+  // NFC Google / Blackview: sin descuento porcentual por cantidad
+  if (excludedFromQtyDiscount(p.nombre)) return 0;
   const tiers = tiersOf(p);
   let percent = 0;
   for (const t of tiers) if (qty >= t.units) percent = t.percent;
@@ -987,6 +1021,9 @@ export function hasMoq(
   const nombre = String(product["nombre"] ?? "");
   const categoria = String(product["categoria"] ?? "");
 
+  // Blackview BV100: sin compra mínima (anula el mínimo por defecto de Tecnología)
+  if (isBlackviewGlasses(nombre)) return null;
+
   // NFC Google: 50 unidades mínimas (prioridad absoluta, ni siquiera moq_group "none" la anula)
   if (isNfcGoogle(nombre)) {
     const nfcRule = catRules["nfc_google"];
@@ -1067,6 +1104,9 @@ export function checkCategoryMins(
 
   for (const item of items) {
     const mg = item.moq_group ?? null;
+
+    // Blackview BV100: sin compra mínima
+    if (isBlackviewGlasses(item.nombre)) continue;
 
     const isNfc = isNfcGoogle(item.nombre);
 

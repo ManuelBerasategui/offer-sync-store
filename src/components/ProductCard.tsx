@@ -21,6 +21,7 @@ import {
   isCamiseta,
   isLongSleeve,
   isNfcGoogle,
+  excludedFromQtyDiscount,
   JERSEY_FAN_TIERS,
   JERSEY_FAN_ML_TIERS,
 } from "@/lib/store";
@@ -62,7 +63,7 @@ export function ProductCard({
   // maxPercent es 12 como mínimo universal; más si hay tiers propios por encima de 12%.
   // NFC Google: sin descuento por cantidad; no mostrar badge de descuento mayorista
   const isNfcGoogleProd = isNfcGoogle(p.nombre);
-  const maxPercent = (!hidePrice && !consultar && !isNfcGoogleProd) ? Math.max(maxTier?.percent ?? 12, 12) : null;
+  const maxPercent = (!hidePrice && !consultar && !excludedFromQtyDiscount(p.nombre)) ? Math.max(maxTier?.percent ?? 12, 12) : null;
 
   const discPct = transferDiscountPct(config);
   const tPrice = transferPrice(basePrice, discPct);
