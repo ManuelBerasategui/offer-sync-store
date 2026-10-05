@@ -335,7 +335,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         unitPrice = Math.round(unitPriceFor(product, item.qty, base));
       }
 
-      const rBase = Math.round(base);
       if (item.unitPrice === unitPrice && item.basePrice === rBase) {
         return item;
       }
