@@ -385,7 +385,7 @@ export function CalculadoraPage() {
           {quote && (
             <div
               ref={resultRef}
-              className="rounded-xl border border-border border-t-4 border-t-[#E8590F] bg-card p-6 sm:p-9 shadow-sm relative print:border-none print:p-0 print:shadow-none"
+              className="rounded-xl border border-border border-t-4 border-t-[#E8590F] bg-card p-6 sm:p-9 shadow-sm relative print:p-5 print:shadow-none"
             >
               {/* Encabezado del comprobante */}
               <div className="flex items-end justify-between border-b-2 border-foreground/90 pb-3.5 mb-5 gap-4">

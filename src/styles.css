@@ -213,6 +213,11 @@ input[name*="cvv"] {
   -webkit-text-security: disc !important;
 }
 
+@page {
+  size: A4;
+  margin: 14mm;
+}
+
 @media print {
   body {
     background-color: #ffffff !important;
