@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Component, Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp, PackagePlus,
@@ -2002,6 +2002,7 @@ function ComboBuilderPanel({
   roundingIncrement?: number;
   markupPercentage?: number;
 }) {
+  const queryClient = useQueryClient();
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [loadingBanners, setLoadingBanners] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -2174,6 +2175,8 @@ function ComboBuilderPanel({
       } else {
         toast.success(`¡Combo "${comboTitle}" guardado correctamente!`);
         resetForm();
+        // El catálogo y el inicio leen los combos de ["store"]: forzar que se actualicen
+        void queryClient.invalidateQueries({ queryKey: ["store"] });
         await loadBanners();
         await onRefresh();
       }
@@ -2191,6 +2194,7 @@ function ComboBuilderPanel({
       if (res.error) toast.error(res.error);
       else {
         toast.info("Combo eliminado.");
+        void queryClient.invalidateQueries({ queryKey: ["store"] });
         await loadBanners();
         await onRefresh();
       }

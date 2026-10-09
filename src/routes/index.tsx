@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, ChevronRight, Calculator } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
+import { ComboCard } from "@/components/ComboCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { HowItWorks, ReviewsCarousel } from "@/components/Social";
 import { storeQueryOptions } from "@/lib/store-query";
@@ -302,67 +303,19 @@ function Home() {
                     banners.length === 1 ? "justify-center" : ""
                   }`}
                 >
-                  {banners.map((b, i) => {
-                    const basePrice = toNumber(b.precio);
-                    const discPct = transferDiscountPct(config);
-                    const tPrice = transferPrice(basePrice, discPct);
-
-                    return (
-                      <Link
-                        key={i}
-                        to="/combo/$index"
-                        params={{ index: String(i) }}
-                        className={`group/card relative flex flex-col shrink-0 overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-primary/30 ${banners.length === 1
-                            ? "w-full max-w-[440px]"
-                            : "w-[85vw] max-w-[380px] sm:w-[360px] shrink-0"
-                          }`}
-                      >
-                        {/* Contenedor de la foto adaptado a la imagen */}
-                        <div className="relative aspect-square w-full overflow-hidden bg-surface flex items-center justify-center">
-                          <img
-                            src={thumbnailUrl(b.imagen_url, "md") || FALLBACK_IMAGE}
-                            alt={b.titulo ?? ""}
-                            width={380}
-                            height={380}
-                            loading="lazy"
-                            decoding="async"
-                            referrerPolicy="no-referrer"
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-105"
-                            onError={onImageError(b.imagen_url)}
-                          />
-                          {/* Badge si tiene tramos de descuento por cantidad */}
-                          {Array.isArray(b.quantity_tiers) && b.quantity_tiers.length > 0 && (
-                            <span className="absolute bottom-2 left-2 rounded-md bg-background/90 backdrop-blur-xs px-2 py-0.5 text-[10px] font-bold text-primary border border-primary/30 shadow-xs">
-                              🎁 Descuento x cantidad
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Footer con título y precios bien legibles */}
-                        <div className="flex flex-1 flex-col justify-between gap-2 border-t border-border bg-card p-3.5 sm:p-4">
-                          <h3 className="font-bold text-sm sm:text-base text-foreground leading-snug group-hover/card:text-primary transition-colors line-clamp-1">
-                            {b.titulo}
-                          </h3>
-
-                          {basePrice > 0 && (
-                            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                              <div className="flex items-baseline gap-1.5 flex-wrap">
-                                <span className="tabular-nums text-base sm:text-lg font-bold text-primary">
-                                  {money(tPrice)}
-                                </span>
-                                <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                                  {discPct}% OFF Transf.
-                                </span>
-                              </div>
-                              <span className="text-[11px] text-muted-foreground">
-                                o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con Mercado Pago
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    );
-                  })}
+                  {banners.map((b, i) => (
+                    <ComboCard
+                      key={i}
+                      banner={b}
+                      index={i}
+                      config={config}
+                      className={
+                        banners.length === 1
+                          ? "w-full max-w-[440px] shrink-0"
+                          : "w-[85vw] max-w-[380px] sm:w-[360px] shrink-0"
+                      }
+                    />
+                  ))}
                 </div>
                 {/* Hint that there's more to scroll on wider screens when multiple banners exist */}
                 {banners.length > 1 && (

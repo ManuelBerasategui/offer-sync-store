@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, ArrowDownUp, X, Loader2, MessageCircle } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
+import { ComboCard } from "@/components/ComboCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import {
@@ -75,13 +76,16 @@ export const Route = createFileRoute("/catalogo")({
 
 function Catalogo() {
   const { data } = useSuspenseQuery(storeQueryOptions);
-  const { products, config } = data;
+  const { products, banners, config } = data;
 
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("todas");
   const [sort, setSort] = useState<Sort>("destacado");
   const [onlyTop, setOnlyTop] = useState(false);
   const [onlyOffers, setOnlyOffers] = useState(false);
+  const [onlyCombos, setOnlyCombos] = useState(false);
+  // Si se borran todos los combos mientras la pestaña está activa, vuelve al catálogo normal
+  const showCombos = onlyCombos && banners.length > 0;
 
   const PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -91,7 +95,15 @@ function Catalogo() {
   // Resetear cantidad visible al cambiar cualquier filtro
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [search, cat, sort, onlyTop, onlyOffers]);
+  }, [search, cat, sort, onlyTop, onlyOffers, onlyCombos]);
+
+  const comboList = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    // Se conserva el índice original: /combo/$index apunta a la posición en `banners`
+    return banners
+      .map((b, index) => ({ b, index }))
+      .filter(({ b }) => !q || (b.titulo ?? "").toLowerCase().includes(q) || (b.subtitulo ?? "").toLowerCase().includes(q));
+  }, [banners, search]);
 
   const cats = useMemo(() => {
     const all = categoriesOf(products);
@@ -239,17 +251,22 @@ function Catalogo() {
 
             {/* Fila 2: Chips de categorías y filtros en una sola línea con scroll horizontal suave */}
             <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto py-0.5 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:flex-wrap">
-              <button className={chip(cat === "todas" && !onlyOffers && !onlyTop)} onClick={() => { setCat("todas"); setOnlyOffers(false); setOnlyTop(false); }}>
+              <button className={chip(cat === "todas" && !onlyOffers && !onlyTop && !showCombos)} onClick={() => { setCat("todas"); setOnlyOffers(false); setOnlyTop(false); setOnlyCombos(false); }}>
                 Todas
               </button>
-              <button className={chip(onlyOffers)} onClick={() => setOnlyOffers((v) => !v)}>
+              {banners.length > 0 && (
+                <button className={chip(showCombos)} onClick={() => setOnlyCombos((v) => !v)}>
+                  Combos
+                </button>
+              )}
+              <button className={chip(onlyOffers)} onClick={() => { setOnlyCombos(false); setOnlyOffers((v) => !v); }}>
                 Ofertas
               </button>
-              <button className={chip(onlyTop)} onClick={() => setOnlyTop((v) => !v)}>
+              <button className={chip(onlyTop)} onClick={() => { setOnlyCombos(false); setOnlyTop((v) => !v); }}>
                 Más vendidos
               </button>
               {cats.map((c) => (
-                <button key={c} className={chip(cat === c)} onClick={() => setCat(c)}>
+                <button key={c} className={chip(cat === c)} onClick={() => { setOnlyCombos(false); setCat(c); }}>
                   {c}
                 </button>
               ))}
@@ -259,7 +276,9 @@ function Catalogo() {
 
         <div className="mb-3 flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
           <span>
-            {list.length ? `Mostrando ${visibleProducts.length} de ${list.length} ${list.length === 1 ? "producto" : "productos"}` : "0 productos"}
+            {showCombos
+              ? `${comboList.length} ${comboList.length === 1 ? "combo" : "combos"}`
+              : list.length ? `Mostrando ${visibleProducts.length} de ${list.length} ${list.length === 1 ? "producto" : "productos"}` : "0 productos"}
           </span>
         </div>
 
@@ -296,7 +315,19 @@ function Catalogo() {
           );
         })()}
 
-        {list.length ? (
+        {showCombos ? (
+          comboList.length ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+              {comboList.map(({ b, index }) => (
+                <ComboCard key={b.id ?? index} banner={b} index={index} config={config} />
+              ))}
+            </div>
+          ) : (
+            <p className="my-10 text-center text-sm text-muted-foreground">
+              No hay combos que coincidan con "{search}".
+            </p>
+          )
+        ) : list.length ? (
           <>
             <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
               {visibleProducts.map((p, i) => (
@@ -360,6 +391,7 @@ function Catalogo() {
                   setCat("todas");
                   setOnlyOffers(false);
                   setOnlyTop(false);
+                  setOnlyCombos(false);
                 }}
                 className="rounded-lg border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted active:scale-95"
               >
