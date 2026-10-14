@@ -327,10 +327,6 @@ export const getAdminPaidOrders = createServerFn({ method: "POST" })
       return { orders: [], error: "No se pudieron obtener las órdenes de la base de datos." };
     }
 
-    if (rows) {
-      const b = JSON.stringify(rows).length;
-      console.info(`[OrdersQuery] Paid orders size: ${(b / 1024).toFixed(2)} KB (${b} B, ${rows.length} rows)`);
-    }
 
     const orders: AdminOrder[] = (rows ?? []).map((row) => ({
       id: String(row.id),
@@ -411,10 +407,6 @@ export const getAdminReservedOrders = createServerFn({ method: "POST" })
       return { orders: [], error: "No se pudieron obtener las órdenes reservadas." };
     }
 
-    if (rows) {
-      const b = JSON.stringify(rows).length;
-      console.info(`[OrdersQuery] Reserved orders size: ${(b / 1024).toFixed(2)} KB (${b} B, ${rows.length} rows)`);
-    }
 
     const orders: AdminOrder[] = (rows ?? []).map((row) => ({
       id: String(row.id),
