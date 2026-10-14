@@ -4,7 +4,7 @@ import { Component, Fragment, type ReactNode, useCallback, useEffect, useMemo, u
 import {
   Plus, Pencil, Trash2, X, Upload, ChevronDown, ChevronUp, PackagePlus,
   Flame, Sparkles, Percent, Save, Tag, Search, Check, RefreshCw, Zap, TrendingDown,
-  DollarSign, Coins, ArrowRightLeft,
+  DollarSign, Coins, ArrowRightLeft, Eye, EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,6 +23,7 @@ import {
   getAdminBanners,
   upsertAdminBanner,
   deleteAdminBanner,
+  setAdminBannerActive,
   bulkUpdateAdminStock,
   updateVariantStock,
   calcArsFromUsd,
@@ -2165,7 +2166,8 @@ function ComboBuilderPanel({
         precio_base: numBase,
         moneda_base: sourceCurrency,
         precio_usd: finalUsd > 0 ? finalUsd : null,
-        activo: "SI",
+        // Al editar se conserva el estado: un combo desactivado no se reactiva solo
+        activo: editingBanner?.activo ?? "SI",
         quantity_tiers: validTiers.length > 0 ? validTiers : null,
       };
 
@@ -2184,6 +2186,21 @@ function ComboBuilderPanel({
       toast.error(err instanceof Error ? err.message : "Error al guardar el combo.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleToggleCombo(id: string, active: boolean) {
+    try {
+      const res = await setAdminBannerActive({ data: { email: userEmail, token: userToken, bannerId: id, active } });
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success(active ? "Combo activado: ya se ve en la tienda." : "Combo desactivado: oculto en la tienda.");
+        void queryClient.invalidateQueries({ queryKey: ["store"] });
+        await loadBanners();
+        await onRefresh();
+      }
+    } catch {
+      toast.error("Error al cambiar el estado del combo.");
     }
   }
 
@@ -2608,6 +2625,12 @@ function ComboBuilderPanel({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {banners.map((b, idx) => {
+            // La tienda solo carga combos con activo = 'SI'
+            const isActive = String(b.activo ?? "").trim().toUpperCase() === "SI";
+            // /combo/$index usa la posición dentro de los combos activos
+            const storeIndex = banners
+              .slice(0, idx)
+              .filter((x) => String(x.activo ?? "").trim().toUpperCase() === "SI").length;
             const bPrice = toNumber(b.precio);
             const bDiscPct = 7;
             const bTransfer = transferPrice(bPrice, bDiscPct);
@@ -2617,7 +2640,7 @@ function ComboBuilderPanel({
             return (
               <div
                 key={b.id ?? idx}
-                className="flex flex-col sm:flex-row items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all"
+                className={`flex flex-col sm:flex-row items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs hover:border-primary/40 transition-all ${isActive ? "" : "opacity-60"}`}
               >
                 <SafeImage
                   rawSrc={b.imagen_url}
@@ -2630,6 +2653,11 @@ function ComboBuilderPanel({
                     <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                       Combo
                     </span>
+                    {!isActive && (
+                      <span className="rounded-full bg-destructive/10 text-destructive border border-destructive/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                        Desactivado
+                      </span>
+                    )}
                     {hasQtyTiers && (
                       <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 px-2 py-0.5 text-[10px] font-bold flex items-center gap-1">
                         🎁 {b.quantity_tiers?.length} tramos desc.
@@ -2657,26 +2685,40 @@ function ComboBuilderPanel({
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-2">
+                  <div className="flex items-center gap-2 pt-2 flex-wrap">
                     <button
                       onClick={() => handleEditClick(b)}
                       className="btn-base bg-muted hover:bg-muted/80 text-foreground text-xs py-1 px-2.5 flex items-center gap-1"
                     >
                       <Pencil className="h-3.5 w-3.5" /> Editar
                     </button>
+                    {b.id !== undefined && b.id !== null && (
+                      <button
+                        onClick={() => void handleToggleCombo(String(b.id), !isActive)}
+                        className={`btn-base text-xs py-1 px-2.5 flex items-center gap-1 ${isActive
+                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 hover:bg-amber-500/25"
+                          : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/25"
+                          }`}
+                      >
+                        {isActive ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        {isActive ? "Desactivar" : "Activar"}
+                      </button>
+                    )}
                     <button
                       onClick={() => void handleDeleteCombo(String(b.id ?? idx), b.titulo ?? "Combo")}
                       className="btn-base bg-destructive/10 text-destructive hover:bg-destructive hover:text-white text-xs py-1 px-2.5 flex items-center gap-1"
                     >
                       <Trash2 className="h-3.5 w-3.5" /> Eliminar
                     </button>
-                    <Link
-                      to="/combo/$index"
-                      params={{ index: String(idx) }}
-                      className="btn-base border border-border text-xs py-1 px-2.5 text-muted-foreground hover:text-foreground ml-auto"
-                    >
-                      Ver en tienda →
-                    </Link>
+                    {isActive && (
+                      <Link
+                        to="/combo/$index"
+                        params={{ index: String(storeIndex) }}
+                        className="btn-base border border-border text-xs py-1 px-2.5 text-muted-foreground hover:text-foreground ml-auto"
+                      >
+                        Ver en tienda →
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>

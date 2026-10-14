@@ -1935,6 +1935,31 @@ export const upsertAdminBanner = createServerFn({ method: "POST" })
     }
   });
 
+/** Activa/desactiva un combo sin borrarlo. Los inactivos no se muestran en la tienda. */
+export const setAdminBannerActive = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string; bannerId: string; active: boolean }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    bannerId: str(data?.bannerId, 100),
+    active: data?.active === true,
+  }))
+  .handler(async ({ data }): Promise<{ error?: string }> => {
+    try {
+      if (!data.bannerId) throw new Error("Combo inválido.");
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabaseAdmin as any)
+        .from("banners")
+        .update({ activo: data.active ? "SI" : "NO" })
+        .eq("id", data.bannerId);
+      if (error) throw error;
+      await invalidateStoreCache();
+      return {};
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Error al cambiar el estado del combo." };
+    }
+  });
+
 export const deleteAdminBanner = createServerFn({ method: "POST" })
   .validator((data: { email?: string; token?: string; bannerId: string }) => ({
     email: str(data?.email, 160).toLowerCase(),

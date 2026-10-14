@@ -53,7 +53,7 @@ export function ComboCard({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col justify-between gap-2 border-t border-border bg-card p-3.5 sm:p-4">
+      <div className="flex flex-1 flex-col justify-between gap-1.5 sm:gap-2 border-t border-border bg-card p-2.5 sm:p-4">
         <h3 className="font-bold text-sm sm:text-base text-foreground leading-snug group-hover/card:text-primary transition-colors line-clamp-1">
           {b.titulo}
         </h3>
