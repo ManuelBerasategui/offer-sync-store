@@ -297,10 +297,13 @@ function Home() {
                   </>
                 )}
 
+                {/* Móvil: grilla de 2 columnas. Desde sm: carrusel horizontal con flechas */}
                 <div
                   ref={combosScrollRef}
-                  className={`no-scrollbar flex gap-4 overflow-x-auto px-4 sm:px-0 scroll-smooth ${
-                    banners.length === 1 ? "justify-center" : ""
+                  className={`no-scrollbar px-4 sm:px-0 ${
+                    banners.length === 1
+                      ? "flex justify-center"
+                      : "grid grid-cols-2 gap-2.5 sm:flex sm:gap-4 sm:overflow-x-auto sm:scroll-smooth"
                   }`}
                 >
                   {banners.map((b, i) => (
@@ -312,7 +315,7 @@ function Home() {
                       className={
                         banners.length === 1
                           ? "w-full max-w-[440px] shrink-0"
-                          : "w-[85vw] max-w-[380px] sm:w-[360px] shrink-0"
+                          : "min-w-0 sm:w-[360px] sm:shrink-0"
                       }
                     />
                   ))}
