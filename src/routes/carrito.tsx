@@ -30,6 +30,8 @@ import {
   checkCategoryMins,
   normCat,
   findRuleForCat,
+  isCurva,
+  CURVA_UNIDADES,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
 
@@ -351,7 +353,14 @@ function CarritoPage() {
                             {displayOrigPrice > 0 && (
                               <span className="line-through text-[11px] opacity-75">{money(displayOrigPrice)}</span>
                             )}
-                            <span className="font-semibold text-foreground">{money(i.unitPrice)} c/u</span>
+                            <span className="font-semibold text-foreground">
+                              {money(i.unitPrice)} {isCurva(i.nombre) ? "por curva" : "c/u"}
+                            </span>
+                            {isCurva(i.nombre) && (
+                              <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                                {i.qty} curva{i.qty !== 1 ? "s" : ""} = {i.qty * CURVA_UNIDADES} u. (1 curva = {CURVA_UNIDADES} unidades)
+                              </span>
+                            )}
                             {displayDiscountPct > 0 && (
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                                 isOfferDiscount

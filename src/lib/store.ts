@@ -404,7 +404,20 @@ export function categoriesOf(products: Product[]) {
 }
 
 /** Returns true when the product's category or name matches "Camisetas" (accent-insensitive). */
+/** Unidades que trae cada curva (ej. "CURVA CAMISETAS DE BOCA"). */
+export const CURVA_UNIDADES = 5;
+
+/**
+ * Productos que se venden solo por curva completa: la cantidad del carrito
+ * cuenta curvas y el precio cargado es por curva. Se detectan por nombre.
+ */
+export function isCurva(nombre?: string | null): boolean {
+  return String(nombre ?? "").trim().toLowerCase().startsWith("curva ");
+}
+
 export function isCamiseta(categoria?: string | null, nombre?: string | null): boolean {
+  // Las curvas no usan la escala mayorista de camisetas sueltas
+  if (isCurva(nombre)) return false;
   const normCat = String(categoria ?? "")
     .trim()
     .toLowerCase()

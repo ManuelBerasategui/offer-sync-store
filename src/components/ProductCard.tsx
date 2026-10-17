@@ -19,6 +19,8 @@ import {
   toNumber,
   waLink,
   isCamiseta,
+  isCurva,
+  CURVA_UNIDADES,
   isLongSleeve,
   isNfcGoogle,
   excludedFromQtyDiscount,
@@ -164,6 +166,12 @@ export function ProductCard({
               {maxPercent !== null && (
                 <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
                   🎁 Hasta {maxPercent}% OFF x mayor
+                </span>
+              )}
+
+              {isCurva(p.nombre) && (
+                <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                  📦 Precio por curva · 1 curva = {CURVA_UNIDADES} unidades
                 </span>
               )}
 
