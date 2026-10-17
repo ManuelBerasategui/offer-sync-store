@@ -1039,7 +1039,8 @@ function ProductoPage() {
 
   const productRec = product as Record<string, unknown>;
   const rawTipo = String(productRec["tipo_talles"] ?? "NINGUNO").toUpperCase();
-  const hasTalles = rawTipo === "ZAPATILLAS" || rawTipo === "ROPA";
+  // Las curvas vienen armadas: no se elige talle
+  const hasTalles = !isCurvaProd && (rawTipo === "ZAPATILLAS" || rawTipo === "ROPA");
   const waOnlyReason: WaOnlyReason | null = waOnlyReasonOf(productRec);
   // Retrocompatibilidad: esZapatilla para los guards de tipo_talles que ya existían
   const esZapatilla = waOnlyReason === "zapatillas";
@@ -1579,8 +1580,29 @@ function ProductoPage() {
                 </label>
                 {isCurvaProd && (
                   <p className="mt-1 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
-                    📦 1 curva = {CURVA_UNIDADES} unidades. Solo se vende por curva completa.
+                    📦 1 curva = {CURVA_UNIDADES} unidades. El precio es por curva completa.
                   </p>
+                )}
+                {isCurvaProd && (
+                  <div className="mt-2 grid grid-cols-4 gap-2">
+                    {[1, 2, 3, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => {
+                          setQty(n);
+                          setQtyStr(String(n));
+                        }}
+                        className={`rounded-lg border px-2 py-2 text-xs font-bold transition ${
+                          qty === n
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input bg-background text-foreground hover:border-primary"
+                        }`}
+                      >
+                        {n} curva{n !== 1 ? "s" : ""}
+                      </button>
+                    ))}
+                  </div>
                 )}
                 <div className="mt-2 flex items-center gap-2">
                   {/* Botón – */}

@@ -1033,6 +1033,8 @@ export function hasMoq(
 
   const nombre = String(product["nombre"] ?? "");
   const categoria = String(product["categoria"] ?? "");
+  // Curvas: el mínimo es 1 curva, sin compra mínima de categoría
+  if (isCurva(nombre)) return null;
 
   // Blackview BV100: sin compra mínima (anula el mínimo por defecto de Tecnología)
   if (isBlackviewGlasses(nombre)) return null;
@@ -1118,8 +1120,8 @@ export function checkCategoryMins(
   for (const item of items) {
     const mg = item.moq_group ?? null;
 
-    // Blackview BV100: sin compra mínima
-    if (isBlackviewGlasses(item.nombre)) continue;
+    // Blackview BV100 y curvas: sin compra mínima
+    if (isBlackviewGlasses(item.nombre) || isCurva(item.nombre)) continue;
 
     const isNfc = isNfcGoogle(item.nombre);
 
