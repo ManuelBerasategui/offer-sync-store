@@ -1,20 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, ChevronRight, Calculator } from "lucide-react";
+import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { ComboCard } from "@/components/ComboCard";
+import { HomeQuiz } from "@/components/HomeQuiz";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { HowItWorks, ReviewsCarousel } from "@/components/Social";
 import { storeQueryOptions } from "@/lib/store-query";
 import {
   FALLBACK_IMAGE, imageUrl, thumbnailUrl, hasOffer,
   onImageError, isYes, money, toNumber, waLink, sanitizeUrl, type SiteConfig,
-  parseCategoryRules, normCat, transferPrice, transferDiscountPct,
+  parseCategoryRules, normCat, transferPrice, transferDiscountPct, orderedCategories,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
-import { track } from "@/lib/analytics";
 
 export const Route = createFileRoute("/")({
   loader: ({ context }) => {
@@ -126,40 +126,24 @@ function Home() {
           Precios de Importador
         </span>
 
-        {/* Título */}
-        <h1 className="relative mx-auto max-w-4xl text-[clamp(40px,12vw,84px)] leading-[0.95]">
-          Importamos
-          <br />
-          <span className="text-primary">para que revendas</span>
+        {/* Título: pregunta de entrada del cuestionario */}
+        <h1 className="relative mx-auto max-w-4xl text-[clamp(36px,11vw,72px)] leading-[0.95]">
+          ¿Qué querés <span className="text-primary">hacer?</span>
         </h1>
+        <p className="relative mx-auto mt-3 mb-6 max-w-md text-sm text-muted-foreground sm:mb-8 sm:text-base">
+          Elegí una opción y te llevamos al camino más corto.
+        </p>
 
-        {/* Línea horizontal divisoria tipo hr */}
-        <hr className="relative mx-auto mt-5 sm:mt-7 w-28 sm:w-40 border-t border-border/70" />
+        {/* Cuestionario: importar / mayorista / minorista → rubro del catálogo */}
+        <div className="relative">
+          <HomeQuiz categories={orderedCategories(products)} hasCombos={banners.length > 0} />
+        </div>
 
         {/* Beneficios sin iconos, centrados con espacio */}
-        <div className="relative mx-auto mt-4 sm:mt-5 flex items-center justify-center gap-4 sm:gap-8 text-xs sm:text-sm font-medium text-muted-foreground/90">
+        <div className="relative mx-auto mt-3 flex items-center justify-center gap-4 sm:gap-8 text-xs sm:text-sm font-medium text-muted-foreground/90">
           <span>Envíos a todo el país</span>
           <span aria-hidden className="text-muted-foreground/40">•</span>
           <span>Productos originales</span>
-        </div>
-
-        {/* CTA — Catálogo y Calculadora de Importaciones */}
-        <div className="relative mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3">
-          <Link
-            to="/catalogo"
-            onClick={() => track("home_cta_clicked", { cta: "ver_catalogo" })}
-            className="btn-base grad-urgente inline-flex items-center justify-center gap-2 px-8 py-3.5 text-base font-black uppercase tracking-wide text-primary-foreground shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-95 w-full sm:w-auto"
-          >
-            Ver Catálogo Mayorista
-          </Link>
-          <Link
-            to="/calculadora"
-            onClick={() => track("home_cta_clicked", { cta: "calculadora" })}
-            className="btn-base border border-border bg-card/80 backdrop-blur-xs hover:bg-muted text-foreground inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-bold shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:scale-95 w-full sm:w-auto"
-          >
-            <Calculator className="h-4 w-4 text-primary" />
-            <span>Calculadora de Importaciones</span>
-          </Link>
         </div>
 
         {/* Aviso mínimos — gris puro, sin ámbar */}

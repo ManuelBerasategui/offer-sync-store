@@ -403,6 +403,19 @@ export function categoriesOf(products: Product[]) {
   return [...new Set(products.map((p) => (p.categoria ?? "").trim()).filter(Boolean))];
 }
 
+/** Categorías en el orden en que se muestran en la tienda (catálogo y cuestionario de la home). */
+export function orderedCategories(products: Product[]) {
+  const all = categoriesOf(products);
+  // Categorías que queremos ver primero (en este orden)
+  const PINNED_FIRST = ["Bazar", "Zapatillas", "Tecnología"];
+  // Categorías que queremos ver al final
+  const PINNED_LAST = ["Vapers"];
+  const pinned = PINNED_FIRST.filter((c) => all.includes(c));
+  const last = PINNED_LAST.filter((c) => all.includes(c));
+  const rest = all.filter((c) => !PINNED_FIRST.includes(c) && !PINNED_LAST.includes(c));
+  return [...pinned, ...rest, ...last];
+}
+
 /** Returns true when the product's category or name matches "Camisetas" (accent-insensitive). */
 export function isCamiseta(categoria?: string | null, nombre?: string | null): boolean {
   const normCat = String(categoria ?? "")

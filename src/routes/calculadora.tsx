@@ -5,6 +5,7 @@ import { Calculator, Plus, Trash2, Copy, Printer, Check, MessageCircle } from "l
 import { SiteChrome } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import { waLink } from "@/lib/store";
+import { track } from "@/lib/analytics";
 
 export const Route = createFileRoute("/calculadora")({
   loader: ({ context }) => {
@@ -176,6 +177,12 @@ export function CalculadoraPage() {
     };
 
     setQuote(res);
+    track("import_quote_calculated", {
+      productos: validItems.length,
+      peso_total_kg: Math.round(totalWeight * 100) / 100,
+      fob_total: Math.round(totalFOB),
+      total: Math.round(grandTotal),
+    });
     setTimeout(() => {
       resultRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 100);
@@ -217,6 +224,7 @@ export function CalculadoraPage() {
   function handleConfirmWhatsapp() {
     const msg = buildWhatsappMessage();
     if (!msg) return;
+    track("import_quote_whatsapp", { total: quote ? Math.round(quote.grandTotal) : null });
     const url = waLink(config, msg);
     try {
       const parsed = new URL(url);

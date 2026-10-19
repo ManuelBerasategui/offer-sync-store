@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import { Search, ArrowDownUp, X, Loader2, MessageCircle } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
@@ -9,6 +10,7 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import {
   categoriesOf,
+  orderedCategories,
   isYes,
   priceOf,
   isCamiseta,
@@ -22,7 +24,24 @@ import { track } from "@/lib/analytics";
 
 type Sort = "destacado" | "precio_asc" | "precio_desc" | "nombre";
 
+// Permite entrar directo a un rubro (ej: /catalogo?cat=Tecnología) o a ofertas/combos (?ver=ofertas).
+// Valores inválidos se ignoran en vez de romper la página.
+const catalogoSearchSchema = z.object({
+  cat: z.string().trim().max(60).optional().catch(undefined),
+  ver: z.enum(["ofertas", "combos"]).optional().catch(undefined),
+});
+
+/** Compara nombres de categoría sin distinguir mayúsculas ni acentos. */
+function normCatName(v: string) {
+  return v
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export const Route = createFileRoute("/catalogo")({
+  validateSearch: catalogoSearchSchema,
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(storeQueryOptions);
   },
@@ -79,12 +98,36 @@ function Catalogo() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { products, banners, config } = data;
 
+  const { cat: catParam, ver } = Route.useSearch();
+  // Categoría pedida por URL, resuelta contra las categorías reales (sin importar mayúsculas/acentos)
+  const catFromUrl = useMemo(() => {
+    if (!catParam) return "todas";
+    const wanted = normCatName(catParam);
+    return categoriesOf(products).find((c) => normCatName(c) === wanted) ?? "todas";
+  }, [catParam, products]);
+
   const [search, setSearch] = useState("");
-  const [cat, setCat] = useState("todas");
+  const [cat, setCat] = useState(catFromUrl);
   const [sort, setSort] = useState<Sort>("destacado");
   const [onlyTop, setOnlyTop] = useState(false);
-  const [onlyOffers, setOnlyOffers] = useState(false);
-  const [onlyCombos, setOnlyCombos] = useState(false);
+  const [onlyOffers, setOnlyOffers] = useState(ver === "ofertas");
+  const [onlyCombos, setOnlyCombos] = useState(ver === "combos");
+
+  // Si cambia la URL con la página ya abierta (ej: otro link a /catalogo?cat=...), aplicar el filtro nuevo
+  useEffect(() => {
+    setCat(catFromUrl);
+    setOnlyOffers(ver === "ofertas");
+    setOnlyCombos(ver === "combos");
+  }, [catFromUrl, ver]);
+
+  // Al entrar a un rubro desde un link, desplazar la fila de categorías hasta que se vea el elegido
+  const chipsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (catFromUrl === "todas") return;
+    const row = chipsRef.current;
+    const active = row?.querySelector<HTMLElement>('[data-active="true"]');
+    if (row && active) row.scrollLeft = active.offsetLeft - row.offsetLeft - 12;
+  }, [catFromUrl]);
   // Si se borran todos los combos mientras la pestaña está activa, vuelve al catálogo normal
   const showCombos = onlyCombos && banners.length > 0;
 
@@ -129,17 +172,7 @@ function Catalogo() {
       .filter(({ b }) => !q || (b.titulo ?? "").toLowerCase().includes(q) || (b.subtitulo ?? "").toLowerCase().includes(q));
   }, [banners, search]);
 
-  const cats = useMemo(() => {
-    const all = categoriesOf(products);
-    // Categorías que queremos ver primero (en este orden)
-    const PINNED_FIRST = ["Bazar", "Zapatillas", "Tecnología"];
-    // Categorías que queremos ver al final
-    const PINNED_LAST = ["Vapers"];
-    const pinned = PINNED_FIRST.filter((c) => all.includes(c));
-    const last = PINNED_LAST.filter((c) => all.includes(c));
-    const rest = all.filter((c) => !PINNED_FIRST.includes(c) && !PINNED_LAST.includes(c));
-    return [...pinned, ...rest, ...last];
-  }, [products]);
+  const cats = useMemo(() => orderedCategories(products), [products]);
 
   const list = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -274,7 +307,10 @@ function Catalogo() {
             </div>
 
             {/* Fila 2: Chips de categorías y filtros en una sola línea con scroll horizontal suave */}
-            <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto py-0.5 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:flex-wrap">
+            <div
+              ref={chipsRef}
+              className="no-scrollbar flex items-center gap-1.5 overflow-x-auto py-0.5 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:flex-wrap"
+            >
               <button className={chip(cat === "todas" && !onlyOffers && !onlyTop && !showCombos)} onClick={() => { setCat("todas"); setOnlyOffers(false); setOnlyTop(false); setOnlyCombos(false); }}>
                 Todas
               </button>
@@ -290,7 +326,7 @@ function Catalogo() {
                 Más vendidos
               </button>
               {cats.map((c) => (
-                <button key={c} className={chip(cat === c)} onClick={() => { setOnlyCombos(false); setCat(c); }}>
+                <button key={c} data-active={cat === c} className={chip(cat === c)} onClick={() => { setOnlyCombos(false); setCat(c); }}>
                   {c}
                 </button>
               ))}
