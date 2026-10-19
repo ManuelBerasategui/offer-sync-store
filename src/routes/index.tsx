@@ -13,8 +13,10 @@ import {
   FALLBACK_IMAGE, imageUrl, thumbnailUrl, hasOffer,
   onImageError, isYes, money, toNumber, waLink, sanitizeUrl, type SiteConfig,
   parseCategoryRules, normCat, transferPrice, transferDiscountPct, orderedCategories,
+  findRuleForCat, type CategoryRule,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
+import { track } from "@/lib/analytics";
 
 export const Route = createFileRoute("/")({
   loader: ({ context }) => {
@@ -377,7 +379,7 @@ function Home() {
           { key: "zapatillas", label: "Zapatillas", defaultDesc: "3 unidades", icon: "👟" },
         ];
 
-        const minItems: { label: string; desc: string; icon: string }[] = [];
+        const minItems: { key: string; label: string; desc: string; icon: string }[] = [];
         const seenKeys = new Set<string>();
 
         for (const cat of canonicalCategories) {
@@ -388,7 +390,7 @@ function Home() {
           } else if (rule?.minAmount) {
             desc = `${money(rule.minAmount)}`;
           }
-          minItems.push({ label: cat.label, desc, icon: cat.icon });
+          minItems.push({ key: cat.key, label: cat.label, desc, icon: cat.icon });
           seenKeys.add(cat.key);
         }
 
@@ -401,15 +403,31 @@ function Home() {
           if (rule.minUnits) {
             seenKeys.add(norm);
             const label = key.charAt(0).toUpperCase() + key.slice(1);
-            minItems.push({ label, desc: `${rule.minUnits} unidades`, icon: "📦" });
+            minItems.push({ key: norm, label, desc: `${rule.minUnits} unidades`, icon: "📦" });
           } else if (rule.minAmount) {
             seenKeys.add(norm);
             const label = key.charAt(0).toUpperCase() + key.slice(1);
-            minItems.push({ label, desc: `${money(rule.minAmount)}`, icon: "💰" });
+            minItems.push({ key: norm, label, desc: `${money(rule.minAmount)}`, icon: "💰" });
           }
         }
 
         if (minItems.length === 0) return null;
+
+        // Categoría real del catálogo para cada mínimo, con la misma asociación que usa el carrito
+        // (findRuleForCat). Si no hay productos de esa categoría, la tarjeta queda sin link.
+        const realCats = orderedCategories(products);
+        const catalogCatFor = (key: string) => {
+          // Las claves del admin pueden venir con guion bajo ("nfc_google" ↔ categoría "NFC Google")
+          const keys = [...new Set([key, key.replace(/_/g, " ")])];
+          for (const k of keys) {
+            const matches = realCats.filter(
+              (c) => findRuleForCat(normCat(c), { [k]: {} as CategoryRule })?.key === k,
+            );
+            const found = matches.find((c) => normCat(c) === k) ?? matches[0];
+            if (found) return found;
+          }
+          return undefined;
+        };
 
         return (
           <section id="minimos" className="px-4 py-10 sm:px-6">
@@ -422,15 +440,35 @@ function Home() {
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-4">
-                  {minItems.map((it) => (
-                    <div key={it.label} className="flex items-center gap-2.5 rounded-xl border border-border bg-card/70 px-3 py-2.5 shadow-2xs">
-                      <span className="text-xl shrink-0">{it.icon}</span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold truncate text-foreground">{it.label}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{it.desc}</p>
+                  {minItems.map((it) => {
+                    const target = catalogCatFor(it.key);
+                    const content = (
+                      <>
+                        <span className="text-xl shrink-0">{it.icon}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold truncate text-foreground">{it.label}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{it.desc}</p>
+                        </div>
+                      </>
+                    );
+                    const base =
+                      "flex items-center gap-2.5 rounded-xl border border-border bg-card/70 px-3 py-2.5 shadow-2xs";
+                    return target ? (
+                      <Link
+                        key={it.label}
+                        to="/catalogo"
+                        search={{ cat: target }}
+                        onClick={() => track("minimos_categoria_click", { categoria: target })}
+                        className={`${base} transition-all hover:border-primary hover:shadow-sm active:scale-[0.99]`}
+                      >
+                        {content}
+                      </Link>
+                    ) : (
+                      <div key={it.label} className={base}>
+                        {content}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
