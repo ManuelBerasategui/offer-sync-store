@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState, useEffect, useRef } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, MessageCircle } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
@@ -69,6 +69,7 @@ import {
   type SiteConfig,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
+import { track } from "@/lib/analytics";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sanitización segura de texto libre (CWE-79 / Snyk XSS)
@@ -1309,6 +1310,32 @@ function ProductoPage() {
                             <p className="mt-0.5 text-muted-foreground leading-relaxed text-[11px] sm:text-xs">
                               {mixMsg}
                             </p>
+                            {moqDisplay.group === "nfc_google" && (
+                              <div className="mt-2.5 border-t border-amber-500/20 pt-2.5">
+                                <p className="font-semibold text-foreground text-xs sm:text-sm">
+                                  ¿Necesitás menos de 50 unidades?
+                                </p>
+                                <p className="mt-0.5 text-muted-foreground leading-relaxed text-[11px] sm:text-xs">
+                                  Periódicamente abrimos cupos de importación compartida para traerlo junto a
+                                  otros compradores. Escribinos por WhatsApp y te avisamos cuándo se abre el
+                                  próximo.
+                                </p>
+                                <a
+                                  href={sanitizeUrl(
+                                    waLink(
+                                      config,
+                                      `Hola! Me interesa el ${product.nombre ?? "NFC para reseñas de Google"} pero necesito menos de 50 unidades. ¿Cuándo abren el próximo cupo de importación compartida?`,
+                                    ),
+                                  )}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={() => track("nfc_cupo_whatsapp", { producto: product.nombre ?? "" })}
+                                  className="btn-base mt-2.5 inline-flex w-full items-center justify-center gap-2 bg-whatsapp text-whatsapp-foreground py-2.5 text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity"
+                                >
+                                  <MessageCircle className="h-4 w-4" /> Consultar cupo por WhatsApp
+                                </a>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
