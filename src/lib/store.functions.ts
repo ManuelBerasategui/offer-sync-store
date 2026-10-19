@@ -55,6 +55,11 @@ async function writeCfCache(data: StoreData): Promise<void> {
   }
 }
 
+// Columnas de products que usa el frontend. ventas_semana (la recalcula cada hora la función
+// refresh_ventas_semana en Supabase) se pide aparte para poder reintentar sin ella si no existiera.
+const PRODUCT_COLUMNS =
+  "id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,imagen_url,descripcion,destacado,oferta,stock,descuento,color_predeterminado,metadata";
+
 /** Ejecuta las 4 queries a Supabase y construye el StoreData. */
 async function fetchFromSupabase(): Promise<StoreData> {
   const [productsResult, variantsResult, bannersResult, configResult] = await Promise.all([
@@ -62,7 +67,7 @@ async function fetchFromSupabase(): Promise<StoreData> {
     // La consulta principal no depende de la tabla opcional de variantes.
     // Así, un error de relación/caché de Supabase nunca deja el catálogo vacío.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('products').select('id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,imagen_url,descripcion,destacado,oferta,stock,descuento,color_predeterminado,metadata').neq('stock', 'NO'),
+    (supabase as any).from('products').select(`${PRODUCT_COLUMNS},ventas_semana`).neq('stock', 'NO'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).from('product_variants').select('id,product_id,color,precio,precio_usd,precio_base,moneda_base,stock,imagen_url').neq('stock', 'NO'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,7 +76,15 @@ async function fetchFromSupabase(): Promise<StoreData> {
     (supabase as any).from('site_config').select('clave,valor'),
   ]);
 
-  if (productsResult.error) throw productsResult.error;
+  let productsData = productsResult.data;
+  if (productsResult.error) {
+    // Si la columna ventas_semana no existe en la base, traer los productos sin ella (sin "Más vendidos" reales)
+    console.warn("Reintentando productos sin ventas_semana:", productsResult.error.message);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const retry = await (supabase as any).from("products").select(PRODUCT_COLUMNS).neq("stock", "NO");
+    if (retry.error) throw retry.error;
+    productsData = retry.data;
+  }
   if (variantsResult.error) {
     console.warn("No se pudieron cargar las variantes de color:", variantsResult.error.message);
   }
@@ -79,7 +92,7 @@ async function fetchFromSupabase(): Promise<StoreData> {
     console.warn("No se pudieron cargar los banners:", bannersResult.error.message);
   }
 
-  const productsRaw = productsResult.data;
+  const productsRaw = productsData;
   const bannersRaw = bannersResult.data;
   const configRaw = configResult.data;
 
