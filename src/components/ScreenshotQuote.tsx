@@ -87,6 +87,8 @@ export function ScreenshotQuote({ onShowGuide }: { onShowGuide: () => void }) {
         ok: true,
         producto: prev?.producto || res.producto || null,
         tiers: prev?.tiers?.length ? prev.tiers : (res.tiers ?? []),
+        // La conversión de moneda acompaña a los precios que se conservan
+        conversion: prev?.tiers?.length ? (prev.conversion ?? null) : (res.conversion ?? null),
         peso_unitario_kg: res.peso_unitario_kg ?? prev?.peso_unitario_kg ?? null,
       };
       setResult(merged);
@@ -222,6 +224,14 @@ export function ScreenshotQuote({ onShowGuide }: { onShowGuide: () => void }) {
               El proveedor vende desde {minQty} unidades.
             </p>
           )}
+          {result.conversion && tiers.length > 0 && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Alibaba mostraba los precios en pesos: los pasamos a dólares con dólar a $
+              {result.conversion.cotizacion.toLocaleString("es-AR")}. Para más precisión, poné la
+              moneda de Alibaba en USD.
+            </p>
+          )}
+
           {tiers.length === 0 && (
             <MissingPiece
               text="Falta la captura de los precios por cantidad (arriba de todo en la publicación)."

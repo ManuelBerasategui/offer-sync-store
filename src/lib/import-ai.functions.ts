@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Lee una captura de una publicación de Alibaba con IA y devuelve los precios por cantidad
@@ -44,13 +45,15 @@ export type QuoteFromScreenshot = {
   producto?: string | null;
   tiers?: { min_qty: number; max_qty: number | null; price_usd: number }[];
   peso_unitario_kg?: number | null;
+  /** Si los precios venían en pesos y se pasaron a dólares, con qué cotización */
+  conversion?: { moneda: "ARS"; cotizacion: number } | null;
 };
 
 // JSON Schema que el modelo debe respetar en la respuesta (structured outputs)
 const OUTPUT_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["es_alibaba", "producto", "tiers", "peso_unitario_kg"],
+  required: ["es_alibaba", "producto", "moneda", "tiers", "peso_unitario_kg"],
   properties: {
     es_alibaba: {
       type: "boolean",
@@ -58,17 +61,26 @@ const OUTPUT_SCHEMA = {
         "true si la imagen es una publicación de producto de Alibaba (o similar, como 1688/AliExpress)",
     },
     producto: { type: ["string", "null"], description: "Nombre corto del producto, en español" },
+    moneda: {
+      type: ["string", "null"],
+      description:
+        "Código de la moneda en que se muestran los precios (USD, ARS, EUR, BRL, CNY...). null si no hay precios",
+    },
     tiers: {
       type: "array",
-      description: "Precios por rango de cantidad tal como figuran, en USD por unidad",
+      description:
+        "Precios por unidad por rango de cantidad, tal como figuran (sin convertir de moneda)",
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["min_qty", "max_qty", "price_usd"],
+        required: ["min_qty", "max_qty", "precio"],
         properties: {
           min_qty: { type: "integer" },
           max_qty: { type: ["integer", "null"], description: "null si el rango es 'N o más'" },
-          price_usd: { type: "number" },
+          precio: {
+            type: "number",
+            description: "Precio por unidad en la moneda indicada en moneda",
+          },
         },
       },
     },
@@ -83,7 +95,9 @@ const OUTPUT_SCHEMA = {
 const SYSTEM = `Leés capturas de pantalla de publicaciones de productos de Alibaba para un importador argentino.
 Puede haber varias capturas de la misma publicación (por ejemplo una con los precios y otra con el embalaje): combiná los datos de todas.
 Extraé solo lo que se ve en las imágenes, sin inventar ni estimar:
-- Los precios por rango de cantidad (en USD por unidad). Si hay un solo precio, devolvelo como un único rango desde la cantidad mínima.
+- Los precios por unidad por rango de cantidad, TAL COMO APARECEN, sin convertir de moneda. Si hay un solo precio, devolvelo como un único rango desde la cantidad mínima.
+- La moneda de esos precios (Alibaba puede mostrarlos en pesos argentinos "ARS" en vez de dólares "US$"/"USD"). Si solo ves "$" o "US$", es USD.
+- Los números sin separador de miles: "ARS 1.894" es 1894; "US$ 4,50" o "US$4.50" es 4.5.
 - El peso bruto por unidad en kg, si aparece (convertí g o lb a kg).
 - Un nombre corto del producto en español.
 Si una captura muestra solo el peso o solo los precios, devolvé lo que haya y dejá lo otro vacío o null.
@@ -111,22 +125,52 @@ function rateLimited(ip: string): boolean {
 type RawExtraction = {
   es_alibaba: boolean;
   producto: string | null;
-  tiers: { min_qty: number; max_qty: number | null; price_usd: number }[];
+  moneda: string | null;
+  tiers: { min_qty: number; max_qty: number | null; precio: number }[];
   peso_unitario_kg: number | null;
 };
 
 const USER_PROMPT = "Extraé los precios por cantidad y el peso por unidad de esta publicación.";
 const GENERIC_ERROR = "No pudimos leer la captura. Probá con otra o usá la guía.";
 
-/** Valida y limpia lo que devolvió el modelo (nunca confiar en que respete el formato). */
-function normalize(parsed: RawExtraction): QuoteFromScreenshot {
-  const tiers = (Array.isArray(parsed.tiers) ? parsed.tiers : [])
+/** Cotización del dólar que cargan en Admin → Configuración (site_config.dolar_cotizacion). */
+async function getUsdRate(): Promise<number> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any)
+      .from("site_config")
+      .select("valor")
+      .eq("clave", "dolar_cotizacion")
+      .maybeSingle();
+    const rate = Number(data?.valor);
+    return Number.isFinite(rate) && rate > 0 ? rate : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Normaliza el código de moneda que leyó el modelo ("US$" → USD, "ARS$" → ARS). */
+function normCurrency(v: unknown): string {
+  const c = String(v ?? "")
+    .toUpperCase()
+    .replace(/[^A-Z$]/g, "");
+  if (!c || c === "$" || c === "US$" || c === "USD$" || c === "US") return "USD";
+  if (c.startsWith("ARS") || c === "AR$") return "ARS";
+  return c.replace(/\$/g, "");
+}
+
+/**
+ * Valida y limpia lo que devolvió el modelo (nunca confiar en que respete el formato) y pasa los precios
+ * a dólares: Alibaba muestra pesos (ARS) a quien navega desde Argentina.
+ */
+async function finalize(parsed: RawExtraction): Promise<QuoteFromScreenshot> {
+  let tiers = (Array.isArray(parsed.tiers) ? parsed.tiers : [])
     .map((t) => ({
       min_qty: Math.max(0, Math.floor(Number(t.min_qty) || 0)),
       max_qty: t.max_qty == null ? null : Math.floor(Number(t.max_qty)) || null,
-      price_usd: Number(t.price_usd),
+      price_usd: Number(t.precio),
     }))
-    .filter((t) => Number.isFinite(t.price_usd) && t.price_usd > 0 && t.price_usd < 1_000_000)
+    .filter((t) => Number.isFinite(t.price_usd) && t.price_usd > 0 && t.price_usd < 100_000_000)
     .sort((a, b) => a.min_qty - b.min_qty)
     .slice(0, 10);
 
@@ -140,11 +184,41 @@ function normalize(parsed: RawExtraction): QuoteFromScreenshot {
         "No encontramos precios ni peso en la captura. Asegurate de que se vea la publicación del producto.",
     };
   }
+
+  let conversion: QuoteFromScreenshot["conversion"] = null;
+  if (tiers.length) {
+    const moneda = normCurrency(parsed.moneda);
+    if (moneda === "ARS") {
+      const rate = await getUsdRate();
+      if (!rate) {
+        return {
+          ok: false,
+          error:
+            "Los precios están en pesos. Cambiá la moneda de Alibaba a USD (en el menú de moneda) y volvé a sacar la captura.",
+        };
+      }
+      tiers = tiers.map((t) => ({
+        ...t,
+        price_usd: Math.max(0.01, Math.round((t.price_usd / rate) * 100) / 100),
+      }));
+      conversion = { moneda: "ARS", cotizacion: rate };
+    } else if (moneda !== "USD") {
+      return {
+        ok: false,
+        error: `Los precios están en ${moneda}. Cambiá la moneda de Alibaba a USD (en el menú de moneda) y volvé a sacar la captura.`,
+      };
+    }
+    if (tiers.some((t) => t.price_usd >= 1_000_000)) {
+      return { ok: false, error: GENERIC_ERROR };
+    }
+  }
+
   return {
     ok: true,
     producto: String(parsed.producto ?? "").slice(0, 80) || null,
     tiers,
     peso_unitario_kg: peso,
+    conversion,
   };
 }
 
@@ -153,7 +227,7 @@ type Image = z.infer<typeof imageSchema>;
 // Mismo esquema en el formato OpenAPI que acepta Gemini en responseSchema
 const GEMINI_SCHEMA = {
   type: "OBJECT",
-  required: ["es_alibaba", "producto", "tiers", "peso_unitario_kg"],
+  required: ["es_alibaba", "producto", "moneda", "tiers", "peso_unitario_kg"],
   properties: {
     es_alibaba: { type: "BOOLEAN", description: OUTPUT_SCHEMA.properties.es_alibaba.description },
     producto: {
@@ -161,12 +235,17 @@ const GEMINI_SCHEMA = {
       nullable: true,
       description: OUTPUT_SCHEMA.properties.producto.description,
     },
+    moneda: {
+      type: "STRING",
+      nullable: true,
+      description: OUTPUT_SCHEMA.properties.moneda.description,
+    },
     tiers: {
       type: "ARRAY",
       description: OUTPUT_SCHEMA.properties.tiers.description,
       items: {
         type: "OBJECT",
-        required: ["min_qty", "max_qty", "price_usd"],
+        required: ["min_qty", "max_qty", "precio"],
         properties: {
           min_qty: { type: "INTEGER" },
           max_qty: {
@@ -174,7 +253,10 @@ const GEMINI_SCHEMA = {
             nullable: true,
             description: "null si el rango es 'N o más'",
           },
-          price_usd: { type: "NUMBER" },
+          precio: {
+            type: "NUMBER",
+            description: OUTPUT_SCHEMA.properties.tiers.items.properties.precio.description,
+          },
         },
       },
     },
@@ -345,7 +427,7 @@ export const readAlibabaScreenshot = createServerFn({ method: "POST" })
     try {
       if (geminiKey) {
         const { raw, busy } = await extractWithGemini(geminiKey, data.images);
-        if (raw) return normalize(raw);
+        if (raw) return await finalize(raw);
         return {
           ok: false,
           error: busy
@@ -354,7 +436,7 @@ export const readAlibabaScreenshot = createServerFn({ method: "POST" })
         };
       }
       const raw = await extractWithClaude(anthropicKey as string, data.images);
-      return raw ? normalize(raw) : { ok: false, error: GENERIC_ERROR };
+      return raw ? await finalize(raw) : { ok: false, error: GENERIC_ERROR };
     } catch (err) {
       console.error("[import-ai] error leyendo captura:", err instanceof Error ? err.message : err);
       return {
