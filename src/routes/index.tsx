@@ -53,6 +53,10 @@ function Home() {
   const { products, banners, config } = data;
 
   const combosScrollRef = useRef<HTMLDivElement>(null);
+  // Se muestran 4 combos; el resto aparece con "Ver más" (menos invasivo en móvil)
+  const COMBOS_VISIBLES = 4;
+  const [showAllCombos, setShowAllCombos] = useState(false);
+  const visibleCombos = showAllCombos ? banners : banners.slice(0, COMBOS_VISIBLES);
 
   const scrollCombos = (dir: "left" | "right") => {
     const el = combosScrollRef.current;
@@ -295,7 +299,7 @@ function Home() {
                       : "grid grid-cols-2 gap-2.5 sm:flex sm:gap-4 sm:overflow-x-auto sm:scroll-smooth"
                   }`}
                 >
-                  {banners.map((b, i) => (
+                  {visibleCombos.map((b, i) => (
                     <ComboCard
                       key={i}
                       banner={b}
@@ -314,6 +318,22 @@ function Home() {
                   <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
                 )}
               </div>
+              {banners.length > COMBOS_VISIBLES && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      track("home_combos_ver_mas", { abrir: !showAllCombos });
+                      setShowAllCombos((v) => !v);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-card px-5 py-2 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
+                  >
+                    {showAllCombos
+                      ? "Ver menos"
+                      : `Ver más combos (${banners.length - COMBOS_VISIBLES})`}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
