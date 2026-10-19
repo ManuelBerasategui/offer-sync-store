@@ -32,6 +32,7 @@ import {
   findRuleForCat,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
+import { track } from "@/lib/analytics";
 
 /**
  * Input de cantidad para el carrito con buffer de display.
@@ -172,6 +173,7 @@ function CarritoPage() {
         const validCode = res.code || code;
         const disc = res.discountPct || 5;
         setAppliedCoupon({ code: validCode, discountPct: disc });
+        track("coupon_applied", { code: validCode, discount_pct: disc });
         setCouponSuccess(`¡Descuento aplicado! (${disc}% OFF)`);
         setCouponError("");
       }

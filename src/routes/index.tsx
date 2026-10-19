@@ -14,6 +14,7 @@ import {
   parseCategoryRules, normCat, transferPrice, transferDiscountPct,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
+import { track } from "@/lib/analytics";
 
 export const Route = createFileRoute("/")({
   loader: ({ context }) => {
@@ -146,12 +147,14 @@ function Home() {
         <div className="relative mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3">
           <Link
             to="/catalogo"
+            onClick={() => track("home_cta_clicked", { cta: "ver_catalogo" })}
             className="btn-base grad-urgente inline-flex items-center justify-center gap-2 px-8 py-3.5 text-base font-black uppercase tracking-wide text-primary-foreground shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-95 w-full sm:w-auto"
           >
             Ver Catálogo Mayorista
           </Link>
           <Link
             to="/calculadora"
+            onClick={() => track("home_cta_clicked", { cta: "calculadora" })}
             className="btn-base border border-border bg-card/80 backdrop-blur-xs hover:bg-muted text-foreground inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-bold shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:scale-95 w-full sm:w-auto"
           >
             <Calculator className="h-4 w-4 text-primary" />

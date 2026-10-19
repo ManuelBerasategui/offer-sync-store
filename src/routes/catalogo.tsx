@@ -18,6 +18,7 @@ import {
   type Product,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
+import { track } from "@/lib/analytics";
 
 type Sort = "destacado" | "precio_asc" | "precio_desc" | "nombre";
 
@@ -96,6 +97,29 @@ function Catalogo() {
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [search, cat, sort, onlyTop, onlyOffers, onlyCombos]);
+
+  // Medición: qué filtros y búsquedas usan los visitantes (se omite el estado inicial)
+  const filtersTrackedRef = useRef(false);
+  useEffect(() => {
+    if (!filtersTrackedRef.current) {
+      filtersTrackedRef.current = true;
+      return;
+    }
+    track("catalog_filter", {
+      categoria: cat,
+      ofertas: onlyOffers,
+      mas_vendidos: onlyTop,
+      combos: onlyCombos,
+      orden: sort,
+    });
+  }, [cat, sort, onlyTop, onlyOffers, onlyCombos]);
+
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) return;
+    const t = setTimeout(() => track("catalog_search", { query: q.slice(0, 100) }), 1200);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const comboList = useMemo(() => {
     const q = search.trim().toLowerCase();

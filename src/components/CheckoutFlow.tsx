@@ -16,6 +16,7 @@ import { createCheckout } from "@/lib/checkout.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
+import { track } from "@/lib/analytics";
 import {
   money,
   transferPrice,
@@ -201,6 +202,7 @@ export function CheckoutFlow({
 
     setError("");
     setStep("payment");
+    track("checkout_shipping_completed", { items: items.length, total });
   };
 
   const confirmTransfer = async () => {
@@ -218,6 +220,11 @@ export function CheckoutFlow({
 
       if (res.status === "success" && res.orderCode) {
         cart.clear();
+        track("order_placed", {
+          metodo: "transferencia",
+          total: res.total ?? finalTransferTotal,
+          cupon: couponCode ?? null,
+        });
 
         // Abrir WhatsApp con el comprobante pre-armado
         const finalAmount = res.total ?? finalTransferTotal;
@@ -260,6 +267,7 @@ export function CheckoutFlow({
       if (res.url) {
         const safeUrl = sanitizeUrl(res.url);
         if (safeUrl !== "#") {
+          track("order_placed", { metodo: "mercadopago", total, cupon: couponCode ?? null });
           window.location.href = safeUrl;
         } else {
           setError("URL de pago no válida.");
