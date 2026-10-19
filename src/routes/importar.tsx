@@ -165,10 +165,11 @@ function ImportarPage() {
           {screen === "captura" && (
             <>
               <Tag>Captura de Alibaba</Tag>
-              <h2 className="text-[clamp(24px,7vw,34px)]">Subí una captura del producto</h2>
+              <h2 className="text-[clamp(24px,7vw,34px)]">Subí capturas del producto</h2>
               <p className="mt-2 mb-5 text-sm text-muted-foreground">
-                Sacá una captura de la publicación donde se vean los precios por cantidad (y el
-                peso, si aparece). Leemos los datos y te armamos la cotización.
+                Sacá una captura de los <b className="text-foreground">precios por cantidad</b>{" "}
+                (arriba de todo) y otra del <b className="text-foreground">peso</b> (más abajo, en
+                &quot;Embalaje y entrega&quot;). Leemos los datos y te armamos la cotización.
               </p>
               <ScreenshotQuote
                 onShowGuide={() => {
