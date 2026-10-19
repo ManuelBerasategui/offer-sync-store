@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { SiteChrome } from "@/components/SiteChrome";
+import { ScreenshotQuote } from "@/components/ScreenshotQuote";
 import { storeQueryOptions } from "@/lib/store-query";
 import { sanitizeUrl, waLink } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/importar")({
   component: ImportarPage,
 });
 
-type Screen = "metodo" | "guia" | "link";
+type Screen = "metodo" | "captura" | "guia" | "link";
 
 const GUIDE_STEPS: { title: string; text: string; art: ReactNode }[] = [
   {
@@ -123,7 +124,7 @@ function ImportarPage() {
                   setScreen("metodo");
                 }
               }}
-              className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+              className="mb-5 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" /> Volver
             </button>
@@ -148,12 +149,9 @@ function ImportarPage() {
               />
               <BigOption
                 icon={<HelpCircle className="h-7 w-7" />}
-                title="No sé dónde buscarlos"
-                sub="Guía de 3 pasos para encontrarlos en Alibaba"
-                onClick={() => {
-                  setGuideStep(0);
-                  goTo("guia", "guia");
-                }}
+                title="No sé qué precio o peso poner"
+                sub="Subí una captura de Alibaba y lo leemos por vos"
+                onClick={() => goTo("captura", "captura")}
               />
               <BigOption
                 icon={<Link2 className="h-7 w-7" />}
@@ -161,6 +159,33 @@ function ImportarPage() {
                 sub="Mandanos el link y te cotizamos por WhatsApp"
                 onClick={() => goTo("link", "link")}
               />
+            </>
+          )}
+
+          {screen === "captura" && (
+            <>
+              <Tag>Captura de Alibaba</Tag>
+              <h2 className="text-[clamp(24px,7vw,34px)]">Subí una captura del producto</h2>
+              <p className="mt-2 mb-5 text-sm text-muted-foreground">
+                Sacá una captura de la publicación donde se vean los precios por cantidad (y el
+                peso, si aparece). Leemos los datos y te armamos la cotización.
+              </p>
+              <ScreenshotQuote
+                onShowGuide={() => {
+                  setGuideStep(2);
+                  goTo("guia", "guia_peso");
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setGuideStep(0);
+                  goTo("guia", "guia");
+                }}
+                className="mt-5 w-full text-center text-sm font-semibold text-primary"
+              >
+                Prefiero buscar los datos yo: ver la guía de 3 pasos
+              </button>
             </>
           )}
 
@@ -245,13 +270,10 @@ function ImportarPage() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setGuideStep(0);
-                  goTo("guia", "guia_desde_link");
-                }}
+                onClick={() => goTo("captura", "captura_desde_link")}
                 className="mt-4 w-full text-center text-sm font-semibold text-primary"
               >
-                ¿Preferís cotizarlo vos? Ver la guía de 3 pasos
+                ¿Preferís el precio ahora? Subí una captura del producto
               </button>
             </>
           )}

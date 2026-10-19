@@ -1,13 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
+import { z } from "zod";
 import { Calculator, Plus, Trash2, Copy, Printer, Check, MessageCircle } from "lucide-react";
 import { SiteChrome } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import { waLink } from "@/lib/store";
 import { track } from "@/lib/analytics";
 
+// Datos precargados (ej: desde la lectura de una captura en /importar). Valores inválidos se ignoran.
+const calculadoraSearchSchema = z.object({
+  nombre: z.string().trim().max(80).optional().catch(undefined),
+  cantidad: z.coerce.number().int().positive().max(1_000_000).optional().catch(undefined),
+  fob: z.coerce.number().positive().max(1_000_000).optional().catch(undefined),
+  peso: z.coerce.number().positive().max(10_000).optional().catch(undefined),
+});
+
 export const Route = createFileRoute("/calculadora")({
+  validateSearch: calculadoraSearchSchema,
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(storeQueryOptions);
   },
@@ -84,8 +94,16 @@ export function CalculadoraPage() {
   };
 
   const [client, setClient] = useState<string>("");
+  const prefill = Route.useSearch();
+  const hasPrefill = Boolean(prefill.cantidad && prefill.fob && prefill.peso);
   const [items, setItems] = useState<Item[]>([
-    { id: "item-1", nombre: "", cantidad: 1, fob: 0, peso: 0 },
+    {
+      id: "item-1",
+      nombre: hasPrefill ? prefill.nombre || "Producto importado" : "",
+      cantidad: hasPrefill ? (prefill.cantidad ?? 1) : 1,
+      fob: hasPrefill ? (prefill.fob ?? 0) : 0,
+      peso: hasPrefill ? (prefill.peso ?? 0) : 0,
+    },
   ]);
   const [quote, setQuote] = useState<QuoteResult | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
@@ -187,6 +205,12 @@ export function CalculadoraPage() {
       resultRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 100);
   }
+
+  // Con datos precargados, mostrar la cotización directamente
+  useEffect(() => {
+    if (hasPrefill) handleCalculate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function buildWhatsappMessage() {
     if (!quote) return "";
