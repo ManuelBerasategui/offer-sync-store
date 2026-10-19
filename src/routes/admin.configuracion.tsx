@@ -123,7 +123,7 @@ function AdminConfiguracionPage() {
 
   async function loadNewsletterData() {
     try {
-      const summary = await getCampaignsSummary();
+      const summary = await getCampaignsSummary({ data: { token: session?.access_token ?? "" } });
       setNewsletterSummary(summary);
     } catch {
       // ignore
@@ -388,7 +388,9 @@ function AdminConfiguracionPage() {
     setCreatingCampaign(true);
     setError("");
     try {
-      const res = await createNewsletterCampaign({ data: campaignForm });
+      const res = await createNewsletterCampaign({
+        data: { ...campaignForm, token: session?.access_token ?? "" },
+      });
       if (res.success) {
         setShowNewCampaignModal(false);
         setCampaignForm({
@@ -422,6 +424,7 @@ function AdminConfiguracionPage() {
         data: {
           campaignId,
           batchSize,
+          token: session?.access_token ?? "",
         },
       });
       setBatchMsg({
@@ -451,6 +454,7 @@ function AdminConfiguracionPage() {
         data: {
           campaignId,
           targetEmail: testCampaignEmail.trim(),
+          token: session?.access_token ?? "",
         },
       });
       setBatchMsg({

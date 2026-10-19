@@ -7,6 +7,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { assertAdmin } from "./admin-auth";
 
 const BASE_URL = "https://teimportamosarg.com";
 
@@ -144,8 +145,12 @@ export function buildPromotionalEmailHtml(params: {
 /**
  * Obtener estadísticas de newsletter y estado de campaña activa
  */
-export const getCampaignsSummary = createServerFn({ method: "GET" }).handler(
-  async (): Promise<CampaignSummary> => {
+export const getCampaignsSummary = createServerFn({ method: "POST" })
+  .validator((d: { token?: string }) => z.object({ token: z.string().max(4000).optional() }).parse(d ?? {}))
+  .handler(
+  async ({ data }): Promise<CampaignSummary> => {
+    // Solo administradores (ver src/lib/admin-auth.ts)
+    await assertAdmin(undefined, data.token);
     try {
       const [subsRes, unsubsRes, campaignsRes] = await Promise.all([
         (supabaseAdmin as any).from("newsletter_subscribers").select("id", { count: "exact", head: true }).eq("is_active", true),
@@ -194,9 +199,10 @@ export const getCampaignsSummary = createServerFn({ method: "GET" }).handler(
  * Crear una nueva campaña de correo
  */
 export const createNewsletterCampaign = createServerFn({ method: "POST" })
-  .validator((d: { subject: string; headline: string; content: string; cta_text?: string; cta_url?: string; coupon_code?: string }) => {
+  .validator((d: { subject: string; headline: string; content: string; cta_text?: string; cta_url?: string; coupon_code?: string; token?: string }) => {
     return z
       .object({
+        token: z.string().max(4000).optional(),
         subject: z.string().min(3, "El asunto es obligatorio"),
         headline: z.string().min(3, "El título es obligatorio"),
         content: z.string().min(10, "El contenido debe tener al menos 10 caracteres"),
@@ -207,6 +213,8 @@ export const createNewsletterCampaign = createServerFn({ method: "POST" })
       .parse(d);
   })
   .handler(async ({ data }) => {
+    // Solo administradores (ver src/lib/admin-auth.ts)
+    await assertAdmin(undefined, data.token);
     try {
       // 1. Contar suscriptores activos
       const { count: activeCount, error: countErr } = await (supabaseAdmin as any)
@@ -252,15 +260,18 @@ export const createNewsletterCampaign = createServerFn({ method: "POST" })
  * Enviar siguiente tanda de la campaña activa (anti-duplicación)
  */
 export const sendNextCampaignBatch = createServerFn({ method: "POST" })
-  .validator((d: { campaignId: string; batchSize: number }) => {
+  .validator((d: { campaignId: string; batchSize: number; token?: string }) => {
     return z
       .object({
+        token: z.string().max(4000).optional(),
         campaignId: z.string().uuid(),
         batchSize: z.number().min(1).max(80).default(50),
       })
       .parse(d);
   })
   .handler(async ({ data }) => {
+    // Solo administradores (ver src/lib/admin-auth.ts)
+    await assertAdmin(undefined, data.token);
     const { campaignId, batchSize } = data;
 
     try {
@@ -419,15 +430,18 @@ export const sendNextCampaignBatch = createServerFn({ method: "POST" })
  * NO cuenta para las tandas ni registra al usuario en logs de entrega real.
  */
 export const sendCampaignTestEmail = createServerFn({ method: "POST" })
-  .validator((d: { campaignId: string; targetEmail: string }) => {
+  .validator((d: { campaignId: string; targetEmail: string; token?: string }) => {
     return z
       .object({
+        token: z.string().max(4000).optional(),
         campaignId: z.string().uuid(),
         targetEmail: z.string().email("Ingresá un correo electrónico válido"),
       })
       .parse(d);
   })
   .handler(async ({ data }) => {
+    // Solo administradores (ver src/lib/admin-auth.ts)
+    await assertAdmin(undefined, data.token);
     try {
       const { data: campaign, error: campErr } = await (supabaseAdmin as any)
         .from("newsletter_campaigns")

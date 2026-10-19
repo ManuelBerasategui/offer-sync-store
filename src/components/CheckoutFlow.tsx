@@ -82,7 +82,7 @@ export function CheckoutFlow({
   appliedCoupon?: { code: string; discountPct: number } | null;
   onBack?: () => void;
 }) {
-  const { user, profile } = useAuth();
+  const { user, profile, session } = useAuth();
   const navigate = useNavigate();
   const cart = useCart();
   const { data: storeData } = useSuspenseQuery(storeQueryOptions);
@@ -215,6 +215,7 @@ export function CheckoutFlow({
           shipping: form,
           userId: user?.id,
           couponCode: couponCode || undefined,
+          token: session?.access_token,
         },
       });
 
@@ -262,6 +263,7 @@ export function CheckoutFlow({
           origin: window.location.origin,
           userId: user?.id,
           couponCode: couponCode || undefined,
+          token: session?.access_token,
         },
       });
       if (res.url) {

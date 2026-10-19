@@ -1,5 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { NotifyOrderInput } from "@/lib/email.functions";
+import { decideMpPayment, type MpPayment } from "./mp-verify";
+import { checkAdmin } from "./admin-auth";
+import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
 
 export type OrderItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
 
@@ -115,42 +118,47 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         return { estado: "desconocido" };
       }
 
-      // Determinamos el estado final del pago
-      let mpStatus: string | undefined;
+      // Solo los pedidos de Mercado Pago se confirman acá (los de transferencia los confirma el admin)
+      const pendingResult = {
+        ...(order?.order_code ? { orderCode: order.order_code } : {}),
+        estado: "pendiente" as const,
+        ...(order?.total ? { total: Number(order.total) } : {}),
+        ...(order?.metodo_pago ? { metodoPago: order.metodo_pago } : {}),
+      };
+      if (!order || (order.metodo_pago && order.metodo_pago !== "mercadopago" && order.metodo_pago !== "tarjeta")) {
+        return order ? pendingResult : { estado: "desconocido" };
+      }
 
-      // Primero intentamos verificar con la API de MP (más confiable)
-      if (data.paymentId) {
-        try {
-          const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${data.paymentId}`, {
-            headers: { authorization: `Bearer ${mpToken}` },
-          });
-          if (mpRes.ok) {
-            const mpJson = (await mpRes.json()) as { status?: string; external_reference?: string };
-            mpStatus = mpJson.status;
-          } else {
-            console.error(`MP payment lookup failed [${mpRes.status}]: ${await mpRes.text()}`);
-          }
-        } catch (err) {
-          console.error("Error consultando MP:", err);
+      // El estado del pago SOLO se toma de la API de Mercado Pago. Nunca del status de la URL:
+      // cualquiera puede escribir ?status=approved a mano. Sin confirmación de MP, queda pendiente.
+      if (!data.paymentId || !/^\d+$/.test(data.paymentId)) {
+        return pendingResult;
+      }
+
+      let payment: MpPayment | null = null;
+      try {
+        const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${data.paymentId}`, {
+          headers: { authorization: `Bearer ${mpToken}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (mpRes.ok) {
+          payment = (await mpRes.json()) as MpPayment;
+        } else {
+          console.error(`MP payment lookup failed [${mpRes.status}]: ${await mpRes.text()}`);
         }
+      } catch (err) {
+        console.error("Error consultando MP:", err);
       }
 
-      // Fallback 1: confiar en el status de la URL (MP lo incluye en el redirect)
-      if (!mpStatus) {
-        mpStatus = data.status?.toLowerCase();
+      const decision = decideMpPayment(order, payment);
+      if (decision === "pendiente") {
+        if (payment && payment.external_reference !== order.order_code) {
+          console.error(`MP payment ${data.paymentId} no corresponde al pedido ${order.order_code}`);
+        }
+        return pendingResult;
       }
-
-      if (mpStatus === "pending" || mpStatus === "in_process" || mpStatus === "authorized") {
-        return {
-          ...(order?.order_code ? { orderCode: order.order_code } : {}),
-          estado: "pendiente",
-          ...(order?.total ? { total: Number(order.total) } : {}),
-          metodoPago: order?.metodo_pago ?? undefined,
-        };
-      }
-
-      if (mpStatus !== "approved") {
-        return { estado: "rechazado", metodoPago: order?.metodo_pago ?? undefined };
+      if (decision === "rechazado") {
+        return { estado: "rechazado", ...(order.metodo_pago ? { metodoPago: order.metodo_pago } : {}) };
       }
 
       // 3. El pago está aprobado: actualizar la orden pendiente a "pagado"
@@ -284,37 +292,12 @@ export const getAdminPaidOrders = createServerFn({ method: "POST" })
       return { orders: [], error: "Variables de Supabase no configuradas en el servidor." };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
-    const adminEmails = adminEmailsRaw
-      .toLowerCase()
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean);
-
-    let requestingEmail = data.email ? data.email.toLowerCase().trim() : "";
-    if (data.token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-      if (userData?.user?.email) {
-        requestingEmail = userData.user.email.toLowerCase().trim();
-      }
+    // Identidad solo desde el token verificado (ver src/lib/admin-auth.ts)
+    const auth = await checkAdmin(data.token);
+    if (!auth.ok) {
+      return { orders: [], error: auth.error };
     }
-
-    if (!requestingEmail) {
-      return { orders: [], error: "Acceso denegado: Debés iniciar sesión como administrador." };
-    }
-
-    if (adminEmails.length > 0) {
-      if (!adminEmails.includes(requestingEmail)) {
-        return { orders: [], error: "Acceso denegado: El email no tiene permisos de administrador." };
-      }
-    } else {
-      const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
-      if (!defaultAdmins.includes(requestingEmail)) {
-        return { orders: [], error: "Acceso denegado: Configurá ADMIN_EMAILS en el archivo .env." };
-      }
-    }
+    const supabaseAdmin = auth.supabaseAdmin;
 
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
@@ -364,37 +347,12 @@ export const getAdminReservedOrders = createServerFn({ method: "POST" })
       return { orders: [], error: "Variables de Supabase no configuradas en el servidor." };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
-    const adminEmails = adminEmailsRaw
-      .toLowerCase()
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean);
-
-    let requestingEmail = data.email ? data.email.toLowerCase().trim() : "";
-    if (data.token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-      if (userData?.user?.email) {
-        requestingEmail = userData.user.email.toLowerCase().trim();
-      }
+    // Identidad solo desde el token verificado (ver src/lib/admin-auth.ts)
+    const auth = await checkAdmin(data.token);
+    if (!auth.ok) {
+      return { orders: [], error: auth.error };
     }
-
-    if (!requestingEmail) {
-      return { orders: [], error: "Acceso denegado: Debés iniciar sesión como administrador." };
-    }
-
-    if (adminEmails.length > 0) {
-      if (!adminEmails.includes(requestingEmail)) {
-        return { orders: [], error: "Acceso denegado: El email no tiene permisos de administrador." };
-      }
-    } else {
-      const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
-      if (!defaultAdmins.includes(requestingEmail)) {
-        return { orders: [], error: "Acceso denegado: Configurá ADMIN_EMAILS en el archivo .env." };
-      }
-    }
+    const supabaseAdmin = auth.supabaseAdmin;
 
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
@@ -448,30 +406,12 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const adminEmails = (process.env.ADMIN_EMAILS || "")
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-
-    let requestingEmail = data.email?.toLowerCase().trim();
-    if (data.token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-      if (userData?.user?.email) {
-        requestingEmail = userData.user.email.toLowerCase().trim();
-      }
+    // Identidad solo desde el token verificado (ver src/lib/admin-auth.ts)
+    const auth = await checkAdmin(data.token);
+    if (!auth.ok) {
+      return { status: "error", message: auth.error };
     }
-
-    if (!requestingEmail) {
-      return { status: "error", message: "Acceso denegado: Debés iniciar sesión." };
-    }
-
-    if (adminEmails.length > 0) {
-      if (!adminEmails.includes(requestingEmail)) {
-        return { status: "error", message: "Acceso denegado: Sin permisos de admin." };
-      }
-    }
+    const supabaseAdmin = auth.supabaseAdmin;
 
     const { error } = await supabaseAdmin
       .from("orders")
@@ -504,37 +444,12 @@ export const deleteAdminOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
-    const adminEmails = adminEmailsRaw
-      .toLowerCase()
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean);
-
-    let requestingEmail = data.email?.toLowerCase().trim() || "";
-    if (data.token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-      if (userData?.user?.email) {
-        requestingEmail = userData.user.email.toLowerCase().trim();
-      }
+    // Identidad solo desde el token verificado (ver src/lib/admin-auth.ts)
+    const auth = await checkAdmin(data.token);
+    if (!auth.ok) {
+      return { status: "error", message: auth.error };
     }
-
-    if (!requestingEmail) {
-      return { status: "error", message: "Acceso denegado: Debés iniciar sesión como administrador." };
-    }
-
-    if (adminEmails.length > 0) {
-      if (!adminEmails.includes(requestingEmail)) {
-        return { status: "error", message: "Acceso denegado: Sin permisos de administrador." };
-      }
-    } else {
-      const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
-      if (!defaultAdmins.includes(requestingEmail)) {
-        return { status: "error", message: "Acceso denegado: Configurá ADMIN_EMAILS en el archivo .env." };
-      }
-    }
+    const supabaseAdmin = auth.supabaseAdmin;
 
     const query = supabaseAdmin.from("orders").delete();
     const { error } = data.orderId
@@ -559,26 +474,26 @@ export const createTransferOrder = createServerFn({ method: "POST" })
       items: OrderItem[];
       userId?: string | undefined;
       couponCode?: string | undefined;
+      token?: string | undefined;
     }) => ({
       shipping: cleanShipping(data.shipping),
       items: cleanItems(data.items),
       userId: data.userId ? text(data.userId, 64) : undefined,
       couponCode: data.couponCode ? text(data.couponCode, 40).toUpperCase().trim() : undefined,
+      token: data.token ? text(data.token, 4000) : undefined,
     }),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // La cuenta sale SOLO del token verificado: el userId que manda el navegador no se usa, porque
+    // con él se podría aplicar el cupón a nombre de otro o sobrescribir el perfil de otra persona.
+    const verified = await verifiedUserFromToken(supabaseAdmin, data.token);
+    data.userId = verified?.id;
+
     // Garantizar que data.shipping tenga el email de la cuenta si el usuario está logueado
-    if (data.userId && (!data.shipping.email || !data.shipping.email.includes("@"))) {
-      try {
-        const { data: userData } = await supabaseAdmin.auth.admin.getUserById(data.userId);
-        if (userData?.user?.email) {
-          data.shipping.email = userData.user.email.trim();
-        }
-      } catch (err) {
-        console.error("Error al obtener email del usuario en transferencia:", err);
-      }
+    if (verified?.email && (!data.shipping.email || !data.shipping.email.includes("@"))) {
+      data.shipping.email = verified.email;
     }
 
     // 1. Revalidar precios y mínimos de categoría
@@ -709,36 +624,27 @@ export const createTransferOrder = createServerFn({ method: "POST" })
         const isCouponActive = (configMap["promo_cupon_activo"] ?? "SI").toUpperCase() === "SI";
         const promoCode = (configMap["promo_cupon_codigo"] ?? "TEIMPORTAMOS").toUpperCase().trim();
 
-        if (isCouponActive && data.couponCode === promoCode) {
-          const usedKeyUser = `coupon_usage_${promoCode}_${data.userId}`;
-          const usedKeyEmail = data.shipping.email ? `coupon_usage_${promoCode}_${data.shipping.email.trim().toLowerCase()}` : "";
-          const alreadyUsedInConfig = Boolean(configMap[usedKeyUser] || (usedKeyEmail && configMap[usedKeyEmail]));
+        if (isCouponActive && data.couponCode === promoCode && verified) {
+          const shippingEmail = (data.shipping.email ?? "").trim().toLowerCase();
+          // Usos viejos registrados en site_config (antes de coupon_usages)
+          const alreadyUsedInConfig = Boolean(
+            configMap[`coupon_usage_${promoCode}_${verified.id}`] ||
+              (verified.email && configMap[`coupon_usage_${promoCode}_${verified.email}`]) ||
+              (shippingEmail && configMap[`coupon_usage_${promoCode}_${shippingEmail}`]),
+          );
+          // Ante cualquier error de verificación, hasUsedCoupon devuelve true: no se aplica el descuento
+          const used =
+            alreadyUsedInConfig ||
+            (await hasUsedCoupon(supabaseAdmin, promoCode, verified.id, verified.email)) ||
+            (shippingEmail && shippingEmail !== verified.email
+              ? await hasUsedCoupon(supabaseAdmin, promoCode, null, shippingEmail)
+              : false);
 
-          if (!alreadyUsedInConfig) {
-            const filterParts: string[] = [`user_id.eq.${data.userId}`];
-            if (data.shipping.email) {
-              filterParts.push(`user_email.ilike.${data.shipping.email.trim().toLowerCase()}`);
-            }
-            try {
-              const { data: usages } = await supabaseAdmin
-                .from("coupon_usages")
-                .select("id")
-                .eq("coupon_code", promoCode)
-                .or(filterParts.join(","))
-                .limit(1);
-
-              if (!usages || usages.length === 0) {
-                const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
-                couponDiscountAmount = Math.round(total * (couponPct / 100));
-                total = Math.max(1, total - couponDiscountAmount);
-                validCouponApplied = promoCode;
-              }
-            } catch {
-              const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
-              couponDiscountAmount = Math.round(total * (couponPct / 100));
-              total = Math.max(1, total - couponDiscountAmount);
-              validCouponApplied = promoCode;
-            }
+          if (!used) {
+            const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
+            couponDiscountAmount = Math.round(total * (couponPct / 100));
+            total = Math.max(1, total - couponDiscountAmount);
+            validCouponApplied = promoCode;
           }
         }
       }
@@ -792,29 +698,8 @@ export const createTransferOrder = createServerFn({ method: "POST" })
           console.error("Error registrando uso de cupón en coupon_usages:", couponErr);
         }
 
-        // Registrar SIEMPRE en site_config para garantizar persistencia y bloqueo inmediato
-        try {
-          const payload = JSON.stringify({
-            orderCode,
-            email: (data.shipping.email ?? "").trim().toLowerCase(),
-            discount: couponDiscountAmount,
-            at: new Date().toISOString(),
-          });
-          if (data.userId) {
-            await (supabaseAdmin as any).from("site_config").upsert({
-              clave: `coupon_usage_${validCouponApplied}_${data.userId}`,
-              valor: payload,
-            }, { onConflict: "clave" });
-          }
-          if (data.shipping.email) {
-            await (supabaseAdmin as any).from("site_config").upsert({
-              clave: `coupon_usage_${validCouponApplied}_${data.shipping.email.trim().toLowerCase()}`,
-              valor: payload,
-            }, { onConflict: "clave" });
-          }
-        } catch (scErr) {
-          console.error("Error registrando uso de cupón en site_config:", scErr);
-        }
+        // Los usos se registran solo en coupon_usages (privada). Antes también se escribían en
+        // site_config, que es pública: eso exponía los emails de los clientes.
       }
 
       if (data.userId) {

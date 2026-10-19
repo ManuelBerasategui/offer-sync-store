@@ -152,7 +152,8 @@ async function fetchFromSupabase(): Promise<StoreData> {
   const config: SiteConfig = {};
   for (const row of configRaw ?? []) {
     const r = row as { clave?: string; valor?: string };
-    if (r.clave) config[r.clave] = r.valor ?? "";
+    // Las filas coupon_usage_* tienen emails de clientes: nunca mandarlas al navegador
+    if (r.clave && !r.clave.startsWith("coupon_usage_")) config[r.clave] = r.valor ?? "";
   }
 
   return { products, banners, config };
@@ -212,10 +213,6 @@ export async function invalidateStoreCache(): Promise<void> {
   }
 }
 
-export const invalidateStoreCacheFn = createServerFn({ method: "POST" }).handler(
-  async () => {
-    await invalidateStoreCache();
-    return { success: true };
-  },
-);
+// (Se eliminó invalidateStoreCacheFn: era pública, sin uso, y permitía forzar recargas a Supabase.
+// La caché se invalida desde las funciones del admin con invalidateStoreCache().)
 

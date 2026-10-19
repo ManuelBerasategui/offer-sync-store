@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
 
 /**
  * Orígenes permitidos para back_urls de MercadoPago (CWE-601 — Open Redirect).
@@ -224,6 +225,7 @@ export const createCheckout = createServerFn({ method: "POST" })
       shipping: ShippingInput;
       userId?: string | undefined;
       couponCode?: string | undefined;
+      token?: string | undefined;
     }) => {
       if (!data || !Array.isArray(data.items) || data.items.length === 0) {
         throw new Error("Carrito vacío");
@@ -233,6 +235,7 @@ export const createCheckout = createServerFn({ method: "POST" })
         origin: String(data.origin ?? "").slice(0, 200),
         userId: data.userId ? String(data.userId).slice(0, 60) : undefined,
         couponCode: data.couponCode ? String(data.couponCode).slice(0, 40).toUpperCase().trim() : undefined,
+        token: data.token ? String(data.token).slice(0, 4000) : undefined,
         shipping: {
           nombre: String(s.nombre ?? "").slice(0, 120),
           dni: String(s.dni ?? "").slice(0, 20),
@@ -273,16 +276,12 @@ export const createCheckout = createServerFn({ method: "POST" })
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+      // Cuenta verificada por token (nunca el userId que manda el navegador)
+      const verified = await verifiedUserFromToken(supabaseAdmin, data.token);
+
       // Garantizar que data.shipping tenga el email de la cuenta si el usuario está logueado
-      if (data.userId && (!data.shipping.email || !data.shipping.email.includes("@"))) {
-        try {
-          const { data: userData } = await supabaseAdmin.auth.admin.getUserById(data.userId);
-          if (userData?.user?.email) {
-            data.shipping.email = userData.user.email.trim();
-          }
-        } catch (err) {
-          console.error("Error al obtener email del usuario en checkout:", err);
-        }
+      if (verified?.email && (!data.shipping.email || !data.shipping.email.includes("@"))) {
+        data.shipping.email = verified.email;
       }
 
       const validation = await revalidateOrderItems(supabaseAdmin, data.items);
@@ -292,8 +291,9 @@ export const createCheckout = createServerFn({ method: "POST" })
       items = validation.validatedItems;
       total = validation.total;
 
-      // Revalidación segura del cupón en el servidor
-      if (data.couponCode && data.userId) {
+      // Revalidación segura del cupón en el servidor: la cuenta sale del token verificado
+      // (no del userId que manda el navegador) y, ante cualquier duda, no se aplica el descuento.
+      if (data.couponCode && verified) {
         const { data: dbConfigRows } = await supabaseAdmin.from("site_config").select("clave,valor");
         const configObj: Record<string, string> = {};
         for (const row of dbConfigRows ?? []) {
@@ -304,49 +304,36 @@ export const createCheckout = createServerFn({ method: "POST" })
         const promoCode = (configObj["promo_cupon_codigo"] ?? "TEIMPORTAMOS").toUpperCase().trim();
 
         if (isCouponActive && data.couponCode === promoCode) {
-          const usedKeyUser = `coupon_usage_${promoCode}_${data.userId}`;
-          const usedKeyEmail = data.shipping.email ? `coupon_usage_${promoCode}_${data.shipping.email.trim().toLowerCase()}` : "";
-          const alreadyUsedInConfig = Boolean(configObj[usedKeyUser] || (usedKeyEmail && configObj[usedKeyEmail]));
+          const shippingEmail = (data.shipping.email ?? "").trim().toLowerCase();
+          // Usos viejos registrados en site_config (antes de coupon_usages)
+          const alreadyUsedInConfig = Boolean(
+            configObj[`coupon_usage_${promoCode}_${verified.id}`] ||
+              (verified.email && configObj[`coupon_usage_${promoCode}_${verified.email}`]) ||
+              (shippingEmail && configObj[`coupon_usage_${promoCode}_${shippingEmail}`]),
+          );
+          const used =
+            alreadyUsedInConfig ||
+            (await hasUsedCoupon(supabaseAdmin, promoCode, verified.id, verified.email)) ||
+            (shippingEmail && shippingEmail !== verified.email
+              ? await hasUsedCoupon(supabaseAdmin, promoCode, null, shippingEmail)
+              : false);
 
-          if (!alreadyUsedInConfig) {
-            const filterParts: string[] = [`user_id.eq.${data.userId}`];
-            if (data.shipping.email) {
-              filterParts.push(`user_email.ilike.${data.shipping.email.trim().toLowerCase()}`);
-            }
-            try {
-              const { data: usages } = await supabaseAdmin
-                .from("coupon_usages")
-                .select("id")
-                .eq("coupon_code", promoCode)
-                .or(filterParts.join(","))
-                .limit(1);
-
-              if (!usages || usages.length === 0) {
-                const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
-                validCouponApplied = promoCode;
-                // Aplicar descuento a cada ítem para reflejar el monto en la preferencia de Mercado Pago
-                items = items.map((i) => ({
-                  ...i,
-                  unitPrice: Math.max(1, Math.round(i.unitPrice * (1 - couponPct / 100))),
-                }));
-                const discountedTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-                couponDiscountAmount = Math.max(0, total - discountedTotal);
-                total = discountedTotal;
-              }
-            } catch {
-              const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
-              validCouponApplied = promoCode;
-              items = items.map((i) => ({
-                ...i,
-                unitPrice: Math.max(1, Math.round(i.unitPrice * (1 - couponPct / 100))),
-              }));
-              const discountedTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-              couponDiscountAmount = Math.max(0, total - discountedTotal);
-              total = discountedTotal;
-            }
+          if (!used) {
+            const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
+            validCouponApplied = promoCode;
+            // Aplicar descuento a cada ítem para reflejar el monto en la preferencia de Mercado Pago
+            items = items.map((i) => ({
+              ...i,
+              unitPrice: Math.max(1, Math.round(i.unitPrice * (1 - couponPct / 100))),
+            }));
+            const discountedTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+            couponDiscountAmount = Math.max(0, total - discountedTotal);
+            total = discountedTotal;
           }
         }
       }
+      // El pedido queda asociado solo a la cuenta verificada
+      data.userId = verified?.id;
     } catch (err) {
       console.error("Error al revalidar la orden:", err);
       return {
@@ -395,29 +382,8 @@ export const createCheckout = createServerFn({ method: "POST" })
           console.error("Error registrando uso de cupón en MP:", couponErr);
         }
 
-        // Registrar SIEMPRE en site_config para garantizar persistencia y bloqueo inmediato
-        try {
-          const payload = JSON.stringify({
-            orderCode,
-            email: (data.shipping.email ?? "").trim().toLowerCase(),
-            discount: couponDiscountAmount,
-            at: new Date().toISOString(),
-          });
-          if (data.userId) {
-            await (supabaseAdmin as any).from("site_config").upsert({
-              clave: `coupon_usage_${validCouponApplied}_${data.userId}`,
-              valor: payload,
-            }, { onConflict: "clave" });
-          }
-          if (data.shipping.email) {
-            await (supabaseAdmin as any).from("site_config").upsert({
-              clave: `coupon_usage_${validCouponApplied}_${data.shipping.email.trim().toLowerCase()}`,
-              valor: payload,
-            }, { onConflict: "clave" });
-          }
-        } catch (scErr) {
-          console.error("Error registrando uso de cupón en site_config (MP):", scErr);
-        }
+        // Los usos se registran solo en coupon_usages (privada). Antes también se escribían en
+        // site_config, que es pública: eso exponía los emails de los clientes.
       }
     } catch (err) {
       console.error("Error al guardar orden pendiente:", err);

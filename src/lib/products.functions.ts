@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Banner, Product, ProductVariant } from "@/lib/store";
 import { invalidateStoreCache } from "./store.functions";
+import { assertAdmin } from "./admin-auth";
+import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
 
 const str = (v: unknown, max = 2000) => String(v ?? "").slice(0, max);
 
@@ -71,35 +73,7 @@ export type ProductInput = {
   whatsapp_only_reason?: string;
 };
 
-/* ─── Helper de autorización ───────────────────────────── */
-
-async function assertAdmin(email?: string, token?: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-  const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
-  const adminEmails = adminEmailsRaw
-    .toLowerCase()
-    .split(",")
-    .map((e) => e.trim())
-    .filter(Boolean);
-
-  let requestingEmail = email ? email.toLowerCase().trim() : "";
-  if (token) {
-    const { data: userData } = await supabaseAdmin.auth.getUser(token);
-    if (userData?.user?.email) requestingEmail = userData.user.email.toLowerCase().trim();
-  }
-
-  if (!requestingEmail) throw new Error("Acceso denegado: no autenticado.");
-
-  const allowed =
-    adminEmails.length > 0
-      ? adminEmails.includes(requestingEmail)
-      : ["admin@config.com", "admin@teimportamos.com"].includes(requestingEmail);
-
-  if (!allowed) throw new Error("Acceso denegado: sin permisos de administrador.");
-
-  return supabaseAdmin;
-}
+/* ─── Helper de autorización: ver src/lib/admin-auth.ts (solo acepta tokens verificados) ── */
 
 export function calcArsFromUsd(
   usd: number | string,
@@ -1573,17 +1547,10 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // 1. Verificar autenticación
-        let verifiedUserId = data.userId;
-        let verifiedEmail = data.email;
-
-        if (data.token) {
-          const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-          if (userData?.user) {
-            verifiedUserId = userData.user.id;
-            verifiedEmail = userData.user.email ?? verifiedEmail;
-          }
-        }
+        // 1. Verificar autenticación: solo la sesión verificada por token (no el userId/email del navegador)
+        const verified = await verifiedUserFromToken(supabaseAdmin, data.token);
+        const verifiedUserId = verified?.id;
+        const verifiedEmail = verified?.email || undefined;
 
         if (!verifiedUserId) {
           return {
@@ -1632,28 +1599,13 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
         }
 
         // 4. Verificar si el usuario ya consumió el cupón en coupon_usages
-        const filterParts: string[] = [`user_id.eq.${verifiedUserId}`];
-        if (verifiedEmail) {
-          filterParts.push(`user_email.ilike.${verifiedEmail.trim().toLowerCase()}`);
-        }
-
-        try {
-          const { data: usageRows } = await (supabaseAdmin as any)
-            .from("coupon_usages")
-            .select("id")
-            .eq("coupon_code", validCode)
-            .or(filterParts.join(","))
-            .limit(1);
-
-          if (usageRows && usageRows.length > 0) {
-            return {
-              valid: false,
-              error:
-                "Ya utilizaste este código de descuento en una compra anterior (válido 1 sola vez por cuenta).",
-            };
-          }
-        } catch (usageErr) {
-          console.warn("Error consultando coupon_usages:", usageErr);
+        // (consultas parametrizadas; ante cualquier error se considera usado)
+        if (await hasUsedCoupon(supabaseAdmin, validCode, verifiedUserId, verifiedEmail ?? null)) {
+          return {
+            valid: false,
+            error:
+              "Ya utilizaste este código de descuento en una compra anterior (válido 1 sola vez por cuenta).",
+          };
         }
 
         return {
