@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useState, useRef } from "react";
 import { z } from "zod";
 import { Calculator, Plus, Trash2, Copy, Printer, Check, MessageCircle } from "lucide-react";
@@ -7,6 +7,7 @@ import { SiteChrome } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import { waLink } from "@/lib/store";
 import { track } from "@/lib/analytics";
+import { getImportUsdRate } from "@/lib/import-ai.functions";
 
 // Datos precargados (ej: desde la lectura de una captura en /importar). Valores inválidos se ignoran.
 const calculadoraSearchSchema = z.object({
@@ -86,8 +87,14 @@ export function CalculadoraPage() {
   const { data: storeData } = useSuspenseQuery(storeQueryOptions);
   const config = storeData.config ?? {};
 
-  // Cotización del dólar que cargan en Admin → Configuración (0 = no mostrar pesos)
-  const usdRate = Math.max(0, Number(config["dolar_cotizacion"]) || 0);
+  // Cotización del dólar: la "activa en Base de Datos" del admin (implícita en los precios de los
+  // productos), la misma que se usa al leer capturas en pesos. Respaldo: dolar_cotizacion guardada.
+  const { data: liveRate } = useQuery({
+    queryKey: ["import-usd-rate"],
+    queryFn: () => getImportUsdRate(),
+    staleTime: 10 * 60 * 1000,
+  });
+  const usdRate = Math.max(0, liveRate || Number(config["dolar_cotizacion"]) || 0);
   const ars = (usd: number) => (usdRate > 0 ? fmtArs(usd, usdRate) : "");
 
   // Tarifas leídas de site_config con fallback

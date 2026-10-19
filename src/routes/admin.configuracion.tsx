@@ -21,7 +21,7 @@ import {
   sendCampaignTestEmail,
   type CampaignSummary,
 } from "@/lib/newsletter.functions";
-import { parseCategoryRules, normCat, getBaseCategory, money } from "@/lib/store";
+import { parseCategoryRules, normCat, getBaseCategory, money, impliedUsdRate } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/configuracion")({
   loader: ({ context }) => {
@@ -172,18 +172,8 @@ function AdminConfiguracionPage() {
       void loadNewsletterData();
 
       // Calcular la cotización implícita ponderada usada actualmente en los productos de la DB
-      const prodsWithBoth = res.products.filter((p) => {
-        const ars = Number(p.precio) || 0;
-        const usd = Number((p as any).precio_usd) || 0;
-        return ars > 0 && usd >= 1;
-      });
-
-      if (prodsWithBoth.length > 0) {
-        const totalArs = prodsWithBoth.reduce((acc, p) => acc + Number(p.precio), 0);
-        const totalUsd = prodsWithBoth.reduce((acc, p) => acc + Number((p as any).precio_usd), 0);
-        const rate = Math.round(totalArs / totalUsd);
-        setDbDolarRate(rate);
-      }
+      const rate = impliedUsdRate(res.products);
+      if (rate > 0) setDbDolarRate(rate);
 
       const existing = parseCategoryRules(config);
       const rawCats = res.products.map((p) => (p.categoria ?? "").trim()).filter(Boolean);

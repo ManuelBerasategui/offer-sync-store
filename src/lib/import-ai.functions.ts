@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { detectCurrency, dropSuspiciousTiers, parsePrice } from "@/lib/price-parse";
+import { impliedUsdRate } from "@/lib/store";
 
 /**
  * Lee una captura de una publicación de Alibaba con IA y devuelve los precios por cantidad
@@ -136,21 +137,64 @@ type RawExtraction = {
 const USER_PROMPT = "Extraé los precios por cantidad y el peso por unidad de esta publicación.";
 const GENERIC_ERROR = "No pudimos leer la captura. Probá con otra o usá la guía.";
 
-/** Cotización del dólar que cargan en Admin → Configuración (site_config.dolar_cotizacion). */
+// Cotización calculada, cacheada unos minutos para no recorrer todos los productos en cada lectura
+let rateCache: { value: number; expiresAt: number } | null = null;
+const RATE_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Cotización del dólar para pasar pesos a dólares: la misma "Cotización activa en Base de Datos"
+ * que muestra Admin → Configuración (implícita en los precios que actualiza el sincronizador).
+ * Respaldos: pricing_settings.last_rate y luego site_config.dolar_cotizacion. 0 = no disponible.
+ */
 async function getUsdRate(): Promise<number> {
+  if (rateCache && rateCache.expiresAt > Date.now()) return rateCache.value;
+  let rate = 0;
   try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // 1) Cotización activa: implícita en los precios que actualiza el sincronizador
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase as any)
-      .from("site_config")
-      .select("valor")
-      .eq("clave", "dolar_cotizacion")
-      .maybeSingle();
-    const rate = Number(data?.valor);
-    return Number.isFinite(rate) && rate > 0 ? rate : 0;
+    const { data: rows } = await (supabaseAdmin as any)
+      .from("products")
+      .select("precio,precio_usd")
+      .order("nombre");
+    rate = impliedUsdRate(Array.isArray(rows) ? rows : []);
+    // 2) Última cotización que guardó el sincronizador (Binance USDT)
+    if (!rate) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: settings } = await (supabaseAdmin as any)
+        .from("pricing_settings")
+        .select("last_rate")
+        .eq("id", true)
+        .maybeSingle();
+      const last = Number(settings?.last_rate);
+      rate = Number.isFinite(last) && last > 0 ? Math.round(last) : 0;
+    }
   } catch {
-    return 0;
+    rate = 0;
   }
+  // 3) Respaldo: valor guardado a mano en Admin → Configuración
+  if (!rate) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("site_config")
+        .select("valor")
+        .eq("clave", "dolar_cotizacion")
+        .maybeSingle();
+      const saved = Number(data?.valor);
+      rate = Number.isFinite(saved) && saved > 0 ? saved : 0;
+    } catch {
+      rate = 0;
+    }
+  }
+  if (rate > 0) rateCache = { value: rate, expiresAt: Date.now() + RATE_TTL_MS };
+  return rate;
 }
+
+/** Para la calculadora: misma cotización que se usa al convertir capturas en pesos. */
+export const getImportUsdRate = createServerFn({ method: "GET" }).handler(
+  async (): Promise<number> => getUsdRate(),
+);
 
 /** Normaliza el código de moneda que leyó el modelo ("US$" → USD, "ARS$" → ARS). */
 function normCurrency(v: unknown): string {

@@ -403,6 +403,25 @@ export function categoriesOf(products: Product[]) {
   return [...new Set(products.map((p) => (p.categoria ?? "").trim()).filter(Boolean))];
 }
 
+/**
+ * Cotización implícita del dólar en los productos: suma de precios en pesos / suma de precios en USD
+ * (solo productos con ambos precios). Es la "Cotización activa en Base de Datos" que muestra el admin
+ * y la que efectivamente usan los precios de la tienda. Devuelve 0 si no hay productos para calcularla.
+ */
+export function impliedUsdRate(rows: { precio?: unknown; precio_usd?: unknown }[]): number {
+  let totalArs = 0;
+  let totalUsd = 0;
+  for (const r of rows) {
+    const ars = Number(r.precio) || 0;
+    const usd = Number(r.precio_usd) || 0;
+    if (ars > 0 && usd >= 1) {
+      totalArs += ars;
+      totalUsd += usd;
+    }
+  }
+  return totalUsd > 0 ? Math.round(totalArs / totalUsd) : 0;
+}
+
 /** Categorías en el orden en que se muestran en la tienda (catálogo y cuestionario de la home). */
 export function orderedCategories(products: Product[]) {
   const all = categoriesOf(products);
