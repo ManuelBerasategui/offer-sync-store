@@ -72,13 +72,23 @@ type QuoteResult = {
   };
 };
 
+/** Montos de la importación: se calculan y se pagan en dólares. */
 function fmt(n: number) {
-  return "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return "US$ " + n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Equivalente en pesos con la cotización del admin (site_config.dolar_cotizacion). */
+function fmtArs(usd: number, rate: number) {
+  return "$" + Math.round(usd * rate).toLocaleString("es-AR");
 }
 
 export function CalculadoraPage() {
   const { data: storeData } = useSuspenseQuery(storeQueryOptions);
   const config = storeData.config ?? {};
+
+  // Cotización del dólar que cargan en Admin → Configuración (0 = no mostrar pesos)
+  const usdRate = Math.max(0, Number(config["dolar_cotizacion"]) || 0);
+  const ars = (usd: number) => (usdRate > 0 ? fmtArs(usd, usdRate) : "");
 
   // Tarifas leídas de site_config con fallback
   const rates = {
@@ -221,7 +231,7 @@ export function CalculadoraPage() {
     if (multi) {
       msg += `_Productos por separado (c/u aislado):_\n`;
       quote.itemsIsolated.forEach((i) => {
-        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u puesto en Argentina — subtotal ${fmt(i.total)}\n`;
+        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u${usdRate ? ` (≈ ${ars(i.unitPrice)})` : ""} puesto en Argentina — subtotal ${fmt(i.total)}\n`;
       });
       msg += `\n_Trayendo todos los productos juntos:_\n`;
       quote.items.forEach((i) => {
@@ -231,13 +241,13 @@ export function CalculadoraPage() {
       msg += `• Handling: ${fmt(quote.handlingTotal)}\n`;
       msg += `• Honorarios: ${fmt(quote.honorariosTotal)}\n`;
       msg += `• Impuestos: ${fmt(quote.taxesTotal)}\n`;
-      msg += `\n*Total trayendo todo: ${fmt(quote.grandTotal)}*\n`;
+      msg += `\n*Total trayendo todo: ${fmt(quote.grandTotal)}*${usdRate ? ` (≈ ${ars(quote.grandTotal)})` : ""}\n`;
     } else {
       const i = quote.itemsIsolated[0];
       if (i) {
-        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u puesto en Argentina\n`;
+        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u${usdRate ? ` (≈ ${ars(i.unitPrice)})` : ""} puesto en Argentina\n`;
       }
-      msg += `\n*Total puesto en Argentina: ${fmt(quote.grandTotal)}*\n`;
+      msg += `\n*Total puesto en Argentina: ${fmt(quote.grandTotal)}*${usdRate ? ` (≈ ${ars(quote.grandTotal)})` : ""}\n`;
       msg += `_(incluye flete, handling, honorarios e impuestos)_\n`;
     }
 
@@ -484,6 +494,11 @@ export function CalculadoraPage() {
                         >
                           {fmt(i.unitPrice)}
                         </div>
+                        {usdRate > 0 && (
+                          <div className="mt-1.5 text-sm font-semibold text-foreground/80">
+                            ≈ {ars(i.unitPrice)} c/u
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -533,12 +548,17 @@ export function CalculadoraPage() {
                       TOTAL TRAYENDO TODO
                     </span>
                     <span
-                      className="price-num font-price-clean text-2xl sm:text-3xl font-bold tracking-tight"
+                      className="price-num font-price-clean whitespace-nowrap text-2xl sm:text-3xl font-bold tracking-tight"
                       style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontVariantNumeric: "normal", fontFeatureSettings: "normal" }}
                     >
                       {fmt(quote.grandTotal)}
                     </span>
                   </div>
+                  {usdRate > 0 && (
+                    <p className="mt-2 text-right text-sm font-semibold text-foreground">
+                      ≈ {ars(quote.grandTotal)}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="mt-2">
@@ -571,12 +591,17 @@ export function CalculadoraPage() {
                       TOTAL PUESTO EN ARGENTINA
                     </span>
                     <span
-                      className="price-num font-price-clean text-2xl sm:text-4xl font-bold text-foreground tracking-tight"
+                      className="price-num font-price-clean whitespace-nowrap text-2xl sm:text-4xl font-bold text-foreground tracking-tight"
                       style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontVariantNumeric: "normal", fontFeatureSettings: "normal" }}
                     >
                       {fmt(quote.grandTotal)}
                     </span>
                   </div>
+                  {usdRate > 0 && (
+                    <p className="mt-1 text-right text-sm font-semibold text-foreground">
+                      ≈ {ars(quote.grandTotal)}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -585,6 +610,12 @@ export function CalculadoraPage() {
                 <p className="text-[11.5px] sm:text-xs text-foreground/80">
                   <span className="font-semibold text-foreground">* Nota:</span> El precio final es estimativo. Si deseás obtener el valor definitivo o confirmar tu pedido, escribinos a WhatsApp.
                 </p>
+                {usdRate > 0 && (
+                  <p className="mt-1.5 text-[11.5px] sm:text-xs">
+                    Montos en dólares. Equivalente en pesos con dólar a {fmtArs(1, usdRate)}{" "}
+                    (cotización del día).
+                  </p>
+                )}
               </div>
 
               {/* Botones de acción */}
