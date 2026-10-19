@@ -107,6 +107,14 @@ function ImportarPage() {
     if (href !== "#") window.open(href, "_blank", "noopener,noreferrer");
   }
 
+  function askHelpOnWhatsapp() {
+    track("import_help_whatsapp", { pantalla: screen });
+    const msg =
+      "Hola! Quiero importar un producto de Alibaba y necesito ayuda para encontrar el precio y el peso para cotizarlo.";
+    const href = sanitizeUrl(waLink(config, msg));
+    if (href !== "#") window.open(href, "_blank", "noopener,noreferrer");
+  }
+
   const step = GUIDE_STEPS[guideStep];
 
   return (
@@ -177,6 +185,21 @@ function ImportarPage() {
                   goTo("guia", "guia_peso");
                 }}
               />
+              <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-center">
+                <p className="text-sm font-bold text-foreground">
+                  ¿Necesitás ayuda encontrando los datos?
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Escribinos por WhatsApp y te ayudamos a cotizarlo.
+                </p>
+                <button
+                  type="button"
+                  onClick={askHelpOnWhatsapp}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-bold uppercase text-white transition-colors hover:bg-emerald-700"
+                >
+                  <MessageCircle className="h-4 w-4" /> Escribinos por WhatsApp
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => {
