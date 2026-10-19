@@ -3,6 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { detectCurrency, dropSuspiciousTiers, parsePrice } from "@/lib/price-parse";
 
 /**
  * Lee una captura de una publicación de Alibaba con IA y devuelve los precios por cantidad
@@ -78,8 +79,9 @@ const OUTPUT_SCHEMA = {
           min_qty: { type: "integer" },
           max_qty: { type: ["integer", "null"], description: "null si el rango es 'N o más'" },
           precio: {
-            type: "number",
-            description: "Precio por unidad en la moneda indicada en moneda",
+            type: "string",
+            description:
+              'Precio por unidad copiado tal como está escrito, INCLUIDA la moneda (ej: "ARS 1,894.63" o "US$4.50")',
           },
         },
       },
@@ -97,8 +99,9 @@ Puede haber varias capturas de la misma publicación (por ejemplo una con los pr
 Extraé solo lo que se ve en las imágenes, sin inventar ni estimar:
 - Los precios por unidad por rango de cantidad, TAL COMO APARECEN, sin convertir de moneda. Si hay un solo precio, devolvelo como un único rango desde la cantidad mínima.
 - La moneda de esos precios (Alibaba puede mostrarlos en pesos argentinos "ARS" en vez de dólares "US$"/"USD"). Si solo ves "$" o "US$", es USD.
-- Los números sin separador de miles: "ARS 1.894" es 1894; "US$ 4,50" o "US$4.50" es 4.5.
-- El peso bruto por unidad en kg, si aparece (convertí g o lb a kg).
+- Copiá cada precio exactamente como está escrito, con la moneda delante y sus comas y puntos (ej: "ARS 1,894.63"), sin interpretarlo ni reformatearlo.
+- No incluyas precios cortados o que no se leen completos (por ejemplo "ARS 44" al borde de la pantalla).
+- El peso por unidad en kg, si aparece: "Gross weight" / "Single gross weight" en embalaje, o "Weight" en los atributos (convertí g o lb a kg; "194G" es 0.194).
 - Un nombre corto del producto en español.
 Si una captura muestra solo el peso o solo los precios, devolvé lo que haya y dejá lo otro vacío o null.
 Si ninguna imagen es una publicación de producto, poné es_alibaba en false y dejá el resto vacío o null.
@@ -126,7 +129,7 @@ type RawExtraction = {
   es_alibaba: boolean;
   producto: string | null;
   moneda: string | null;
-  tiers: { min_qty: number; max_qty: number | null; precio: number }[];
+  tiers: { min_qty: number; max_qty: number | null; precio: string | number }[];
   peso_unitario_kg: number | null;
 };
 
@@ -164,15 +167,19 @@ function normCurrency(v: unknown): string {
  * a dólares: Alibaba muestra pesos (ARS) a quien navega desde Argentina.
  */
 async function finalize(parsed: RawExtraction): Promise<QuoteFromScreenshot> {
-  let tiers = (Array.isArray(parsed.tiers) ? parsed.tiers : [])
+  const rawTiers = Array.isArray(parsed.tiers) ? parsed.tiers : [];
+  // La moneda se detecta en el texto de los precios ("ARS 1,894.63"); lo que diga el modelo es el respaldo
+  const monedaEnTexto = rawTiers.map((t) => detectCurrency(t.precio)).find((c) => c !== null);
+  let tiers = rawTiers
     .map((t) => ({
       min_qty: Math.max(0, Math.floor(Number(t.min_qty) || 0)),
       max_qty: t.max_qty == null ? null : Math.floor(Number(t.max_qty)) || null,
-      price_usd: Number(t.precio),
+      price_usd: parsePrice(t.precio),
     }))
     .filter((t) => Number.isFinite(t.price_usd) && t.price_usd > 0 && t.price_usd < 100_000_000)
     .sort((a, b) => a.min_qty - b.min_qty)
     .slice(0, 10);
+  tiers = dropSuspiciousTiers(tiers);
 
   const pesoRaw = Number(parsed.peso_unitario_kg);
   const peso = parsed.peso_unitario_kg != null && pesoRaw > 0 && pesoRaw < 1000 ? pesoRaw : null;
@@ -187,7 +194,7 @@ async function finalize(parsed: RawExtraction): Promise<QuoteFromScreenshot> {
 
   let conversion: QuoteFromScreenshot["conversion"] = null;
   if (tiers.length) {
-    const moneda = normCurrency(parsed.moneda);
+    const moneda = monedaEnTexto ?? normCurrency(parsed.moneda);
     if (moneda === "ARS") {
       const rate = await getUsdRate();
       if (!rate) {
@@ -254,7 +261,7 @@ const GEMINI_SCHEMA = {
             description: "null si el rango es 'N o más'",
           },
           precio: {
-            type: "NUMBER",
+            type: "STRING",
             description: OUTPUT_SCHEMA.properties.tiers.items.properties.precio.description,
           },
         },
