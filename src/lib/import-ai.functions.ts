@@ -172,43 +172,111 @@ const GEMINI_SCHEMA = {
   },
 };
 
-/** Google Gemini por REST (sin SDK). Devuelve null si el modelo no dio una respuesta usable. */
-async function extractWithGemini(apiKey: string, img: Image): Promise<RawExtraction | null> {
-  const model = process.env["GEMINI_MODEL"] || "gemini-flash-latest";
-  const base = process.env["GEMINI_API_BASE"] || "https://generativelanguage.googleapis.com";
-  const res = await fetch(`${base}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-    signal: AbortSignal.timeout(60_000),
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: SYSTEM }] },
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inline_data: { mime_type: img.mediaType, data: img.data } },
-            { text: USER_PROMPT },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0,
-        responseMimeType: "application/json",
-        responseSchema: GEMINI_SCHEMA,
-      },
-    }),
-  });
-  if (!res.ok) {
-    console.error("[import-ai] Gemini HTTP", res.status, (await res.text()).slice(0, 300));
+/** Saca el JSON de la respuesta aunque venga envuelto en ```json ... ``` o con texto alrededor. */
+function parseJsonLoose(text: string): RawExtraction | null {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1)) as RawExtraction;
+  } catch {
     return null;
   }
+}
+
+// Saturación o cuota del plan gratis: conviene reintentar (con otro modelo, que tiene su propia cuota)
+const RETRIABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+
+/** Una llamada a Gemini por REST. status 0 = timeout o error de red. */
+async function callGemini(
+  apiKey: string,
+  img: Image,
+  model: string,
+): Promise<{ status: number; raw: RawExtraction | null }> {
+  const base = process.env["GEMINI_API_BASE"] || "https://generativelanguage.googleapis.com";
+  let res: Response;
+  try {
+    res = await fetch(`${base}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(25_000),
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM }] },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inline_data: { mime_type: img.mediaType, data: img.data } },
+              { text: USER_PROMPT },
+            ],
+          },
+        ],
+        generationConfig: { responseMimeType: "application/json", responseSchema: GEMINI_SCHEMA },
+      }),
+    });
+  } catch (err) {
+    console.error(
+      "[import-ai] Gemini",
+      model,
+      "sin respuesta:",
+      err instanceof Error ? err.message : err,
+    );
+    return { status: 0, raw: null };
+  }
+  if (!res.ok) {
+    console.error("[import-ai] Gemini HTTP", res.status, model, (await res.text()).slice(0, 300));
+    return { status: res.status, raw: null };
+  }
   const json = (await res.json()) as {
-    candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
+    candidates?: {
+      finishReason?: string;
+      content?: { parts?: { text?: string; thought?: boolean }[] };
+    }[];
   };
   const cand = json.candidates?.[0];
-  if (!cand || (cand.finishReason && cand.finishReason !== "STOP")) return null;
-  const text = (cand.content?.parts ?? []).map((p) => p.text ?? "").join("");
-  return text ? (JSON.parse(text) as RawExtraction) : null;
+  if (!cand || (cand.finishReason && cand.finishReason !== "STOP")) {
+    console.error(
+      "[import-ai] Gemini sin respuesta usable:",
+      model,
+      cand?.finishReason ?? "sin candidatos",
+    );
+    return { status: res.status, raw: null };
+  }
+  // Ignorar partes de "pensamiento" de los modelos que razonan; quedarse con el texto de la respuesta
+  const text = (cand.content?.parts ?? [])
+    .filter((p) => !p.thought)
+    .map((p) => p.text ?? "")
+    .join("");
+  return { status: res.status, raw: text ? parseJsonLoose(text) : null };
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Google Gemini (plan gratis de AI Studio). Si el modelo principal está saturado (503) o sin cuota (429),
+ * prueba con un modelo más liviano y, por último, otra vez con el principal.
+ * busy = true si todos los intentos fallaron por saturación (para avisarle al cliente que reintente).
+ */
+async function extractWithGemini(
+  apiKey: string,
+  img: Image,
+): Promise<{ raw: RawExtraction | null; busy: boolean }> {
+  const primary = process.env["GEMINI_MODEL"] || "gemini-flash-latest";
+  const fallback = process.env["GEMINI_FALLBACK_MODEL"] || "gemini-flash-lite-latest";
+  const attempts = [
+    { model: primary, waitMs: 0 },
+    { model: fallback, waitMs: 1000 },
+    { model: primary, waitMs: 2000 },
+  ];
+  let busy = false;
+  for (const { model, waitMs } of attempts) {
+    if (waitMs) await sleep(waitMs);
+    const { status, raw } = await callGemini(apiKey, img, model);
+    if (raw) return { raw, busy: false };
+    busy = status === 0 || RETRIABLE_STATUS.has(status);
+    if (!busy) break; // clave inválida, modelo inexistente, respuesta ilegible: reintentar no sirve
+  }
+  return { raw: null, busy };
 }
 
 /** Claude (Anthropic SDK) con structured outputs y fallback server-side ante rechazos. */
@@ -258,9 +326,17 @@ export const readAlibabaScreenshot = createServerFn({ method: "POST" })
     }
 
     try {
-      const raw = geminiKey
-        ? await extractWithGemini(geminiKey, data)
-        : await extractWithClaude(anthropicKey as string, data);
+      if (geminiKey) {
+        const { raw, busy } = await extractWithGemini(geminiKey, data);
+        if (raw) return normalize(raw);
+        return {
+          ok: false,
+          error: busy
+            ? "El lector de capturas está con mucha demanda. Probá de nuevo en un minuto o usá la guía."
+            : GENERIC_ERROR,
+        };
+      }
+      const raw = await extractWithClaude(anthropicKey as string, data);
       return raw ? normalize(raw) : { ok: false, error: GENERIC_ERROR };
     } catch (err) {
       console.error("[import-ai] error leyendo captura:", err instanceof Error ? err.message : err);
