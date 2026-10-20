@@ -13,7 +13,7 @@ import {
   FALLBACK_IMAGE, imageUrl, thumbnailUrl, hasOffer,
   onImageError, isYes, money, toNumber, waLink, sanitizeUrl, type SiteConfig,
   parseCategoryRules, normCat, transferPrice, transferDiscountPct, orderedCategories,
-  findRuleForCat, type CategoryRule,
+  findRuleForCat, type CategoryRule, isNfcGoogle,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
 import { track } from "@/lib/analytics";
@@ -414,6 +414,13 @@ function Home() {
           seenKeys.add(cat.key);
         }
 
+        // Nombre visible de una clave del admin ("nfc_google" → "NFC Google")
+        const minLabel = (key: string) => {
+          const text = key.replace(/_/g, " ").trim();
+          if (isNfcGoogle(text)) return "NFC Google";
+          return text.charAt(0).toUpperCase() + text.slice(1);
+        };
+
         // Agregar cualquier otra categoría que el admin configure con mínimo
         for (const [key, rule] of Object.entries(catRules)) {
           const norm = normCat(key);
@@ -422,11 +429,11 @@ function Home() {
 
           if (rule.minUnits) {
             seenKeys.add(norm);
-            const label = key.charAt(0).toUpperCase() + key.slice(1);
+            const label = minLabel(key);
             minItems.push({ key: norm, label, desc: `${rule.minUnits} unidades`, icon: "📦" });
           } else if (rule.minAmount) {
             seenKeys.add(norm);
-            const label = key.charAt(0).toUpperCase() + key.slice(1);
+            const label = minLabel(key);
             minItems.push({ key: norm, label, desc: `${money(rule.minAmount)}`, icon: "💰" });
           }
         }
@@ -448,6 +455,11 @@ function Home() {
           }
           return undefined;
         };
+        // NFC Google es un solo producto: la tarjeta lleva directo a ese producto (con stock primero)
+        const nfcCandidates = products.filter((p) => isNfcGoogle(p.nombre));
+        const nfcProduct = nfcCandidates.find((p) => isYes(p.stock)) ?? nfcCandidates[0];
+        const productFor = (key: string) =>
+          nfcProduct && isNfcGoogle(key.replace(/_/g, " ")) ? nfcProduct : undefined;
 
         return (
           <section id="minimos" className="px-4 py-10 sm:px-6">
@@ -461,6 +473,7 @@ function Home() {
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-4">
                   {minItems.map((it) => {
+                    const product = productFor(it.key) ?? productFor(it.label);
                     const target = catalogCatFor(it.key);
                     const content = (
                       <>
@@ -473,13 +486,32 @@ function Home() {
                     );
                     const base =
                       "flex items-center gap-2.5 rounded-xl border border-border bg-card/70 px-3 py-2.5 shadow-2xs";
+                    const linkClass = `${base} transition-all hover:border-primary hover:shadow-sm active:scale-[0.99]`;
+                    if (product) {
+                      return (
+                        <Link
+                          key={it.label}
+                          to="/producto/$id"
+                          params={{ id: String(product.id ?? product.nombre ?? "") }}
+                          onClick={() =>
+                            track("minimos_categoria_click", {
+                              categoria: it.label,
+                              producto: product.nombre,
+                            })
+                          }
+                          className={linkClass}
+                        >
+                          {content}
+                        </Link>
+                      );
+                    }
                     return target ? (
                       <Link
                         key={it.label}
                         to="/catalogo"
                         search={{ cat: target }}
                         onClick={() => track("minimos_categoria_click", { categoria: target })}
-                        className={`${base} transition-all hover:border-primary hover:shadow-sm active:scale-[0.99]`}
+                        className={linkClass}
                       >
                         {content}
                       </Link>
