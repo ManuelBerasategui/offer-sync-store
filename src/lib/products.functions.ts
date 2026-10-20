@@ -970,22 +970,9 @@ export async function optimizeImageOnServer(
       .webp({ quality: 80, effort: 4 })
       .toBuffer();
 
-    // Generar variante miniatura liviana (160x160 WebP) para carrito y tablas (~2-3 KB)
-    let thumbBuffer: Buffer | null = null;
-    try {
-      thumbBuffer = await sharp(rawBuffer)
-        .rotate()
-        .resize({ width: 160, height: 160, fit: "inside", withoutEnlargement: true })
-        .webp({ quality: 80, effort: 4 })
-        .toBuffer();
-    } catch {
-      // Ignorar fallo de miniatura
-    }
-
     const bucketName = "store-images";
     const fileId = crypto.randomUUID();
     const filename = `${folder}/${fileId}.webp`;
-    const thumbFilename = `${folder}/thumbnails/${fileId}.webp`;
 
     // Asegurar existencia del bucket si hiciera falta
     try {
@@ -1010,17 +997,9 @@ export async function optimizeImageOnServer(
       return trimmed;
     }
 
-    // Subir miniatura si se generó
-    if (thumbBuffer) {
-      supabaseAdmin.storage
-        .from(bucketName)
-        .upload(thumbFilename, thumbBuffer, {
-          contentType: "image/webp",
-          cacheControl: "31536000",
-          upsert: false,
-        })
-        .catch(() => {});
-    }
+    // Miniaturas de 160px y 320px (las tarjetas usan la de 320px)
+    const { uploadThumbnails } = await import("./storage-thumbs.server");
+    await uploadThumbnails(supabaseAdmin, bucketName, filename, compressedBuffer);
 
     const { data: pubData } = supabaseAdmin.storage
       .from(bucketName)
@@ -1343,6 +1322,10 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
         });
 
       if (uploadErr) throw uploadErr;
+
+      // Miniaturas de 160px y 320px (las tarjetas usan la de 320px)
+      const { uploadThumbnails } = await import("./storage-thumbs.server");
+      await uploadThumbnails(supabaseAdmin, bucketName, filename, uploadBuffer);
 
       const { data: pubData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(filename);
       return { publicUrl: pubData.publicUrl };
@@ -2693,15 +2676,30 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
 
             // Detectar content-type de la respuesta
             const rawCt = imgRes.headers.get("content-type") ?? "image/jpeg";
-            const ct = rawCt.split(";")[0]?.trim() || "image/jpeg";
-            const ext = ct === "image/webp" ? "webp" : ct === "image/png" ? "png" : "jpg";
+            let ct = rawCt.split(";")[0]?.trim() || "image/jpeg";
+            let ext = ct === "image/webp" ? "webp" : ct === "image/png" ? "png" : "jpg";
+            let body: Buffer = Buffer.from(buffer);
+
+            // Comprimir a WebP 900px como el resto de las fotos (las de Yupoo vienen pesadas)
+            try {
+              const sharp = (await import("sharp")).default;
+              body = await sharp(body)
+                .rotate()
+                .resize({ width: 900, height: 900, fit: "inside", withoutEnlargement: true })
+                .webp({ quality: 80, effort: 4 })
+                .toBuffer();
+              ct = "image/webp";
+              ext = "webp";
+            } catch {
+              // si sharp falla, se sube el original
+            }
+
             const fileId = crypto.randomUUID();
             const filename = `yupoo/${fileId}.${ext}`;
-            const thumbFilename = `yupoo/thumbnails/${fileId}.webp`;
 
             const { error: uploadErr } = await supabaseAdmin.storage
               .from(bucketName)
-              .upload(filename, buffer, {
+              .upload(filename, body, {
                 contentType: ct,
                 cacheControl: "31536000",
                 upsert: false,
@@ -2709,25 +2707,9 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
 
             if (uploadErr) continue;
 
-            // Generar y subir miniatura liviana 160x160 WebP
-            try {
-              const sharp = (await import("sharp")).default;
-              const thumbBuf = await sharp(Buffer.from(buffer))
-                .rotate()
-                .resize({ width: 160, height: 160, fit: "inside", withoutEnlargement: true })
-                .webp({ quality: 80, effort: 4 })
-                .toBuffer();
-              supabaseAdmin.storage
-                .from(bucketName)
-                .upload(thumbFilename, thumbBuf, {
-                  contentType: "image/webp",
-                  cacheControl: "31536000",
-                  upsert: false,
-                })
-                .catch(() => {});
-            } catch {
-              // no bloquear si la miniatura falla
-            }
+            // Miniaturas de 160px y 320px con el mismo nombre de archivo que la foto
+            const { uploadThumbnails } = await import("./storage-thumbs.server");
+            await uploadThumbnails(supabaseAdmin, bucketName, filename, body);
 
             const { data: pubData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(filename);
             if (pubData.publicUrl) uploadedUrls.push(pubData.publicUrl);
@@ -2782,6 +2764,129 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         };
       } catch (err) {
         return { error: err instanceof Error ? err.message : "Error al importar el álbum." };
+      }
+    },
+  );
+
+/* ─── Generar miniaturas faltantes de las fotos ya cargadas ─── */
+/**
+ * Recorre las fotos del catálogo (productos, galerías, variantes y combos) y genera las miniaturas
+ * de 160px y 320px que falten. Procesa de a tandas: el panel la llama repetidamente con `offset`
+ * hasta que devuelve `done: true`.
+ */
+export const generateMissingThumbnails = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string; offset?: number }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    offset: Math.max(0, Math.floor(Number(data?.offset) || 0)),
+  }))
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      total: number;
+      nextOffset: number;
+      generated: number;
+      failed: number;
+      done: boolean;
+      error?: string;
+    }> => {
+      const empty = { total: 0, nextOffset: data.offset, generated: 0, failed: 0, done: true };
+      try {
+        // Tipado laxo: los tipos generados de la base no incluyen todas las columnas de imagen
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const supabaseAdmin: any = await assertAdmin(data.email, data.token);
+        const { galleryImages } = await import("./store");
+        const { parseStoragePublicUrl, thumbObjectPaths } = await import("./thumb-paths");
+        const { uploadThumbnails } = await import("./storage-thumbs.server");
+
+        const [prods, vars, bans] = await Promise.all([
+          supabaseAdmin.from("products").select("id,imagen_url,metadata"),
+          supabaseAdmin.from("product_variants").select("id,imagen_url"),
+          supabaseAdmin.from("banners").select("id,imagen_url"),
+        ]);
+        const urls = new Set<string>();
+        for (const p of (prods.data ?? []) as Product[])
+          for (const u of galleryImages(p)) urls.add(u);
+        for (const row of [...(vars.data ?? []), ...(bans.data ?? [])] as {
+          imagen_url?: string | null;
+        }[]) {
+          if (row.imagen_url) urls.add(row.imagen_url.trim());
+        }
+        const images = [...urls]
+          .map(parseStoragePublicUrl)
+          .filter((x): x is { bucket: string; objectPath: string } => x !== null)
+          .sort((a, b) =>
+            `${a.bucket}/${a.objectPath}`.localeCompare(`${b.bucket}/${b.objectPath}`),
+          );
+
+        const exists = async (bucket: string, path: string) => {
+          const { data: pub } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
+          try {
+            const res = await fetch(pub.publicUrl, {
+              method: "HEAD",
+              signal: AbortSignal.timeout(5000),
+            });
+            return res.ok;
+          } catch {
+            return false;
+          }
+        };
+
+        // Límites por llamada para no pasarse del tiempo máximo de la función
+        const MAX_CHECKED = 40;
+        const MAX_GENERATED = 6;
+        const started = Date.now();
+        let i = data.offset;
+        let generated = 0;
+        let failed = 0;
+        while (
+          i < images.length &&
+          i - data.offset < MAX_CHECKED &&
+          generated + failed < MAX_GENERATED &&
+          Date.now() - started < 6000
+        ) {
+          const chunk = images.slice(i, Math.min(i + 8, images.length));
+          const missing = await Promise.all(
+            chunk.map(async (img) => {
+              const t = thumbObjectPaths(img.objectPath);
+              const [sm, md] = await Promise.all([
+                exists(img.bucket, t.sm),
+                exists(img.bucket, t.md),
+              ]);
+              return !(sm && md);
+            }),
+          );
+          let consumed = 0;
+          for (let k = 0; k < chunk.length; k++) {
+            if (generated + failed >= MAX_GENERATED) break;
+            consumed++;
+            if (!missing[k]) continue;
+            const img = chunk[k]!;
+            const { data: blob, error } = await supabaseAdmin.storage
+              .from(img.bucket)
+              .download(img.objectPath);
+            const ok =
+              !error && blob
+                ? (await uploadThumbnails(
+                    supabaseAdmin,
+                    img.bucket,
+                    img.objectPath,
+                    await blob.arrayBuffer(),
+                  )) === 2
+                : false;
+            if (ok) generated++;
+            else failed++;
+          }
+          i += consumed;
+        }
+
+        return { total: images.length, nextOffset: i, generated, failed, done: i >= images.length };
+      } catch (err) {
+        return {
+          ...empty,
+          error: err instanceof Error ? err.message : "No se pudieron generar las miniaturas.",
+        };
       }
     },
   );

@@ -149,14 +149,22 @@ export async function handleImageProxy(request: Request, _ctx?: unknown): Promis
             "public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, immutable",
           "CDN-Cache-Control": "public, max-age=31536000, immutable",
           "Vercel-CDN-Cache-Control": "public, max-age=31536000, immutable",
-          Vary: "Accept",
         },
       });
     }
 
     if (!upstreamRes.ok) {
+      // "No existe" (p. ej. miniatura todavía no generada) se cachea unos minutos para no consultar a
+      // Supabase en cada visita; otros errores no se cachean. Storage responde 400 o 404 según versión.
+      const cacheNotFound = upstreamRes.status === 404 || upstreamRes.status === 400;
       return new Response(`Upstream error: ${upstreamRes.statusText}`, {
         status: upstreamRes.status,
+        headers: cacheNotFound
+          ? {
+              "Cache-Control": "public, max-age=300, s-maxage=600",
+              "Vercel-CDN-Cache-Control": "public, max-age=600",
+            }
+          : { "Cache-Control": "no-store" },
       });
     }
 
@@ -177,7 +185,6 @@ export async function handleImageProxy(request: Request, _ctx?: unknown): Promis
     resHeaders.set("Content-Type", safeContentType);
     resHeaders.set("X-Content-Type-Options", "nosniff");
     resHeaders.set("Content-Security-Policy", "default-src 'none'");
-    resHeaders.set("Vary", "Accept");
 
     const contentLength = upstreamRes.headers.get("content-length");
     if (contentLength) resHeaders.set("Content-Length", contentLength);

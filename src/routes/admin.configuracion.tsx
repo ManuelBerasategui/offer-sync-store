@@ -12,6 +12,7 @@ import {
   upsertCategoryRules,
   testAdminResendEmail,
   getCouponUsagesSummary,
+  generateMissingThumbnails,
   type CategoryRuleInput,
 } from "@/lib/products.functions";
 import {
@@ -91,6 +92,8 @@ function AdminConfiguracionPage() {
   );
   const [couponUsageCount, setCouponUsageCount] = useState<number | null>(null);
   const [testEmailTarget, setTestEmailTarget] = useState<string>("");
+  const [thumbsRunning, setThumbsRunning] = useState(false);
+  const [thumbsMsg, setThumbsMsg] = useState<{ success: boolean; text: string } | null>(null);
 
   // Estado para Tarifas de Calculadora de Importaciones (solo admin)
   const [calcFleteKg, setCalcFleteKg] = useState<string>(config["calc_flete_kg"] ?? "22");
@@ -383,6 +386,44 @@ function AdminConfiguracionPage() {
     }
   }
 
+  async function handleGenerateThumbnails() {
+    setThumbsRunning(true);
+    setThumbsMsg(null);
+    let offset = 0;
+    let generated = 0;
+    let failed = 0;
+    try {
+      // La función procesa de a tandas; se llama hasta que termina
+      for (let round = 0; round < 500; round++) {
+        const res = await generateMissingThumbnails({
+          data: { email: userEmail, token: userToken, offset },
+        });
+        if (res.error) throw new Error(res.error);
+        generated += res.generated;
+        failed += res.failed;
+        offset = res.nextOffset;
+        setThumbsMsg({
+          success: true,
+          text: `Revisando fotos… ${Math.min(offset, res.total)} de ${res.total} (${generated} miniaturas nuevas)`,
+        });
+        if (res.done) break;
+      }
+      setThumbsMsg({
+        success: failed === 0,
+        text:
+          `Listo: ${generated} fotos con miniaturas nuevas` +
+          (failed ? `, ${failed} no se pudieron procesar.` : ". Las demás ya las tenían."),
+      });
+    } catch (err) {
+      setThumbsMsg({
+        success: false,
+        text: err instanceof Error ? err.message : "No se pudieron generar las miniaturas.",
+      });
+    } finally {
+      setThumbsRunning(false);
+    }
+  }
+
   async function handleCreateCampaign(e: React.FormEvent) {
     e.preventDefault();
     setCreatingCampaign(true);
@@ -664,6 +705,37 @@ function AdminConfiguracionPage() {
               </div>
             </label>
           </div>
+        </div>
+
+        {/* Miniaturas de fotos (menos consumo de Supabase) */}
+        <div className="mb-6 rounded-2xl border border-border bg-card p-3.5 sm:p-5">
+          <h2 className="mb-2 flex items-center gap-2 text-base font-bold">
+            🖼️ Miniaturas de fotos
+          </h2>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Las tarjetas de la tienda usan una versión chica de cada foto. Si falta, se carga la
+            foto completa, que pesa mucho más y gasta más transferencia de Supabase. Este botón
+            genera las que falten (las fotos nuevas ya se suben con su miniatura).
+          </p>
+          {thumbsMsg && (
+            <div
+              className={`mb-4 rounded-xl border p-3 text-xs font-medium ${
+                thumbsMsg.success
+                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                  : "border-destructive/20 bg-destructive/10 text-destructive"
+              }`}
+            >
+              {thumbsMsg.text}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleGenerateThumbnails()}
+            disabled={thumbsRunning}
+            className="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+          >
+            {thumbsRunning ? "Generando miniaturas…" : "Generar miniaturas faltantes"}
+          </button>
         </div>
 
         {/* Configuración de Notificaciones por Email (Resend) */}

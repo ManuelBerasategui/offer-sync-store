@@ -37,6 +37,7 @@ import {
 } from "@/lib/products.functions";
 import { type Product, type Banner, money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
+import { THUMB_SIZES, thumbObjectPaths } from "@/lib/thumb-paths";
 import { SafeImage } from "@/components/SafeImage";
 
 export const Route = createFileRoute("/admin/productos")({
@@ -201,6 +202,27 @@ function ImageDropzone({
       });
 
       if (!clientErr) {
+        // Miniaturas de 160px y 320px con el mismo nombre (las tarjetas usan la de 320px)
+        const paths = thumbObjectPaths(filename);
+        await Promise.all(
+          (["sm", "md"] as const).map(async (size) => {
+            try {
+              const px = THUMB_SIZES[size];
+              const thumb = await compressImageFile(file, {
+                maxWidth: px,
+                maxHeight: px,
+                quality: 0.8,
+              });
+              await supabase.storage.from(bucket).upload(paths[size], thumb.file, {
+                contentType: "image/webp",
+                cacheControl: "31536000",
+                upsert: true,
+              });
+            } catch (thumbErr) {
+              console.warn("No se pudo subir la miniatura:", thumbErr);
+            }
+          }),
+        );
         const { data } = supabase.storage.from(bucket).getPublicUrl(filename);
         onChange(data.publicUrl);
         setUploading(false);
