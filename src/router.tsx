@@ -18,6 +18,8 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    // Al cambiar de página, saltar arriba sin animación (el CSS tiene scroll-behavior: smooth)
+    scrollRestorationBehavior: "instant",
     defaultPreloadStaleTime: 1000 * 60 * 5, // 5 minutos para evitar re-validaciones continuas en hover de enlaces
   });
 
