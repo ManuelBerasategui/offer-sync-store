@@ -703,6 +703,73 @@ export function discountFor(p: Product, qty: number) {
   return percent;
 }
 
+/**
+ * Precio de lista de un producto o de su variante (color), antes de descuentos por cantidad.
+ * Es la misma cuenta que muestra la ficha del producto y la que repite el servidor al cobrar.
+ * "default_base" es la variante sintética que representa al producto base.
+ */
+export function variantBasePrice(
+  p: Product,
+  variant?: { id?: string | null; precio?: unknown } | null,
+): number {
+  const variantPrice = Number(variant?.precio);
+  const useVariant = Boolean(variant && variant.id !== "default_base" && variantPrice > 0);
+  if (!useVariant) return priceOf(p);
+  return hasOffer(p) ? Math.round(variantPrice * (1 - offerDiscountPct(p) / 100)) : variantPrice;
+}
+
+/** Tramos de precio por cantidad de un combo (vienen en quantity_tiers o, en datos viejos, en link). */
+export function parseComboTiers(raw: unknown): ComboQuantityTier[] | null {
+  let tiers: unknown = raw;
+  if (typeof raw === "string" && raw.trim().startsWith("[")) {
+    try {
+      tiers = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(tiers)) return null;
+  const clean = tiers
+    .map((t) => ({
+      units: Number((t as ComboQuantityTier)?.units),
+      price: Number((t as ComboQuantityTier)?.price),
+    }))
+    .filter(
+      (t) => Number.isFinite(t.units) && t.units > 0 && Number.isFinite(t.price) && t.price > 0,
+    );
+  return clean.length ? clean : null;
+}
+
+/** Precio unitario de un combo para una cantidad: el tramo de mayor cantidad alcanzada, o el precio base. */
+export function comboUnitPrice(
+  banner: { precio?: unknown; quantity_tiers?: unknown; link?: unknown },
+  qty: number,
+): number {
+  const tiers = parseComboTiers(banner.quantity_tiers ?? banner.link);
+  if (tiers) {
+    const tier = [...tiers].sort((a, b) => b.units - a.units).find((t) => qty >= t.units);
+    if (tier) return Math.round(tier.price);
+  }
+  return Math.round(toNumber(String(banner.precio ?? "")));
+}
+
+/** Busca un combo activo por su título (así llega en el carrito: nombre = título del combo). */
+export function findComboByName<T extends { titulo?: string | null }>(
+  banners: T[],
+  nombre: string,
+): T | undefined {
+  const key = String(nombre ?? "")
+    .trim()
+    .toLowerCase();
+  if (!key) return undefined;
+  return banners.find(
+    (b) =>
+      String(b.titulo ?? "")
+        .trim()
+        .toLowerCase() === key,
+  );
+}
+
 export function unitPriceFor(p: Product, qty: number, basePrice = priceOf(p)) {
   return basePrice * (1 - discountFor(p, qty) / 100);
 }

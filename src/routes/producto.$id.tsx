@@ -39,6 +39,7 @@ import {
   money,
   priceOf,
   hasOffer,
+  variantBasePrice,
   originalPriceOf,
   offerDiscountPct,
   tiersOf,
@@ -1093,12 +1094,8 @@ function ProductoPage() {
 
   const isOffer = hasOffer(product);
   const offerPct = isOffer ? offerDiscountPct(product) : 0;
-  const rawBasePrice = selectedVariant ? Number(selectedVariant.precio) : Number(product.precio ?? 0);
-  const basePrice = isOffer
-    ? (selectedVariant && selectedVariant.id !== "default_base"
-        ? Math.round(rawBasePrice * (1 - offerPct / 100))
-        : priceOf(product))
-    : (selectedVariant ? Number(selectedVariant.precio) : priceOf(product));
+  // Misma cuenta que usa el servidor al cobrar (variantBasePrice en src/lib/store.ts)
+  const basePrice = variantBasePrice(product, selectedVariant ?? null);
   const origPrice = selectedVariant ? Number(selectedVariant.precio) : originalPriceOf(product);
   const isOfferDiscounted = isOffer && origPrice > basePrice;
 
@@ -1675,7 +1672,15 @@ function ProductoPage() {
                   </a>
                 ) : showCheckout ? (
                   <CheckoutFlow
-                    items={[{ nombre: cartItem.nombre, qty, unitPrice: cartItem.unitPrice }]}
+                    items={[
+                      {
+                        nombre: cartItem.nombre,
+                        qty,
+                        unitPrice: cartItem.unitPrice,
+                        productId: cartItem.productId,
+                        variantId: cartItem.variantId,
+                      },
+                    ]}
                     total={total}
                     onBack={() => setShowCheckout(false)}
                   />

@@ -26,7 +26,13 @@ import {
   sanitizeUrl,
 } from "@/lib/store";
 
-type CheckoutItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
+type CheckoutItem = {
+  nombre: string;
+  qty: number;
+  unitPrice: number;
+  productId?: string | undefined;
+  variantId?: string | undefined;
+};
 
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
+import { priceOrderItems } from "./order-pricing";
 
 /**
  * Orígenes permitidos para back_urls de MercadoPago (CWE-601 — Open Redirect).
@@ -21,26 +22,14 @@ function safeOrigin(raw: string): string {
     return FALLBACK_ORIGIN;
   }
 }
-import {
-  findProduct,
-  priceOf,
-  unitPriceFor,
-  parseCategoryRules,
-  categoryDiscountForUnits,
-  findRuleForCat,
-  normCat,
-  checkCategoryMins,
-  moqGroupOf,
-  isNfcGoogle,
-  isBlackviewGlasses,
-  blackviewUnitPrice,
-  isCamiseta,
-  isLongSleeve,
-  parseJerseyItem,
-  calcJerseyUnitPrice,
-} from "./store";
 
-type CheckoutItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
+type CheckoutItem = {
+  nombre: string;
+  qty: number;
+  unitPrice: number;
+  productId?: string | undefined;
+  variantId?: string | undefined;
+};
 
 type ShippingInput = {
   nombre: string;
@@ -53,164 +42,6 @@ type ShippingInput = {
   transporte: string;
   sucursal_correo: string;
 };
-
-async function revalidateOrderItems(
-  supabaseAdmin: any,
-  rawItems: CheckoutItem[],
-): Promise<{
-  validatedItems: CheckoutItem[];
-  total: number;
-  error?: string;
-}> {
-  try {
-    const [{ data: dbProducts }, { data: dbConfigRows }] = await Promise.all([
-      supabaseAdmin.from("products").select("id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,oferta,stock,descuento"),
-      supabaseAdmin.from("site_config").select("clave,valor"),
-    ]);
-
-    if (!dbProducts || dbProducts.length === 0) {
-      return { validatedItems: [], total: 0, error: "No se pudieron obtener los productos de la base de datos." };
-    }
-
-    const configObj: Record<string, string> = {};
-    if (Array.isArray(dbConfigRows)) {
-      for (const row of dbConfigRows) {
-        if (row.clave && row.valor !== undefined) configObj[row.clave] = String(row.valor);
-      }
-    }
-
-    const catRules = parseCategoryRules(configObj);
-
-    const catTotals: Record<string, number> = {};
-    const itemsWithCat: { nombre?: string; categoria?: string; moq_group?: string; qty: number; unitPrice: number }[] = [];
-
-    for (const item of rawItems) {
-      const prod = findProduct(dbProducts, item.nombre);
-      const cat = prod?.categoria ?? "";
-      const isNfc = isNfcGoogle(item.nombre) || (prod ? isNfcGoogle(prod.nombre) : false);
-      const isBv = isBlackviewGlasses(item.nombre) || (prod ? isBlackviewGlasses(prod.nombre) : false);
-      const catNorm = normCat(cat);
-      if (catNorm && !isNfc && !isBv) {
-        const match = findRuleForCat(catNorm, catRules);
-        const key = match?.key ?? catNorm;
-        catTotals[key] = (catTotals[key] ?? 0) + item.qty;
-      }
-      const baseP = prod ? priceOf(prod) : item.unitPrice;
-      const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
-      itemsWithCat.push({ nombre: (isNfc && prod?.nombre) || item.nombre, categoria: cat, moq_group, qty: item.qty, unitPrice: baseP });
-    }
-
-    const violations = checkCategoryMins(itemsWithCat, catRules);
-    if (violations.length > 0) {
-      const v = violations[0]!;
-      const msg =
-        v.type === "amount"
-          ? `No se cumple el mínimo de compra para ${v.category} ($${v.min.toLocaleString("es-AR")}).`
-          : `No se cumple el mínimo de compra para ${v.category} (${v.min} unidades).`;
-      return { validatedItems: [], total: 0, error: msg };
-    }
-
-    const { isSuplemento, SUPLEMENTOS_MIN } = await import("./store");
-    const minSuplementos = catRules[normCat("Suplementos")]?.minAmount || SUPLEMENTOS_MIN;
-    const supTotal = rawItems
-      .filter((i) => {
-        const prod = findProduct(dbProducts, i.nombre);
-        return isSuplemento(prod?.categoria, i.nombre);
-      })
-      .reduce((a, i) => a + i.qty * i.unitPrice, 0);
-
-    if (supTotal > 0 && supTotal < minSuplementos) {
-      return {
-        validatedItems: [],
-        total: 0,
-        error: `No se cumple el mínimo de compra para Suplementos ($${minSuplementos.toLocaleString("es-AR")}).`,
-      };
-    }
-
-    const totalJerseyUnits = rawItems
-      .filter((i) => {
-        const prod = findProduct(dbProducts, i.nombre);
-        return isCamiseta(prod?.categoria, prod?.nombre) || isCamiseta(undefined, i.nombre);
-      })
-      .reduce((sum, i) => sum + i.qty, 0);
-    const usdRate = Number(configObj["dolar_cotizacion"] ?? 0);
-
-    const validatedItems: CheckoutItem[] = rawItems.map((item) => {
-      const prod = findProduct(dbProducts, item.nombre);
-
-      if ((prod && isCamiseta(prod.categoria, prod.nombre)) || isCamiseta(undefined, item.nombre)) {
-        const { version, isExtraSize, badge } = parseJerseyItem(item);
-        const effectiveQty = Math.max(item.qty, totalJerseyUnits);
-        const { unitArs } = calcJerseyUnitPrice({
-          qty: effectiveQty,
-          version,
-          isExtraSize,
-          badge,
-          usdRate,
-          isLongSleeve: isLongSleeve(item.nombre) || (prod ? isLongSleeve(prod.nombre) : false),
-        });
-        return {
-          nombre: item.nombre,
-          qty: item.qty,
-          unitPrice: unitArs > 0 ? unitArs : item.unitPrice,
-          ...(item.productId ? { productId: item.productId } : {}),
-        };
-      }
-
-      if (!prod) return item;
-
-      // Blackview BV100: precio fijo US$100 (+7%) desde 3 unidades, sin otros descuentos
-      if (isBlackviewGlasses(item.nombre) || isBlackviewGlasses(prod.nombre)) {
-        return {
-          nombre: item.nombre,
-          qty: item.qty,
-          unitPrice: blackviewUnitPrice(priceOf(prod), item.qty, usdRate),
-          ...(item.productId ? { productId: item.productId } : {}),
-        };
-      }
-
-      // NFC Google: sin descuento por cantidad bajo ningún concepto
-      if (isNfcGoogle(item.nombre) || isNfcGoogle(prod.nombre)) {
-        const base = priceOf(prod);
-        return {
-          nombre: item.nombre,
-          qty: item.qty,
-          unitPrice: base,
-          ...(item.productId ? { productId: item.productId } : {}),
-        };
-      }
-
-      const catNorm = normCat(prod.categoria ?? "");
-      const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
-      const catRule = match?.rule;
-      const ruleKey = match?.key;
-
-      let unitPrice: number;
-      if (catRule?.discountTiers?.length && ruleKey) {
-        const totalCatUnits = catTotals[ruleKey] ?? 0;
-        const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
-        const base = priceOf(prod);
-        unitPrice = Math.round(base * (1 - percent / 100));
-      } else {
-        unitPrice = Math.round(unitPriceFor(prod, item.qty));
-      }
-
-      return {
-        nombre: item.nombre,
-        qty: item.qty,
-        unitPrice: unitPrice > 0 ? unitPrice : item.unitPrice,
-        ...(item.productId ? { productId: item.productId } : {}),
-      };
-    });
-
-    const total = validatedItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-    return { validatedItems, total };
-  } catch (err) {
-    console.error("Error al revalidar items en el servidor:", err);
-    const total = rawItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-    return { validatedItems: rawItems, total };
-  }
-}
 
 /**
  * Crea la preferencia de pago en Mercado Pago Y guarda la orden en Supabase
@@ -250,7 +81,10 @@ export const createCheckout = createServerFn({ method: "POST" })
         items: data.items.slice(0, 50).map((i) => ({
           nombre: String(i.nombre ?? "Producto").slice(0, 120),
           qty: Math.max(1, Math.min(9999, Math.round(Number(i.qty) || 1))),
+          // Solo informativo: el precio que se cobra lo calcula el servidor (priceOrderItems)
           unitPrice: Math.max(1, Math.round(Number(i.unitPrice) || 0)),
+          ...(i.productId ? { productId: String(i.productId).slice(0, 100) } : {}),
+          ...(i.variantId ? { variantId: String(i.variantId).slice(0, 100) } : {}),
         })),
       };
     },
@@ -284,7 +118,7 @@ export const createCheckout = createServerFn({ method: "POST" })
         data.shipping.email = verified.email;
       }
 
-      const validation = await revalidateOrderItems(supabaseAdmin, data.items);
+      const validation = await priceOrderItems(supabaseAdmin, data.items);
       if (validation.error) {
         return { error: validation.error };
       }

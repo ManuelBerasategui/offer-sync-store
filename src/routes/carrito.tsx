@@ -216,7 +216,14 @@ function CarritoPage() {
     });
   }, [cart.items, products, banners]);
 
-  const items = cartItemsWithCat.map((i) => ({ nombre: i.nombre, qty: i.qty, unitPrice: i.unitPrice, productId: i.productId }));
+  const items = cartItemsWithCat.map((i) => ({
+    nombre: i.nombre,
+    qty: i.qty,
+    unitPrice: i.unitPrice,
+    productId: i.productId,
+    // El servidor calcula el precio con el producto y la variante (no con unitPrice)
+    variantId: i.variantId,
+  }));
 
   // Mínimos por categoría (dinámicos o estáticos)
   const catRules = parseCategoryRules(config);

@@ -3,8 +3,15 @@ import type { NotifyOrderInput } from "@/lib/email.functions";
 import { decideMpPayment, type MpPayment } from "./mp-verify";
 import { checkAdmin } from "./admin-auth";
 import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
+import { priceOrderItems } from "./order-pricing";
 
-export type OrderItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
+export type OrderItem = {
+  nombre: string;
+  qty: number;
+  unitPrice: number;
+  productId?: string | undefined;
+  variantId?: string | undefined;
+};
 
 export type ShippingInput = {
   nombre: string;
@@ -49,8 +56,10 @@ function cleanItems(items: OrderItem[]): OrderItem[] {
   return items.slice(0, 50).map((i) => ({
     nombre: text(i.nombre),
     qty: Math.max(1, Math.min(9999, Math.round(Number(i.qty) || 1))),
+    // Solo informativo: el precio que se cobra lo calcula el servidor (priceOrderItems)
     unitPrice: Math.max(1, Math.round(Number(i.unitPrice) || 0)),
     ...(i.productId ? { productId: text(i.productId, 100) } : {}),
+    ...(i.variantId ? { variantId: text(i.variantId, 100) } : {}),
   }));
 }
 
@@ -503,121 +512,16 @@ export const createTransferOrder = createServerFn({ method: "POST" })
     let validCouponApplied: string | null = null;
 
     try {
-      const [{ data: dbProducts }, { data: dbConfig }] = await Promise.all([
-        supabaseAdmin.from("products").select("id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,oferta,stock,descuento"),
-        supabaseAdmin.from("site_config").select("clave,valor"),
-      ]);
-
-      if (!dbProducts || dbProducts.length === 0) {
-        return { status: "error", message: "No se pudieron obtener los productos de la base de datos." };
+      // Precios calculados en el servidor (nunca los del navegador): ver src/lib/order-pricing.ts
+      const pricing = await priceOrderItems(supabaseAdmin, data.items);
+      if (pricing.error) {
+        return { status: "error", message: pricing.error };
       }
-
-      const configMap: Record<string, string> = {};
-      for (const row of dbConfig ?? []) {
-        if (row.clave && row.valor) configMap[row.clave] = row.valor;
-      }
-        const {
-          normCat,
-          parseCategoryRules,
-          findRuleForCat,
-          findProduct,
-          priceOf,
-          unitPriceFor,
-          categoryDiscountForUnits,
-          checkCategoryMins,
-          moqGroupOf,
-          isNfcGoogle,
-          isBlackviewGlasses,
-          blackviewUnitPrice,
-          transferPrice,
-          transferDiscountPct,
-        } = await import("./store");
-
-        const catRules = parseCategoryRules(configMap);
-        const catTotals: Record<string, number> = {};
-        const usdRate = Number(configMap["dolar_cotizacion"] ?? 0);
-
-        for (const item of data.items) {
-          const prod = findProduct(dbProducts as any, item.nombre);
-          if (prod && !isNfcGoogle(item.nombre) && !isNfcGoogle(prod.nombre) &&
-              !isBlackviewGlasses(item.nombre) && !isBlackviewGlasses(prod.nombre)) {
-            const catNorm = normCat(prod.categoria ?? "");
-            const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
-            if (match) {
-              catTotals[match.key] = (catTotals[match.key] ?? 0) + item.qty;
-            }
-          }
-        }
-
-        const itemsWithCat = data.items.map((item) => {
-          const prod = findProduct(dbProducts as any, item.nombre);
-          const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
-          return {
-            nombre: prod && isNfcGoogle(prod.nombre) ? prod.nombre : item.nombre,
-            categoria: prod?.categoria ?? "",
-            moq_group,
-            qty: item.qty,
-            unitPrice: item.unitPrice,
-          };
-        });
-
-        const minViolations = checkCategoryMins(itemsWithCat, catRules);
-        if (minViolations.length > 0) {
-          const v = minViolations[0]!;
-          const msg =
-            v.type === "amount"
-              ? `No se cumple el mínimo de compra para ${v.category} ($${v.min.toLocaleString("es-AR")}).`
-              : `No se cumple el mínimo de compra para ${v.category} (${v.min} unidades).`;
-          return { status: "error", message: msg };
-        }
-
-        items = data.items.map((item) => {
-          const prod = findProduct(dbProducts as any, item.nombre);
-          if (!prod) return item;
-
-          // Blackview BV100: precio fijo US$100 (+7%) desde 3 unidades, sin otros descuentos
-          if (isBlackviewGlasses(item.nombre) || isBlackviewGlasses(prod.nombre)) {
-            return {
-              nombre: item.nombre,
-              qty: item.qty,
-              unitPrice: blackviewUnitPrice(priceOf(prod), item.qty, usdRate),
-            };
-          }
-
-          // NFC Google: sin descuento por cantidad bajo ningún concepto
-          if (isNfcGoogle(item.nombre) || isNfcGoogle(prod.nombre)) {
-            return {
-              nombre: item.nombre,
-              qty: item.qty,
-              unitPrice: priceOf(prod),
-            };
-          }
-
-          const catNorm = normCat(prod.categoria ?? "");
-          const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
-          const catRule = match?.rule;
-          const ruleKey = match?.key;
-
-          let unitPrice: number;
-          if (catRule?.discountTiers?.length && ruleKey) {
-            const totalCatUnits = catTotals[ruleKey] ?? 0;
-            const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
-            const base = priceOf(prod);
-            unitPrice = Math.round(base * (1 - percent / 100));
-          } else {
-            unitPrice = Math.round(unitPriceFor(prod, item.qty));
-          }
-
-          return {
-            nombre: item.nombre,
-            qty: item.qty,
-            unitPrice: unitPrice > 0 ? unitPrice : item.unitPrice,
-          };
-        });
-
-        const listTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-        const discPct = transferDiscountPct(configMap);
-        total = transferPrice(listTotal, discPct);
+      const configMap = pricing.config;
+      items = pricing.validatedItems;
+      const listTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+      const { transferPrice, transferDiscountPct } = await import("./store");
+      total = transferPrice(listTotal, transferDiscountPct(configMap));
 
       // Revalidación segura del cupón en el servidor
       if (data.couponCode && data.userId) {
