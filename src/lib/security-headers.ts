@@ -6,13 +6,14 @@
  * no bloquean recursos:
  * - HSTS: el navegador usa siempre HTTPS.
  * - frame-ancestors: nadie puede meter la tienda dentro de otra página (clickjacking), salvo la
- *   propia tienda y el editor de Lovable (su vista previa la muestra en un iframe).
+ *   propia tienda, el editor de Lovable (su vista previa la muestra en un iframe) y PostHog
+ *   (los heatmaps muestran la tienda dentro de su panel).
  * - nosniff, Referrer-Policy y Permissions-Policy (sin cámara, micrófono ni ubicación).
  */
 export const SECURITY_HEADERS: Record<string, string> = {
   "Strict-Transport-Security": "max-age=31536000",
   "Content-Security-Policy":
-    "frame-ancestors 'self' https://lovable.dev https://*.lovable.dev https://*.lovable.app https://*.lovableproject.com",
+    "frame-ancestors 'self' https://lovable.dev https://*.lovable.dev https://*.lovable.app https://*.lovableproject.com https://*.posthog.com",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",

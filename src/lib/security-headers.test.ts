@@ -24,6 +24,7 @@ describe("withSecurityHeaders", () => {
     expect(csp).not.toMatch(/script-src|connect-src|default-src|img-src/);
     expect(csp).toContain("frame-ancestors");
     expect(csp).toContain("lovable");
+    expect(csp).toContain("https://*.posthog.com");
   });
 
   it("funciona con respuestas sin cuerpo", () => {
