@@ -53,6 +53,7 @@ function Home() {
   const { products, banners, config } = data;
 
   const combosScrollRef = useRef<HTMLDivElement>(null);
+  const ofertasScrollRef = useRef<HTMLDivElement>(null);
   // Se muestran 4 combos; el resto aparece con "Ver más" (menos invasivo en móvil)
   const COMBOS_VISIBLES = 4;
   const [showAllCombos, setShowAllCombos] = useState(false);
@@ -66,6 +67,14 @@ function Home() {
       left: dir === "left" ? -scrollAmount : scrollAmount,
       behavior: "smooth",
     });
+  };
+
+  // Flechas del carrusel de productos en oferta (en PC no se puede deslizar con el dedo)
+  const scrollOfertas = (dir: "left" | "right") => {
+    const el = ofertasScrollRef.current;
+    if (!el) return;
+    const amount = Math.max(276, Math.round(el.clientWidth * 0.8));
+    el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
   };
 
   const ofertasDelDia = products.filter((p) => hasOffer(p));
@@ -230,34 +239,6 @@ function Home() {
                   </span>
                   <div className="h-px flex-1 bg-gradient-to-r from-primary/30 to-transparent" />
                 </div>
-                {banners.length > 1 && (
-                  <div className="hidden sm:flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        scrollCombos("left");
-                      }}
-                      aria-label="Deslizar combo anterior"
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all active:scale-95 shadow-xs cursor-pointer"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        scrollCombos("right");
-                      }}
-                      aria-label="Deslizar combo siguiente"
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all active:scale-95 shadow-xs cursor-pointer"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
               </div>
 
               <div className="relative group -mx-4 sm:mx-0">
@@ -348,7 +329,28 @@ function Home() {
                 </div>
               )}
               <div className="relative -mx-4 sm:mx-0">
+                {ofertasDelDia.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => scrollOfertas("left")}
+                      aria-label="Ver productos anteriores"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/95 backdrop-blur-xs text-foreground shadow-md hover:bg-surface hover:border-primary transition-all active:scale-95 cursor-pointer"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollOfertas("right")}
+                      aria-label="Ver más productos"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/95 backdrop-blur-xs text-foreground shadow-md hover:bg-surface hover:border-primary transition-all active:scale-95 cursor-pointer"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
                 <div
+                  ref={ofertasScrollRef}
                   className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${ofertasDelDia.length === 1 ? "justify-center" : ""
                     }`}
                 >
