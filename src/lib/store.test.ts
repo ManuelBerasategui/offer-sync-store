@@ -12,6 +12,7 @@ import {
   waOnlyReasonOf,
   normCat,
   parseJerseyItem,
+  isHiddenCategory,
   calcJerseyUnitPrice,
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
@@ -903,3 +904,19 @@ describe("NFC Google — Reglas de compra mínima y descuentos", () => {
 });
 
 
+
+describe("isHiddenCategory", () => {
+  it("oculta Electrodomésticos con o sin acento ni mayúsculas", () => {
+    for (const c of [
+      "Electrodomésticos",
+      "electrodomesticos",
+      " ELECTRODOMÉSTICOS ",
+      "Electrodoméstico",
+    ]) {
+      expect(isHiddenCategory(c)).toBe(true);
+    }
+    for (const c of ["Tecnología", "Bazar", "", null, undefined]) {
+      expect(isHiddenCategory(c)).toBe(false);
+    }
+  });
+});

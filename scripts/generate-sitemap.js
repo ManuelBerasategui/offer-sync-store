@@ -41,13 +41,20 @@ async function generateSitemap() {
       // Fetch active products
       const { data: products, error: pErr } = await supabase
         .from("products")
-        .select("id, metadata");
+        .select("id, categoria, metadata");
 
       if (!pErr && products) {
         for (const p of products) {
           if (p.id) {
             const stock = p.metadata?.stock ?? p.stock;
             if (String(stock || "").toUpperCase() === "NO") continue;
+            // Mismas categorías ocultas que la tienda (HIDDEN_CATEGORIES en src/lib/store.ts)
+            const cat = String(p.categoria ?? "")
+              .trim()
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "");
+            if (cat === "electrodomesticos" || cat === "electrodomestico") continue;
             urls.push({
               loc: `${BASE_URL}/producto/${p.id}`,
               priority: "0.8",

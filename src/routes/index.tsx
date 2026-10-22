@@ -13,7 +13,7 @@ import {
   FALLBACK_IMAGE, imageUrl, thumbnailUrl, hasOffer,
   onImageError, isYes, money, toNumber, waLink, sanitizeUrl, type SiteConfig,
   parseCategoryRules, normCat, transferPrice, transferDiscountPct, orderedCategories,
-  findRuleForCat, type CategoryRule, isNfcGoogle,
+  findRuleForCat, type CategoryRule, isNfcGoogle, isHiddenCategory,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
 import { track } from "@/lib/analytics";
@@ -428,6 +428,7 @@ function Home() {
           const norm = normCat(key);
           if (seenKeys.has(norm)) continue;
           if (norm === "perfumes" || norm === "perfume") continue;
+          if (isHiddenCategory(norm)) continue;
 
           if (rule.minUnits) {
             seenKeys.add(norm);

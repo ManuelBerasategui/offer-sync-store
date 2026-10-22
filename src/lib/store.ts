@@ -849,6 +849,17 @@ export type CategoryRule = {
   minAmount?: number;
 };
 
+/**
+ * Categorías que no se muestran en la tienda (catálogo, home, búsquedas ni páginas de producto).
+ * Los productos siguen en la base y en el panel de admin. Se compara sin acentos ni mayúsculas.
+ */
+export const HIDDEN_CATEGORIES = ["electrodomesticos", "electrodomestico"];
+
+export function isHiddenCategory(categoria?: string | null): boolean {
+  const norm = normCat(String(categoria ?? ""));
+  return HIDDEN_CATEGORIES.includes(norm);
+}
+
 /** Normaliza el nombre de una categoría para usarla como clave (remueve acentos y minúsculas) */
 export const normCat = (s: string) => {
   const norm = String(s ?? "")

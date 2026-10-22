@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Banner, Product, SiteConfig, StoreData } from "./store";
+import { isHiddenCategory } from "./store";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -105,7 +106,11 @@ async function fetchFromSupabase(): Promise<StoreData> {
     variantsByProduct.set(productId, current);
   }
 
-  const products: Product[] = (productsRaw ?? []).map((p: any) => {
+  // Las categorías ocultas (ver HIDDEN_CATEGORIES) no llegan al navegador
+  const visibleRaw = (productsRaw ?? []).filter(
+    (p: { categoria?: string | null }) => !isHiddenCategory(p.categoria),
+  );
+  const products: Product[] = visibleRaw.map((p: any) => {
     // Expand metadata back onto the product object sin URLs de backup pesadas
     const rawMeta = typeof p.metadata === 'object' && p.metadata !== null ? { ...(p.metadata as Record<string, unknown>) } : {};
     delete rawMeta.raw_imagen_url_backup;
