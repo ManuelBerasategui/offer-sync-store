@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState, useEffect, useRef } from "react";
-import { CheckCircle2, MessageCircle } from "lucide-react";
+import { Award, Ban, CheckCircle2, MessageCircle, PenLine, Shirt } from "lucide-react";
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
@@ -156,23 +156,38 @@ function JerseyProductUI({
   // Total final para la cantidad exacta solicitada
   const totalArs = unitArs !== null ? unitArs * qty : null;
 
+  // Diferencia de precio de la versión Jugador para la cantidad elegida (en pesos)
+  const versionUnit = (v: "fan" | "player") =>
+    calcJerseyUnitPrice({ qty, version: v, isExtraSize: false, badge: "no", usdRate, isLongSleeve: isML }).unitArs;
+  const playerExtraArs = Math.max(0, versionUnit("player") - versionUnit("fan"));
+  const patchLabel = usdRate > 0 ? `+${money(Math.round(1 * 1.07 * usdRate))} c/u` : "+US$1 c/u";
+
   // Nombre enriquecido con opciones para el carrito, orden y mails de compra/venta
-  const fullItemName = `${productName} (Talle: ${selectedTalle || "S"} - ${version === "player" ? "Versión Jugador (Personalizado Nombre y Número)" : "Versión Fan (Sin personalizar)"}${badge === "yes" ? " - Con Badge" : ""})`;
+  const fullItemName = `${productName} (Talle: ${selectedTalle || "S"} - ${version === "player" ? "Versión Jugador (Personalizado Nombre y Número)" : "Versión Fan (Sin personalizar)"}${badge === "yes" ? " - Con Parche" : ""})`;
 
   const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "5493418051515").replace(/\D/g, "");
 
-  /** Abre WhatsApp para coordinar el badge deseado y cerrar la venta */
+  /** Abre WhatsApp para coordinar el parche deseado y cerrar la venta */
   function handleBadgeWhatsApp() {
     const talleStr = selectedTalle || talles[0] || "S";
     const versionStr = version === "player" ? "Jugador (Personalizado Nombre y Número)" : "Fan (Sin personalizar)";
-    const priceStr = unitArs !== null ? ` — $${unitArs.toLocaleString("es-AR")} c/u` : "";
-    const totalStr = totalArs !== null ? ` — Total: $${totalArs.toLocaleString("es-AR")}` : "";
-    const msg = `Hola! Quiero que tenga el siguiente badge para la camiseta: ${productName}\n• Talle: ${talleStr}\n• Versión: ${versionStr}\n• Cantidad: ${qty} unidades${priceStr}${totalStr}`;
+    // Precio CON parche calculado acá: al tocar "Con parche" el estado todavía no se actualizó
+    const withPatch = calcJerseyUnitPrice({
+      qty,
+      version,
+      isExtraSize,
+      badge: "yes",
+      usdRate,
+      isLongSleeve: isML,
+    }).unitArs;
+    const priceStr = withPatch > 0 ? ` — $${withPatch.toLocaleString("es-AR")} c/u` : "";
+    const totalStr = withPatch > 0 ? ` — Total: $${(withPatch * qty).toLocaleString("es-AR")}` : "";
+    const msg = `Hola! Quiero pedir ${productName} con parche. ¿Qué parches tienen?\n• Talle: ${talleStr}\n• Versión: ${versionStr}\n• Cantidad: ${qty} unidades${priceStr}${totalStr}`;
     const href = sanitizeUrl(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
     if (href) window.open(href, "_blank", "noopener,noreferrer");
   }
 
-  /** Selecciona badge y abre WhatsApp para coordinar el modelo deseado */
+  /** Selecciona el parche y abre WhatsApp para coordinar el modelo deseado */
   function handleSelectBadgeYes() {
     setBadge("yes");
     handleBadgeWhatsApp();
@@ -182,11 +197,11 @@ function JerseyProductUI({
   function buildWaMessage() {
     const talleStr = selectedTalle || talles[0] || "S";
     const versionStr = version === "player" ? "Jugador (Personalizado Nombre y Número)" : "Fan (Sin personalizar)";
-    const badgeStr = badge === "yes" ? "Sí (con badge oficial)" : "No";
+    const badgeStr = badge === "yes" ? "Sí (parche oficial)" : "No";
     const qtyStr = String(qty);
     const priceStr = unitArs !== null ? ` — $${unitArs.toLocaleString("es-AR")} c/u` : "";
     const totalStr = totalArs !== null ? ` — Total: $${totalArs.toLocaleString("es-AR")}` : "";
-    return `Hola! Quiero hacer un pedido de camisetas:\n🏷️ Producto: ${productName}\n📐 Talle: ${talleStr}\n⚽ Versión: ${versionStr}\n🏅 Badge: ${badgeStr}\n📦 Cantidad: ${qtyStr} unidades${priceStr}${totalStr}`;
+    return `Hola! Quiero hacer un pedido de camisetas:\n🏷️ Producto: ${productName}\n📐 Talle: ${talleStr}\n⚽ Versión: ${versionStr}\n🏅 Parche: ${badgeStr}\n📦 Cantidad: ${qtyStr} unidades${priceStr}${totalStr}`;
   }
 
   function handleWhatsApp() {
@@ -214,7 +229,7 @@ function JerseyProductUI({
       setSelectedTalle(talleToUse);
     }
     const currentQty = Math.max(10, parseInt(qtyStr, 10) || qty || 10);
-    const fullItem = `${productName} (Talle: ${talleToUse} - ${version === "player" ? "Versión Jugador (Personalizado Nombre y Número)" : "Versión Fan (Sin personalizar)"}${badge === "yes" ? " - Con Badge" : ""})`;
+    const fullItem = `${productName} (Talle: ${talleToUse} - ${version === "player" ? "Versión Jugador (Personalizado Nombre y Número)" : "Versión Fan (Sin personalizar)"}${badge === "yes" ? " - Con Parche" : ""})`;
 
     const { unitArs: calculatedUnit, baseArs: calculatedBase } = calcJerseyUnitPrice({
       qty: currentQty,
@@ -314,7 +329,7 @@ function JerseyProductUI({
         {talles.length === 0 ? (
           <p className="text-xs font-semibold text-destructive">Sin talles disponibles en este momento.</p>
         ) : (
-          <div className="grid grid-cols-4 sm:flex sm:flex-wrap gap-1.5 sm:gap-2 min-w-0 w-full">
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 sm:gap-2 min-w-0 w-full">
             {talles.map((t) => {
               const isXtra = t === "3XL" || t === "4XL";
               const isSelected = selectedTalle === t;
@@ -326,7 +341,7 @@ function JerseyProductUI({
                   type="button"
                   onClick={() => { setSelectedTalle(t); setTalleError(false); }}
                   className={[
-                    "h-11 sm:h-12 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center relative active:scale-95 px-1 min-w-0",
+                    "h-12 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center relative active:scale-95 px-1 min-w-0",
                     isSelected
                       ? "bg-primary text-primary-foreground border-primary shadow-md ring-2 ring-primary/30"
                       : "bg-background text-foreground border-border hover:border-primary/50 hover:bg-muted/50",
@@ -348,131 +363,113 @@ function JerseyProductUI({
         )}
       </div>
 
-      {/* ── Selector Nombre y Número ── */}
+      {/* ── Versión: Fan (lisa) o Jugador (con nombre y número) ── */}
       <div className="min-w-0 w-full">
         <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
-          Personalización (Nombre y Número)
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 min-w-0 w-full">
-          {/* Fan */}
-          <button
-            type="button"
-            id="jersey-version-fan"
-            onClick={() => setVersion("fan")}
-            className={[
-              "w-full rounded-xl p-3 sm:p-3.5 text-left transition-all border flex items-start justify-between gap-2.5 active:scale-[0.99] min-w-0",
-              version === "fan"
-                ? "bg-primary/10 border-primary shadow-sm ring-1 ring-primary"
-                : "bg-background border-border hover:border-primary/40",
-            ].join(" ")}
-          >
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xl shrink-0">👕</span>
-                <span className="text-sm font-bold text-foreground">Versión Fan</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Sin nombre ni número (lisa)</p>
-              <p className="text-[11px] font-bold text-primary mt-1.5">Desde $18.50 USD</p>
-            </div>
-            <div className={`mt-1 h-5 w-5 shrink-0 rounded-full border flex items-center justify-center ${version === "fan" ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>
-              {version === "fan" && <span className="text-xs">✓</span>}
-            </div>
-          </button>
-
-          {/* Jugador */}
-          <button
-            type="button"
-            id="jersey-version-player"
-            onClick={() => setVersion("player")}
-            className={[
-              "w-full rounded-xl p-3 sm:p-3.5 text-left transition-all border flex items-start justify-between gap-2.5 active:scale-[0.99] min-w-0",
-              version === "player"
-                ? "bg-primary/10 border-primary shadow-sm ring-1 ring-primary"
-                : "bg-background border-border hover:border-primary/40",
-            ].join(" ")}
-          >
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xl shrink-0">✏️</span>
-                <span className="text-sm font-bold text-foreground">Versión Jugador</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Personalizado (Nombre y Número)</p>
-              <p className="text-[11px] font-bold text-primary mt-1.5">Desde $20.50 USD</p>
-            </div>
-            <div className={`mt-1 h-5 w-5 shrink-0 rounded-full border flex items-center justify-center ${version === "player" ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>
-              {version === "player" && <span className="text-xs">✓</span>}
-            </div>
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg border border-border/60">
-          {version === "player"
-            ? "✏️ Versión Jugador — luego de mandar el comprobante indicanos cómo la querés personalizar"
-            : "👕 Versión Fan — camiseta lisa sin personalización"}
-        </p>
-      </div>
-
-      {/* ── Selector Badge ── */}
-      <div className="min-w-0 w-full">
-        <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
-          Badge / Parche Oficial
+          Versión
         </label>
         <div className="grid grid-cols-2 gap-2 sm:gap-2.5 min-w-0 w-full">
-          {/* Sin Badge */}
-          <button
-            type="button"
-            id="jersey-badge-no"
-            onClick={() => setBadge("no")}
-            className={[
-              "h-16 rounded-xl border-2 p-2 sm:p-2.5 font-bold transition-all flex items-center gap-2 active:scale-[0.98] min-w-0",
-              badge === "no"
-                ? "border-primary bg-primary/10 text-primary shadow-sm"
-                : "border-border bg-background text-foreground hover:border-primary/40",
-            ].join(" ")}
-          >
-            <span className="text-xl sm:text-2xl shrink-0">🚫</span>
-            <div className="text-left min-w-0 flex-1">
-              <span className="block text-xs font-bold leading-tight truncate">Sin Badge</span>
-              <span className="block text-[10px] font-normal text-muted-foreground mt-0.5 truncate">Versión lisa</span>
-            </div>
-          </button>
+          {(
+            [
+              {
+                value: "fan",
+                id: "jersey-version-fan",
+                Icon: Shirt,
+                title: "Fan",
+                desc: "Sin nombre ni número",
+                price: "Precio base",
+              },
+              {
+                value: "player",
+                id: "jersey-version-player",
+                Icon: PenLine,
+                title: "Jugador",
+                desc: "Con nombre y número",
+                price: playerExtraArs > 0 ? `+${money(playerExtraArs)} c/u` : "Personalizada",
+              },
+            ] as const
+          ).map((opt) => {
+            const active = version === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                id={opt.id}
+                onClick={() => setVersion(opt.value)}
+                className={[
+                  "w-full rounded-xl border p-3 text-left transition-all active:scale-[0.99] min-w-0",
+                  active
+                    ? "bg-primary/10 border-primary ring-1 ring-primary"
+                    : "bg-background border-border hover:border-primary/40",
+                ].join(" ")}
+              >
+                <div className="flex items-center gap-2">
+                  <opt.Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary" : "text-muted-foreground"}`} />
+                  <span className="text-sm font-bold text-foreground">{opt.title}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{opt.desc}</p>
+                <p className={`text-[11px] font-bold mt-1 ${opt.value === "fan" ? "text-muted-foreground" : "text-primary"}`}>
+                  {opt.price}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+        {version === "player" && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Después de pagar nos pasás por WhatsApp el nombre y número de cada camiseta.
+          </p>
+        )}
+      </div>
 
-          {/* Agregar Badge */}
-          <button
-            type="button"
-            id="jersey-badge-yes"
-            onClick={handleSelectBadgeYes}
-            className={[
-              "h-16 rounded-xl border-2 p-2 sm:p-2.5 font-bold transition-all flex items-center gap-2 active:scale-[0.98] min-w-0",
-              badge === "yes"
-                ? "border-primary bg-primary/10 text-primary shadow-sm"
-                : "border-border bg-background text-foreground hover:border-primary/40",
-            ].join(" ")}
-          >
-            <span className="text-xl sm:text-2xl shrink-0">🏆</span>
-            <div className="text-left min-w-0 flex-1">
-              <span className="block text-xs font-bold leading-tight truncate">Con Badge</span>
-              <span className="block text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-0.5 truncate">
-                {usdRate > 0 ? `+${money(Math.round(1 * 1.07 * usdRate))}` : "+US$1.00"}
-              </span>
-            </div>
-          </button>
+      {/* ── Parche oficial ── */}
+      <div className="min-w-0 w-full">
+        <label className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground block mb-2">
+          Parche oficial
+        </label>
+        <div className="grid grid-cols-2 gap-2 sm:gap-2.5 min-w-0 w-full">
+          {(
+            [
+              { value: "no", id: "jersey-badge-no", Icon: Ban, title: "Sin parche", desc: "Precio base" },
+              { value: "yes", id: "jersey-badge-yes", Icon: Award, title: "Con parche", desc: patchLabel },
+            ] as const
+          ).map((opt) => {
+            const active = badge === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                id={opt.id}
+                onClick={opt.value === "yes" ? handleSelectBadgeYes : () => setBadge("no")}
+                className={[
+                  "w-full rounded-xl border p-3 text-left transition-all active:scale-[0.99] min-w-0",
+                  active
+                    ? "bg-primary/10 border-primary ring-1 ring-primary"
+                    : "bg-background border-border hover:border-primary/40",
+                ].join(" ")}
+              >
+                <div className="flex items-center gap-2">
+                  <opt.Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary" : "text-muted-foreground"}`} />
+                  <span className="text-sm font-bold text-foreground">{opt.title}</span>
+                </div>
+                <p className={`text-[11px] font-bold mt-1 ${opt.value === "yes" ? "text-primary" : "text-muted-foreground"}`}>
+                  {opt.desc}
+                </p>
+              </button>
+            );
+          })}
         </div>
         {badge === "yes" && (
-          <div className="mt-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-300 min-w-0">
-            <p className="font-bold flex items-center gap-1.5">
-              <span>✓</span> Badge seleccionado (+{usdRate > 0 ? money(Math.round(1 * 1.07 * usdRate)) : "US$1.00"} c/u)
-            </p>
-            <p className="mt-1 text-emerald-700 dark:text-emerald-400">
-              Para coordinar qué badge querés y cerrar la venta, lo coordinamos directamente por WhatsApp.
-            </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            El modelo de parche lo elegimos con vos por WhatsApp.{" "}
             <button
               type="button"
               onClick={handleBadgeWhatsApp}
-              className="mt-2 inline-flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-300 underline hover:opacity-80"
+              className="font-bold text-primary underline hover:opacity-80"
             >
-              Abrir WhatsApp para coordinar el badge →
+              Abrir WhatsApp
             </button>
-          </div>
+          </p>
         )}
       </div>
 
@@ -635,7 +632,7 @@ function JerseyProductUI({
       {selectedTalle && (
         <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 sm:p-4 text-xs shadow-sm min-w-0 w-full">
           <p className="font-extrabold text-primary text-xs uppercase tracking-wider mb-2.5">
-            📋 Resumen de tu selección:
+            Resumen de tu pedido
           </p>
           <div className="grid grid-cols-2 gap-2 text-foreground mb-3 min-w-0">
             <div className="bg-background/80 rounded-lg p-2 border border-border/50 min-w-0">
@@ -644,11 +641,11 @@ function JerseyProductUI({
             </div>
             <div className="bg-background/80 rounded-lg p-2 border border-border/50 min-w-0">
               <span className="text-[10px] text-muted-foreground block">Versión</span>
-              <span className="font-bold text-xs truncate block">{version === "player" ? "Jugador (Personalizado)" : "Fan"}</span>
+              <span className="font-bold text-xs truncate block">{version === "player" ? "Jugador (nombre y número)" : "Fan"}</span>
             </div>
             <div className="bg-background/80 rounded-lg p-2 border border-border/50 min-w-0">
-              <span className="text-[10px] text-muted-foreground block">Badge</span>
-              <span className="font-bold text-xs truncate block">{badge === "yes" ? "Con Badge 🏆" : "Sin Badge"}</span>
+              <span className="text-[10px] text-muted-foreground block">Parche</span>
+              <span className="font-bold text-xs truncate block">{badge === "yes" ? "Con parche" : "Sin parche"}</span>
             </div>
             <div className="bg-background/80 rounded-lg p-2 border border-border/50 min-w-0">
               <span className="text-[10px] text-muted-foreground block">Cantidad</span>
@@ -677,10 +674,10 @@ function JerseyProductUI({
         <div className="flex flex-col gap-2.5 min-w-0 w-full">
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 sm:p-4 text-xs text-emerald-800 dark:text-emerald-300 min-w-0">
             <p className="font-bold flex items-center gap-1.5 text-sm text-emerald-900 dark:text-emerald-200">
-              <span>💬</span> Los pedidos con Badge se coordinan y cierran por WhatsApp
+              Los pedidos con parche se cierran por WhatsApp
             </p>
             <p className="mt-1 text-emerald-700 dark:text-emerald-400 leading-relaxed">
-              Te confirmamos modelos de parches disponibles, precio final y método de pago directamente por chat para asegurar que recibas el parche exacto.
+              Te mostramos los parches disponibles y te confirmamos el precio final y la forma de pago por chat.
             </p>
           </div>
           <button
@@ -692,14 +689,14 @@ function JerseyProductUI({
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
             </svg>
-            <span className="truncate">Coordinar con Badge por WhatsApp</span>
+            <span className="truncate">Pedir con parche por WhatsApp</span>
           </button>
           <button
             type="button"
             onClick={() => setBadge("no")}
             className="text-xs text-muted-foreground hover:text-foreground text-center underline py-1 transition-colors"
           >
-            ← Comprar sin badge directamente por la web
+            ← Comprar sin parche por la web
           </button>
         </div>
       ) : (
@@ -790,9 +787,11 @@ function ProductGallery({
   const current = allImages[activeIdx] ?? allImages[0] ?? "";
 
   return (
-    <div className="flex flex-col gap-2 min-w-0 w-full max-w-full">
+    // En PC, foto y miniaturas van juntas como bloque fijo (si se habilita sticky en la página);
+    // antes solo la foto era sticky y las miniaturas podían quedar por encima.
+    <div className="flex flex-col gap-2.5 min-w-0 w-full max-w-full lg:sticky lg:top-24">
       {/* Imagen principal */}
-      <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-2xl border border-border bg-surface lg:sticky lg:top-24">
+      <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-2xl border border-border bg-surface">
         <img
           key={current}
           src={imageUrl(current) || FALLBACK_IMAGE}
@@ -813,10 +812,10 @@ function ProductGallery({
               onClick={() => setActiveIdx(i)}
               aria-label={`Ver foto ${i + 1}`}
               className={[
-                "shrink-0 h-14 w-14 sm:h-16 sm:w-16 rounded-lg border-2 overflow-hidden bg-surface transition-all",
+                "shrink-0 h-16 w-16 sm:h-[72px] sm:w-[72px] rounded-xl border-2 overflow-hidden bg-surface transition-all",
                 i === activeIdx
-                  ? "border-primary shadow-md scale-105"
-                  : "border-border opacity-60 hover:opacity-100 hover:border-primary/50",
+                  ? "border-primary"
+                  : "border-transparent opacity-70 hover:opacity-100 hover:border-primary/40",
               ].join(" ")}
             >
               <img
@@ -824,7 +823,9 @@ function ProductGallery({
                 alt={`Miniatura ${i + 1}`}
                 loading="lazy"
                 referrerPolicy="no-referrer"
-                className="h-full w-full object-contain p-0.5"
+                className="h-full w-full object-contain p-1"
+                // Si la miniatura no existe (fotos viejas de Yupoo), cargar la foto completa
+                onError={onImageError(url)}
               />
             </button>
           ))}

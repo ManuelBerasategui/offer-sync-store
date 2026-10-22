@@ -524,7 +524,8 @@ export function parseJerseyItem(item: { id?: string; nombre?: string }): {
   const hasBadge =
     idStr.endsWith("-yes") ||
     idStr.includes("-yes-") ||
-    /Con Badge/i.test(nomStr);
+    // "Con Parche" (texto actual) o "Con Badge" (carritos armados antes del cambio de nombre)
+    /Con (Badge|Parche)/i.test(nomStr);
   const badge: "yes" | "no" = hasBadge ? "yes" : "no";
 
   let talle = "S";

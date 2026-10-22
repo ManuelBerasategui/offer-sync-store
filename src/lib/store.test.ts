@@ -680,6 +680,19 @@ describe("parseJerseyItem", () => {
     expect(res.isExtraSize).toBe(true);
   });
 
+  it("detects the patch from the name alone, with the new 'Con Parche' text (server side)", () => {
+    // El servidor recibe solo el nombre (sin id), así que el parche se cobra por este texto
+    const nuevo = parseJerseyItem({
+      nombre: "Camiseta Argentina (Talle: L - Versión Fan (Sin personalizar) - Con Parche)",
+    });
+    expect(nuevo.badge).toBe("yes");
+    expect(nuevo.talle).toBe("L");
+    const sinParche = parseJerseyItem({
+      nombre: "Camiseta Argentina (Talle: L - Versión Fan (Sin personalizar))",
+    });
+    expect(sinParche.badge).toBe("no");
+  });
+
   it("detects 4XL as extra size", () => {
     const res = parseJerseyItem({
       nombre: "Camiseta Real Madrid (Talle: 4XL - Versión Fan (Sin personalizar))",
