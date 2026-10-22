@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
 import { priceOrderItems } from "./order-pricing";
+import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit";
+
+// Pagos con Mercado Pago iniciados por IP
+const checkoutLimited = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 30 });
 
 /**
  * Orígenes permitidos para back_urls de MercadoPago (CWE-601 — Open Redirect).
@@ -95,6 +99,9 @@ export const createCheckout = createServerFn({ method: "POST" })
       return {
         error: "Falta configurar MercadoPago. Escribinos por WhatsApp para completar tu compra.",
       };
+    }
+    if (checkoutLimited(await currentClientIp())) {
+      return { error: RATE_LIMIT_MSG };
     }
 
     if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {

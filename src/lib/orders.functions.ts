@@ -4,6 +4,10 @@ import { decideMpPayment, type MpPayment } from "./mp-verify";
 import { checkAdmin } from "./admin-auth";
 import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
 import { priceOrderItems } from "./order-pricing";
+import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit";
+
+// Pedidos por transferencia por IP (generoso: varias personas pueden compartir IP en el celular)
+const transferOrderLimited = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 30 });
 
 export type OrderItem = {
   nombre: string;
@@ -493,6 +497,9 @@ export const createTransferOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    if (transferOrderLimited(await currentClientIp())) {
+      return { status: "error", message: RATE_LIMIT_MSG };
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // La cuenta sale SOLO del token verificado: el userId que manda el navegador no se usa, porque

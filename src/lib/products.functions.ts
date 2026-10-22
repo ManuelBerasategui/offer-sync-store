@@ -3,6 +3,10 @@ import type { Banner, Product, ProductVariant } from "@/lib/store";
 import { invalidateStoreCache } from "./store.functions";
 import { assertAdmin } from "./admin-auth";
 import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
+import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit";
+
+// Intentos de cupón por IP (evita probar códigos a la fuerza)
+const couponLimited = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 15 });
 
 const str = (v: unknown, max = 2000) => String(v ?? "").slice(0, max);
 
@@ -1526,6 +1530,9 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
       try {
         if (!data.code) {
           return { valid: false, error: "Ingresá un código promocional." };
+        }
+        if (couponLimited(await currentClientIp())) {
+          return { valid: false, error: RATE_LIMIT_MSG };
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

@@ -5,6 +5,7 @@
  */
 
 import { money } from "@/lib/store";
+import { escapeHtml } from "@/lib/html-escape";
 
 export type NotifyOrderInput = {
   orderCode: string;
@@ -30,13 +31,37 @@ const ADMIN_EMAILS = [
   "teimportamosar@gmail.com",
 ];
 
+/**
+ * Copia del pedido con todo el texto escapado para HTML. Nombre, dirección y nombres de productos
+ * los escribe el cliente: sin escapar, alguien podría meter links o contenido falso en un email que
+ * sale desde nuestro dominio (por ejemplo, poniendo el email de otra persona).
+ */
+function escapeOrderForHtml(order: NotifyOrderInput): NotifyOrderInput {
+  const shipping = Object.fromEntries(
+    Object.entries(order.shipping).map(([k, v]) => [k, v === undefined ? v : escapeHtml(v)]),
+  ) as NotifyOrderInput["shipping"];
+  return {
+    ...order,
+    orderCode: escapeHtml(order.orderCode),
+    total: Number(order.total) || 0,
+    shipping,
+    items: order.items.map((i) => ({
+      nombre: escapeHtml(i.nombre),
+      qty: Number(i.qty) || 0,
+      unitPrice: Number(i.unitPrice) || 0,
+    })),
+    ...(order.couponCode !== undefined ? { couponCode: escapeHtml(order.couponCode) } : {}),
+  };
+}
+
 const METODO_LABEL: Record<string, string> = {
   transferencia: "🏦 Transferencia Bancaria",
   tarjeta: "💳 Tarjeta de Crédito/Débito",
   mercadopago: "🔵 Mercado Pago",
 };
 
-function buildAdminEmailHtml(order: NotifyOrderInput): string {
+export function buildAdminEmailHtml(rawOrder: NotifyOrderInput): string {
+  const order = escapeOrderForHtml(rawOrder);
   const itemsHtml = order.items
     .map(
       (i) =>
@@ -49,7 +74,7 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
     )
     .join("");
 
-  const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
+  const metodoPago = METODO_LABEL[order.metodoPago] ?? escapeHtml(order.metodoPago);
   const itemsSubtotal = order.items.reduce((acc, i) => acc + i.qty * i.unitPrice, 0);
   const discountAmount = Math.max(0, itemsSubtotal - order.total);
   const hasDiscount = discountAmount > 0;
@@ -182,7 +207,8 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
   `;
 }
 
-function buildCustomerEmailHtml(order: NotifyOrderInput): string {
+export function buildCustomerEmailHtml(rawOrder: NotifyOrderInput): string {
+  const order = escapeOrderForHtml(rawOrder);
   const itemsHtml = order.items
     .map(
       (i) =>
@@ -195,7 +221,7 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
     )
     .join("");
 
-  const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
+  const metodoPago = METODO_LABEL[order.metodoPago] ?? escapeHtml(order.metodoPago);
   const isTransfer = order.metodoPago === "transferencia";
   const itemsSubtotal = order.items.reduce((acc, i) => acc + i.qty * i.unitPrice, 0);
   const discountAmount = Math.max(0, itemsSubtotal - order.total);
@@ -398,7 +424,7 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
     return { success: false, error: msg };
   }
 
-  const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
+  const metodoPago = METODO_LABEL[order.metodoPago] ?? escapeHtml(order.metodoPago);
   let adminSuccess = false;
   let adminError = "";
   let customerSuccess = false;

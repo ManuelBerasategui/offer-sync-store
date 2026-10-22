@@ -191,6 +191,7 @@ function AuthPage() {
             email: email.trim(),
             nombre: form.nombre,
             acceptMarketing,
+            token: signupData.session?.access_token,
           },
         });
 

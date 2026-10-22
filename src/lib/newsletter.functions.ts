@@ -8,6 +8,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertAdmin } from "./admin-auth";
+import { verifiedUserFromToken } from "./coupon-usage";
+import { createRateLimiter, currentClientIp } from "./rate-limit";
+
+// Altas al newsletter por IP
+const subscribeLimited = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
 
 const BASE_URL = "https://teimportamosarg.com";
 
@@ -507,29 +512,46 @@ export const sendCampaignTestEmail = createServerFn({ method: "POST" })
  * Sincronizar nuevo suscriptor al registrar cuenta
  */
 export const syncNewUserSubscriber = createServerFn({ method: "POST" })
-  .validator((d: { email: string; nombre?: string; acceptMarketing: boolean }) => {
-    return z
-      .object({
-        email: z.string().email(),
-        nombre: z.string().optional(),
-        acceptMarketing: z.boolean(),
-      })
-      .parse(d);
-  })
+  .validator(
+    (d: {
+      email: string;
+      nombre?: string;
+      acceptMarketing: boolean;
+      token?: string | undefined;
+    }) => {
+      return z
+        .object({
+          email: z.string().email().max(160),
+          nombre: z.string().max(120).optional(),
+          acceptMarketing: z.boolean(),
+          token: z.string().max(4000).optional(),
+        })
+        .parse(d);
+    },
+  )
   .handler(async ({ data }) => {
     try {
+      if (subscribeLimited(await currentClientIp())) {
+        return { success: false, error: "Demasiados intentos. Probá más tarde." };
+      }
+      // Con sesión: el email sale de la cuenta verificada y se puede actualizar la preferencia.
+      // Sin sesión: solo se puede dar de alta un email nuevo, nunca modificar uno existente
+      // (antes cualquiera podía suscribir, desuscribir o renombrar el email de otra persona).
+      const verified = await verifiedUserFromToken(supabaseAdmin, data.token);
+      const email = (verified?.email || data.email).trim().toLowerCase();
+
       const crypto = await import("crypto");
-      const token = crypto.randomBytes(16).toString("hex");
+      const unsubscribeToken = crypto.randomBytes(16).toString("hex");
 
       await (supabaseAdmin as any).from("newsletter_subscribers").upsert(
         {
-          email: data.email.trim().toLowerCase(),
+          email,
           nombre: data.nombre?.trim() || null,
           is_active: data.acceptMarketing,
-          unsubscribe_token: token,
+          unsubscribe_token: unsubscribeToken,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "email" }
+        { onConflict: "email", ignoreDuplicates: !verified },
       );
 
       return { success: true };
