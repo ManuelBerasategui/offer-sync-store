@@ -9,6 +9,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertAdmin } from "./admin-auth";
 import { verifiedUserFromToken } from "./coupon-usage";
+import { escapeHtml } from "./html-escape";
 import { createRateLimiter, currentClientIp } from "./rate-limit";
 
 // Altas al newsletter por IP
@@ -60,7 +61,8 @@ export function buildPromotionalEmailHtml(params: {
   couponCode?: string;
   unsubscribeToken: string;
 }): string {
-  const greeting = params.nombre ? `¡Hola ${params.nombre}!` : "¡Hola!";
+  // El nombre lo escribe el suscriptor: se escapa para que no pueda meter links ni HTML en el email
+  const greeting = params.nombre ? `¡Hola ${escapeHtml(params.nombre)}!` : "¡Hola!";
   const ctaText = params.ctaText || "Ver Ofertas en la Tienda";
   const ctaUrl = params.ctaUrl || `${BASE_URL}/catalogo`;
   const unsubscribeUrl = `${BASE_URL}/desuscribir?token=${encodeURIComponent(params.unsubscribeToken)}`;

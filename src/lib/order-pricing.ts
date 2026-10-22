@@ -51,6 +51,24 @@ const PRODUCT_COLUMNS =
 const RELOAD_MSG =
   "Recargá la página y volvé a armar el carrito. Si sigue pasando, escribinos por WhatsApp.";
 
+const normName = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * Nombre que queda guardado en el pedido. Si el ítem es un producto de la base, el nombre del
+ * navegador tiene que contener el del producto (le puede agregar talle, color o versión); si no,
+ * se guarda el nombre real, para que nadie vea un pedido con un nombre engañoso.
+ */
+function orderItemName(clientName: string, prod: Product | undefined): string {
+  if (!prod?.nombre) return clientName;
+  return normName(clientName).includes(normName(prod.nombre)) ? clientName : prod.nombre;
+}
+
 export async function priceOrderItems(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseAdmin: any,
@@ -116,8 +134,7 @@ export async function priceOrderItems(
     for (const item of rawItems) {
       const { prod } = resolve(item);
       if (!prod) continue;
-      if (isNfcGoogle(item.nombre) || isNfcGoogle(prod.nombre)) continue;
-      if (isBlackviewGlasses(item.nombre) || isBlackviewGlasses(prod.nombre)) continue;
+      if (isNfcGoogle(prod.nombre) || isBlackviewGlasses(prod.nombre)) continue;
       const catNorm = normCat(prod.categoria ?? "");
       if (!catNorm) continue;
       const key = findRuleForCat(catNorm, catRules)?.key ?? catNorm;
@@ -127,7 +144,7 @@ export async function priceOrderItems(
     const totalJerseyUnits = rawItems
       .filter((i) => {
         const { prod } = resolve(i);
-        return isCamiseta(prod?.categoria, prod?.nombre) || isCamiseta(undefined, i.nombre);
+        return prod ? isCamiseta(prod.categoria, prod.nombre) : isCamiseta(undefined, i.nombre);
       })
       .reduce((sum, i) => sum + i.qty, 0);
 
@@ -140,7 +157,13 @@ export async function priceOrderItems(
       };
       let unitPrice = 0;
 
-      if ((prod && isCamiseta(prod.categoria, prod.nombre)) || isCamiseta(undefined, item.nombre)) {
+      // El tipo de precio sale SIEMPRE del producto de la base. El nombre que manda el navegador solo
+      // se usa cuando no hay producto (combos, o camisetas sin id): si no, alguien podía renombrar un
+      // producto caro como "camiseta" o "blackview" y pagarlo a ese precio.
+      const isJersey = prod
+        ? isCamiseta(prod.categoria, prod.nombre)
+        : isCamiseta(undefined, item.nombre);
+      if (isJersey) {
         // Camisetas: tramos mayoristas en ARS según el total de camisetas del pedido
         const { version, isExtraSize, badge } = parseJerseyItem(item);
         unitPrice = calcJerseyUnitPrice({
@@ -149,14 +172,14 @@ export async function priceOrderItems(
           isExtraSize,
           badge,
           usdRate,
-          isLongSleeve: isLongSleeve(item.nombre) || (prod ? isLongSleeve(prod.nombre) : false),
+          isLongSleeve: prod ? isLongSleeve(prod.nombre) : isLongSleeve(item.nombre),
         }).unitArs;
       } else if (prod) {
         const base = variantBasePrice(prod, variant ?? null);
-        if (isBlackviewGlasses(item.nombre) || isBlackviewGlasses(prod.nombre)) {
+        if (isBlackviewGlasses(prod.nombre)) {
           // Blackview BV100: precio fijo desde 3 unidades, sin otros descuentos
           unitPrice = blackviewUnitPrice(base, item.qty, usdRate);
-        } else if (isNfcGoogle(item.nombre) || isNfcGoogle(prod.nombre)) {
+        } else if (isNfcGoogle(prod.nombre)) {
           // NFC Google: sin descuento por cantidad
           unitPrice = base;
         } else {
@@ -183,7 +206,7 @@ export async function priceOrderItems(
         return fail(`No pudimos verificar el precio de "${item.nombre}". ${RELOAD_MSG}`);
       }
       validatedItems.push({
-        nombre: item.nombre,
+        nombre: orderItemName(item.nombre, prod),
         qty: item.qty,
         unitPrice: Math.round(unitPrice),
         ...ids,
@@ -194,7 +217,7 @@ export async function priceOrderItems(
     const itemsWithCat = rawItems.map((item, idx) => {
       const { prod } = resolve(item);
       return {
-        nombre: prod && isNfcGoogle(prod.nombre) ? prod.nombre : item.nombre,
+        nombre: prod?.nombre ?? item.nombre,
         categoria: prod?.categoria ?? "",
         moq_group: prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined,
         qty: item.qty,

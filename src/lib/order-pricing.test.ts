@@ -118,6 +118,62 @@ describe("priceOrderItems", () => {
   });
 });
 
+describe("priceOrderItems — nombres adulterados", () => {
+  const rows: Rows = {
+    ...baseRows,
+    products: [
+      { id: "caro", nombre: "Notebook Pro", categoria: "Varios", precio: "2500000", oferta: "NO" },
+    ],
+  };
+
+  for (const nombre of [
+    "Notebook Pro (sin camiseta)",
+    "Notebook Pro blackview bv100",
+    "Notebook Pro llavero nfc google",
+  ]) {
+    it(`cobra el precio real aunque el nombre diga otra cosa: "${nombre}"`, async () => {
+      const res = await priceOrderItems(fakeSupabase(rows), [
+        { nombre, qty: 1, unitPrice: 1, productId: "caro" },
+      ]);
+      expect(res.error).toBeUndefined();
+      expect(res.validatedItems[0]!.unitPrice).toBe(2500000);
+    });
+  }
+
+  it("guarda el nombre real si el del navegador no corresponde al producto", async () => {
+    const res = await priceOrderItems(fakeSupabase(rows), [
+      { nombre: "Llavero barato", qty: 1, unitPrice: 1, productId: "caro" },
+    ]);
+    expect(res.validatedItems[0]!.nombre).toBe("Notebook Pro");
+    const ok = await priceOrderItems(fakeSupabase(rows), [
+      { nombre: "Notebook Pro Gris (Talle: M)", qty: 1, unitPrice: 1, productId: "caro" },
+    ]);
+    expect(ok.validatedItems[0]!.nombre).toBe("Notebook Pro Gris (Talle: M)");
+  });
+
+  it("las camisetas reales se siguen cobrando con su escala", async () => {
+    const jersey: Rows = {
+      ...baseRows,
+      products: [
+        { id: "cam", nombre: "Camiseta Boca", categoria: "Camisetas", precio: "1", oferta: "NO" },
+      ],
+    };
+    const res = await priceOrderItems(fakeSupabase(jersey), [
+      {
+        nombre: "Camiseta Boca (Talle: M - Versión Fan (Sin personalizar) - Con Parche)",
+        qty: 10,
+        unitPrice: 1,
+        productId: "cam",
+      },
+    ]);
+    expect(res.error).toBeUndefined();
+    // 18.5 USD * 1.07 * 1500 + parche (1 * 1.07 * 1500)
+    expect(res.validatedItems[0]!.unitPrice).toBe(
+      Math.round(18.5 * 1.07 * 1500) + Math.round(1.07 * 1500),
+    );
+  });
+});
+
 describe("priceOrderItems — mínimos por categoría", () => {
   it("sigue exigiendo el mínimo de la categoría con los precios del servidor", async () => {
     const rows: Rows = {

@@ -8,6 +8,9 @@ import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit
 
 // Pedidos por transferencia por IP (generoso: varias personas pueden compartir IP en el celular)
 const transferOrderLimited = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 30 });
+// Consultas de estado de pago por IP (la página de "gracias" la llama una vez; esto evita que
+// alguien pruebe códigos de pedido en masa para ver totales ajenos)
+const verifyPaymentLimited = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 30 });
 
 export type OrderItem = {
   nombre: string;
@@ -99,6 +102,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       metodoPago?: string;
     }> => {
       if (!data.code) return { estado: "desconocido" };
+      if (verifyPaymentLimited(await currentClientIp())) return { estado: "desconocido" };
 
       if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
         console.error("Variables de Supabase no configuradas en el servidor.");

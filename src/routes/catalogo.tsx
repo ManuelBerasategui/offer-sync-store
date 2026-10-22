@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { jsonForScript } from "@/lib/html-escape";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
@@ -70,7 +71,7 @@ export const Route = createFileRoute("/catalogo")({
     scripts: [
       {
         type: "application/ld+json",
-        children: JSON.stringify({
+        children: jsonForScript({
           "@context": "https://schema.org",
           "@type": "BreadcrumbList",
           itemListElement: [

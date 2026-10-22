@@ -47,4 +47,18 @@ describe("createRateLimiter", () => {
     expect(clientIpFrom(new Headers({ "x-real-ip": "8.8.8.8" }))).toBe("8.8.8.8");
     expect(clientIpFrom(new Headers())).toBe("desconocida");
   });
+
+  it("en Vercel ignora un cf-connecting-ip inventado por el cliente", () => {
+    const h = new Headers({ "cf-connecting-ip": "1.2.3.4", "x-real-ip": "5.6.7.8" });
+    expect(clientIpFrom(h, true)).toBe("5.6.7.8");
+    expect(clientIpFrom(h, false)).toBe("1.2.3.4");
+  });
+
+  it("al llenarse no se resetean todos los contadores", () => {
+    const limited = createRateLimiter({ windowMs: 60_000, max: 1 });
+    limited("victima");
+    for (let i = 0; i < 4500; i++) limited(`falsa-${i}`);
+    // La IP real sigue limitada (solo se descartan las más viejas al pasar de 5000)
+    expect(limited("victima")).toBe(true);
+  });
 });

@@ -4,7 +4,7 @@ import {
   buildCustomerEmailHtml,
   type NotifyOrderInput,
 } from "./email.functions";
-import { escapeHtml } from "./html-escape";
+import { escapeHtml, jsonForScript } from "./html-escape";
 
 const evil = '<a href="https://phish.example">Reclamá tu premio</a><img src=x onerror=alert(1)>';
 
@@ -52,4 +52,14 @@ describe("emails de pedido", () => {
       expect(html).toContain("51.000");
     });
   }
+});
+
+describe("jsonForScript", () => {
+  it("no deja cerrar el <script> desde un nombre de producto", () => {
+    const out = jsonForScript({ name: "</script><script>alert(1)</script>" });
+    expect(out).not.toContain("</script>");
+    expect(out).not.toContain("<");
+    // Sigue siendo JSON válido con el mismo contenido
+    expect(JSON.parse(out).name).toBe("</script><script>alert(1)</script>");
+  });
 });

@@ -5,9 +5,11 @@
  * el navegador: cualquiera puede escribir el email de un admin en una llamada.
  */
 
-const DEFAULT_ADMINS = ["admin@config.com", "admin@teimportamos.com"];
-
-/** Emails con permiso de admin: ADMIN_EMAILS (servidor). Si no está configurada, los de siempre. */
+/**
+ * Emails con permiso de admin: ADMIN_EMAILS (servidor). Si no está configurada, NADIE es admin.
+ * Antes había una lista por defecto con emails que cualquiera podía registrar (el registro no pide
+ * confirmar el email) y así entrar al panel.
+ */
 export function adminEmailList(): string[] {
   const raw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
   const list = raw
@@ -15,7 +17,7 @@ export function adminEmailList(): string[] {
     .split(",")
     .map((e) => e.trim())
     .filter(Boolean);
-  return list.length > 0 ? list : DEFAULT_ADMINS;
+  return list;
 }
 
 /**

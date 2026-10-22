@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { jsonForScript } from "@/lib/html-escape";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Award, Ban, CheckCircle2, MessageCircle, PenLine, Shirt } from "lucide-react";
@@ -963,7 +964,7 @@ export const Route = createFileRoute("/producto/$id")({
           ? [
               {
                 type: "application/ld+json",
-                children: JSON.stringify(productSchema),
+                children: jsonForScript(productSchema),
               },
             ]
           : []),
@@ -971,7 +972,7 @@ export const Route = createFileRoute("/producto/$id")({
           ? [
               {
                 type: "application/ld+json",
-                children: JSON.stringify(breadcrumbSchema),
+                children: jsonForScript(breadcrumbSchema),
               },
             ]
           : []),

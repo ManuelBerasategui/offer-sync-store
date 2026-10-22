@@ -54,6 +54,18 @@ function escapeOrderForHtml(order: NotifyOrderInput): NotifyOrderInput {
   };
 }
 
+/**
+ * site_config es pública (la lee la tienda): el registro del último envío no puede llevar el email
+ * del cliente ni el número de pedido. Se guarda enmascarado ("j***@gmail.com").
+ */
+function maskEmail(email: string): string {
+  const [user = "", domain = ""] = String(email ?? "").split("@");
+  return domain ? `${user.slice(0, 1)}***@${domain}` : "***";
+}
+function redactEmails(text: string): string {
+  return String(text ?? "").replace(/[^\s@"'<>]+@[^\s@"'<>]+/g, (m) => maskEmail(m));
+}
+
 const METODO_LABEL: Record<string, string> = {
   transferencia: "🏦 Transferencia Bancaria",
   tarjeta: "💳 Tarjeta de Crédito/Débito",
@@ -513,7 +525,7 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
           await (supabaseAdmin as any).from("site_config").upsert(
             {
               clave: "last_email_error",
-              valor: `[${new Date().toLocaleTimeString("es-AR")}] Error enviando a ${customerEmail} (HTTP ${resCustomer.status}): ${body}`,
+              valor: `[${new Date().toLocaleTimeString("es-AR")}] Error enviando a ${maskEmail(customerEmail)} (HTTP ${resCustomer.status}): ${redactEmails(body).slice(0, 300)}`,
             },
             { onConflict: "clave" },
           );
@@ -527,7 +539,7 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
           await (supabaseAdmin as any).from("site_config").upsert(
             {
               clave: "last_email_success",
-              valor: `[${new Date().toLocaleTimeString("es-AR")}] Enviado con éxito a ${customerEmail} (Orden ${order.orderCode})`,
+              valor: `[${new Date().toLocaleTimeString("es-AR")}] Enviado con éxito a ${maskEmail(customerEmail)}`,
             },
             { onConflict: "clave" },
           );

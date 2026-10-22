@@ -14,20 +14,28 @@ export function createRateLimiter(opts: { windowMs: number; max: number }) {
       return true;
     }
     recent.push(now);
+    hits.delete(key);
     hits.set(key, recent);
-    if (hits.size > 5000) hits.clear();
+    // Si se llena, se descartan las IPs más viejas (no todo: borrar todo permitía resetear los
+    // contadores mandando miles de IPs inventadas)
+    if (hits.size > 5000) {
+      for (const old of [...hits.keys()].slice(0, 1000)) hits.delete(old);
+    }
     return false;
   };
 }
 
-/** IP del cliente según los encabezados del proxy (Vercel / Cloudflare). */
-export function clientIpFrom(headers: Headers): string {
-  return (
-    headers.get("cf-connecting-ip") ||
-    headers.get("x-real-ip") ||
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "desconocida"
-  );
+/**
+ * IP del cliente según la plataforma. Solo se confía en el encabezado que pone el proxy de cada una:
+ * en Vercel, x-real-ip / x-forwarded-for (Vercel los pisa); cf-connecting-ip lo podría mandar el
+ * propio cliente para esquivar el límite. En Cloudflare es al revés.
+ */
+export function clientIpFrom(headers: Headers, onVercel = Boolean(process.env["VERCEL"])): string {
+  const xff = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const ip = onVercel
+    ? headers.get("x-real-ip") || headers.get("x-vercel-forwarded-for") || xff
+    : headers.get("cf-connecting-ip") || headers.get("x-real-ip") || xff;
+  return ip?.trim() || "desconocida";
 }
 
 /** IP del pedido en curso dentro de una server function. */

@@ -1266,7 +1266,10 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
       token: str(data?.token, 2000),
       filename: str(data?.filename, 200),
       base64: data?.base64 ?? "",
-      bucket: str(data?.bucket, 60) || "storage-images",
+      // Solo los buckets de la tienda (antes se podía crear cualquier bucket público)
+      bucket: ["storage-images", "store-images"].includes(str(data?.bucket, 60))
+        ? str(data?.bucket, 60)
+        : "storage-images",
       contentType: str(data?.contentType, 60),
     }),
   )
@@ -1279,7 +1282,13 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
       const buffer = Buffer.from(base64Data, "base64");
       const bucketName = data.bucket || "storage-images";
 
-      let cleanFilename = (data.filename || "").trim().replace(/^\/+/, "");
+      // Nombre de archivo limpio: sin "..", sin barras iniciales y solo caracteres seguros
+      let cleanFilename = (data.filename || "")
+        .trim()
+        .replace(/[^\w./-]/g, "_")
+        .replace(/\.{2,}/g, ".")
+        .replace(/\/{2,}/g, "/")
+        .replace(/^\/+/, "");
       const folder = cleanFilename.includes("/") ? cleanFilename.substring(0, cleanFilename.lastIndexOf("/")) : "products";
       const baseName = cleanFilename.includes("/") ? cleanFilename.substring(cleanFilename.lastIndexOf("/") + 1) : cleanFilename;
       const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
@@ -1301,6 +1310,10 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
         }
       } catch (sharpErr) {
         console.warn("[Upload] Aviso al comprimir con sharp:", sharpErr);
+        // Si sharp no la pudo leer, solo se acepta si declara ser una imagen común
+        if (cType && !/^image\/(webp|jpeg|png|gif|avif)$/.test(cType)) {
+          return { error: "El archivo no es una imagen válida." };
+        }
         if (!cType) {
           if (filename.endsWith(".webp")) cType = "image/webp";
           else if (filename.endsWith(".png")) cType = "image/png";
@@ -2349,6 +2362,20 @@ export function prioritizeCoverImage(images: string[], coverUrl?: string): strin
 }
 
 /** Extrae todas las URLs de imágenes de alta resolución de un álbum Yupoo. */
+/**
+ * Solo fotos alojadas en Yupoo y por HTTPS. La página del álbum la controla quien la publica: sin
+ * este filtro, podía hacer que el servidor descargara cualquier URL y la publicara en nuestro bucket.
+ */
+function isYupooImageUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+    return u.protocol === "https:" && (host === "yupoo.com" || host.endsWith(".yupoo.com"));
+  } catch {
+    return false;
+  }
+}
+
 function extractAlbumImages(html: string): string[] {
   const urls: string[] = [];
   const regex = /data-origin-src="([^"]+)"/g;
@@ -2356,7 +2383,7 @@ function extractAlbumImages(html: string): string[] {
   while ((m = regex.exec(html)) !== null) {
     const raw = m[1].trim();
     const url = raw.startsWith("//") ? `https:${raw}` : raw;
-    if (url.startsWith("http://") || url.startsWith("https://")) {
+    if (isYupooImageUrl(url)) {
       urls.push(url);
     }
   }
@@ -2367,7 +2394,7 @@ function extractAlbumImages(html: string): string[] {
     while ((m = fallbackRegex.exec(html)) !== null) {
       const raw = m[1].trim();
       const url = raw.startsWith("//") ? `https:${raw}` : raw;
-      if (url.startsWith("http://") || url.startsWith("https://")) {
+      if (isYupooImageUrl(url)) {
         urls.push(toYupooHighRes(url));
       }
     }
@@ -2631,7 +2658,8 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         const bestCover = data.coverUrl || albumCover;
         const rawImages = extractAlbumImages(html);
         const orderedImages = prioritizeCoverImage(rawImages, bestCover);
-        const imageUrls = orderedImages.slice(0, data.maxImages);
+        // La portada puede venir de la página o del panel: también tiene que ser de Yupoo
+        const imageUrls = orderedImages.filter(isYupooImageUrl).slice(0, data.maxImages);
 
         if (imageUrls.length === 0) {
           return { error: "No se encontraron imágenes en el álbum." };
@@ -2677,6 +2705,8 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
               signal: AbortSignal.timeout(15000),
             });
             if (!imgRes.ok) continue;
+            // Si hubo redirección, el destino final también tiene que ser de Yupoo
+            if (imgRes.url && !isYupooImageUrl(imgRes.url)) continue;
 
             const buffer = await imgRes.arrayBuffer();
             if (buffer.byteLength === 0) continue;
@@ -2698,7 +2728,8 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
               ct = "image/webp";
               ext = "webp";
             } catch {
-              // si sharp falla, se sube el original
+              // Si no es una imagen válida, no se sube nada (nunca se publica contenido arbitrario)
+              continue;
             }
 
             const fileId = crypto.randomUUID();
