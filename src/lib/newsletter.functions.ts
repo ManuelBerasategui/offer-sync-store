@@ -334,8 +334,11 @@ export const sendNextCampaignBatch = createServerFn({ method: "POST" })
       const batch = pendingSubscribers.slice(0, batchSize);
 
       // Obtener API Key de Resend
-      let apiKey = process.env["RESEND_API_KEY"] || process.env["VITE_RESEND_API_KEY"];
-      const fromAddress = "Te Importamos <noreply@teimportamosarg.com>";
+      // Misma clave que los emails de pedido, desde la configuración privada
+      const { getResendConfig } = await import("./secrets.server");
+      const resend = await getResendConfig(supabaseAdmin);
+      let apiKey = resend.apiKey;
+      const fromAddress = resend.from;
 
       let sentCount = 0;
       let failedCount = 0;
@@ -460,8 +463,11 @@ export const sendCampaignTestEmail = createServerFn({ method: "POST" })
         return { success: false, error: "Campaña no encontrada." };
       }
 
-      let apiKey = process.env["RESEND_API_KEY"] || process.env["VITE_RESEND_API_KEY"];
-      const fromAddress = "Te Importamos <noreply@teimportamosarg.com>";
+      // Misma clave que los emails de pedido, desde la configuración privada
+      const { getResendConfig } = await import("./secrets.server");
+      const resend = await getResendConfig(supabaseAdmin);
+      let apiKey = resend.apiKey;
+      const fromAddress = resend.from;
 
       const html = buildPromotionalEmailHtml({
         nombre: "Admin (Prueba)",
@@ -558,8 +564,9 @@ export const syncNewUserSubscriber = createServerFn({ method: "POST" })
 
       return { success: true };
     } catch (err: any) {
-      console.error("[newsletter] Error al registrar suscriptor:", err);
-      return { success: false, error: err.message };
+      console.error("[newsletter] Error al registrar suscriptor:", err?.message ?? err);
+      // Mensaje genérico: el error interno de la base no se le muestra al visitante
+      return { success: false, error: "No pudimos registrar la suscripción." };
     }
   });
 

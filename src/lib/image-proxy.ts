@@ -102,6 +102,12 @@ export async function handleImageProxy(request: Request, _ctx?: unknown): Promis
   const reqUrl = new URL(request.url);
   const targetUrlStr = reqUrl.searchParams.get("url");
 
+  // Solo el parámetro "url": cualquier otro (?url=...&x=1) generaba una entrada nueva en la caché
+  // del CDN por cada variante y obligaba a pedir la imagen otra vez a Supabase (egress)
+  if ([...reqUrl.searchParams.keys()].some((k) => k !== "url") || reqUrl.searchParams.getAll("url").length > 1) {
+    return new Response("Bad request", { status: 400 });
+  }
+
   if (!targetUrlStr) {
     return new Response("Missing url parameter", { status: 400 });
   }

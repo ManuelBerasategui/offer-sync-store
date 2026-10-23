@@ -12,7 +12,6 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { AdminHeader } from "@/components/AdminHeader";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import {
   getAdminProducts,
   upsertAdminProduct,
@@ -37,7 +36,6 @@ import {
 } from "@/lib/products.functions";
 import { type Product, type Banner, money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
-import { THUMB_SIZES, thumbObjectPaths } from "@/lib/thumb-paths";
 import { SafeImage } from "@/components/SafeImage";
 
 export const Route = createFileRoute("/admin/productos")({
@@ -194,42 +192,9 @@ function ImageDropzone({
 
       const filename = `${folder}/${crypto.randomUUID()}.webp`;
 
-      // 2. Intentar primero subida directa por cliente
-      const { error: clientErr } = await supabase.storage.from(bucket).upload(filename, compressed.file, {
-        contentType: "image/webp",
-        cacheControl: "31536000",
-        upsert: false,
-      });
-
-      if (!clientErr) {
-        // Miniaturas de 160px y 320px con el mismo nombre (las tarjetas usan la de 320px)
-        const paths = thumbObjectPaths(filename);
-        await Promise.all(
-          (["sm", "md"] as const).map(async (size) => {
-            try {
-              const px = THUMB_SIZES[size];
-              const thumb = await compressImageFile(file, {
-                maxWidth: px,
-                maxHeight: px,
-                quality: 0.8,
-              });
-              await supabase.storage.from(bucket).upload(paths[size], thumb.file, {
-                contentType: "image/webp",
-                cacheControl: "31536000",
-                upsert: true,
-              });
-            } catch (thumbErr) {
-              console.warn("No se pudo subir la miniatura:", thumbErr);
-            }
-          }),
-        );
-        const { data } = supabase.storage.from(bucket).getPublicUrl(filename);
-        onChange(data.publicUrl);
-        setUploading(false);
-        return;
-      }
-
-      // 3. Si falla por RLS, usar función admin del servidor (base64)
+      // 2. Siempre por la función del servidor, que verifica que sea admin y genera las miniaturas.
+      // (Antes se intentaba primero subir directo desde el navegador con la sesión del usuario:
+      // si las reglas de Storage lo permitían, cualquier cuenta podía subir o pisar imágenes.)
       const res = await uploadAdminProductImage({
         data: {
           email: user?.email ?? "",

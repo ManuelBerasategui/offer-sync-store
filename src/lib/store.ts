@@ -331,6 +331,10 @@ const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
 export function sanitizeUrl(url?: string | null): string {
   if (!url || typeof url !== "string") return "#";
   const trimmed = url.trim();
+  // Los navegadores ignoran tabs, saltos de línea y otros caracteres de control dentro de una URL:
+  // "/\t/evil.com" terminaba siendo "//evil.com" (otro sitio)
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f\\]/.test(trimmed)) return "#";
   if (trimmed.startsWith("#")) {
     return "#" + trimmed.slice(1).replace(/[^\w\-]/g, "");
   }
@@ -423,6 +427,57 @@ export function impliedUsdRate(rows: { precio?: unknown; precio_usd?: unknown }[
 }
 
 /** Categorías en el orden en que se muestran en la tienda (catálogo y cuestionario de la home). */
+/**
+ * Claves de site_config que NO se mandan al navegador (la configuración de la tienda la recibe
+ * cualquier visitante). Incluye credenciales, registros internos, usos de cupón (emails) y el
+ * código del cupón, que solo usa el panel de admin.
+ */
+export function isPrivateConfigKey(clave: string): boolean {
+  const k = clave.trim().toLowerCase();
+  return (
+    k.startsWith("coupon_usage_") ||
+    k.startsWith("last_email_") ||
+    k.startsWith("resend_") ||
+    k === "promo_cupon_codigo" ||
+    /(api[_-]?key|secret|token|password|passwd|private|access[_-]?key)/.test(k)
+  );
+}
+
+/** "Parlante JBL Negro" + "Negro" → "Parlante JBL" (para armar el nombre con otro color). */
+export function stripTrailingColor(name: string, color: string): string {
+  const trimmedName = name.trim();
+  const trimmedColor = color.trim();
+  if (!trimmedColor) return trimmedName;
+
+  if (trimmedName.toLowerCase().endsWith(trimmedColor.toLowerCase())) {
+    let withoutColor = trimmedName.slice(0, trimmedName.length - trimmedColor.length).trimEnd();
+    if (withoutColor.endsWith("-") || withoutColor.endsWith("—")) {
+      withoutColor = withoutColor.slice(0, -1).trimEnd();
+    }
+    return withoutColor;
+  }
+  return trimmedName;
+}
+
+/** Talles válidos para un producto (o para un color, si la variante tiene los suyos). */
+export function allowedTallesFor(product: Record<string, unknown>, color?: string | null): string[] {
+  const meta =
+    product["metadata"] && typeof product["metadata"] === "object"
+      ? (product["metadata"] as Record<string, unknown>)
+      : {};
+  const read = (key: string): string[] => {
+    const raw = product[key] ?? meta[key];
+    if (Array.isArray(raw)) return raw.map((t) => String(t).trim()).filter(Boolean);
+    if (typeof raw === "string") return raw.split(",").map((t) => t.trim()).filter(Boolean);
+    return [];
+  };
+  if (color) {
+    const byColor = read(`talles_color_${color.trim().toLowerCase().normalize("NFC").replace(/\s+/g, "_")}`);
+    if (byColor.length > 0) return byColor;
+  }
+  return read("talles_disponibles");
+}
+
 /** Cuántos "Más vendidos" muestra la home. */
 export const HOME_BEST_SELLERS = 3;
 

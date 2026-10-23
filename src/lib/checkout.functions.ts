@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
+import { couponUsedByDni, hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
 import { priceOrderItems } from "./order-pricing";
 import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit";
 
@@ -73,7 +73,8 @@ export const createCheckout = createServerFn({ method: "POST" })
         token: data.token ? String(data.token).slice(0, 4000) : undefined,
         shipping: {
           nombre: String(s.nombre ?? "").slice(0, 120),
-          dni: String(s.dni ?? "").slice(0, 20),
+          // Solo números: así el control del cupón por DNI encuentra los pedidos anteriores
+          dni: String(s.dni ?? "").slice(0, 20).replace(/\D/g, ""),
           telefono: String(s.telefono ?? "").slice(0, 30),
           email: String(s.email ?? "").slice(0, 160),
           provincia: String(s.provincia ?? "").slice(0, 60),
@@ -113,12 +114,14 @@ export const createCheckout = createServerFn({ method: "POST" })
     let total = 0;
     let couponDiscountAmount = 0;
     let validCouponApplied: string | null = null;
+    let verifiedEmail = "";
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
       // Cuenta verificada por token (nunca el userId que manda el navegador)
       const verified = await verifiedUserFromToken(supabaseAdmin, data.token);
+      verifiedEmail = verified?.email ?? "";
 
       // Garantizar que data.shipping tenga el email de la cuenta si el usuario está logueado
       if (verified?.email && (!data.shipping.email || !data.shipping.email.includes("@"))) {
@@ -157,7 +160,8 @@ export const createCheckout = createServerFn({ method: "POST" })
             (await hasUsedCoupon(supabaseAdmin, promoCode, verified.id, verified.email)) ||
             (shippingEmail && shippingEmail !== verified.email
               ? await hasUsedCoupon(supabaseAdmin, promoCode, null, shippingEmail)
-              : false);
+              : false) ||
+            (await couponUsedByDni(supabaseAdmin, promoCode, data.shipping.dni));
 
           if (!used) {
             const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
@@ -186,46 +190,34 @@ export const createCheckout = createServerFn({ method: "POST" })
       return { error: "No se pudieron calcular los totales de tu orden. Por favor recargá la página." };
     }
 
-    // Generamos el código de orden
-    const d = new Date();
-    const stamp = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-    const orderCode = `TI-${stamp}-${rand}`;
-
+    // Código aleatorio + cupón reservado antes del pedido (ver src/lib/order-create.server.ts)
+    let orderCode = "";
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { error } = await supabaseAdmin.from("orders").insert({
-        order_code: orderCode,
-        user_id: data.userId ?? null,
-        ...data.shipping,
-        items,
-        total,
-        estado: "pendiente",
-        metodo_pago: "mercadopago",
-      });
-
-      if (error) {
-        console.error("Error al guardar orden pendiente:", error);
-        return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
+      const { createOrderRecord } = await import("./order-create.server");
+      const created = await createOrderRecord(
+        supabaseAdmin,
+        {
+          user_id: data.userId ?? null,
+          ...data.shipping,
+          items,
+          total,
+          estado: "pendiente",
+          metodo_pago: "mercadopago",
+        },
+        validCouponApplied
+          ? {
+              code: validCouponApplied,
+              userId: data.userId ?? null,
+              email: verifiedEmail || data.shipping.email || "",
+              discount: couponDiscountAmount,
+            }
+          : null,
+      );
+      if (!created.orderCode) {
+        return { error: created.error ?? "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
       }
-
-      // Registrar uso del cupón si fue aplicado
-      if (validCouponApplied) {
-        try {
-          await supabaseAdmin.from("coupon_usages").insert({
-            user_id: data.userId ?? null,
-            user_email: (data.shipping.email ?? "").trim().toLowerCase(),
-            coupon_code: validCouponApplied,
-            order_code: orderCode,
-            discount_amount: couponDiscountAmount,
-          });
-        } catch (couponErr) {
-          console.error("Error registrando uso de cupón en MP:", couponErr);
-        }
-
-        // Los usos se registran solo en coupon_usages (privada). Antes también se escribían en
-        // site_config, que es pública: eso exponía los emails de los clientes.
-      }
+      orderCode = created.orderCode;
     } catch (err) {
       console.error("Error al guardar orden pendiente:", err);
       return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
@@ -255,6 +247,8 @@ export const createCheckout = createServerFn({ method: "POST" })
           failure: `${origin}/carrito`,
         },
         auto_return: "approved",
+        // MP avisa acá cuando cambia el pago, aunque el comprador no vuelva a la tienda
+        notification_url: `${origin}/api/mp-webhook`,
         payer: {
           name: data.shipping.nombre,
           email: data.shipping.email,

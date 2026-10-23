@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Banner, Product, SiteConfig, StoreData } from "./store";
-import { isHiddenCategory } from "./store";
+import { isHiddenCategory, isPrivateConfigKey } from "./store";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -157,8 +157,8 @@ async function fetchFromSupabase(): Promise<StoreData> {
   const config: SiteConfig = {};
   for (const row of configRaw ?? []) {
     const r = row as { clave?: string; valor?: string };
-    // Las filas coupon_usage_* tienen emails de clientes: nunca mandarlas al navegador
-    if (r.clave && !r.clave.startsWith("coupon_usage_")) config[r.clave] = r.valor ?? "";
+    // Esta configuración la recibe cualquier visitante: nunca mandar claves privadas
+    if (r.clave && !isPrivateConfigKey(r.clave)) config[r.clave] = r.valor ?? "";
   }
 
   return { products, banners, config };

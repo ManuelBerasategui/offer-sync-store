@@ -11,7 +11,9 @@
  * confirmar el email) y así entrar al panel.
  */
 export function adminEmailList(): string[] {
-  const raw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
+  // Solo la variable de servidor: una VITE_* termina en el JS público y su valor viejo
+  // ("admin@config.com") lo podía registrar cualquiera
+  const raw = process.env["ADMIN_EMAILS"] || "";
   const list = raw
     .toLowerCase()
     .split(",")
@@ -33,6 +35,16 @@ export async function assertAdmin(_email?: string, token?: string) {
   if (error || !email) throw new Error("Acceso denegado: sesión inválida o vencida.");
 
   if (!adminEmailList().includes(email)) {
+    throw new Error("Acceso denegado: sin permisos de administrador.");
+  }
+  // Opcional y más fuerte: ADMIN_USER_IDS (ids de usuario de Supabase, separados por coma).
+  // Si está configurada, además del email tiene que coincidir el id: aunque alguien registre un
+  // email de la lista, su cuenta tiene otro id y no entra.
+  const ids = (process.env["ADMIN_USER_IDS"] || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (ids.length > 0 && !ids.includes(String(data?.user?.id ?? ""))) {
     throw new Error("Acceso denegado: sin permisos de administrador.");
   }
   return supabaseAdmin;

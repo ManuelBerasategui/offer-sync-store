@@ -28,6 +28,39 @@ function isAdminUrl(url: unknown): boolean {
   }
 }
 
+/** Páginas cuya URL puede traer tokens (recuperar contraseña, desuscribirse): no se registran. */
+const SENSITIVE_PATHS = ["/reset-password", "/desuscribir"];
+
+function isSensitiveUrl(url: unknown): boolean {
+  if (typeof url !== "string") return false;
+  try {
+    const { pathname } = new URL(url);
+    return SENSITIVE_PATHS.some((p) => pathname.startsWith(p));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Saca de una URL el hash y los parámetros con tokens. El link de recuperación de contraseña
+ * trae access_token/refresh_token en el hash: si PostHog lo registraba, cualquiera con acceso al
+ * proyecto de PostHog podía usarlo para cambiar la contraseña de esa cuenta.
+ */
+export function scrubUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.hash = "";
+    for (const key of [...u.searchParams.keys()]) {
+      if (/token|code|key|secret|password|session|payment_id|preference_id/i.test(key)) {
+        u.searchParams.delete(key);
+      }
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function initAnalytics(): void {
   if (typeof window === "undefined" || !KEY || client || loading) return;
   loading = true;
@@ -46,10 +79,19 @@ export function initAnalytics(): void {
         before_send: (event) => {
           if (!event) return null;
           const url = event.properties?.["$current_url"];
-          return isAdminUrl(url) ? null : event;
+          if (isAdminUrl(url) || isSensitiveUrl(url)) return null;
+          // Nunca mandar tokens que vengan en la URL
+          for (const prop of ["$current_url", "$referrer", "$initial_current_url", "$initial_referrer"]) {
+            const value = event.properties?.[prop];
+            if (typeof value === "string") event.properties[prop] = scrubUrl(value);
+          }
+          return event;
         },
       });
       client = posthog;
+      // El link de recuperación de contraseña abre /reset-password con los tokens en la URL:
+      // en esa página no se graba la sesión
+      if (isSensitiveUrl(window.location.href)) posthog.stopSessionRecording();
       for (const [name, props] of queue.splice(0)) posthog.capture(name, props);
     })
     .catch(() => {

@@ -1265,7 +1265,8 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
       filename: str(data?.filename, 200),
-      base64: data?.base64 ?? "",
+      // Hasta ~6 MB de imagen (el panel ya la comprime a WebP de 900px, que pesa mucho menos)
+      base64: String(data?.base64 ?? "").slice(0, 8_000_000),
       // Solo los buckets de la tienda (antes se podía crear cualquier bucket público)
       bucket: ["storage-images", "store-images"].includes(str(data?.bucket, 60))
         ? str(data?.bucket, 60)
@@ -1452,22 +1453,19 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         }
       }
 
+      // Clave y remitente de Resend: a la configuración privada (app_secrets), nunca a
+      // site_config, que es pública. Si el campo de la clave viene vacío, se mantiene la guardada.
       if (data.resendConfig) {
-        if (data.resendConfig.apiKey) {
-          await (supabaseAdmin as any)
-            .from("site_config")
-            .upsert(
-              { clave: "resend_api_key", valor: data.resendConfig.apiKey.trim() },
-              { onConflict: "clave" },
-            );
+        const { setSecret } = await import("./secrets.server");
+        const apiKey = str(data.resendConfig.apiKey, 200).trim();
+        const from = str(data.resendConfig.from, 160).trim();
+        if (apiKey) {
+          const res = await setSecret(supabaseAdmin, "resend_api_key", apiKey);
+          if (res.error) return { error: res.error };
         }
-        if (data.resendConfig.from) {
-          await (supabaseAdmin as any)
-            .from("site_config")
-            .upsert(
-              { clave: "resend_from", valor: data.resendConfig.from.trim() },
-              { onConflict: "clave" },
-            );
+        if (from) {
+          const res = await setSecret(supabaseAdmin, "resend_from", from);
+          if (res.error) return { error: res.error };
         }
       }
 
@@ -1477,10 +1475,15 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
             clave: "promo_cupon_activo",
             valor: data.couponConfig.activo ? "SI" : "NO",
           },
-          {
-            clave: "promo_cupon_codigo",
-            valor: (data.couponConfig.codigo || "TEIMPORTAMOS").trim().toUpperCase(),
-          },
+          // Si el código llega vacío (el panel todavía no lo cargó), se mantiene el guardado
+          ...(str(data.couponConfig.codigo, 40).trim()
+            ? [
+                {
+                  clave: "promo_cupon_codigo",
+                  valor: str(data.couponConfig.codigo, 40).trim().toUpperCase(),
+                },
+              ]
+            : []),
           {
             clave: "promo_cupon_descuento_pct",
             valor: String(data.couponConfig.descuentoPct ?? 5),
@@ -1681,6 +1684,53 @@ export const testAdminResendEmail = createServerFn({ method: "POST" })
       };
     }
   });
+
+/**
+ * Datos privados que el panel necesita mostrar. Ya no viajan en la configuración pública de la
+ * tienda. La clave de Resend nunca se devuelve: solo si está configurada.
+ */
+export const getAdminPrivateConfig = createServerFn({ method: "POST" })
+  .validator((data: { token?: string }) => ({ token: str(data?.token, 2000) }))
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      resendConfigured: boolean;
+      resendFrom: string;
+      lastEmailSuccess: string;
+      lastEmailError: string;
+      cuponCodigo: string;
+      error?: string;
+    }> => {
+      const empty = {
+        resendConfigured: false,
+        resendFrom: "",
+        lastEmailSuccess: "",
+        lastEmailError: "",
+        cuponCodigo: "",
+      };
+      try {
+        const supabaseAdmin = await assertAdmin(undefined, data.token);
+        const { getResendConfig, getSecret } = await import("./secrets.server");
+        const resend = await getResendConfig(supabaseAdmin);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: cupon } = await (supabaseAdmin as any)
+          .from("site_config")
+          .select("valor")
+          .eq("clave", "promo_cupon_codigo")
+          .maybeSingle();
+        return {
+          resendConfigured: Boolean(resend.apiKey),
+          resendFrom: resend.from,
+          lastEmailSuccess: (await getSecret(supabaseAdmin, "last_email_success")) ?? "",
+          lastEmailError: (await getSecret(supabaseAdmin, "last_email_error")) ?? "",
+          cuponCodigo: cupon?.valor ? String(cupon.valor) : "",
+        };
+      } catch (err) {
+        return { ...empty, error: err instanceof Error ? err.message : "Acceso denegado." };
+      }
+    },
+  );
 
 /* ─── Tipos e Integración para Combos / Banners en Oferta ─── */
 

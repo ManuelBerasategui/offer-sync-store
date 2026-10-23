@@ -45,6 +45,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 import { handleImageProxy } from "./lib/image-proxy";
+import { handleMpWebhook } from "./lib/mp-webhook";
 import { withSecurityHeaders } from "./lib/security-headers";
 
 export default {
@@ -58,6 +59,9 @@ async function handleRequest(request: Request, env: unknown, ctx: unknown): Prom
     const url = new URL(request.url);
     if (url.pathname === "/api/img") {
       return await handleImageProxy(request, ctx as { waitUntil(p: Promise<unknown>): void });
+    }
+    if (url.pathname === "/api/mp-webhook") {
+      return await handleMpWebhook(request);
     }
 
     const handler = await getServerEntry();

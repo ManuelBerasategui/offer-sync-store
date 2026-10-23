@@ -12,6 +12,7 @@ import {
   upsertCategoryRules,
   testAdminResendEmail,
   getCouponUsagesSummary,
+  getAdminPrivateConfig,
   generateMissingThumbnails,
   type CategoryRuleInput,
 } from "@/lib/products.functions";
@@ -75,8 +76,14 @@ function AdminConfiguracionPage() {
   const [bankBanco, setBankBanco] = useState<string>(config["transferencia_banco"] ?? "Mercado Pago");
   const [bankDiscountPct, setBankDiscountPct] = useState<string>(config["transferencia_descuento_pct"] ?? "7");
 
-  const [resendApiKey, setResendApiKey] = useState<string>(config["resend_api_key"] ?? "");
-  const [resendFrom, setResendFrom] = useState<string>(config["resend_from"] ?? "Te Importamos <noreply@teimportamosarg.com>");
+  // La clave de Resend nunca se muestra: el campo queda vacío y solo se guarda si se escribe una nueva
+  const [resendApiKey, setResendApiKey] = useState<string>("");
+  const [resendFrom, setResendFrom] = useState<string>("");
+  const [privateConfig, setPrivateConfig] = useState<{
+    resendConfigured: boolean;
+    lastEmailSuccess: string;
+    lastEmailError: string;
+  }>({ resendConfigured: false, lastEmailSuccess: "", lastEmailError: "" });
   const [testingEmail, setTestingEmail] = useState(false);
   const [testEmailMsg, setTestEmailMsg] = useState<{ success?: boolean; text?: string } | null>(null);
 
@@ -84,9 +91,8 @@ function AdminConfiguracionPage() {
   const [couponActive, setCouponActive] = useState<boolean>(
     (config["promo_cupon_activo"] ?? "SI").toUpperCase() === "SI",
   );
-  const [couponCode, setCouponCode] = useState<string>(
-    config["promo_cupon_codigo"] ?? "TEIMPORTAMOS",
-  );
+  // El código del cupón ya no viaja en la configuración pública: se carga desde el servidor
+  const [couponCode, setCouponCode] = useState<string>("");
   const [couponDiscountPct, setCouponDiscountPct] = useState<string>(
     config["promo_cupon_descuento_pct"] ?? "5",
   );
@@ -110,7 +116,8 @@ function AdminConfiguracionPage() {
   const [newsletterSummary, setNewsletterSummary] = useState<CampaignSummary | null>(null);
   const [batchSize, setBatchSize] = useState<number>(50);
   const [sendingBatch, setSendingBatch] = useState<boolean>(false);
-  const [testCampaignEmail, setTestCampaignEmail] = useState<string>("manuelberasategui1@gmail.com");
+  // Vacío = se usa el email del admin con la sesión iniciada (antes había un email personal fijo)
+  const [testCampaignEmail, setTestCampaignEmail] = useState<string>("");
   const [sendingCampaignTest, setSendingCampaignTest] = useState<boolean>(false);
   const [batchMsg, setBatchMsg] = useState<{ success: boolean; text: string } | null>(null);
   const [showNewCampaignModal, setShowNewCampaignModal] = useState<boolean>(false);
@@ -164,6 +171,20 @@ function AdminConfiguracionPage() {
         return;
       }
       setIsAuthorized(true);
+
+      // Datos privados (Resend, cupón): ya no vienen en la configuración pública de la tienda
+      getAdminPrivateConfig({ data: { token } })
+        .then((priv) => {
+          if (priv.error) return;
+          setPrivateConfig({
+            resendConfigured: priv.resendConfigured,
+            lastEmailSuccess: priv.lastEmailSuccess,
+            lastEmailError: priv.lastEmailError,
+          });
+          if (priv.resendFrom) setResendFrom(priv.resendFrom);
+          if (priv.cuponCodigo) setCouponCode(priv.cuponCodigo);
+        })
+        .catch(() => { });
 
       // Cargar usos registrados del cupón y newsletter
       getCouponUsagesSummary({ data: { email, token } })
@@ -350,6 +371,10 @@ function AdminConfiguracionPage() {
         },
       });
       if (res.error) { setError(res.error); return; }
+      if (resendApiKey.trim()) {
+        setResendApiKey("");
+        setPrivateConfig((p) => ({ ...p, resendConfigured: true }));
+      }
       // Invalidar la cache para que el próximo F5 lea los nuevos valores
       void queryClient.invalidateQueries({ queryKey: ["store"] });
       setSuccessMsg("¡Configuración guardada correctamente!");
@@ -484,7 +509,8 @@ function AdminConfiguracionPage() {
   }
 
   async function handleSendCampaignTest(campaignId: string) {
-    if (!testCampaignEmail.trim()) {
+    const target = testCampaignEmail.trim() || userEmail;
+    if (!target) {
       setBatchMsg({ success: false, text: "Ingresá un correo de prueba válido." });
       return;
     }
@@ -494,7 +520,7 @@ function AdminConfiguracionPage() {
       const res = await sendCampaignTestEmail({
         data: {
           campaignId,
-          targetEmail: testCampaignEmail.trim(),
+          targetEmail: target,
           token: session?.access_token ?? "",
         },
       });
@@ -765,10 +791,15 @@ function AdminConfiguracionPage() {
               <span className="text-xs font-semibold text-muted-foreground">Resend API Key (re_...)</span>
               <input
                 type="password"
+                autoComplete="off"
                 className="input-base"
                 value={resendApiKey}
                 onChange={(e) => setResendApiKey(e.target.value)}
-                placeholder="re_1234567890abcdef..."
+                placeholder={
+                  privateConfig.resendConfigured
+                    ? "•••••••• Guardada (escribí una nueva solo para reemplazarla)"
+                    : "re_1234567890abcdef..."
+                }
               />
             </label>
 
@@ -807,16 +838,16 @@ function AdminConfiguracionPage() {
           </div>
 
           {/* Registro del último envío */}
-          {(config["last_email_error"] || config["last_email_success"]) && (
+          {(privateConfig.lastEmailError || privateConfig.lastEmailSuccess) && (
             <div className="mt-3 space-y-1.5 pt-2 border-t border-border/40 text-[11px]">
-              {config["last_email_success"] && (
+              {privateConfig.lastEmailSuccess && (
                 <p className="text-emerald-600 dark:text-emerald-400 font-medium">
-                  ✓ Último envío exitoso: {config["last_email_success"]}
+                  ✓ Último envío exitoso: {privateConfig.lastEmailSuccess}
                 </p>
               )}
-              {config["last_email_error"] && (
+              {privateConfig.lastEmailError && (
                 <p className="text-destructive font-mono bg-destructive/10 p-2 rounded-lg break-all">
-                  ⚠️ Último error de Resend: {config["last_email_error"]}
+                  ⚠️ Último error de Resend: {privateConfig.lastEmailError}
                 </p>
               )}
             </div>
@@ -958,7 +989,7 @@ function AdminConfiguracionPage() {
                     className="input-base text-xs"
                     value={testCampaignEmail}
                     onChange={(e) => setTestCampaignEmail(e.target.value)}
-                    placeholder="manuelberasategui1@gmail.com"
+                    placeholder={userEmail || "tu@email.com"}
                   />
                 </label>
                 <button

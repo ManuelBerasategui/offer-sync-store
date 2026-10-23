@@ -1,8 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { NotifyOrderInput } from "@/lib/email.functions";
-import { decideMpPayment, type MpPayment } from "./mp-verify";
 import { checkAdmin } from "./admin-auth";
-import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
+import { couponUsedByDni, hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
 import { priceOrderItems } from "./order-pricing";
 import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit";
 
@@ -37,17 +36,12 @@ const text = (v: unknown, max = 120) =>
     .trim()
     .slice(0, max);
 
-export function makeCode() {
-  const d = new Date();
-  const stamp = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `TI-${stamp}-${rand}`;
-}
 
 function cleanShipping(s: ShippingInput): ShippingInput {
   return {
     nombre: text(s?.nombre),
-    dni: text(s?.dni, 20),
+    // Solo números: así el control del cupón por DNI encuentra los pedidos anteriores
+    dni: text(s?.dni, 20).replace(/\D/g, ""),
     telefono: text(s?.telefono, 30),
     email: text(s?.email, 160),
     provincia: text(s?.provincia, 60),
@@ -110,11 +104,14 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       }
 
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { ORDER_FIELDS, confirmMpOrder, fetchMpPayment, isMpOrder } = await import(
+        "./mp-confirm.server"
+      );
 
       // 1. Buscar la orden en Supabase (puede ser "pendiente" o ya "pagado")
       const { data: order } = await supabaseAdmin
         .from("orders")
-        .select("id, order_code, estado, total, metodo_pago, nombre, email, telefono, dni, provincia, ciudad, codigo_postal, transporte, sucursal_correo, items")
+        .select(ORDER_FIELDS)
         .eq("order_code", data.code)
         .maybeSingle();
 
@@ -128,13 +125,6 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         };
       }
 
-      // 2. Consultar el estado real del pago en la API de Mercado Pago
-      const mpToken = process.env["MERCADOPAGO_ACCESS_TOKEN"];
-      if (!mpToken) {
-        console.error("MERCADOPAGO_ACCESS_TOKEN no configurado.");
-        return { estado: "desconocido" };
-      }
-
       // Solo los pedidos de Mercado Pago se confirman acá (los de transferencia los confirma el admin)
       const pendingResult = {
         ...(order?.order_code ? { orderCode: order.order_code } : {}),
@@ -142,141 +132,26 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         ...(order?.total ? { total: Number(order.total) } : {}),
         ...(order?.metodo_pago ? { metodoPago: order.metodo_pago } : {}),
       };
-      if (!order || (order.metodo_pago && order.metodo_pago !== "mercadopago" && order.metodo_pago !== "tarjeta")) {
-        return order ? pendingResult : { estado: "desconocido" };
-      }
+      if (!order) return { estado: "desconocido" };
+      if (!isMpOrder(order)) return pendingResult;
 
-      // El estado del pago SOLO se toma de la API de Mercado Pago. Nunca del status de la URL:
+      // 2. El estado del pago SOLO se toma de la API de Mercado Pago. Nunca del status de la URL:
       // cualquiera puede escribir ?status=approved a mano. Sin confirmación de MP, queda pendiente.
-      if (!data.paymentId || !/^\d+$/.test(data.paymentId)) {
-        return pendingResult;
-      }
+      if (!data.paymentId || !/^\d+$/.test(data.paymentId)) return pendingResult;
+      const payment = await fetchMpPayment(data.paymentId);
 
-      let payment: MpPayment | null = null;
-      try {
-        const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${data.paymentId}`, {
-          headers: { authorization: `Bearer ${mpToken}` },
-          signal: AbortSignal.timeout(10_000),
-        });
-        if (mpRes.ok) {
-          payment = (await mpRes.json()) as MpPayment;
-        } else {
-          console.error(`MP payment lookup failed [${mpRes.status}]: ${await mpRes.text()}`);
-        }
-      } catch (err) {
-        console.error("Error consultando MP:", err);
-      }
-
-      const decision = decideMpPayment(order, payment);
-      if (decision === "pendiente") {
-        if (payment && payment.external_reference !== order.order_code) {
-          console.error(`MP payment ${data.paymentId} no corresponde al pedido ${order.order_code}`);
-        }
-        return pendingResult;
-      }
+      // 3. Mismo paso que el webhook: marca "pagado" (una sola vez) y manda los emails
+      const decision = await confirmMpOrder(supabaseAdmin, order, payment);
+      if (decision === "pendiente") return pendingResult;
       if (decision === "rechazado") {
         return { estado: "rechazado", ...(order.metodo_pago ? { metodoPago: order.metodo_pago } : {}) };
       }
-
-      // 3. El pago está aprobado: actualizar la orden pendiente a "pagado"
-      if (order) {
-        const finalMetodo = order.metodo_pago === "tarjeta" ? "tarjeta" : "mercadopago";
-        const { error: updErr } = await supabaseAdmin
-          .from("orders")
-          .update({ estado: "pagado", metodo_pago: finalMetodo })
-          .eq("id", order.id);
-
-        if (updErr) {
-          console.error("Error al actualizar orden a pagado:", updErr);
-        }
-
-        // Actualizar perfil si corresponde
-        const { data: fullOrder } = await supabaseAdmin
-          .from("orders")
-          .select(
-            "user_id, nombre, dni, telefono, provincia, ciudad, codigo_postal, transporte, sucursal_correo",
-          )
-          .eq("id", order.id)
-          .maybeSingle();
-
-        if (fullOrder?.user_id) {
-          await supabaseAdmin.from("profiles").upsert(
-            {
-              id: fullOrder.user_id,
-              nombre: fullOrder.nombre,
-              dni: fullOrder.dni,
-              telefono: fullOrder.telefono,
-              provincia: fullOrder.provincia,
-              ciudad: fullOrder.ciudad,
-              codigo_postal: fullOrder.codigo_postal,
-              transporte: fullOrder.transporte,
-              sucursal_correo: fullOrder.sucursal_correo,
-            },
-            { onConflict: "id" },
-          );
-        }
-
-        // Notificar a los admins (fire-and-forget)
-        try {
-          let mpCouponCode: string | undefined;
-          let mpCouponDiscount: number | undefined;
-          try {
-            const { data: usage } = await supabaseAdmin
-              .from("coupon_usages")
-              .select("coupon_code, discount_amount")
-              .eq("order_code", order.order_code)
-              .maybeSingle();
-            if (usage) {
-              mpCouponCode = usage.coupon_code;
-              mpCouponDiscount = Number(usage.discount_amount) || undefined;
-            }
-          } catch {
-            // ignore
-          }
-
-          const { notifyNewOrder } = await import("@/lib/email.functions");
-          const mpItems: NotifyOrderInput["items"] = Array.isArray(order.items)
-            ? (order.items as { nombre: string; qty: number; unitPrice: number }[]).map((i) => ({
-                nombre: i.nombre ?? "",
-                qty: Number(i.qty) || 1,
-                unitPrice: Number(i.unitPrice) || 0,
-              }))
-            : [];
-          await notifyNewOrder({
-            orderCode: order.order_code,
-            total: Number(order.total),
-            metodoPago: finalMetodo === "tarjeta" ? "tarjeta" : "mercadopago",
-            shipping: {
-              nombre: order.nombre ?? "",
-              email: order.email ?? "",
-              telefono: order.telefono ?? "",
-              dni: order.dni ?? undefined,
-              provincia: order.provincia ?? undefined,
-              ciudad: order.ciudad ?? undefined,
-              codigo_postal: order.codigo_postal ?? undefined,
-              transporte: order.transporte ?? undefined,
-              sucursal_correo: order.sucursal_correo ?? undefined,
-            },
-            items: mpItems,
-            couponCode: mpCouponCode,
-            couponDiscountAmount: mpCouponDiscount,
-          } satisfies NotifyOrderInput);
-        } catch (e) {
-          console.error("[email] Error enviando notificación de MP:", e);
-        }
-
-        return {
-          orderCode: order.order_code,
-          estado: "pagado",
-          total: Number(order.total),
-          metodoPago: finalMetodo,
-        };
-      }
-
-      // La orden no existía (ej: un pedido creado por una versión anterior)
-      // Igual marcamos como pagado con datos mínimos
-      console.warn(`Borrador no encontrado para code=${data.code}, registrando pago mínimo.`);
-      return { orderCode: data.code, estado: "pagado" };
+      return {
+        orderCode: order.order_code,
+        estado: "pagado",
+        total: Number(order.total),
+        metodoPago: order.metodo_pago === "tarjeta" ? "tarjeta" : "mercadopago",
+      };
     },
   );
 
@@ -430,6 +305,12 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     }
     const supabaseAdmin = auth.supabaseAdmin;
 
+    // Solo estados conocidos (antes se aceptaba cualquier texto)
+    const ESTADOS = ["pendiente", "pagado", "rechazado", "enviado", "entregado", "cancelado"];
+    if (!ESTADOS.includes(data.estado)) {
+      return { status: "error", message: "Estado de pedido inválido." };
+    }
+
     const { error } = await supabaseAdmin
       .from("orders")
       .update({ estado: data.estado })
@@ -553,7 +434,8 @@ export const createTransferOrder = createServerFn({ method: "POST" })
             (await hasUsedCoupon(supabaseAdmin, promoCode, verified.id, verified.email)) ||
             (shippingEmail && shippingEmail !== verified.email
               ? await hasUsedCoupon(supabaseAdmin, promoCode, null, shippingEmail)
-              : false);
+              : false) ||
+            (await couponUsedByDni(supabaseAdmin, promoCode, data.shipping.dni));
 
           if (!used) {
             const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
@@ -578,44 +460,32 @@ export const createTransferOrder = createServerFn({ method: "POST" })
       };
     }
 
-    const orderCode = makeCode();
-
     try {
-      const { error } = await supabaseAdmin.from("orders").insert({
-        order_code: orderCode,
-        user_id: data.userId ?? null,
-        ...data.shipping,
-        items,
-        total,
-        estado: "pendiente",
-        metodo_pago: "transferencia",
-      });
-
-      if (error) {
-        console.error("Error al registrar la orden por transferencia:", error);
-        return {
-          status: "error",
-          message: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos.",
-        };
+      // Código aleatorio + cupón reservado antes del pedido (ver src/lib/order-create.server.ts)
+      const { createOrderRecord } = await import("./order-create.server");
+      const created = await createOrderRecord(
+        supabaseAdmin,
+        {
+          user_id: data.userId ?? null,
+          ...data.shipping,
+          items,
+          total,
+          estado: "pendiente",
+          metodo_pago: "transferencia",
+        },
+        validCouponApplied
+          ? {
+              code: validCouponApplied,
+              userId: data.userId ?? null,
+              email: verified?.email || data.shipping.email || "",
+              discount: couponDiscountAmount,
+            }
+          : null,
+      );
+      if (!created.orderCode) {
+        return { status: "error", message: created.error ?? "No pudimos registrar tu pedido." };
       }
-
-      // Registrar uso del cupón si se aplicó
-      if (validCouponApplied) {
-        try {
-          await supabaseAdmin.from("coupon_usages").insert({
-            user_id: data.userId ?? null,
-            user_email: (data.shipping.email ?? "").trim().toLowerCase(),
-            coupon_code: validCouponApplied,
-            order_code: orderCode,
-            discount_amount: couponDiscountAmount,
-          });
-        } catch (couponErr) {
-          console.error("Error registrando uso de cupón en coupon_usages:", couponErr);
-        }
-
-        // Los usos se registran solo en coupon_usages (privada). Antes también se escribían en
-        // site_config, que es pública: eso exponía los emails de los clientes.
-      }
+      const orderCode = created.orderCode;
 
       if (data.userId) {
         await supabaseAdmin.from("profiles").upsert(
