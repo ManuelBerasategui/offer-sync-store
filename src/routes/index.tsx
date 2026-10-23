@@ -1,13 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, ChevronRight } from "lucide-react";
+import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, ChevronRight, Truck, ShieldCheck, CreditCard } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { ComboCard } from "@/components/ComboCard";
 import { HomeQuiz } from "@/components/HomeQuiz";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { HowItWorks, ReviewsCarousel } from "@/components/Social";
+import { SectionHead } from "@/components/SectionHead";
 import { storeQueryOptions } from "@/lib/store-query";
 import {
   FALLBACK_IMAGE, imageUrl, thumbnailUrl, hasOffer,
@@ -124,57 +125,109 @@ function Home() {
     }
   }
 
+  // Fotos del hero (PC): ofertas y más vendidos con imagen, sin repetir
+  const heroProducts: typeof products = [];
+  const heroSeen = new Set<string>();
+  for (const p of [...ofertasDelDia, ...masVendidos, ...products]) {
+    if (heroProducts.length >= 4) break;
+    const id = String(p.id ?? p.nombre ?? "");
+    if (!p.imagen_url || heroSeen.has(id)) continue;
+    heroSeen.add(id);
+    heroProducts.push(p);
+  }
 
   return (
     <div className="min-h-screen">
       <SiteHeader config={config} />
 
       {/* HERO */}
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 pt-10 pb-8 text-center sm:px-6 sm:pt-20 sm:pb-16">
+      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 pt-10 pb-8 sm:px-6 sm:pt-16 sm:pb-14">
         {/* Decorative color wash & difuminados suaves */}
         <div aria-hidden className="pointer-events-none absolute -top-28 -left-20 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-10 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
 
-        {/* Badge superior: oscuro/neutro, NO naranja */}
-        <span className="relative mb-4 sm:mb-6 inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/[0.06] px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-foreground/60">
-          <Flame className="h-3 w-3 opacity-70" />
-          Precios de Importador
-        </span>
+        <div
+          className={`relative mx-auto grid max-w-[1180px] items-center gap-10 ${
+            heroProducts.length >= 4 ? "lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-14" : ""
+          }`}
+        >
+          <div className="text-center">
+            {/* Badge superior: oscuro/neutro, NO naranja */}
+            <span className="mb-4 sm:mb-6 inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/[0.06] px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-foreground/60">
+              <Flame className="h-3 w-3 opacity-70" />
+              Precios de Importador
+            </span>
 
-        {/* Título: pregunta de entrada del cuestionario */}
-        <h1 className="relative mx-auto max-w-4xl text-[clamp(36px,11vw,72px)] leading-[0.95]">
-          ¿Qué querés <span className="text-primary">hacer?</span>
-        </h1>
-        <p className="relative mx-auto mt-3 mb-6 max-w-md text-sm text-muted-foreground sm:mb-8 sm:text-base">
-          Elegí una opción y te llevamos al camino más corto.
-        </p>
+            {/* Título: pregunta de entrada del cuestionario */}
+            <h1 className="mx-auto max-w-4xl text-[clamp(36px,11vw,72px)] leading-[0.95]">
+              ¿Qué querés <span className="text-primary">hacer?</span>
+            </h1>
+            <p className="mx-auto mt-3 mb-6 max-w-md text-sm text-muted-foreground sm:mb-8 sm:text-base">
+              Elegí una opción y te llevamos al camino más corto.
+            </p>
 
-        {/* Cuestionario: importar / mayorista / minorista → rubro del catálogo */}
-        <div className="relative">
-          <HomeQuiz categories={orderedCategories(products)} hasCombos={banners.length > 0} />
-        </div>
+            {/* Cuestionario: importar / mayorista / minorista → rubro del catálogo */}
+            <HomeQuiz categories={orderedCategories(products)} hasCombos={banners.length > 0} />
 
-        {/* Beneficios sin iconos, centrados con espacio */}
-        <div className="relative mx-auto mt-3 flex items-center justify-center gap-4 sm:gap-8 text-xs sm:text-sm font-medium text-muted-foreground/90">
-          <span>Envíos a todo el país</span>
-          <span aria-hidden className="text-muted-foreground/40">•</span>
-          <span>Productos originales</span>
-        </div>
+            {/* Confianza: datos reales del negocio, sin números inventados */}
+            <ul className="mx-auto mt-5 flex max-w-xl flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium text-muted-foreground sm:text-[13px]">
+              <li className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <Truck className="h-4 w-4 shrink-0 text-primary" /> Envíos a todo el país
+              </li>
+              <li className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-primary" /> Productos originales
+              </li>
+              <li className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <CreditCard className="h-4 w-4 shrink-0 text-primary" /> Mercado Pago o transferencia
+              </li>
+            </ul>
 
-        {/* Aviso mínimos — gris puro, sin ámbar */}
-        <div className="relative mt-2 text-center">
-          <a
-            href="#minimos"
-            className="text-[11px] font-medium text-muted-foreground/80 transition-colors hover:text-muted-foreground active:scale-95"
-          >
-            Aplican mínimos de compra según categoría. <span className="font-bold">Ver ↓</span>
-          </a>
+            {/* Aviso mínimos — gris puro, sin ámbar */}
+            <div className="mt-3 text-center">
+              <a
+                href="#minimos"
+                className="text-[11px] font-medium text-muted-foreground/80 transition-colors hover:text-muted-foreground active:scale-95"
+              >
+                Aplican mínimos de compra según categoría. <span className="font-bold">Ver ↓</span>
+              </a>
+            </div>
+          </div>
+
+          {/* PC: fotos de productos reales, para que se vea qué vendemos */}
+          {heroProducts.length >= 4 && (
+            <div className="hidden grid-cols-2 gap-3 lg:grid" aria-label="Algunos de nuestros productos">
+              {heroProducts.map((p, i) => (
+                <Link
+                  key={String(p.id ?? i)}
+                  to="/producto/$id"
+                  params={{ id: String(p.id ?? p.nombre ?? "") }}
+                  onClick={() => track("home_hero_producto", { producto: p.nombre })}
+                  className={`group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md ${
+                    i % 2 === 1 ? "translate-y-6" : ""
+                  }`}
+                >
+                  <img
+                    src={thumbnailUrl(p.imagen_url, "md") || FALLBACK_IMAGE}
+                    alt={p.nombre ?? "Producto"}
+                    width={320}
+                    height={320}
+                    referrerPolicy="no-referrer"
+                    className="aspect-square w-full bg-surface object-contain p-3"
+                    onError={onImageError(p.imagen_url)}
+                  />
+                  <p className="truncate border-t border-border px-3 py-2 text-xs font-semibold text-foreground">
+                    {p.nombre}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
 
       {/* MÁS VENDIDOS */}
-      <section id="mas-vendidos" className="relative overflow-hidden bg-gradient-to-b from-surface via-surface to-primary/5 px-4 py-14 sm:px-6">
+      <section id="mas-vendidos" className="relative overflow-hidden bg-gradient-to-b from-surface via-surface to-primary/5 px-4 pt-14 pb-10 sm:px-6">
         <div aria-hidden className="pointer-events-none absolute -bottom-20 -left-16 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
 
         <div className="relative mx-auto max-w-[1180px]">
@@ -183,7 +236,8 @@ function Home() {
           {masVendidos.length > 0 && (
             <div className="relative -mx-4 sm:mx-0">
               <div
-                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${masVendidos.length === 1 ? "justify-center" : ""
+                // En PC entran las 3 tarjetas: centradas (antes quedaban pegadas a la izquierda)
+                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 lg:justify-center lg:overflow-visible ${masVendidos.length === 1 ? "justify-center" : ""
                   }`}
               >
                 {masVendidos.map((p, i) => (
@@ -198,21 +252,8 @@ function Home() {
                   </div>
                 ))}
               </div>
-              {masVendidos.length > 1 && (
-                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-surface to-transparent sm:block" />
-              )}
             </div>
           )}
-
-          <div className="mt-8 flex justify-center">
-            <Link
-              to="/catalogo"
-              className="btn-base grad-urgente group inline-flex w-full items-center justify-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:w-auto sm:px-12"
-            >
-              Ver más
-              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-            </Link>
-          </div>
         </div>
       </section>
 
@@ -378,7 +419,7 @@ function Home() {
               to="/catalogo"
               className="btn-base grad-urgente group inline-flex w-full items-center justify-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:w-auto sm:px-12"
             >
-              Ver más
+              Ver todo el catálogo
               <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
           </div>
@@ -467,13 +508,15 @@ function Home() {
         return (
           <section id="minimos" className="px-4 py-10 sm:px-6">
             <div className="mx-auto max-w-[1180px]">
-              <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/5 via-amber-500/[0.03] to-transparent p-5 sm:p-7">
-                <div className="mb-4">
-                  <h2 className="font-sans text-base sm:text-lg font-bold tracking-tight">Mínimos de compra por categoría</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Para ciertas categorías aplicamos un mínimo de compra. Podés combinar productos de la misma categoría para llegar al mínimo.
-                  </p>
-                </div>
+              <SectionHead
+                title={
+                  <>
+                    Mínimos <span className="text-primary">de compra</span>
+                  </>
+                }
+                sub="En algunas categorías hay un mínimo. Podés combinar productos de la misma categoría para llegar."
+              />
+              <div className="rounded-2xl border border-border bg-card/60 p-3 sm:p-5">
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-4">
                   {minItems.map((it) => {
                     const product = productFor(it.key) ?? productFor(it.label);
@@ -482,8 +525,8 @@ function Home() {
                       <>
                         <span className="text-xl shrink-0">{it.icon}</span>
                         <div className="min-w-0">
-                          <p className="text-xs font-bold truncate text-foreground">{it.label}</p>
-                          <p className="text-[11px] text-muted-foreground truncate">{it.desc}</p>
+                          <p className="text-xs font-bold leading-tight text-foreground break-words">{it.label}</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">{it.desc}</p>
                         </div>
                       </>
                     );
@@ -538,14 +581,16 @@ function Home() {
         <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
 
         <div className="relative mx-auto max-w-2xl">
-          <h2 className="font-sans text-[clamp(24px,6vw,38px)] font-semibold uppercase tracking-tight text-foreground/90">
-            Importamos para que vos revendas
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] text-muted-foreground sm:text-base">
-            Somos un equipo dedicado a traer productos importados de tecnología, bazar,
-            perfumes y mucho más
-          </p>
-          <a href="#contacto" className="btn-base grad-urgente group mt-8 inline-flex items-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+          <SectionHead
+            align="center"
+            title={
+              <>
+                Importamos para que <span className="text-primary">vos revendas</span>
+              </>
+            }
+            sub="Somos un equipo dedicado a traer productos importados de tecnología, bazar, perfumes y mucho más."
+          />
+          <a href="#contacto" className="btn-base grad-urgente group mt-1 inline-flex items-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg">
             Emprendé hoy
             <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
           </a>
@@ -567,19 +612,22 @@ function Home() {
             title="Contactanos"
             sub="Escribinos por el formulario o directo por WhatsApp. Respondemos rápido."
           />
-          <div className="grid gap-8 lg:grid-cols-2">
+          <div className="grid items-start gap-8 lg:grid-cols-2">
             <ContactForm config={config} />
             <div className="card-soft flex flex-col gap-4 border-l-4 border-primary p-6 shadow-sm">
+              {/* Si hay link al grupo, la tarjeta invita al grupo; si no, a escribir directo */}
               <h3 className="font-sans text-lg font-bold normal-case tracking-normal">
-                Grupo mayorista de WhatsApp
+                {config["whatsapp_grupo"] ? "Grupo mayorista de WhatsApp" : "Escribinos por WhatsApp"}
               </h3>
               <p className="text-sm text-muted-foreground">
-                Sumate al grupo para recibir las listas de precios y las ofertas antes que nadie.
+                {config["whatsapp_grupo"]
+                  ? "Sumate al grupo para recibir las listas de precios y las ofertas antes que nadie."
+                  : "Consultanos precios, stock y envíos. Te respondemos rápido."}
               </p>
-              {config['whatsapp_grupo'] && (
+              {config["whatsapp_grupo"] && (
                 <a
                   className="btn-base bg-whatsapp text-whatsapp-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-                  href={sanitizeUrl(config['whatsapp_grupo'])}
+                  href={sanitizeUrl(config["whatsapp_grupo"])}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -587,30 +635,34 @@ function Home() {
                 </a>
               )}
               <a
-                className="btn-base border border-primary/30 text-foreground transition-colors duration-200 hover:bg-primary/5"
+                className={
+                  config["whatsapp_grupo"]
+                    ? "btn-base border border-primary/30 text-foreground transition-colors duration-200 hover:bg-primary/5"
+                    : "btn-base bg-whatsapp text-whatsapp-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+                }
                 href={waLink(config)}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Escribirnos directo
+                {config["whatsapp_grupo"] ? "Escribirnos directo" : "Abrir WhatsApp"}
               </a>
-              <div className="mt-2 space-y-2 text-sm text-muted-foreground">
-                {config['whatsapp_individual'] && (
+              <div className="mt-1 space-y-2 text-sm text-muted-foreground">
+                {config["whatsapp_individual"] && (
                   <p className="flex items-center gap-2">
                     <MessageCircle className="h-4 w-4 text-primary" />
-                    {config['whatsapp_individual']}
+                    {formatWhatsapp(config["whatsapp_individual"])}
                   </p>
                 )}
-                {config['email'] && (
+                {config["email"] && (
                   <p className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-primary" />
-                    {config['email']}
+                    {config["email"]}
                   </p>
                 )}
-                {config['instagram'] && (
+                {config["instagram"] && (
                   <p className="flex items-center gap-2">
                     <Instagram className="h-4 w-4 text-primary" />
-                    {config['instagram']}
+                    {config["instagram"]}
                   </p>
                 )}
               </div>
@@ -624,17 +676,11 @@ function Home() {
   );
 }
 
-function SectionHead({ title, sub, icon }: { title: React.ReactNode; sub?: string; icon?: React.ReactNode }) {
-  return (
-    <div className="mb-7">
-      <div className="mb-3 flex items-center gap-2">
-        <div className="h-1 w-10 rounded-full bg-primary" />
-        {icon && <span className="text-primary">{icon}</span>}
-      </div>
-      <h2 className="text-[clamp(24px,7vw,40px)]">{title}</h2>
-      {sub && <p className="mt-2 max-w-md text-sm text-muted-foreground">{sub}</p>}
-    </div>
-  );
+/** "5493418051515" → "+54 9 341 805 1515" (solo para mostrar; el link usa el número limpio). */
+function formatWhatsapp(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  const m = digits.match(/^549(\d{3})(\d{3})(\d{4})$/);
+  return m ? `+54 9 ${m[1]} ${m[2]} ${m[3]}` : raw;
 }
 
 function ContactForm({ config }: { config: SiteConfig }) {

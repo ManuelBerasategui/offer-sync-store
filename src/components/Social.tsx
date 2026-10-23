@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { SectionHead } from "@/components/SectionHead";
 import { ChevronLeft, ChevronRight, Star, CheckCircle2, Quote } from "lucide-react";
 
 export const REVIEWS = [
@@ -108,9 +109,9 @@ export function ReviewsCarousel() {
     >
       {/* Tarjeta principal con animación suave y diseño glass */}
       <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-card/90 backdrop-blur-sm p-6 sm:p-8 text-left shadow-lg transition-all duration-300">
-        <Quote className="absolute right-6 top-6 h-12 w-12 text-primary/10 -rotate-12 pointer-events-none" />
+        <Quote className="absolute right-5 top-5 h-10 w-10 text-primary/10 -rotate-12 pointer-events-none" />
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 pr-12">
           <div className="flex items-center gap-3">
             {/* Avatar circular con iniciales y gradiente */}
             <div
@@ -128,12 +129,11 @@ export function ReviewsCarousel() {
               <p className="text-xs text-muted-foreground">
                 {current.role} · <span className="opacity-80">{current.location}</span>
               </p>
+              <div className="mt-1 flex items-center gap-2">
+                <Stars value={current.stars} />
+                <span className="text-[10px] text-muted-foreground">{current.date}</span>
+              </div>
             </div>
-          </div>
-
-          <div className="flex flex-col items-end gap-0.5">
-            <Stars value={current.stars} />
-            <span className="text-[10px] text-muted-foreground">{current.date}</span>
           </div>
         </div>
 
@@ -210,14 +210,15 @@ export function HowItWorks() {
   return (
     <section className="px-4 py-16 sm:px-6">
       <div className="mx-auto max-w-[1180px]">
-        <div className="mb-8 text-center">
-          <h2 className="font-sans text-[clamp(24px,6vw,36px)] font-semibold uppercase tracking-tight">
-            Cómo trabajar con nosotros
-          </h2>
-          <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
-            Cuatro pasos simples para arrancar a revender productos importados.
-          </p>
-        </div>
+        <SectionHead
+          align="center"
+          title={
+            <>
+              Cómo trabajar <span className="text-primary">con nosotros</span>
+            </>
+          }
+          sub="Cuatro pasos simples para arrancar a revender productos importados."
+        />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s) => (
             <div key={s.n} className="card-soft p-5">
