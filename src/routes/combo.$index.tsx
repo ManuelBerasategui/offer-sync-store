@@ -191,16 +191,19 @@ function ComboPage() {
                   <span className="tabular-nums text-3xl font-bold text-foreground">
                     {money(unitTransferPrice)}
                   </span>
-                  <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                    {discPct}% OFF con Transferencia
-                  </span>
-                  {savingsPct > 0 && (
-                    <span className="text-xs font-bold text-primary">({savingsPct}% OFF x volumen)</span>
+                  {/* Mismo formato de precio que las tarjetas y la página de producto */}
+                  {discPct > 0 && (
+                    <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                      con transferencia
+                    </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  o <span className="font-semibold text-foreground/80">{money(unitListPrice)}</span> con Mercado Pago
-                </p>
+                {savingsPct > 0 && (
+                  <p className="text-xs font-semibold text-primary">-{savingsPct}% por cantidad aplicado</p>
+                )}
+                {discPct > 0 && (
+                  <p className="text-xs text-muted-foreground">{money(unitListPrice)} con Mercado Pago</p>
+                )}
               </div>
             )}
 
