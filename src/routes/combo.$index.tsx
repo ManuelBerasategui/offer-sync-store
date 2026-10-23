@@ -151,12 +151,8 @@ function ComboPage() {
       <SiteHeader config={config} />
 
       <main className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6 sm:py-12">
-        <Link
-          to="/catalogo"
-          search={{ ver: "combos" }}
-          className="text-sm font-semibold text-muted-foreground hover:text-primary"
-        >
-          ← Volver a los combos
+        <Link to="/" className="text-sm font-semibold text-muted-foreground hover:text-primary">
+          ← Volver al inicio
         </Link>
 
         <div className="mt-6 grid gap-8 lg:grid-cols-2 lg:items-start">
