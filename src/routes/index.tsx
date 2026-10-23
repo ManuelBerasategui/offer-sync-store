@@ -6,7 +6,7 @@ import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, Ch
 import { ProductCard } from "@/components/ProductCard";
 import { ComboCard } from "@/components/ComboCard";
 import { HomeQuiz } from "@/components/HomeQuiz";
-import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { SiteFooter, SiteHeader, instagramUrl } from "@/components/SiteChrome";
 import { HowItWorks, ReviewsCarousel } from "@/components/Social";
 import { SectionHead } from "@/components/SectionHead";
 import { storeQueryOptions } from "@/lib/store-query";
@@ -606,25 +606,47 @@ function Home() {
               >
                 {config["whatsapp_grupo"] ? "Escribirnos directo" : "Abrir WhatsApp"}
               </a>
-              <div className="mt-1 space-y-2 text-sm text-muted-foreground">
+              {/* Datos de contacto como links: WhatsApp (wa.me), email e Instagram */}
+              <div className="mt-1 flex flex-col items-start gap-2 text-sm text-muted-foreground">
                 {config["whatsapp_individual"] && (
-                  <p className="flex items-center gap-2">
+                  <a
+                    href={waLink(config)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => track("contacto_whatsapp_numero")}
+                    className="inline-flex items-center gap-2 transition-colors hover:text-primary hover:underline"
+                  >
                     <MessageCircle className="h-4 w-4 text-primary" />
                     {formatWhatsapp(config["whatsapp_individual"])}
-                  </p>
+                  </a>
                 )}
                 {config["email"] && (
-                  <p className="flex items-center gap-2">
+                  <a
+                    href={sanitizeUrl(`mailto:${config["email"].trim()}`)}
+                    className="inline-flex items-center gap-2 transition-colors hover:text-primary hover:underline"
+                  >
                     <Mail className="h-4 w-4 text-primary" />
                     {config["email"]}
-                  </p>
+                  </a>
                 )}
-                {config["instagram"] && (
-                  <p className="flex items-center gap-2">
-                    <Instagram className="h-4 w-4 text-primary" />
-                    {config["instagram"]}
-                  </p>
-                )}
+                {config["instagram"] &&
+                  (instagramUrl(config["instagram"]) ? (
+                    <a
+                      href={instagramUrl(config["instagram"])}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => track("contacto_instagram")}
+                      className="inline-flex items-center gap-2 transition-colors hover:text-primary hover:underline"
+                    >
+                      <Instagram className="h-4 w-4 text-primary" />
+                      {config["instagram"]}
+                    </a>
+                  ) : (
+                    <p className="flex items-center gap-2">
+                      <Instagram className="h-4 w-4 text-primary" />
+                      {config["instagram"]}
+                    </p>
+                  ))}
               </div>
             </div>
           </div>

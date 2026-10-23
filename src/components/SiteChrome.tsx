@@ -91,7 +91,7 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
 }
 
 /** "@teimportamos" o un link → URL de Instagram segura; "" si no hay. */
-function instagramUrl(raw?: string): string {
+export function instagramUrl(raw?: string): string {
   const value = String(raw ?? "").trim();
   if (!value) return "";
   if (/^https?:\/\//i.test(value)) {
