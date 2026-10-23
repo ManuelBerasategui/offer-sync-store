@@ -56,10 +56,9 @@ function Home() {
 
   const combosScrollRef = useRef<HTMLDivElement>(null);
   const ofertasScrollRef = useRef<HTMLDivElement>(null);
-  // Se muestran 4 combos; el resto aparece con "Ver más" (menos invasivo en móvil)
+  // En la home se muestran 4 combos; "Ver todos los combos" lleva al catálogo (sección Combos)
   const COMBOS_VISIBLES = 4;
-  const [showAllCombos, setShowAllCombos] = useState(false);
-  const visibleCombos = showAllCombos ? banners : banners.slice(0, COMBOS_VISIBLES);
+  const visibleCombos = banners.slice(0, COMBOS_VISIBLES);
 
   const scrollCombos = (dir: "left" | "right") => {
     const el = combosScrollRef.current;
@@ -302,18 +301,16 @@ function Home() {
               </div>
               {banners.length > COMBOS_VISIBLES && (
                 <div className="mt-4 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      track("home_combos_ver_mas", { abrir: !showAllCombos });
-                      setShowAllCombos((v) => !v);
-                    }}
+                  {/* El número es la cantidad de combos activos cargados en la base */}
+                  <Link
+                    to="/catalogo"
+                    search={{ ver: "combos" }}
+                    onClick={() => track("home_combos_ver_todos", { total: banners.length })}
                     className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-card px-5 py-2 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
                   >
-                    {showAllCombos
-                      ? "Ver menos"
-                      : `Ver más combos (${banners.length - COMBOS_VISIBLES})`}
-                  </button>
+                    Ver todos los combos ({banners.length})
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
                 </div>
               )}
             </div>
