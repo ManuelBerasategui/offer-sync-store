@@ -416,7 +416,7 @@ export function CalculadoraPage() {
                   onClick={addItem}
                   className="btn-base border border-dashed border-border hover:border-foreground/50 text-xs text-foreground font-semibold px-4 py-2 w-full sm:w-auto flex items-center justify-center gap-1.5"
                 >
-                  <Plus className="h-3.5 w-3.5" /> + Agregar otro producto
+                  <Plus className="h-3.5 w-3.5" /> Agregar otro producto
                 </button>
 
                 <button
