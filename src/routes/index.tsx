@@ -15,6 +15,7 @@ import {
   onImageError, isYes, money, toNumber, waLink, sanitizeUrl, type SiteConfig,
   parseCategoryRules, normCat, transferPrice, transferDiscountPct, orderedCategories,
   findRuleForCat, type CategoryRule, isNfcGoogle, isHiddenCategory,
+  rankBestSellers, HOME_BEST_SELLERS,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
 import { track } from "@/lib/analytics";
@@ -80,50 +81,9 @@ function Home() {
 
   const ofertasDelDia = products.filter((p) => hasOffer(p));
 
-  // Más vendidos: toma hasta 3 productos con ventas reales esta semana (ordenados de mayor a menor).
-  // Si hay menos de 3, rellena los cupos restantes con productos marcados como 'destacado' (sin repetir).
-  // Si aún faltan, completa con los primeros productos del catálogo.
-  const conVentas = [...products]
-    .filter((p) => (p.ventas_semana ?? 0) > 0)
-    .sort((a, b) => (b.ventas_semana ?? 0) - (a.ventas_semana ?? 0));
-
-  const masVendidos: typeof products = [];
-  const seenIds = new Set<string>();
-
-  // 1. Agregar los que tienen ventas reales (hasta 3)
-  for (const p of conVentas) {
-    if (masVendidos.length >= 3) break;
-    const id = String(p.id ?? p.nombre ?? "");
-    if (!seenIds.has(id)) {
-      seenIds.add(id);
-      masVendidos.push(p);
-    }
-  }
-
-  // 2. Rellenar con destacados si hay menos de 3
-  if (masVendidos.length < 3) {
-    const destacados = products.filter((p) => isYes(p.destacado));
-    for (const p of destacados) {
-      if (masVendidos.length >= 3) break;
-      const id = String(p.id ?? p.nombre ?? "");
-      if (!seenIds.has(id)) {
-        seenIds.add(id);
-        masVendidos.push(p);
-      }
-    }
-  }
-
-  // 3. Fallback con catálogo general si aún faltan
-  if (masVendidos.length < 3) {
-    for (const p of products) {
-      if (masVendidos.length >= 3) break;
-      const id = String(p.id ?? p.nombre ?? "");
-      if (!seenIds.has(id)) {
-        seenIds.add(id);
-        masVendidos.push(p);
-      }
-    }
-  }
+  // Más vendidos: mismo ranking que el catálogo (rankBestSellers), así los 3 de la home son
+  // siempre los primeros de "Más vendidos" en el catálogo
+  const masVendidos = rankBestSellers(products).ranked.slice(0, HOME_BEST_SELLERS);
 
   // Fotos del hero (PC): ofertas y más vendidos con imagen, sin repetir
   const heroProducts: typeof products = [];

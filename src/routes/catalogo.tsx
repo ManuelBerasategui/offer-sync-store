@@ -12,6 +12,7 @@ import { storeQueryOptions } from "@/lib/store-query";
 import {
   categoriesOf,
   orderedCategories,
+  rankBestSellers,
   isYes,
   priceOf,
   isCamiseta,
@@ -175,6 +176,14 @@ function Catalogo() {
 
   const cats = useMemo(() => orderedCategories(products), [products]);
 
+  // Mismo ranking de "Más vendidos" que la home: posición de cada producto y cuántos entran
+  const bestSellers = useMemo(() => {
+    const { ranked, topCount } = rankBestSellers(products);
+    const rank = new Map<Product, number>();
+    ranked.forEach((p, i) => rank.set(p, i));
+    return { rank, topCount };
+  }, [products]);
+
   const list = useMemo(() => {
     const q = search.trim().toLowerCase();
     const filtered = products.filter((p) => {
@@ -185,7 +194,7 @@ function Catalogo() {
         const desc = (p.descripcion ?? "").toLowerCase();
         if (!nom.includes(q) && !cate.includes(q) && !desc.includes(q)) return false;
       }
-      if (onlyTop && (p.ventas_semana ?? 0) <= 0 && !isYes(p.destacado)) return false;
+      if (onlyTop && (bestSellers.rank.get(p) ?? Infinity) >= bestSellers.topCount) return false;
       if (onlyOffers && !isYes(p.oferta)) return false;
       return true;
     });
@@ -204,12 +213,10 @@ function Catalogo() {
       if (sort === "precio_asc") return getSortPrice(a) - getSortPrice(b);
       if (sort === "precio_desc") return getSortPrice(b) - getSortPrice(a);
       if (sort === "nombre") return (a.nombre ?? "").localeCompare(b.nombre ?? "");
-      // "destacado": ordena por ventas semanales reales, luego por flag destacado como desempate
-      const ventasB = (b.ventas_semana ?? 0) - (a.ventas_semana ?? 0);
-      if (ventasB !== 0) return ventasB;
-      return (isYes(b.destacado) ? 1 : 0) - (isYes(a.destacado) ? 1 : 0);
+      // "destacado" (Más vendidos): el mismo orden que la home
+      return (bestSellers.rank.get(a) ?? Infinity) - (bestSellers.rank.get(b) ?? Infinity);
     });
-  }, [products, search, cat, sort, onlyTop, onlyOffers, config]);
+  }, [products, search, cat, sort, onlyTop, onlyOffers, config, bestSellers]);
 
   const visibleProducts = useMemo(() => {
     return list.slice(0, visibleCount);

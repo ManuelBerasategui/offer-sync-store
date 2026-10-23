@@ -423,6 +423,37 @@ export function impliedUsdRate(rows: { precio?: unknown; precio_usd?: unknown }[
 }
 
 /** Categorías en el orden en que se muestran en la tienda (catálogo y cuestionario de la home). */
+/** Cuántos "Más vendidos" muestra la home. */
+export const HOME_BEST_SELLERS = 3;
+
+/**
+ * Ranking único de "Más vendidos", compartido por la home y el catálogo (así siempre coinciden).
+ *
+ * Orden: 1) con ventas de la semana, de más a menos (empate: destacados primero);
+ * 2) destacados sin ventas; 3) el resto, en el orden del catálogo.
+ * `topCount` es cuántos cuentan como "Más vendidos": los de 1) y 2), y como mínimo los
+ * HOME_BEST_SELLERS que muestra la home (aunque alguno haya entrado de relleno desde 3).
+ */
+export function rankBestSellers(products: Product[]): { ranked: Product[]; topCount: number } {
+  const indexed = products.map((p, i) => ({ p, i, ventas: Number(p.ventas_semana ?? 0) || 0 }));
+  const conVentas = indexed
+    .filter((x) => x.ventas > 0)
+    .sort(
+      (a, b) =>
+        b.ventas - a.ventas ||
+        (isYes(b.p.destacado) ? 1 : 0) - (isYes(a.p.destacado) ? 1 : 0) ||
+        a.i - b.i,
+    );
+  const destacados = indexed.filter((x) => x.ventas <= 0 && isYes(x.p.destacado));
+  const resto = indexed.filter((x) => x.ventas <= 0 && !isYes(x.p.destacado));
+  const ranked = [...conVentas, ...destacados, ...resto].map((x) => x.p);
+  const topCount = Math.min(
+    ranked.length,
+    Math.max(conVentas.length + destacados.length, HOME_BEST_SELLERS),
+  );
+  return { ranked, topCount };
+}
+
 export function orderedCategories(products: Product[]) {
   const all = categoriesOf(products);
   // Categorías que queremos ver primero (en este orden)

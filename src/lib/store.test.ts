@@ -13,6 +13,8 @@ import {
   normCat,
   parseJerseyItem,
   isHiddenCategory,
+  rankBestSellers,
+  HOME_BEST_SELLERS,
   calcJerseyUnitPrice,
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
@@ -918,5 +920,24 @@ describe("isHiddenCategory", () => {
     for (const c of ["Tecnología", "Bazar", "", null, undefined]) {
       expect(isHiddenCategory(c)).toBe(false);
     }
+  });
+});
+
+describe("rankBestSellers (home y catálogo usan el mismo ranking)", () => {
+  const mk = (id: string, ventas: number, destacado = "NO") =>
+    ({ id, nombre: id, ventas_semana: ventas, destacado }) as unknown as Product;
+
+  it("ordena por ventas, desempata con destacados y después rellena", () => {
+    const products = [mk("a", 0), mk("b", 5), mk("c", 9), mk("d", 5, "SI"), mk("e", 0, "SI")];
+    const { ranked, topCount } = rankBestSellers(products);
+    expect(ranked.map((p) => p.id)).toEqual(["c", "d", "b", "e", "a"]);
+    expect(topCount).toBe(4); // 3 con ventas + 1 destacado
+  });
+
+  it("si hay menos de 3 con ventas o destacados, los de relleno también cuentan como más vendidos", () => {
+    const products = [mk("a", 0), mk("b", 2), mk("c", 0)];
+    const { ranked, topCount } = rankBestSellers(products);
+    expect(ranked.slice(0, HOME_BEST_SELLERS).map((p) => p.id)).toEqual(["b", "a", "c"]);
+    expect(topCount).toBe(3);
   });
 });
