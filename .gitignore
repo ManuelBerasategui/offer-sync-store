@@ -35,3 +35,6 @@ dist-ssr
 .dccache
 .semgrep
 backups/
+
+# Salida de builds de Vercel (puede incluir código del servidor ya compilado)
+.vercel
