@@ -83,7 +83,9 @@ export function Stars({ value }: { value: number }) {
   );
 }
 
-export function ReviewsCarousel() {
+export function ReviewsCarousel({
+  className = "mx-auto mt-12 max-w-2xl px-2",
+}: { className?: string } = {}) {
   const [active, setActive] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -103,7 +105,7 @@ export function ReviewsCarousel() {
 
   return (
     <div
-      className="mx-auto mt-12 max-w-2xl px-2"
+      className={className}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >

@@ -6,7 +6,8 @@ import { Award, Ban, CheckCircle2, MessageCircle, PenLine, Shirt } from "lucide-
 
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
-import { REVIEWS, Stars } from "@/components/Social";
+import { ReviewsCarousel } from "@/components/Social";
+import { ProductCard } from "@/components/ProductCard";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
 import {
@@ -1023,14 +1024,31 @@ function ProductoPage() {
   const isCamisetaProd = isCamiseta(product?.categoria, product?.nombre);
 
   if (!product) {
+    // Sugerencias: primero ofertas, después el resto (con foto)
+    const suggested = [...products.filter((p) => hasOffer(p)), ...products]
+      .filter((p, i, arr) => p.imagen_url && arr.findIndex((q) => q.id === p.id) === i)
+      .slice(0, 4);
     return (
       <div className="min-h-screen">
         <SiteHeader config={config} />
-        <div className="mx-auto max-w-[1180px] px-4 py-20 text-center">
+        <div className="mx-auto max-w-[1180px] px-4 py-16 text-center sm:py-20">
           <h1 className="text-3xl">Producto no encontrado</h1>
-          <Link to="/catalogo" className="btn-base grad-urgente mt-6 text-primary-foreground">
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+            Puede que ya no esté disponible. Mirá estos productos o buscá en el catálogo.
+          </p>
+          <Link
+            to="/catalogo"
+            className="btn-base grad-urgente mt-6 inline-flex px-10 text-primary-foreground"
+          >
             Ver catálogo
           </Link>
+          {suggested.length > 0 && (
+            <div className="mt-12 grid grid-cols-2 gap-3 text-left sm:gap-4 lg:grid-cols-4">
+              {suggested.map((p, i) => (
+                <ProductCard key={String(p.id ?? i)} p={p} config={config} index={i} />
+              ))}
+            </div>
+          )}
         </div>
         <SiteFooter config={config} />
       </div>
@@ -1246,13 +1264,14 @@ function ProductoPage() {
             ) : (
               <>
                 <div className="mt-4 flex flex-col gap-1.5">
+                  {/* Mismo formato de precio que las tarjetas de la home y el catálogo */}
                   {isOfferDiscounted && (
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="rounded-md bg-red-600 px-2 py-0.5 text-xs font-bold text-white uppercase tracking-wider">
-                        🔥 Oferta del día -{offerPct}% OFF
+                      <span className="rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-extrabold uppercase text-white">
+                        -{offerPct}%
                       </span>
                       <span className="text-sm text-muted-foreground line-through tabular-nums">
-                        Antes {money(origPrice)}
+                        {money(origPrice)}
                       </span>
                     </div>
                   )}
@@ -1265,16 +1284,22 @@ function ProductoPage() {
                     <span className="tabular-nums text-3xl font-bold text-foreground">
                       {money(transferPrice(unit, transferDiscountPct(config)))}
                     </span>
-                    <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                      {transferDiscountPct(config)}% OFF con Transferencia
-                    </span>
-                    {percent > 0 && (
-                      <span className="text-xs font-bold text-primary">({percent}% OFF x volumen)</span>
+                    {transferDiscountPct(config) > 0 && (
+                      <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                        con transferencia
+                      </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    o <span className="font-semibold text-foreground/80">{money(unit)}</span> con Mercado Pago
-                  </p>
+                  {percent > 0 && (
+                    <p className="text-xs font-semibold text-primary">
+                      -{percent}% por cantidad aplicado
+                    </p>
+                  )}
+                  {transferDiscountPct(config) > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {money(unit)} con Mercado Pago
+                    </p>
+                  )}
                 </div>
 
                 {/* AVISO DE MÍNIMO DE COMPRA POR CATEGORÍA EN LA FICHA DEL PRODUCTO */}
@@ -1788,7 +1813,7 @@ function ProductoPage() {
         </section>
 
         {/* Reseñas */}
-        <section className="mt-12 max-w-4xl">
+        <section className="mt-12 max-w-2xl">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <div>
               <h2 className="font-sans text-xl sm:text-2xl font-bold normal-case tracking-tight">
@@ -1803,35 +1828,12 @@ function ProductoPage() {
             </span>
           </div>
 
-          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-            {REVIEWS.map((r) => (
-              <div key={r.name} className="card-soft p-4 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${r.avatarBg} text-xs font-bold text-white shadow-xs`}>
-                        {r.name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-foreground leading-none">{r.name}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{r.location}</p>
-                      </div>
-                    </div>
-                    <Stars value={r.stars} />
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">“{r.text}”</p>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground/80">
-                  <span className="font-medium truncate max-w-[160px]">{r.role}</span>
-                  <span className="shrink-0">{r.date}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* Una reseña a la vez (antes eran 6 tarjetas: casi dos pantallas en el celular) */}
+          <ReviewsCarousel className="max-w-2xl" />
         </section>
 
         <a
-          className="btn-base mt-10 w-full bg-whatsapp text-whatsapp-foreground sm:w-auto sm:px-10"
+          className="btn-base mt-10 flex w-full bg-whatsapp text-whatsapp-foreground sm:inline-flex sm:w-auto sm:px-10"
           href={waLink(config, product.nombre)}
           target="_blank"
           rel="noopener noreferrer"
