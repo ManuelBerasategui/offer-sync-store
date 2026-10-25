@@ -523,6 +523,16 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         if (p.precio_oferta_base !== undefined) {
           row.precio_oferta_base = p.precio_oferta_base ? Number(p.precio_oferta_base) : null;
         }
+        // La sincronización de precios (cada 15 min) recalcula el precio en pesos DESDE el USD.
+        // Si el USD guardado no coincide con el precio en pesos que se acaba de fijar, la sync
+        // vuelve al valor viejo. Por eso el USD de la oferta siempre se deriva del ARS guardado.
+        const offerArs = Number(String(p.precio_oferta ?? "").replace(/[^\d.]/g, ""));
+        if (offerArs > 0 && rate > 0) {
+          // Se redondea para abajo: la sync redondea hacia arriba, y así no salta al múltiplo siguiente
+          row["precio_oferta_usd"] = Math.floor((offerArs / (rate * (1 + markup))) * 1e6 - 1) / 1e6;
+          row["precio_oferta_base"] = null;
+          row["moneda_oferta_base"] = null;
+        }
         if (p.moneda_oferta_base !== undefined) {
           row.moneda_oferta_base = p.moneda_oferta_base || null;
         }
