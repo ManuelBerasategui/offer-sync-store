@@ -1587,6 +1587,12 @@ function ProductModal({
   );
 }
 
+/** Inversa de calcArsFromUsd (sin el redondeo): el USD que da ese precio en pesos. */
+function usdFromArs(ars: number, rate: number, markupPct: number): number {
+  if (!(ars > 0) || !(rate > 0)) return 0;
+  return Math.round((ars / (rate * (1 + markupPct / 100))) * 10000) / 10000;
+}
+
 /* ───────────────────────────────────────────────────────── */
 /*  Componentes para Panel de Ofertas del Día                */
 /* ───────────────────────────────────────────────────────── */
@@ -1640,15 +1646,24 @@ function ActiveOfferCard({
     }
   };
 
+  // Precio en ARS escrito a mano: se recalcula el USD para que la sincronización con la
+  // cotización no lo pise (la sync vuelve a calcular el ARS a partir del USD)
+  const handleOfferArsChange = (val: string) => {
+    setPrecioOferta(val);
+    const usd = usdFromArs(toNumber(val), dolarRate, markupPercentage);
+    setPrecioOfertaUsd(usd > 0 ? String(usd) : "");
+  };
+
+  // El descuento se calcula sobre el precio de lista que se ve (ARS), no sobre el USD guardado,
+  // que puede no coincidir con el ARS si el producto se cargó o editó en pesos
   const applyPreset = (pct: number) => {
     const baseArs = toNumber(product.precio);
-    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
-    if (baseUsd > 0) {
-      const newUsd = Math.round(baseUsd * (1 - pct / 100) * 100) / 100;
-      handleOfferUsdChange(String(newUsd));
-    } else if (baseArs > 0) {
-      setPrecioOferta(String(Math.round(baseArs * (1 - pct / 100))));
+    if (baseArs > 0) {
+      handleOfferArsChange(String(Math.round(baseArs * (1 - pct / 100))));
+      return;
     }
+    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
+    if (baseUsd > 0) handleOfferUsdChange(String(Math.round(baseUsd * (1 - pct / 100) * 100) / 100));
   };
 
   async function handleSave() {
@@ -1752,7 +1767,7 @@ function ActiveOfferCard({
             <input
               type="text"
               value={precioOferta}
-              onChange={(e) => setPrecioOferta(e.target.value)}
+              onChange={(e) => handleOfferArsChange(e.target.value)}
               placeholder="Precio ARS"
               className="input-base text-xs py-1.5 w-28 font-bold text-primary"
             />
@@ -1801,8 +1816,8 @@ function CandidateOfferCard({
     return baseArs > 0 ? String(Math.round(baseArs * 0.9)) : "";
   });
   const [precioOfertaUsd, setPrecioOfertaUsd] = useState(() => {
-    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
-    return baseUsd > 0 ? String(Math.round(baseUsd * 0.9 * 100) / 100) : "";
+    const usd = usdFromArs(Math.round(toNumber(product.precio) * 0.9), dolarRate, markupPercentage);
+    return usd > 0 ? String(usd) : "";
   });
   const [saving, setSaving] = useState(false);
 
@@ -1824,15 +1839,24 @@ function CandidateOfferCard({
     }
   };
 
+  // Precio en ARS escrito a mano: se recalcula el USD para que la sincronización con la
+  // cotización no lo pise (la sync vuelve a calcular el ARS a partir del USD)
+  const handleOfferArsChange = (val: string) => {
+    setPrecioOferta(val);
+    const usd = usdFromArs(toNumber(val), dolarRate, markupPercentage);
+    setPrecioOfertaUsd(usd > 0 ? String(usd) : "");
+  };
+
+  // El descuento se calcula sobre el precio de lista que se ve (ARS), no sobre el USD guardado,
+  // que puede no coincidir con el ARS si el producto se cargó o editó en pesos
   const applyPreset = (pct: number) => {
     const baseArs = toNumber(product.precio);
-    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
-    if (baseUsd > 0) {
-      const newUsd = Math.round(baseUsd * (1 - pct / 100) * 100) / 100;
-      handleOfferUsdChange(String(newUsd));
-    } else if (baseArs > 0) {
-      setPrecioOferta(String(Math.round(baseArs * (1 - pct / 100))));
+    if (baseArs > 0) {
+      handleOfferArsChange(String(Math.round(baseArs * (1 - pct / 100))));
+      return;
     }
+    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
+    if (baseUsd > 0) handleOfferUsdChange(String(Math.round(baseUsd * (1 - pct / 100) * 100) / 100));
   };
 
   async function handleActivate() {
@@ -1915,7 +1939,7 @@ function CandidateOfferCard({
             <input
               type="text"
               value={precioOferta}
-              onChange={(e) => setPrecioOferta(e.target.value)}
+              onChange={(e) => handleOfferArsChange(e.target.value)}
               placeholder="Precio ARS"
               className="input-base text-xs py-1.5 w-28 font-bold text-primary"
             />
