@@ -1724,7 +1724,7 @@ function ActiveOfferCard({
       <div className="w-full sm:w-auto flex flex-col gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border">
         <div className="flex items-center gap-1 flex-wrap">
           <span className="text-[11px] font-medium text-muted-foreground">Calcular:</span>
-          {[10, 15, 20, 25, 30, 40, 50].map((pct) => (
+          {[5, 10, 15, 20, 25, 30, 40, 50].map((pct) => (
             <button
               key={pct}
               type="button"
@@ -1887,7 +1887,7 @@ function CandidateOfferCard({
       <div className="w-full sm:w-auto flex flex-col gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border">
         <div className="flex items-center gap-1 flex-wrap">
           <span className="text-[11px] font-medium text-muted-foreground">Descuento:</span>
-          {[10, 15, 20, 25, 30, 40, 50].map((pct) => (
+          {[5, 10, 15, 20, 25, 30, 40, 50].map((pct) => (
             <button
               key={pct}
               type="button"
