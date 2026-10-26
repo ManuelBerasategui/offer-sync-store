@@ -122,6 +122,14 @@ function Catalogo() {
     setOnlyCombos(ver === "combos");
   }, [catFromUrl, ver]);
 
+  // Un solo filtro a la vez: combinarlos (ej. Ofertas + Más vendidos + Bazar) solía dejar 0 productos
+  const pickFilter = (f: "todas" | "combos" | "ofertas" | "top" | { cat: string }) => {
+    setOnlyCombos(f === "combos");
+    setOnlyOffers(f === "ofertas");
+    setOnlyTop(f === "top");
+    setCat(typeof f === "object" ? f.cat : "todas");
+  };
+
   // Al entrar a un rubro desde un link, desplazar la fila de categorías hasta que se vea el elegido
   const chipsRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -320,22 +328,22 @@ function Catalogo() {
               ref={chipsRef}
               className="no-scrollbar flex items-center gap-1.5 overflow-x-auto py-0.5 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:flex-wrap"
             >
-              <button className={chip(cat === "todas" && !onlyOffers && !onlyTop && !showCombos)} onClick={() => { setCat("todas"); setOnlyOffers(false); setOnlyTop(false); setOnlyCombos(false); }}>
+              <button className={chip(cat === "todas" && !onlyOffers && !onlyTop && !showCombos)} onClick={() => pickFilter("todas")}>
                 Todas
               </button>
               {banners.length > 0 && (
-                <button className={chip(showCombos)} onClick={() => setOnlyCombos((v) => !v)}>
+                <button className={chip(showCombos)} onClick={() => pickFilter(showCombos ? "todas" : "combos")}>
                   Combos
                 </button>
               )}
-              <button className={chip(onlyOffers)} onClick={() => { setOnlyCombos(false); setOnlyOffers((v) => !v); }}>
+              <button className={chip(onlyOffers)} onClick={() => pickFilter(onlyOffers ? "todas" : "ofertas")}>
                 Ofertas
               </button>
-              <button className={chip(onlyTop)} onClick={() => { setOnlyCombos(false); setOnlyTop((v) => !v); }}>
+              <button className={chip(onlyTop)} onClick={() => pickFilter(onlyTop ? "todas" : "top")}>
                 Más vendidos
               </button>
               {cats.map((c) => (
-                <button key={c} data-active={cat === c} className={chip(cat === c)} onClick={() => { setOnlyCombos(false); setCat(c); }}>
+                <button key={c} data-active={cat === c} className={chip(cat === c)} onClick={() => pickFilter(cat === c ? "todas" : { cat: c })}>
                   {c}
                 </button>
               ))}
