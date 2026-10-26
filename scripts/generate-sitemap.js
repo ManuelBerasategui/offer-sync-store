@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
 
-const BASE_URL = "https://teimportamosarg.com";
+const BASE_URL = "https://www.teimportamosarg.com";
 
 // Read .env if present
 const envVars = { ...process.env };

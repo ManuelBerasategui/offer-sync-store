@@ -41,12 +41,14 @@ export const Route = createFileRoute("/combo/$index")({
       { property: "og:image:secure_url", content: `${SITE_URL}/businessicon.jpg` },
       { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
       { property: "og:url", content: `${SITE_URL}/combo/${encodeURIComponent(params.index)}` },
+      // "/combo/$index" literal u otros valores no numéricos no son combos reales
+      ...(/^\d+$/.test(params.index) ? [] : [{ name: "robots", content: "noindex" }]),
     ],
     // Cada combo es su propia página (está en el sitemap): antes apuntaba a la home como
     // canónica y Google no la indexaba ("Página alternativa con etiqueta canónica adecuada")
-    links: [
-      { rel: "canonical", href: `${SITE_URL}/combo/${encodeURIComponent(params.index)}` },
-    ],
+    links: /^\d+$/.test(params.index)
+      ? [{ rel: "canonical", href: `${SITE_URL}/combo/${params.index}` }]
+      : [],
   }),
   component: ComboPage,
 });

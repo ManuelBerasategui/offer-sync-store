@@ -54,11 +54,24 @@ export default {
   },
 };
 
+function noIndex(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("X-Robots-Tag", "noindex");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function handleRequest(request: Request, env: unknown, ctx: unknown): Promise<Response> {
   try {
     const url = new URL(request.url);
     if (url.pathname === "/api/img") {
-      return await handleImageProxy(request, ctx as { waitUntil(p: Promise<unknown>): void });
+      // Las imágenes del proxy no son páginas: que Google no las liste como URLs sin indexar
+      return noIndex(
+        await handleImageProxy(request, ctx as { waitUntil(p: Promise<unknown>): void }),
+      );
     }
     if (url.pathname === "/api/mp-webhook") {
       return await handleMpWebhook(request);

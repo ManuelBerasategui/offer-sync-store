@@ -15,7 +15,7 @@ import { createRateLimiter, currentClientIp } from "./rate-limit";
 // Altas al newsletter por IP
 const subscribeLimited = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
 
-const BASE_URL = "https://teimportamosarg.com";
+const BASE_URL = "https://www.teimportamosarg.com";
 
 export interface NewsletterSubscriber {
   id: string;

@@ -8,5 +8,8 @@
 export const SITE_URL: string = (() => {
   const raw = (import.meta.env["VITE_SITE_URL"] as string | undefined) ?? "";
   // Strip trailing slash so callers can always do `${SITE_URL}/path`
-  return raw.replace(/\/+$/, "") || "https://teimportamosarg.com";
+  // La tienda vive en www (teimportamosarg.com redirige a www): canónicos y sitemap tienen que
+  // usar www, si no Google ve cada URL como "Página con redirección" y no la indexa
+  const clean = raw.replace(/\/+$/, "").replace(/^https?:\/\/teimportamosarg\.com$/i, "https://www.teimportamosarg.com");
+  return clean || "https://www.teimportamosarg.com";
 })();

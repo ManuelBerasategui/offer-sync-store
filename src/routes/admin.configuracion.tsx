@@ -127,7 +127,7 @@ function AdminConfiguracionPage() {
     headline: "",
     content: "",
     cta_text: "Ver Ofertas en la Tienda",
-    cta_url: "https://teimportamosarg.com/catalogo",
+    cta_url: "https://www.teimportamosarg.com/catalogo",
     coupon_code: "",
   });
 
@@ -464,7 +464,7 @@ function AdminConfiguracionPage() {
           headline: "",
           content: "",
           cta_text: "Ver Ofertas en la Tienda",
-          cta_url: "https://teimportamosarg.com/catalogo",
+          cta_url: "https://www.teimportamosarg.com/catalogo",
           coupon_code: "",
         });
         setBatchMsg({
@@ -1100,7 +1100,7 @@ function AdminConfiguracionPage() {
                       className="input-base"
                       value={campaignForm.cta_url}
                       onChange={(e) => setCampaignForm({ ...campaignForm, cta_url: e.target.value })}
-                      placeholder="https://teimportamosarg.com/catalogo"
+                      placeholder="https://www.teimportamosarg.com/catalogo"
                     />
                   </label>
                 </div>
