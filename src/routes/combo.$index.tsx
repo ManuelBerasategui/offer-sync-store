@@ -24,7 +24,7 @@ export const Route = createFileRoute("/combo/$index")({
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(storeQueryOptions);
   },
-  head: () => ({
+  head: ({ params }) => ({
     meta: [
       { title: "Combo en oferta — Te importamos" },
       {
@@ -40,10 +40,12 @@ export const Route = createFileRoute("/combo/$index")({
       { property: "og:image", content: `${SITE_URL}/businessicon.jpg` },
       { property: "og:image:secure_url", content: `${SITE_URL}/businessicon.jpg` },
       { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
-      { property: "og:url", content: `${SITE_URL}/` },
+      { property: "og:url", content: `${SITE_URL}/combo/${encodeURIComponent(params.index)}` },
     ],
+    // Cada combo es su propia página (está en el sitemap): antes apuntaba a la home como
+    // canónica y Google no la indexaba ("Página alternativa con etiqueta canónica adecuada")
     links: [
-      { rel: "canonical", href: `${SITE_URL}/` },
+      { rel: "canonical", href: `${SITE_URL}/combo/${encodeURIComponent(params.index)}` },
     ],
   }),
   component: ComboPage,
