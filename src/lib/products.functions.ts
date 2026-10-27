@@ -1,6 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Banner, Product, ProductVariant } from "@/lib/store";
 import { invalidateStoreCache } from "./store.functions";
+import { assertAdmin } from "./admin-auth";
+import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
+import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit";
+
+// Intentos de cupón por IP (evita probar códigos a la fuerza)
+const couponLimited = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 15 });
 
 const str = (v: unknown, max = 2000) => String(v ?? "").slice(0, max);
 
@@ -71,35 +77,7 @@ export type ProductInput = {
   whatsapp_only_reason?: string;
 };
 
-/* ─── Helper de autorización ───────────────────────────── */
-
-async function assertAdmin(email?: string, token?: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-  const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
-  const adminEmails = adminEmailsRaw
-    .toLowerCase()
-    .split(",")
-    .map((e) => e.trim())
-    .filter(Boolean);
-
-  let requestingEmail = email ? email.toLowerCase().trim() : "";
-  if (token) {
-    const { data: userData } = await supabaseAdmin.auth.getUser(token);
-    if (userData?.user?.email) requestingEmail = userData.user.email.toLowerCase().trim();
-  }
-
-  if (!requestingEmail) throw new Error("Acceso denegado: no autenticado.");
-
-  const allowed =
-    adminEmails.length > 0
-      ? adminEmails.includes(requestingEmail)
-      : ["admin@config.com", "admin@teimportamos.com"].includes(requestingEmail);
-
-  if (!allowed) throw new Error("Acceso denegado: sin permisos de administrador.");
-
-  return supabaseAdmin;
-}
+/* ─── Helper de autorización: ver src/lib/admin-auth.ts (solo acepta tokens verificados) ── */
 
 export function calcArsFromUsd(
   usd: number | string,
@@ -544,6 +522,16 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
         }
         if (p.precio_oferta_base !== undefined) {
           row.precio_oferta_base = p.precio_oferta_base ? Number(p.precio_oferta_base) : null;
+        }
+        // La sincronización de precios (cada 15 min) recalcula el precio en pesos DESDE el USD.
+        // Si el USD guardado no coincide con el precio en pesos que se acaba de fijar, la sync
+        // vuelve al valor viejo. Por eso el USD de la oferta siempre se deriva del ARS guardado.
+        const offerArs = Number(String(p.precio_oferta ?? "").replace(/[^\d.]/g, ""));
+        if (offerArs > 0 && rate > 0) {
+          // Se redondea para abajo: la sync redondea hacia arriba, y así no salta al múltiplo siguiente
+          row["precio_oferta_usd"] = Math.floor((offerArs / (rate * (1 + markup))) * 1e6 - 1) / 1e6;
+          row["precio_oferta_base"] = null;
+          row["moneda_oferta_base"] = null;
         }
         if (p.moneda_oferta_base !== undefined) {
           row.moneda_oferta_base = p.moneda_oferta_base || null;
@@ -996,22 +984,9 @@ export async function optimizeImageOnServer(
       .webp({ quality: 80, effort: 4 })
       .toBuffer();
 
-    // Generar variante miniatura liviana (160x160 WebP) para carrito y tablas (~2-3 KB)
-    let thumbBuffer: Buffer | null = null;
-    try {
-      thumbBuffer = await sharp(rawBuffer)
-        .rotate()
-        .resize({ width: 160, height: 160, fit: "inside", withoutEnlargement: true })
-        .webp({ quality: 80, effort: 4 })
-        .toBuffer();
-    } catch {
-      // Ignorar fallo de miniatura
-    }
-
     const bucketName = "store-images";
     const fileId = crypto.randomUUID();
     const filename = `${folder}/${fileId}.webp`;
-    const thumbFilename = `${folder}/thumbnails/${fileId}.webp`;
 
     // Asegurar existencia del bucket si hiciera falta
     try {
@@ -1036,17 +1011,9 @@ export async function optimizeImageOnServer(
       return trimmed;
     }
 
-    // Subir miniatura si se generó
-    if (thumbBuffer) {
-      supabaseAdmin.storage
-        .from(bucketName)
-        .upload(thumbFilename, thumbBuffer, {
-          contentType: "image/webp",
-          cacheControl: "31536000",
-          upsert: false,
-        })
-        .catch(() => {});
-    }
+    // Miniaturas de 160px y 320px (las tarjetas usan la de 320px)
+    const { uploadThumbnails } = await import("./storage-thumbs.server");
+    await uploadThumbnails(supabaseAdmin, bucketName, filename, compressedBuffer);
 
     const { data: pubData } = supabaseAdmin.storage
       .from(bucketName)
@@ -1308,8 +1275,12 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
       email: str(data?.email, 160).toLowerCase(),
       token: str(data?.token, 2000),
       filename: str(data?.filename, 200),
-      base64: data?.base64 ?? "",
-      bucket: str(data?.bucket, 60) || "storage-images",
+      // Hasta ~6 MB de imagen (el panel ya la comprime a WebP de 900px, que pesa mucho menos)
+      base64: String(data?.base64 ?? "").slice(0, 8_000_000),
+      // Solo los buckets de la tienda (antes se podía crear cualquier bucket público)
+      bucket: ["storage-images", "store-images"].includes(str(data?.bucket, 60))
+        ? str(data?.bucket, 60)
+        : "storage-images",
       contentType: str(data?.contentType, 60),
     }),
   )
@@ -1322,7 +1293,13 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
       const buffer = Buffer.from(base64Data, "base64");
       const bucketName = data.bucket || "storage-images";
 
-      let cleanFilename = (data.filename || "").trim().replace(/^\/+/, "");
+      // Nombre de archivo limpio: sin "..", sin barras iniciales y solo caracteres seguros
+      let cleanFilename = (data.filename || "")
+        .trim()
+        .replace(/[^\w./-]/g, "_")
+        .replace(/\.{2,}/g, ".")
+        .replace(/\/{2,}/g, "/")
+        .replace(/^\/+/, "");
       const folder = cleanFilename.includes("/") ? cleanFilename.substring(0, cleanFilename.lastIndexOf("/")) : "products";
       const baseName = cleanFilename.includes("/") ? cleanFilename.substring(cleanFilename.lastIndexOf("/") + 1) : cleanFilename;
       const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
@@ -1344,6 +1321,10 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
         }
       } catch (sharpErr) {
         console.warn("[Upload] Aviso al comprimir con sharp:", sharpErr);
+        // Si sharp no la pudo leer, solo se acepta si declara ser una imagen común
+        if (cType && !/^image\/(webp|jpeg|png|gif|avif)$/.test(cType)) {
+          return { error: "El archivo no es una imagen válida." };
+        }
         if (!cType) {
           if (filename.endsWith(".webp")) cType = "image/webp";
           else if (filename.endsWith(".png")) cType = "image/png";
@@ -1369,6 +1350,10 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
         });
 
       if (uploadErr) throw uploadErr;
+
+      // Miniaturas de 160px y 320px (las tarjetas usan la de 320px)
+      const { uploadThumbnails } = await import("./storage-thumbs.server");
+      await uploadThumbnails(supabaseAdmin, bucketName, filename, uploadBuffer);
 
       const { data: pubData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(filename);
       return { publicUrl: pubData.publicUrl };
@@ -1478,22 +1463,19 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         }
       }
 
+      // Clave y remitente de Resend: a la configuración privada (app_secrets), nunca a
+      // site_config, que es pública. Si el campo de la clave viene vacío, se mantiene la guardada.
       if (data.resendConfig) {
-        if (data.resendConfig.apiKey) {
-          await (supabaseAdmin as any)
-            .from("site_config")
-            .upsert(
-              { clave: "resend_api_key", valor: data.resendConfig.apiKey.trim() },
-              { onConflict: "clave" },
-            );
+        const { setSecret } = await import("./secrets.server");
+        const apiKey = str(data.resendConfig.apiKey, 200).trim();
+        const from = str(data.resendConfig.from, 160).trim();
+        if (apiKey) {
+          const res = await setSecret(supabaseAdmin, "resend_api_key", apiKey);
+          if (res.error) return { error: res.error };
         }
-        if (data.resendConfig.from) {
-          await (supabaseAdmin as any)
-            .from("site_config")
-            .upsert(
-              { clave: "resend_from", valor: data.resendConfig.from.trim() },
-              { onConflict: "clave" },
-            );
+        if (from) {
+          const res = await setSecret(supabaseAdmin, "resend_from", from);
+          if (res.error) return { error: res.error };
         }
       }
 
@@ -1503,10 +1485,15 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
             clave: "promo_cupon_activo",
             valor: data.couponConfig.activo ? "SI" : "NO",
           },
-          {
-            clave: "promo_cupon_codigo",
-            valor: (data.couponConfig.codigo || "TEIMPORTAMOS").trim().toUpperCase(),
-          },
+          // Si el código llega vacío (el panel todavía no lo cargó), se mantiene el guardado
+          ...(str(data.couponConfig.codigo, 40).trim()
+            ? [
+                {
+                  clave: "promo_cupon_codigo",
+                  valor: str(data.couponConfig.codigo, 40).trim().toUpperCase(),
+                },
+              ]
+            : []),
           {
             clave: "promo_cupon_descuento_pct",
             valor: String(data.couponConfig.descuentoPct ?? 5),
@@ -1570,20 +1557,16 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
         if (!data.code) {
           return { valid: false, error: "Ingresá un código promocional." };
         }
+        if (couponLimited(await currentClientIp())) {
+          return { valid: false, error: RATE_LIMIT_MSG };
+        }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // 1. Verificar autenticación
-        let verifiedUserId = data.userId;
-        let verifiedEmail = data.email;
-
-        if (data.token) {
-          const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-          if (userData?.user) {
-            verifiedUserId = userData.user.id;
-            verifiedEmail = userData.user.email ?? verifiedEmail;
-          }
-        }
+        // 1. Verificar autenticación: solo la sesión verificada por token (no el userId/email del navegador)
+        const verified = await verifiedUserFromToken(supabaseAdmin, data.token);
+        const verifiedUserId = verified?.id;
+        const verifiedEmail = verified?.email || undefined;
 
         if (!verifiedUserId) {
           return {
@@ -1632,28 +1615,13 @@ export const validatePromoCoupon = createServerFn({ method: "POST" })
         }
 
         // 4. Verificar si el usuario ya consumió el cupón en coupon_usages
-        const filterParts: string[] = [`user_id.eq.${verifiedUserId}`];
-        if (verifiedEmail) {
-          filterParts.push(`user_email.ilike.${verifiedEmail.trim().toLowerCase()}`);
-        }
-
-        try {
-          const { data: usageRows } = await (supabaseAdmin as any)
-            .from("coupon_usages")
-            .select("id")
-            .eq("coupon_code", validCode)
-            .or(filterParts.join(","))
-            .limit(1);
-
-          if (usageRows && usageRows.length > 0) {
-            return {
-              valid: false,
-              error:
-                "Ya utilizaste este código de descuento en una compra anterior (válido 1 sola vez por cuenta).",
-            };
-          }
-        } catch (usageErr) {
-          console.warn("Error consultando coupon_usages:", usageErr);
+        // (consultas parametrizadas; ante cualquier error se considera usado)
+        if (await hasUsedCoupon(supabaseAdmin, validCode, verifiedUserId, verifiedEmail ?? null)) {
+          return {
+            valid: false,
+            error:
+              "Ya utilizaste este código de descuento en una compra anterior (válido 1 sola vez por cuenta).",
+          };
         }
 
         return {
@@ -1726,6 +1694,53 @@ export const testAdminResendEmail = createServerFn({ method: "POST" })
       };
     }
   });
+
+/**
+ * Datos privados que el panel necesita mostrar. Ya no viajan en la configuración pública de la
+ * tienda. La clave de Resend nunca se devuelve: solo si está configurada.
+ */
+export const getAdminPrivateConfig = createServerFn({ method: "POST" })
+  .validator((data: { token?: string }) => ({ token: str(data?.token, 2000) }))
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      resendConfigured: boolean;
+      resendFrom: string;
+      lastEmailSuccess: string;
+      lastEmailError: string;
+      cuponCodigo: string;
+      error?: string;
+    }> => {
+      const empty = {
+        resendConfigured: false,
+        resendFrom: "",
+        lastEmailSuccess: "",
+        lastEmailError: "",
+        cuponCodigo: "",
+      };
+      try {
+        const supabaseAdmin = await assertAdmin(undefined, data.token);
+        const { getResendConfig, getSecret } = await import("./secrets.server");
+        const resend = await getResendConfig(supabaseAdmin);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: cupon } = await (supabaseAdmin as any)
+          .from("site_config")
+          .select("valor")
+          .eq("clave", "promo_cupon_codigo")
+          .maybeSingle();
+        return {
+          resendConfigured: Boolean(resend.apiKey),
+          resendFrom: resend.from,
+          lastEmailSuccess: (await getSecret(supabaseAdmin, "last_email_success")) ?? "",
+          lastEmailError: (await getSecret(supabaseAdmin, "last_email_error")) ?? "",
+          cuponCodigo: cupon?.valor ? String(cupon.valor) : "",
+        };
+      } catch (err) {
+        return { ...empty, error: err instanceof Error ? err.message : "Acceso denegado." };
+      }
+    },
+  );
 
 /* ─── Tipos e Integración para Combos / Banners en Oferta ─── */
 
@@ -2407,6 +2422,20 @@ export function prioritizeCoverImage(images: string[], coverUrl?: string): strin
 }
 
 /** Extrae todas las URLs de imágenes de alta resolución de un álbum Yupoo. */
+/**
+ * Solo fotos alojadas en Yupoo y por HTTPS. La página del álbum la controla quien la publica: sin
+ * este filtro, podía hacer que el servidor descargara cualquier URL y la publicara en nuestro bucket.
+ */
+function isYupooImageUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+    return u.protocol === "https:" && (host === "yupoo.com" || host.endsWith(".yupoo.com"));
+  } catch {
+    return false;
+  }
+}
+
 function extractAlbumImages(html: string): string[] {
   const urls: string[] = [];
   const regex = /data-origin-src="([^"]+)"/g;
@@ -2414,7 +2443,7 @@ function extractAlbumImages(html: string): string[] {
   while ((m = regex.exec(html)) !== null) {
     const raw = m[1].trim();
     const url = raw.startsWith("//") ? `https:${raw}` : raw;
-    if (url.startsWith("http://") || url.startsWith("https://")) {
+    if (isYupooImageUrl(url)) {
       urls.push(url);
     }
   }
@@ -2425,7 +2454,7 @@ function extractAlbumImages(html: string): string[] {
     while ((m = fallbackRegex.exec(html)) !== null) {
       const raw = m[1].trim();
       const url = raw.startsWith("//") ? `https:${raw}` : raw;
-      if (url.startsWith("http://") || url.startsWith("https://")) {
+      if (isYupooImageUrl(url)) {
         urls.push(toYupooHighRes(url));
       }
     }
@@ -2689,7 +2718,8 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         const bestCover = data.coverUrl || albumCover;
         const rawImages = extractAlbumImages(html);
         const orderedImages = prioritizeCoverImage(rawImages, bestCover);
-        const imageUrls = orderedImages.slice(0, data.maxImages);
+        // La portada puede venir de la página o del panel: también tiene que ser de Yupoo
+        const imageUrls = orderedImages.filter(isYupooImageUrl).slice(0, data.maxImages);
 
         if (imageUrls.length === 0) {
           return { error: "No se encontraron imágenes en el álbum." };
@@ -2735,21 +2765,39 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
               signal: AbortSignal.timeout(15000),
             });
             if (!imgRes.ok) continue;
+            // Si hubo redirección, el destino final también tiene que ser de Yupoo
+            if (imgRes.url && !isYupooImageUrl(imgRes.url)) continue;
 
             const buffer = await imgRes.arrayBuffer();
             if (buffer.byteLength === 0) continue;
 
             // Detectar content-type de la respuesta
             const rawCt = imgRes.headers.get("content-type") ?? "image/jpeg";
-            const ct = rawCt.split(";")[0]?.trim() || "image/jpeg";
-            const ext = ct === "image/webp" ? "webp" : ct === "image/png" ? "png" : "jpg";
+            let ct = rawCt.split(";")[0]?.trim() || "image/jpeg";
+            let ext = ct === "image/webp" ? "webp" : ct === "image/png" ? "png" : "jpg";
+            let body: Buffer = Buffer.from(buffer);
+
+            // Comprimir a WebP 900px como el resto de las fotos (las de Yupoo vienen pesadas)
+            try {
+              const sharp = (await import("sharp")).default;
+              body = await sharp(body)
+                .rotate()
+                .resize({ width: 900, height: 900, fit: "inside", withoutEnlargement: true })
+                .webp({ quality: 80, effort: 4 })
+                .toBuffer();
+              ct = "image/webp";
+              ext = "webp";
+            } catch {
+              // Si no es una imagen válida, no se sube nada (nunca se publica contenido arbitrario)
+              continue;
+            }
+
             const fileId = crypto.randomUUID();
             const filename = `yupoo/${fileId}.${ext}`;
-            const thumbFilename = `yupoo/thumbnails/${fileId}.webp`;
 
             const { error: uploadErr } = await supabaseAdmin.storage
               .from(bucketName)
-              .upload(filename, buffer, {
+              .upload(filename, body, {
                 contentType: ct,
                 cacheControl: "31536000",
                 upsert: false,
@@ -2757,25 +2805,9 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
 
             if (uploadErr) continue;
 
-            // Generar y subir miniatura liviana 160x160 WebP
-            try {
-              const sharp = (await import("sharp")).default;
-              const thumbBuf = await sharp(Buffer.from(buffer))
-                .rotate()
-                .resize({ width: 160, height: 160, fit: "inside", withoutEnlargement: true })
-                .webp({ quality: 80, effort: 4 })
-                .toBuffer();
-              supabaseAdmin.storage
-                .from(bucketName)
-                .upload(thumbFilename, thumbBuf, {
-                  contentType: "image/webp",
-                  cacheControl: "31536000",
-                  upsert: false,
-                })
-                .catch(() => {});
-            } catch {
-              // no bloquear si la miniatura falla
-            }
+            // Miniaturas de 160px y 320px con el mismo nombre de archivo que la foto
+            const { uploadThumbnails } = await import("./storage-thumbs.server");
+            await uploadThumbnails(supabaseAdmin, bucketName, filename, body);
 
             const { data: pubData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(filename);
             if (pubData.publicUrl) uploadedUrls.push(pubData.publicUrl);
@@ -2830,6 +2862,129 @@ export const importYupooAlbum = createServerFn({ method: "POST" })
         };
       } catch (err) {
         return { error: err instanceof Error ? err.message : "Error al importar el álbum." };
+      }
+    },
+  );
+
+/* ─── Generar miniaturas faltantes de las fotos ya cargadas ─── */
+/**
+ * Recorre las fotos del catálogo (productos, galerías, variantes y combos) y genera las miniaturas
+ * de 160px y 320px que falten. Procesa de a tandas: el panel la llama repetidamente con `offset`
+ * hasta que devuelve `done: true`.
+ */
+export const generateMissingThumbnails = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string; offset?: number }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    offset: Math.max(0, Math.floor(Number(data?.offset) || 0)),
+  }))
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      total: number;
+      nextOffset: number;
+      generated: number;
+      failed: number;
+      done: boolean;
+      error?: string;
+    }> => {
+      const empty = { total: 0, nextOffset: data.offset, generated: 0, failed: 0, done: true };
+      try {
+        // Tipado laxo: los tipos generados de la base no incluyen todas las columnas de imagen
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const supabaseAdmin: any = await assertAdmin(data.email, data.token);
+        const { galleryImages } = await import("./store");
+        const { parseStoragePublicUrl, thumbObjectPaths } = await import("./thumb-paths");
+        const { uploadThumbnails } = await import("./storage-thumbs.server");
+
+        const [prods, vars, bans] = await Promise.all([
+          supabaseAdmin.from("products").select("id,imagen_url,metadata"),
+          supabaseAdmin.from("product_variants").select("id,imagen_url"),
+          supabaseAdmin.from("banners").select("id,imagen_url"),
+        ]);
+        const urls = new Set<string>();
+        for (const p of (prods.data ?? []) as Product[])
+          for (const u of galleryImages(p)) urls.add(u);
+        for (const row of [...(vars.data ?? []), ...(bans.data ?? [])] as {
+          imagen_url?: string | null;
+        }[]) {
+          if (row.imagen_url) urls.add(row.imagen_url.trim());
+        }
+        const images = [...urls]
+          .map(parseStoragePublicUrl)
+          .filter((x): x is { bucket: string; objectPath: string } => x !== null)
+          .sort((a, b) =>
+            `${a.bucket}/${a.objectPath}`.localeCompare(`${b.bucket}/${b.objectPath}`),
+          );
+
+        const exists = async (bucket: string, path: string) => {
+          const { data: pub } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
+          try {
+            const res = await fetch(pub.publicUrl, {
+              method: "HEAD",
+              signal: AbortSignal.timeout(5000),
+            });
+            return res.ok;
+          } catch {
+            return false;
+          }
+        };
+
+        // Límites por llamada para no pasarse del tiempo máximo de la función
+        const MAX_CHECKED = 40;
+        const MAX_GENERATED = 6;
+        const started = Date.now();
+        let i = data.offset;
+        let generated = 0;
+        let failed = 0;
+        while (
+          i < images.length &&
+          i - data.offset < MAX_CHECKED &&
+          generated + failed < MAX_GENERATED &&
+          Date.now() - started < 6000
+        ) {
+          const chunk = images.slice(i, Math.min(i + 8, images.length));
+          const missing = await Promise.all(
+            chunk.map(async (img) => {
+              const t = thumbObjectPaths(img.objectPath);
+              const [sm, md] = await Promise.all([
+                exists(img.bucket, t.sm),
+                exists(img.bucket, t.md),
+              ]);
+              return !(sm && md);
+            }),
+          );
+          let consumed = 0;
+          for (let k = 0; k < chunk.length; k++) {
+            if (generated + failed >= MAX_GENERATED) break;
+            consumed++;
+            if (!missing[k]) continue;
+            const img = chunk[k]!;
+            const { data: blob, error } = await supabaseAdmin.storage
+              .from(img.bucket)
+              .download(img.objectPath);
+            const ok =
+              !error && blob
+                ? (await uploadThumbnails(
+                    supabaseAdmin,
+                    img.bucket,
+                    img.objectPath,
+                    await blob.arrayBuffer(),
+                  )) === 2
+                : false;
+            if (ok) generated++;
+            else failed++;
+          }
+          i += consumed;
+        }
+
+        return { total: images.length, nextOffset: i, generated, failed, done: i >= images.length };
+      } catch (err) {
+        return {
+          ...empty,
+          error: err instanceof Error ? err.message : "No se pudieron generar las miniaturas.",
+        };
       }
     },
   );

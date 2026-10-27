@@ -12,7 +12,6 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { AdminHeader } from "@/components/AdminHeader";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import {
   getAdminProducts,
   upsertAdminProduct,
@@ -193,21 +192,9 @@ function ImageDropzone({
 
       const filename = `${folder}/${crypto.randomUUID()}.webp`;
 
-      // 2. Intentar primero subida directa por cliente
-      const { error: clientErr } = await supabase.storage.from(bucket).upload(filename, compressed.file, {
-        contentType: "image/webp",
-        cacheControl: "31536000",
-        upsert: false,
-      });
-
-      if (!clientErr) {
-        const { data } = supabase.storage.from(bucket).getPublicUrl(filename);
-        onChange(data.publicUrl);
-        setUploading(false);
-        return;
-      }
-
-      // 3. Si falla por RLS, usar función admin del servidor (base64)
+      // 2. Siempre por la función del servidor, que verifica que sea admin y genera las miniaturas.
+      // (Antes se intentaba primero subir directo desde el navegador con la sesión del usuario:
+      // si las reglas de Storage lo permitían, cualquier cuenta podía subir o pisar imágenes.)
       const res = await uploadAdminProductImage({
         data: {
           email: user?.email ?? "",
@@ -1600,6 +1587,12 @@ function ProductModal({
   );
 }
 
+/** Inversa de calcArsFromUsd (sin el redondeo): el USD que da ese precio en pesos. */
+function usdFromArs(ars: number, rate: number, markupPct: number): number {
+  if (!(ars > 0) || !(rate > 0)) return 0;
+  return Math.round((ars / (rate * (1 + markupPct / 100))) * 10000) / 10000;
+}
+
 /* ───────────────────────────────────────────────────────── */
 /*  Componentes para Panel de Ofertas del Día                */
 /* ───────────────────────────────────────────────────────── */
@@ -1653,15 +1646,24 @@ function ActiveOfferCard({
     }
   };
 
+  // Precio en ARS escrito a mano: se recalcula el USD para que la sincronización con la
+  // cotización no lo pise (la sync vuelve a calcular el ARS a partir del USD)
+  const handleOfferArsChange = (val: string) => {
+    setPrecioOferta(val);
+    const usd = usdFromArs(toNumber(val), dolarRate, markupPercentage);
+    setPrecioOfertaUsd(usd > 0 ? String(usd) : "");
+  };
+
+  // El descuento se calcula sobre el precio de lista que se ve (ARS), no sobre el USD guardado,
+  // que puede no coincidir con el ARS si el producto se cargó o editó en pesos
   const applyPreset = (pct: number) => {
     const baseArs = toNumber(product.precio);
-    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
-    if (baseUsd > 0) {
-      const newUsd = Math.round(baseUsd * (1 - pct / 100) * 100) / 100;
-      handleOfferUsdChange(String(newUsd));
-    } else if (baseArs > 0) {
-      setPrecioOferta(String(Math.round(baseArs * (1 - pct / 100))));
+    if (baseArs > 0) {
+      handleOfferArsChange(String(Math.round(baseArs * (1 - pct / 100))));
+      return;
     }
+    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
+    if (baseUsd > 0) handleOfferUsdChange(String(Math.round(baseUsd * (1 - pct / 100) * 100) / 100));
   };
 
   async function handleSave() {
@@ -1737,7 +1739,7 @@ function ActiveOfferCard({
       <div className="w-full sm:w-auto flex flex-col gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border">
         <div className="flex items-center gap-1 flex-wrap">
           <span className="text-[11px] font-medium text-muted-foreground">Calcular:</span>
-          {[10, 15, 20, 25, 30, 40, 50].map((pct) => (
+          {[5, 10, 15, 20, 25, 30, 40, 50].map((pct) => (
             <button
               key={pct}
               type="button"
@@ -1765,7 +1767,7 @@ function ActiveOfferCard({
             <input
               type="text"
               value={precioOferta}
-              onChange={(e) => setPrecioOferta(e.target.value)}
+              onChange={(e) => handleOfferArsChange(e.target.value)}
               placeholder="Precio ARS"
               className="input-base text-xs py-1.5 w-28 font-bold text-primary"
             />
@@ -1814,8 +1816,8 @@ function CandidateOfferCard({
     return baseArs > 0 ? String(Math.round(baseArs * 0.9)) : "";
   });
   const [precioOfertaUsd, setPrecioOfertaUsd] = useState(() => {
-    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
-    return baseUsd > 0 ? String(Math.round(baseUsd * 0.9 * 100) / 100) : "";
+    const usd = usdFromArs(Math.round(toNumber(product.precio) * 0.9), dolarRate, markupPercentage);
+    return usd > 0 ? String(usd) : "";
   });
   const [saving, setSaving] = useState(false);
 
@@ -1837,15 +1839,24 @@ function CandidateOfferCard({
     }
   };
 
+  // Precio en ARS escrito a mano: se recalcula el USD para que la sincronización con la
+  // cotización no lo pise (la sync vuelve a calcular el ARS a partir del USD)
+  const handleOfferArsChange = (val: string) => {
+    setPrecioOferta(val);
+    const usd = usdFromArs(toNumber(val), dolarRate, markupPercentage);
+    setPrecioOfertaUsd(usd > 0 ? String(usd) : "");
+  };
+
+  // El descuento se calcula sobre el precio de lista que se ve (ARS), no sobre el USD guardado,
+  // que puede no coincidir con el ARS si el producto se cargó o editó en pesos
   const applyPreset = (pct: number) => {
     const baseArs = toNumber(product.precio);
-    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
-    if (baseUsd > 0) {
-      const newUsd = Math.round(baseUsd * (1 - pct / 100) * 100) / 100;
-      handleOfferUsdChange(String(newUsd));
-    } else if (baseArs > 0) {
-      setPrecioOferta(String(Math.round(baseArs * (1 - pct / 100))));
+    if (baseArs > 0) {
+      handleOfferArsChange(String(Math.round(baseArs * (1 - pct / 100))));
+      return;
     }
+    const baseUsd = toNumber(String((product as Record<string, unknown>)["precio_usd"] ?? ""));
+    if (baseUsd > 0) handleOfferUsdChange(String(Math.round(baseUsd * (1 - pct / 100) * 100) / 100));
   };
 
   async function handleActivate() {
@@ -1900,7 +1911,7 @@ function CandidateOfferCard({
       <div className="w-full sm:w-auto flex flex-col gap-2 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-border">
         <div className="flex items-center gap-1 flex-wrap">
           <span className="text-[11px] font-medium text-muted-foreground">Descuento:</span>
-          {[10, 15, 20, 25, 30, 40, 50].map((pct) => (
+          {[5, 10, 15, 20, 25, 30, 40, 50].map((pct) => (
             <button
               key={pct}
               type="button"
@@ -1928,7 +1939,7 @@ function CandidateOfferCard({
             <input
               type="text"
               value={precioOferta}
-              onChange={(e) => setPrecioOferta(e.target.value)}
+              onChange={(e) => handleOfferArsChange(e.target.value)}
               placeholder="Precio ARS"
               className="input-base text-xs py-1.5 w-28 font-bold text-primary"
             />

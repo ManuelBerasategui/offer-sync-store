@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 
 import { supabase } from "@/integrations/supabase/client";
+import { getIsAdmin } from "@/lib/admin.functions";
 
 export type ShippingData = {
   nombre: string;
@@ -80,22 +81,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, [loadProfile]);
 
-  const rawAdminEmails =
-    (import.meta.env["VITE_ADMIN_EMAILS"] as string | undefined) ||
-    (import.meta.env["ADMIN_EMAILS"] as string | undefined) ||
-    "";
-  const adminEmails = rawAdminEmails
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-
-  const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
-
-  const userEmail = session?.user?.email?.toLowerCase().trim();
-  const isAdmin = Boolean(
-    userEmail &&
-    (adminEmails.length > 0 ? adminEmails.includes(userEmail) : defaultAdmins.includes(userEmail)),
-  );
+  // Si la cuenta es admin lo decide el servidor (misma lista ADMIN_EMAILS que protege el panel).
+  // Solo sirve para mostrar el link al admin: cada acción del panel se vuelve a verificar en el servidor.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const accessToken = session?.access_token;
+  useEffect(() => {
+    if (!accessToken) {
+      setIsAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    getIsAdmin({ data: { token: accessToken } })
+      .then((res) => {
+        if (!cancelled) setIsAdmin(Boolean(res?.isAdmin));
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
 
   const value = useMemo<AuthCtx>(
     () => ({

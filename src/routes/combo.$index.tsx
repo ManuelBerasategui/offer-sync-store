@@ -24,7 +24,7 @@ export const Route = createFileRoute("/combo/$index")({
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(storeQueryOptions);
   },
-  head: () => ({
+  head: ({ params }) => ({
     meta: [
       { title: "Combo en oferta — Te importamos" },
       {
@@ -40,11 +40,15 @@ export const Route = createFileRoute("/combo/$index")({
       { property: "og:image", content: `${SITE_URL}/businessicon.jpg` },
       { property: "og:image:secure_url", content: `${SITE_URL}/businessicon.jpg` },
       { name: "twitter:image", content: `${SITE_URL}/businessicon.jpg` },
-      { property: "og:url", content: `${SITE_URL}/` },
+      { property: "og:url", content: `${SITE_URL}/combo/${encodeURIComponent(params.index)}` },
+      // "/combo/$index" literal u otros valores no numéricos no son combos reales
+      ...(/^\d+$/.test(params.index) ? [] : [{ name: "robots", content: "noindex" }]),
     ],
-    links: [
-      { rel: "canonical", href: `${SITE_URL}/` },
-    ],
+    // Cada combo es su propia página (está en el sitemap): antes apuntaba a la home como
+    // canónica y Google no la indexaba ("Página alternativa con etiqueta canónica adecuada")
+    links: /^\d+$/.test(params.index)
+      ? [{ rel: "canonical", href: `${SITE_URL}/combo/${params.index}` }]
+      : [],
   }),
   component: ComboPage,
 });
@@ -191,16 +195,19 @@ function ComboPage() {
                   <span className="tabular-nums text-3xl font-bold text-foreground">
                     {money(unitTransferPrice)}
                   </span>
-                  <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                    {discPct}% OFF con Transferencia
-                  </span>
-                  {savingsPct > 0 && (
-                    <span className="text-xs font-bold text-primary">({savingsPct}% OFF x volumen)</span>
+                  {/* Mismo formato de precio que las tarjetas y la página de producto */}
+                  {discPct > 0 && (
+                    <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                      con transferencia
+                    </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  o <span className="font-semibold text-foreground/80">{money(unitListPrice)}</span> con Mercado Pago
-                </p>
+                {savingsPct > 0 && (
+                  <p className="text-xs font-semibold text-primary">-{savingsPct}% por cantidad aplicado</p>
+                )}
+                {discPct > 0 && (
+                  <p className="text-xs text-muted-foreground">{money(unitListPrice)} con Mercado Pago</p>
+                )}
               </div>
             )}
 

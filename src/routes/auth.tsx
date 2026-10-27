@@ -9,20 +9,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { EMPTY_SHIPPING, useAuth, type ShippingData } from "@/hooks/useAuth";
 import { syncNewUserSubscriber } from "@/lib/newsletter.functions";
 import { SITE_URL } from "@/lib/constants";
+import { getSafeRedirect } from "@/lib/safe-redirect";
 
 const authSearchSchema = z.object({
   mode: z.enum(["login", "register", "forgot"]).optional(),
   redirect: z.string().optional(),
 });
-
-function getSafeRedirect(target?: string): string {
-  if (!target) return "/";
-  const trimmed = target.trim();
-  if (trimmed.startsWith("/") && !trimmed.startsWith("//") && !trimmed.startsWith("/\\")) {
-    return trimmed;
-  }
-  return "/";
-}
 
 export const Route = createFileRoute("/auth")({
   validateSearch: authSearchSchema,
@@ -191,6 +183,7 @@ function AuthPage() {
             email: email.trim(),
             nombre: form.nombre,
             acceptMarketing,
+            token: signupData.session?.access_token,
           },
         });
 

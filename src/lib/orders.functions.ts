@@ -1,7 +1,23 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { NotifyOrderInput } from "@/lib/email.functions";
+import { checkAdmin } from "./admin-auth";
+import { couponUsedByDni, hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
+import { priceOrderItems } from "./order-pricing";
+import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit";
 
-export type OrderItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
+// Pedidos por transferencia por IP (generoso: varias personas pueden compartir IP en el celular)
+const transferOrderLimited = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 30 });
+// Consultas de estado de pago por IP (la página de "gracias" la llama una vez; esto evita que
+// alguien pruebe códigos de pedido en masa para ver totales ajenos)
+const verifyPaymentLimited = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 30 });
+
+export type OrderItem = {
+  nombre: string;
+  qty: number;
+  unitPrice: number;
+  productId?: string | undefined;
+  variantId?: string | undefined;
+};
 
 export type ShippingInput = {
   nombre: string;
@@ -20,17 +36,12 @@ const text = (v: unknown, max = 120) =>
     .trim()
     .slice(0, max);
 
-export function makeCode() {
-  const d = new Date();
-  const stamp = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `TI-${stamp}-${rand}`;
-}
 
 function cleanShipping(s: ShippingInput): ShippingInput {
   return {
     nombre: text(s?.nombre),
-    dni: text(s?.dni, 20),
+    // Solo números: así el control del cupón por DNI encuentra los pedidos anteriores
+    dni: text(s?.dni, 20).replace(/\D/g, ""),
     telefono: text(s?.telefono, 30),
     email: text(s?.email, 160),
     provincia: text(s?.provincia, 60),
@@ -46,8 +57,10 @@ function cleanItems(items: OrderItem[]): OrderItem[] {
   return items.slice(0, 50).map((i) => ({
     nombre: text(i.nombre),
     qty: Math.max(1, Math.min(9999, Math.round(Number(i.qty) || 1))),
+    // Solo informativo: el precio que se cobra lo calcula el servidor (priceOrderItems)
     unitPrice: Math.max(1, Math.round(Number(i.unitPrice) || 0)),
     ...(i.productId ? { productId: text(i.productId, 100) } : {}),
+    ...(i.variantId ? { variantId: text(i.variantId, 100) } : {}),
   }));
 }
 
@@ -83,6 +96,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       metodoPago?: string;
     }> => {
       if (!data.code) return { estado: "desconocido" };
+      if (verifyPaymentLimited(await currentClientIp())) return { estado: "desconocido" };
 
       if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
         console.error("Variables de Supabase no configuradas en el servidor.");
@@ -90,11 +104,14 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
       }
 
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { ORDER_FIELDS, confirmMpOrder, fetchMpPayment, isMpOrder } = await import(
+        "./mp-confirm.server"
+      );
 
       // 1. Buscar la orden en Supabase (puede ser "pendiente" o ya "pagado")
       const { data: order } = await supabaseAdmin
         .from("orders")
-        .select("id, order_code, estado, total, metodo_pago, nombre, email, telefono, dni, provincia, ciudad, codigo_postal, transporte, sucursal_correo, items")
+        .select(ORDER_FIELDS)
         .eq("order_code", data.code)
         .maybeSingle();
 
@@ -108,150 +125,33 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
         };
       }
 
-      // 2. Consultar el estado real del pago en la API de Mercado Pago
-      const mpToken = process.env["MERCADOPAGO_ACCESS_TOKEN"];
-      if (!mpToken) {
-        console.error("MERCADOPAGO_ACCESS_TOKEN no configurado.");
-        return { estado: "desconocido" };
+      // Solo los pedidos de Mercado Pago se confirman acá (los de transferencia los confirma el admin)
+      const pendingResult = {
+        ...(order?.order_code ? { orderCode: order.order_code } : {}),
+        estado: "pendiente" as const,
+        ...(order?.total ? { total: Number(order.total) } : {}),
+        ...(order?.metodo_pago ? { metodoPago: order.metodo_pago } : {}),
+      };
+      if (!order) return { estado: "desconocido" };
+      if (!isMpOrder(order)) return pendingResult;
+
+      // 2. El estado del pago SOLO se toma de la API de Mercado Pago. Nunca del status de la URL:
+      // cualquiera puede escribir ?status=approved a mano. Sin confirmación de MP, queda pendiente.
+      if (!data.paymentId || !/^\d+$/.test(data.paymentId)) return pendingResult;
+      const payment = await fetchMpPayment(data.paymentId);
+
+      // 3. Mismo paso que el webhook: marca "pagado" (una sola vez) y manda los emails
+      const decision = await confirmMpOrder(supabaseAdmin, order, payment);
+      if (decision === "pendiente") return pendingResult;
+      if (decision === "rechazado") {
+        return { estado: "rechazado", ...(order.metodo_pago ? { metodoPago: order.metodo_pago } : {}) };
       }
-
-      // Determinamos el estado final del pago
-      let mpStatus: string | undefined;
-
-      // Primero intentamos verificar con la API de MP (más confiable)
-      if (data.paymentId) {
-        try {
-          const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${data.paymentId}`, {
-            headers: { authorization: `Bearer ${mpToken}` },
-          });
-          if (mpRes.ok) {
-            const mpJson = (await mpRes.json()) as { status?: string; external_reference?: string };
-            mpStatus = mpJson.status;
-          } else {
-            console.error(`MP payment lookup failed [${mpRes.status}]: ${await mpRes.text()}`);
-          }
-        } catch (err) {
-          console.error("Error consultando MP:", err);
-        }
-      }
-
-      // Fallback 1: confiar en el status de la URL (MP lo incluye en el redirect)
-      if (!mpStatus) {
-        mpStatus = data.status?.toLowerCase();
-      }
-
-      if (mpStatus === "pending" || mpStatus === "in_process" || mpStatus === "authorized") {
-        return {
-          ...(order?.order_code ? { orderCode: order.order_code } : {}),
-          estado: "pendiente",
-          ...(order?.total ? { total: Number(order.total) } : {}),
-          metodoPago: order?.metodo_pago ?? undefined,
-        };
-      }
-
-      if (mpStatus !== "approved") {
-        return { estado: "rechazado", metodoPago: order?.metodo_pago ?? undefined };
-      }
-
-      // 3. El pago está aprobado: actualizar la orden pendiente a "pagado"
-      if (order) {
-        const finalMetodo = order.metodo_pago === "tarjeta" ? "tarjeta" : "mercadopago";
-        const { error: updErr } = await supabaseAdmin
-          .from("orders")
-          .update({ estado: "pagado", metodo_pago: finalMetodo })
-          .eq("id", order.id);
-
-        if (updErr) {
-          console.error("Error al actualizar orden a pagado:", updErr);
-        }
-
-        // Actualizar perfil si corresponde
-        const { data: fullOrder } = await supabaseAdmin
-          .from("orders")
-          .select(
-            "user_id, nombre, dni, telefono, provincia, ciudad, codigo_postal, transporte, sucursal_correo",
-          )
-          .eq("id", order.id)
-          .maybeSingle();
-
-        if (fullOrder?.user_id) {
-          await supabaseAdmin.from("profiles").upsert(
-            {
-              id: fullOrder.user_id,
-              nombre: fullOrder.nombre,
-              dni: fullOrder.dni,
-              telefono: fullOrder.telefono,
-              provincia: fullOrder.provincia,
-              ciudad: fullOrder.ciudad,
-              codigo_postal: fullOrder.codigo_postal,
-              transporte: fullOrder.transporte,
-              sucursal_correo: fullOrder.sucursal_correo,
-            },
-            { onConflict: "id" },
-          );
-        }
-
-        // Notificar a los admins (fire-and-forget)
-        try {
-          let mpCouponCode: string | undefined;
-          let mpCouponDiscount: number | undefined;
-          try {
-            const { data: usage } = await supabaseAdmin
-              .from("coupon_usages")
-              .select("coupon_code, discount_amount")
-              .eq("order_code", order.order_code)
-              .maybeSingle();
-            if (usage) {
-              mpCouponCode = usage.coupon_code;
-              mpCouponDiscount = Number(usage.discount_amount) || undefined;
-            }
-          } catch {
-            // ignore
-          }
-
-          const { notifyNewOrder } = await import("@/lib/email.functions");
-          const mpItems: NotifyOrderInput["items"] = Array.isArray(order.items)
-            ? (order.items as { nombre: string; qty: number; unitPrice: number }[]).map((i) => ({
-                nombre: i.nombre ?? "",
-                qty: Number(i.qty) || 1,
-                unitPrice: Number(i.unitPrice) || 0,
-              }))
-            : [];
-          await notifyNewOrder({
-            orderCode: order.order_code,
-            total: Number(order.total),
-            metodoPago: finalMetodo === "tarjeta" ? "tarjeta" : "mercadopago",
-            shipping: {
-              nombre: order.nombre ?? "",
-              email: order.email ?? "",
-              telefono: order.telefono ?? "",
-              dni: order.dni ?? undefined,
-              provincia: order.provincia ?? undefined,
-              ciudad: order.ciudad ?? undefined,
-              codigo_postal: order.codigo_postal ?? undefined,
-              transporte: order.transporte ?? undefined,
-              sucursal_correo: order.sucursal_correo ?? undefined,
-            },
-            items: mpItems,
-            couponCode: mpCouponCode,
-            couponDiscountAmount: mpCouponDiscount,
-          } satisfies NotifyOrderInput);
-        } catch (e) {
-          console.error("[email] Error enviando notificación de MP:", e);
-        }
-
-        return {
-          orderCode: order.order_code,
-          estado: "pagado",
-          total: Number(order.total),
-          metodoPago: finalMetodo,
-        };
-      }
-
-      // La orden no existía (ej: un pedido creado por una versión anterior)
-      // Igual marcamos como pagado con datos mínimos
-      console.warn(`Borrador no encontrado para code=${data.code}, registrando pago mínimo.`);
-      return { orderCode: data.code, estado: "pagado" };
+      return {
+        orderCode: order.order_code,
+        estado: "pagado",
+        total: Number(order.total),
+        metodoPago: order.metodo_pago === "tarjeta" ? "tarjeta" : "mercadopago",
+      };
     },
   );
 
@@ -284,37 +184,12 @@ export const getAdminPaidOrders = createServerFn({ method: "POST" })
       return { orders: [], error: "Variables de Supabase no configuradas en el servidor." };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
-    const adminEmails = adminEmailsRaw
-      .toLowerCase()
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean);
-
-    let requestingEmail = data.email ? data.email.toLowerCase().trim() : "";
-    if (data.token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-      if (userData?.user?.email) {
-        requestingEmail = userData.user.email.toLowerCase().trim();
-      }
+    // Identidad solo desde el token verificado (ver src/lib/admin-auth.ts)
+    const auth = await checkAdmin(data.token);
+    if (!auth.ok) {
+      return { orders: [], error: auth.error };
     }
-
-    if (!requestingEmail) {
-      return { orders: [], error: "Acceso denegado: Debés iniciar sesión como administrador." };
-    }
-
-    if (adminEmails.length > 0) {
-      if (!adminEmails.includes(requestingEmail)) {
-        return { orders: [], error: "Acceso denegado: El email no tiene permisos de administrador." };
-      }
-    } else {
-      const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
-      if (!defaultAdmins.includes(requestingEmail)) {
-        return { orders: [], error: "Acceso denegado: Configurá ADMIN_EMAILS en el archivo .env." };
-      }
-    }
+    const supabaseAdmin = auth.supabaseAdmin;
 
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
@@ -364,37 +239,12 @@ export const getAdminReservedOrders = createServerFn({ method: "POST" })
       return { orders: [], error: "Variables de Supabase no configuradas en el servidor." };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
-    const adminEmails = adminEmailsRaw
-      .toLowerCase()
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean);
-
-    let requestingEmail = data.email ? data.email.toLowerCase().trim() : "";
-    if (data.token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-      if (userData?.user?.email) {
-        requestingEmail = userData.user.email.toLowerCase().trim();
-      }
+    // Identidad solo desde el token verificado (ver src/lib/admin-auth.ts)
+    const auth = await checkAdmin(data.token);
+    if (!auth.ok) {
+      return { orders: [], error: auth.error };
     }
-
-    if (!requestingEmail) {
-      return { orders: [], error: "Acceso denegado: Debés iniciar sesión como administrador." };
-    }
-
-    if (adminEmails.length > 0) {
-      if (!adminEmails.includes(requestingEmail)) {
-        return { orders: [], error: "Acceso denegado: El email no tiene permisos de administrador." };
-      }
-    } else {
-      const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
-      if (!defaultAdmins.includes(requestingEmail)) {
-        return { orders: [], error: "Acceso denegado: Configurá ADMIN_EMAILS en el archivo .env." };
-      }
-    }
+    const supabaseAdmin = auth.supabaseAdmin;
 
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
@@ -448,29 +298,17 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const adminEmails = (process.env.ADMIN_EMAILS || "")
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-
-    let requestingEmail = data.email?.toLowerCase().trim();
-    if (data.token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-      if (userData?.user?.email) {
-        requestingEmail = userData.user.email.toLowerCase().trim();
-      }
+    // Identidad solo desde el token verificado (ver src/lib/admin-auth.ts)
+    const auth = await checkAdmin(data.token);
+    if (!auth.ok) {
+      return { status: "error", message: auth.error };
     }
+    const supabaseAdmin = auth.supabaseAdmin;
 
-    if (!requestingEmail) {
-      return { status: "error", message: "Acceso denegado: Debés iniciar sesión." };
-    }
-
-    if (adminEmails.length > 0) {
-      if (!adminEmails.includes(requestingEmail)) {
-        return { status: "error", message: "Acceso denegado: Sin permisos de admin." };
-      }
+    // Solo estados conocidos (antes se aceptaba cualquier texto)
+    const ESTADOS = ["pendiente", "pagado", "rechazado", "enviado", "entregado", "cancelado"];
+    if (!ESTADOS.includes(data.estado)) {
+      return { status: "error", message: "Estado de pedido inválido." };
     }
 
     const { error } = await supabaseAdmin
@@ -504,37 +342,12 @@ export const deleteAdminOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const adminEmailsRaw = process.env["ADMIN_EMAILS"] || process.env["VITE_ADMIN_EMAILS"] || "";
-    const adminEmails = adminEmailsRaw
-      .toLowerCase()
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean);
-
-    let requestingEmail = data.email?.toLowerCase().trim() || "";
-    if (data.token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(data.token);
-      if (userData?.user?.email) {
-        requestingEmail = userData.user.email.toLowerCase().trim();
-      }
+    // Identidad solo desde el token verificado (ver src/lib/admin-auth.ts)
+    const auth = await checkAdmin(data.token);
+    if (!auth.ok) {
+      return { status: "error", message: auth.error };
     }
-
-    if (!requestingEmail) {
-      return { status: "error", message: "Acceso denegado: Debés iniciar sesión como administrador." };
-    }
-
-    if (adminEmails.length > 0) {
-      if (!adminEmails.includes(requestingEmail)) {
-        return { status: "error", message: "Acceso denegado: Sin permisos de administrador." };
-      }
-    } else {
-      const defaultAdmins = ["admin@config.com", "admin@teimportamos.com"];
-      if (!defaultAdmins.includes(requestingEmail)) {
-        return { status: "error", message: "Acceso denegado: Configurá ADMIN_EMAILS en el archivo .env." };
-      }
-    }
+    const supabaseAdmin = auth.supabaseAdmin;
 
     const query = supabaseAdmin.from("orders").delete();
     const { error } = data.orderId
@@ -559,26 +372,29 @@ export const createTransferOrder = createServerFn({ method: "POST" })
       items: OrderItem[];
       userId?: string | undefined;
       couponCode?: string | undefined;
+      token?: string | undefined;
     }) => ({
       shipping: cleanShipping(data.shipping),
       items: cleanItems(data.items),
       userId: data.userId ? text(data.userId, 64) : undefined,
       couponCode: data.couponCode ? text(data.couponCode, 40).toUpperCase().trim() : undefined,
+      token: data.token ? text(data.token, 4000) : undefined,
     }),
   )
   .handler(async ({ data }) => {
+    if (transferOrderLimited(await currentClientIp())) {
+      return { status: "error", message: RATE_LIMIT_MSG };
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // La cuenta sale SOLO del token verificado: el userId que manda el navegador no se usa, porque
+    // con él se podría aplicar el cupón a nombre de otro o sobrescribir el perfil de otra persona.
+    const verified = await verifiedUserFromToken(supabaseAdmin, data.token);
+    data.userId = verified?.id;
+
     // Garantizar que data.shipping tenga el email de la cuenta si el usuario está logueado
-    if (data.userId && (!data.shipping.email || !data.shipping.email.includes("@"))) {
-      try {
-        const { data: userData } = await supabaseAdmin.auth.admin.getUserById(data.userId);
-        if (userData?.user?.email) {
-          data.shipping.email = userData.user.email.trim();
-        }
-      } catch (err) {
-        console.error("Error al obtener email del usuario en transferencia:", err);
-      }
+    if (verified?.email && (!data.shipping.email || !data.shipping.email.includes("@"))) {
+      data.shipping.email = verified.email;
     }
 
     // 1. Revalidar precios y mínimos de categoría
@@ -588,157 +404,44 @@ export const createTransferOrder = createServerFn({ method: "POST" })
     let validCouponApplied: string | null = null;
 
     try {
-      const [{ data: dbProducts }, { data: dbConfig }] = await Promise.all([
-        supabaseAdmin.from("products").select("id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,oferta,stock,descuento"),
-        supabaseAdmin.from("site_config").select("clave,valor"),
-      ]);
-
-      if (!dbProducts || dbProducts.length === 0) {
-        return { status: "error", message: "No se pudieron obtener los productos de la base de datos." };
+      // Precios calculados en el servidor (nunca los del navegador): ver src/lib/order-pricing.ts
+      const pricing = await priceOrderItems(supabaseAdmin, data.items);
+      if (pricing.error) {
+        return { status: "error", message: pricing.error };
       }
-
-      const configMap: Record<string, string> = {};
-      for (const row of dbConfig ?? []) {
-        if (row.clave && row.valor) configMap[row.clave] = row.valor;
-      }
-        const {
-          normCat,
-          parseCategoryRules,
-          findRuleForCat,
-          findProduct,
-          priceOf,
-          unitPriceFor,
-          categoryDiscountForUnits,
-          checkCategoryMins,
-          moqGroupOf,
-          isNfcGoogle,
-          isBlackviewGlasses,
-          blackviewUnitPrice,
-          transferPrice,
-          transferDiscountPct,
-        } = await import("./store");
-
-        const catRules = parseCategoryRules(configMap);
-        const catTotals: Record<string, number> = {};
-        const usdRate = Number(configMap["dolar_cotizacion"] ?? 0);
-
-        for (const item of data.items) {
-          const prod = findProduct(dbProducts as any, item.nombre);
-          if (prod && !isNfcGoogle(item.nombre) && !isNfcGoogle(prod.nombre) &&
-              !isBlackviewGlasses(item.nombre) && !isBlackviewGlasses(prod.nombre)) {
-            const catNorm = normCat(prod.categoria ?? "");
-            const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
-            if (match) {
-              catTotals[match.key] = (catTotals[match.key] ?? 0) + item.qty;
-            }
-          }
-        }
-
-        const itemsWithCat = data.items.map((item) => {
-          const prod = findProduct(dbProducts as any, item.nombre);
-          const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
-          return {
-            nombre: prod && isNfcGoogle(prod.nombre) ? prod.nombre : item.nombre,
-            categoria: prod?.categoria ?? "",
-            moq_group,
-            qty: item.qty,
-            unitPrice: item.unitPrice,
-          };
-        });
-
-        const minViolations = checkCategoryMins(itemsWithCat, catRules);
-        if (minViolations.length > 0) {
-          const v = minViolations[0]!;
-          const msg =
-            v.type === "amount"
-              ? `No se cumple el mínimo de compra para ${v.category} ($${v.min.toLocaleString("es-AR")}).`
-              : `No se cumple el mínimo de compra para ${v.category} (${v.min} unidades).`;
-          return { status: "error", message: msg };
-        }
-
-        items = data.items.map((item) => {
-          const prod = findProduct(dbProducts as any, item.nombre);
-          if (!prod) return item;
-
-          // Blackview BV100: precio fijo US$100 (+7%) desde 3 unidades, sin otros descuentos
-          if (isBlackviewGlasses(item.nombre) || isBlackviewGlasses(prod.nombre)) {
-            return {
-              nombre: item.nombre,
-              qty: item.qty,
-              unitPrice: blackviewUnitPrice(priceOf(prod), item.qty, usdRate),
-            };
-          }
-
-          // NFC Google: sin descuento por cantidad bajo ningún concepto
-          if (isNfcGoogle(item.nombre) || isNfcGoogle(prod.nombre)) {
-            return {
-              nombre: item.nombre,
-              qty: item.qty,
-              unitPrice: priceOf(prod),
-            };
-          }
-
-          const catNorm = normCat(prod.categoria ?? "");
-          const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
-          const catRule = match?.rule;
-          const ruleKey = match?.key;
-
-          let unitPrice: number;
-          if (catRule?.discountTiers?.length && ruleKey) {
-            const totalCatUnits = catTotals[ruleKey] ?? 0;
-            const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
-            const base = priceOf(prod);
-            unitPrice = Math.round(base * (1 - percent / 100));
-          } else {
-            unitPrice = Math.round(unitPriceFor(prod, item.qty));
-          }
-
-          return {
-            nombre: item.nombre,
-            qty: item.qty,
-            unitPrice: unitPrice > 0 ? unitPrice : item.unitPrice,
-          };
-        });
-
-        const listTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-        const discPct = transferDiscountPct(configMap);
-        total = transferPrice(listTotal, discPct);
+      const configMap = pricing.config;
+      items = pricing.validatedItems;
+      const listTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+      const { transferPrice, transferDiscountPct } = await import("./store");
+      total = transferPrice(listTotal, transferDiscountPct(configMap));
 
       // Revalidación segura del cupón en el servidor
       if (data.couponCode && data.userId) {
         const isCouponActive = (configMap["promo_cupon_activo"] ?? "SI").toUpperCase() === "SI";
         const promoCode = (configMap["promo_cupon_codigo"] ?? "TEIMPORTAMOS").toUpperCase().trim();
 
-        if (isCouponActive && data.couponCode === promoCode) {
-          const usedKeyUser = `coupon_usage_${promoCode}_${data.userId}`;
-          const usedKeyEmail = data.shipping.email ? `coupon_usage_${promoCode}_${data.shipping.email.trim().toLowerCase()}` : "";
-          const alreadyUsedInConfig = Boolean(configMap[usedKeyUser] || (usedKeyEmail && configMap[usedKeyEmail]));
+        if (isCouponActive && data.couponCode === promoCode && verified) {
+          const shippingEmail = (data.shipping.email ?? "").trim().toLowerCase();
+          // Usos viejos registrados en site_config (antes de coupon_usages)
+          const alreadyUsedInConfig = Boolean(
+            configMap[`coupon_usage_${promoCode}_${verified.id}`] ||
+              (verified.email && configMap[`coupon_usage_${promoCode}_${verified.email}`]) ||
+              (shippingEmail && configMap[`coupon_usage_${promoCode}_${shippingEmail}`]),
+          );
+          // Ante cualquier error de verificación, hasUsedCoupon devuelve true: no se aplica el descuento
+          const used =
+            alreadyUsedInConfig ||
+            (await hasUsedCoupon(supabaseAdmin, promoCode, verified.id, verified.email)) ||
+            (shippingEmail && shippingEmail !== verified.email
+              ? await hasUsedCoupon(supabaseAdmin, promoCode, null, shippingEmail)
+              : false) ||
+            (await couponUsedByDni(supabaseAdmin, promoCode, data.shipping.dni));
 
-          if (!alreadyUsedInConfig) {
-            const filterParts: string[] = [`user_id.eq.${data.userId}`];
-            if (data.shipping.email) {
-              filterParts.push(`user_email.ilike.${data.shipping.email.trim().toLowerCase()}`);
-            }
-            try {
-              const { data: usages } = await supabaseAdmin
-                .from("coupon_usages")
-                .select("id")
-                .eq("coupon_code", promoCode)
-                .or(filterParts.join(","))
-                .limit(1);
-
-              if (!usages || usages.length === 0) {
-                const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
-                couponDiscountAmount = Math.round(total * (couponPct / 100));
-                total = Math.max(1, total - couponDiscountAmount);
-                validCouponApplied = promoCode;
-              }
-            } catch {
-              const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
-              couponDiscountAmount = Math.round(total * (couponPct / 100));
-              total = Math.max(1, total - couponDiscountAmount);
-              validCouponApplied = promoCode;
-            }
+          if (!used) {
+            const couponPct = Number(configMap["promo_cupon_descuento_pct"]) || 5;
+            couponDiscountAmount = Math.round(total * (couponPct / 100));
+            total = Math.max(1, total - couponDiscountAmount);
+            validCouponApplied = promoCode;
           }
         }
       }
@@ -757,65 +460,32 @@ export const createTransferOrder = createServerFn({ method: "POST" })
       };
     }
 
-    const orderCode = makeCode();
-
     try {
-      const { error } = await supabaseAdmin.from("orders").insert({
-        order_code: orderCode,
-        user_id: data.userId ?? null,
-        ...data.shipping,
-        items,
-        total,
-        estado: "pendiente",
-        metodo_pago: "transferencia",
-      });
-
-      if (error) {
-        console.error("Error al registrar la orden por transferencia:", error);
-        return {
-          status: "error",
-          message: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos.",
-        };
+      // Código aleatorio + cupón reservado antes del pedido (ver src/lib/order-create.server.ts)
+      const { createOrderRecord } = await import("./order-create.server");
+      const created = await createOrderRecord(
+        supabaseAdmin,
+        {
+          user_id: data.userId ?? null,
+          ...data.shipping,
+          items,
+          total,
+          estado: "pendiente",
+          metodo_pago: "transferencia",
+        },
+        validCouponApplied
+          ? {
+              code: validCouponApplied,
+              userId: data.userId ?? null,
+              email: verified?.email || data.shipping.email || "",
+              discount: couponDiscountAmount,
+            }
+          : null,
+      );
+      if (!created.orderCode) {
+        return { status: "error", message: created.error ?? "No pudimos registrar tu pedido." };
       }
-
-      // Registrar uso del cupón si se aplicó
-      if (validCouponApplied) {
-        try {
-          await supabaseAdmin.from("coupon_usages").insert({
-            user_id: data.userId ?? null,
-            user_email: (data.shipping.email ?? "").trim().toLowerCase(),
-            coupon_code: validCouponApplied,
-            order_code: orderCode,
-            discount_amount: couponDiscountAmount,
-          });
-        } catch (couponErr) {
-          console.error("Error registrando uso de cupón en coupon_usages:", couponErr);
-        }
-
-        // Registrar SIEMPRE en site_config para garantizar persistencia y bloqueo inmediato
-        try {
-          const payload = JSON.stringify({
-            orderCode,
-            email: (data.shipping.email ?? "").trim().toLowerCase(),
-            discount: couponDiscountAmount,
-            at: new Date().toISOString(),
-          });
-          if (data.userId) {
-            await (supabaseAdmin as any).from("site_config").upsert({
-              clave: `coupon_usage_${validCouponApplied}_${data.userId}`,
-              valor: payload,
-            }, { onConflict: "clave" });
-          }
-          if (data.shipping.email) {
-            await (supabaseAdmin as any).from("site_config").upsert({
-              clave: `coupon_usage_${validCouponApplied}_${data.shipping.email.trim().toLowerCase()}`,
-              valor: payload,
-            }, { onConflict: "clave" });
-          }
-        } catch (scErr) {
-          console.error("Error registrando uso de cupón en site_config:", scErr);
-        }
-      }
+      const orderCode = created.orderCode;
 
       if (data.userId) {
         await supabaseAdmin.from("profiles").upsert(

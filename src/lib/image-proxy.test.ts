@@ -121,6 +121,27 @@ describe("handleImageProxy request processing", () => {
     expect(res.headers.get("Content-Type")).toBe("image/webp");
     expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(res.headers.get("ETag")).toBe('"abc123etag"');
+    // Sin Vary: Accept, para no partir la caché del CDN por navegador
+    expect(res.headers.get("Vary")).toBeNull();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("caches a missing image briefly and does not cache server errors", async () => {
+    const targetUrl =
+      "https://dybzgnmghisqapdzgknv.supabase.co/storage/v1/object/public/storage-images/thumbnails-md/x.webp";
+    const req = () =>
+      new Request(`https://myshop.com/api/img?url=${encodeURIComponent(targetUrl)}`);
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("nope", { status: 404 })));
+    const missing = await handleImageProxy(req());
+    expect(missing.status).toBe(404);
+    expect(missing.headers.get("Cache-Control")).toContain("s-maxage=600");
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 500 })));
+    const broken = await handleImageProxy(req());
+    expect(broken.status).toBe(500);
+    expect(broken.headers.get("Cache-Control")).toBe("no-store");
 
     vi.unstubAllGlobals();
   });

@@ -331,6 +331,10 @@ const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
 export function sanitizeUrl(url?: string | null): string {
   if (!url || typeof url !== "string") return "#";
   const trimmed = url.trim();
+  // Los navegadores ignoran tabs, saltos de línea y otros caracteres de control dentro de una URL:
+  // "/\t/evil.com" terminaba siendo "//evil.com" (otro sitio)
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f\\]/.test(trimmed)) return "#";
   if (trimmed.startsWith("#")) {
     return "#" + trimmed.slice(1).replace(/[^\w\-]/g, "");
   }
@@ -401,6 +405,120 @@ export function waLink(config: SiteConfig, messageOrProduct?: string) {
 
 export function categoriesOf(products: Product[]) {
   return [...new Set(products.map((p) => (p.categoria ?? "").trim()).filter(Boolean))];
+}
+
+/**
+ * Cotización implícita del dólar en los productos: suma de precios en pesos / suma de precios en USD
+ * (solo productos con ambos precios). Es la "Cotización activa en Base de Datos" que muestra el admin
+ * y la que efectivamente usan los precios de la tienda. Devuelve 0 si no hay productos para calcularla.
+ */
+export function impliedUsdRate(rows: { precio?: unknown; precio_usd?: unknown }[]): number {
+  let totalArs = 0;
+  let totalUsd = 0;
+  for (const r of rows) {
+    const ars = Number(r.precio) || 0;
+    const usd = Number(r.precio_usd) || 0;
+    if (ars > 0 && usd >= 1) {
+      totalArs += ars;
+      totalUsd += usd;
+    }
+  }
+  return totalUsd > 0 ? Math.round(totalArs / totalUsd) : 0;
+}
+
+/** Categorías en el orden en que se muestran en la tienda (catálogo y cuestionario de la home). */
+/**
+ * Claves de site_config que NO se mandan al navegador (la configuración de la tienda la recibe
+ * cualquier visitante). Incluye credenciales, registros internos, usos de cupón (emails) y el
+ * código del cupón, que solo usa el panel de admin.
+ */
+export function isPrivateConfigKey(clave: string): boolean {
+  const k = clave.trim().toLowerCase();
+  return (
+    k.startsWith("coupon_usage_") ||
+    k.startsWith("last_email_") ||
+    k.startsWith("resend_") ||
+    k === "promo_cupon_codigo" ||
+    /(api[_-]?key|secret|token|password|passwd|private|access[_-]?key)/.test(k)
+  );
+}
+
+/** "Parlante JBL Negro" + "Negro" → "Parlante JBL" (para armar el nombre con otro color). */
+export function stripTrailingColor(name: string, color: string): string {
+  const trimmedName = name.trim();
+  const trimmedColor = color.trim();
+  if (!trimmedColor) return trimmedName;
+
+  if (trimmedName.toLowerCase().endsWith(trimmedColor.toLowerCase())) {
+    let withoutColor = trimmedName.slice(0, trimmedName.length - trimmedColor.length).trimEnd();
+    if (withoutColor.endsWith("-") || withoutColor.endsWith("—")) {
+      withoutColor = withoutColor.slice(0, -1).trimEnd();
+    }
+    return withoutColor;
+  }
+  return trimmedName;
+}
+
+/** Talles válidos para un producto (o para un color, si la variante tiene los suyos). */
+export function allowedTallesFor(product: Record<string, unknown>, color?: string | null): string[] {
+  const meta =
+    product["metadata"] && typeof product["metadata"] === "object"
+      ? (product["metadata"] as Record<string, unknown>)
+      : {};
+  const read = (key: string): string[] => {
+    const raw = product[key] ?? meta[key];
+    if (Array.isArray(raw)) return raw.map((t) => String(t).trim()).filter(Boolean);
+    if (typeof raw === "string") return raw.split(",").map((t) => t.trim()).filter(Boolean);
+    return [];
+  };
+  if (color) {
+    const byColor = read(`talles_color_${color.trim().toLowerCase().normalize("NFC").replace(/\s+/g, "_")}`);
+    if (byColor.length > 0) return byColor;
+  }
+  return read("talles_disponibles");
+}
+
+/** Cuántos "Más vendidos" muestra la home. */
+export const HOME_BEST_SELLERS = 3;
+
+/**
+ * Ranking único de "Más vendidos", compartido por la home y el catálogo (así siempre coinciden).
+ *
+ * Orden: 1) con ventas de la semana, de más a menos (empate: destacados primero);
+ * 2) destacados sin ventas; 3) el resto, en el orden del catálogo.
+ * `topCount` es cuántos cuentan como "Más vendidos": los de 1) y 2), y como mínimo los
+ * HOME_BEST_SELLERS que muestra la home (aunque alguno haya entrado de relleno desde 3).
+ */
+export function rankBestSellers(products: Product[]): { ranked: Product[]; topCount: number } {
+  const indexed = products.map((p, i) => ({ p, i, ventas: Number(p.ventas_semana ?? 0) || 0 }));
+  const conVentas = indexed
+    .filter((x) => x.ventas > 0)
+    .sort(
+      (a, b) =>
+        b.ventas - a.ventas ||
+        (isYes(b.p.destacado) ? 1 : 0) - (isYes(a.p.destacado) ? 1 : 0) ||
+        a.i - b.i,
+    );
+  const destacados = indexed.filter((x) => x.ventas <= 0 && isYes(x.p.destacado));
+  const resto = indexed.filter((x) => x.ventas <= 0 && !isYes(x.p.destacado));
+  const ranked = [...conVentas, ...destacados, ...resto].map((x) => x.p);
+  const topCount = Math.min(
+    ranked.length,
+    Math.max(conVentas.length + destacados.length, HOME_BEST_SELLERS),
+  );
+  return { ranked, topCount };
+}
+
+export function orderedCategories(products: Product[]) {
+  const all = categoriesOf(products);
+  // Categorías que queremos ver primero (en este orden)
+  const PINNED_FIRST = ["Bazar", "Zapatillas", "Tecnología"];
+  // Categorías que queremos ver al final
+  const PINNED_LAST = ["Vapers"];
+  const pinned = PINNED_FIRST.filter((c) => all.includes(c));
+  const last = PINNED_LAST.filter((c) => all.includes(c));
+  const rest = all.filter((c) => !PINNED_FIRST.includes(c) && !PINNED_LAST.includes(c));
+  return [...pinned, ...rest, ...last];
 }
 
 /** Returns true when the product's category or name matches "Camisetas" (accent-insensitive). */
@@ -505,7 +623,8 @@ export function parseJerseyItem(item: { id?: string; nombre?: string }): {
   const hasBadge =
     idStr.endsWith("-yes") ||
     idStr.includes("-yes-") ||
-    /Con Badge/i.test(nomStr);
+    // "Con Parche" (texto actual) o "Con Badge" (carritos armados antes del cambio de nombre)
+    /Con (Badge|Parche)/i.test(nomStr);
   const badge: "yes" | "no" = hasBadge ? "yes" : "no";
 
   let talle = "S";
@@ -684,6 +803,73 @@ export function discountFor(p: Product, qty: number) {
   return percent;
 }
 
+/**
+ * Precio de lista de un producto o de su variante (color), antes de descuentos por cantidad.
+ * Es la misma cuenta que muestra la ficha del producto y la que repite el servidor al cobrar.
+ * "default_base" es la variante sintética que representa al producto base.
+ */
+export function variantBasePrice(
+  p: Product,
+  variant?: { id?: string | null; precio?: unknown } | null,
+): number {
+  const variantPrice = Number(variant?.precio);
+  const useVariant = Boolean(variant && variant.id !== "default_base" && variantPrice > 0);
+  if (!useVariant) return priceOf(p);
+  return hasOffer(p) ? Math.round(variantPrice * (1 - offerDiscountPct(p) / 100)) : variantPrice;
+}
+
+/** Tramos de precio por cantidad de un combo (vienen en quantity_tiers o, en datos viejos, en link). */
+export function parseComboTiers(raw: unknown): ComboQuantityTier[] | null {
+  let tiers: unknown = raw;
+  if (typeof raw === "string" && raw.trim().startsWith("[")) {
+    try {
+      tiers = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(tiers)) return null;
+  const clean = tiers
+    .map((t) => ({
+      units: Number((t as ComboQuantityTier)?.units),
+      price: Number((t as ComboQuantityTier)?.price),
+    }))
+    .filter(
+      (t) => Number.isFinite(t.units) && t.units > 0 && Number.isFinite(t.price) && t.price > 0,
+    );
+  return clean.length ? clean : null;
+}
+
+/** Precio unitario de un combo para una cantidad: el tramo de mayor cantidad alcanzada, o el precio base. */
+export function comboUnitPrice(
+  banner: { precio?: unknown; quantity_tiers?: unknown; link?: unknown },
+  qty: number,
+): number {
+  const tiers = parseComboTiers(banner.quantity_tiers ?? banner.link);
+  if (tiers) {
+    const tier = [...tiers].sort((a, b) => b.units - a.units).find((t) => qty >= t.units);
+    if (tier) return Math.round(tier.price);
+  }
+  return Math.round(toNumber(String(banner.precio ?? "")));
+}
+
+/** Busca un combo activo por su título (así llega en el carrito: nombre = título del combo). */
+export function findComboByName<T extends { titulo?: string | null }>(
+  banners: T[],
+  nombre: string,
+): T | undefined {
+  const key = String(nombre ?? "")
+    .trim()
+    .toLowerCase();
+  if (!key) return undefined;
+  return banners.find(
+    (b) =>
+      String(b.titulo ?? "")
+        .trim()
+        .toLowerCase() === key,
+  );
+}
+
 export function unitPriceFor(p: Product, qty: number, basePrice = priceOf(p)) {
   return basePrice * (1 - discountFor(p, qty) / 100);
 }
@@ -761,6 +947,17 @@ export type CategoryRule = {
   minUnits?: number;
   minAmount?: number;
 };
+
+/**
+ * Categorías que no se muestran en la tienda (catálogo, home, búsquedas ni páginas de producto).
+ * Los productos siguen en la base y en el panel de admin. Se compara sin acentos ni mayúsculas.
+ */
+export const HIDDEN_CATEGORIES = ["electrodomesticos", "electrodomestico"];
+
+export function isHiddenCategory(categoria?: string | null): boolean {
+  const norm = normCat(String(categoria ?? ""));
+  return HIDDEN_CATEGORIES.includes(norm);
+}
 
 /** Normaliza el nombre de una categoría para usarla como clave (remueve acentos y minúsculas) */
 export const normCat = (s: string) => {

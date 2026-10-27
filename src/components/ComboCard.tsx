@@ -59,18 +59,23 @@ export function ComboCard({
         </h3>
 
         {basePrice > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+          // Mismo formato de precio que las tarjetas de producto
+          <div className="flex flex-col gap-0.5">
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <span className="tabular-nums text-base sm:text-lg font-bold text-primary">
                 {money(tPrice)}
               </span>
-              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                {discPct}% OFF Transf.
-              </span>
+              {discPct > 0 && (
+                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                  con transferencia
+                </span>
+              )}
             </div>
-            <span className="text-[11px] text-muted-foreground">
-              o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con Mercado Pago
-            </span>
+            {discPct > 0 && (
+              <span className="text-[11px] text-muted-foreground">
+                {money(basePrice)} con Mercado Pago
+              </span>
+            )}
           </div>
         )}
       </div>

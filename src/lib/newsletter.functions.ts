@@ -7,8 +7,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { assertAdmin } from "./admin-auth";
+import { verifiedUserFromToken } from "./coupon-usage";
+import { escapeHtml } from "./html-escape";
+import { createRateLimiter, currentClientIp } from "./rate-limit";
 
-const BASE_URL = "https://teimportamosarg.com";
+// Altas al newsletter por IP
+const subscribeLimited = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
+
+const BASE_URL = "https://www.teimportamosarg.com";
 
 export interface NewsletterSubscriber {
   id: string;
@@ -54,7 +61,8 @@ export function buildPromotionalEmailHtml(params: {
   couponCode?: string;
   unsubscribeToken: string;
 }): string {
-  const greeting = params.nombre ? `¡Hola ${params.nombre}!` : "¡Hola!";
+  // El nombre lo escribe el suscriptor: se escapa para que no pueda meter links ni HTML en el email
+  const greeting = params.nombre ? `¡Hola ${escapeHtml(params.nombre)}!` : "¡Hola!";
   const ctaText = params.ctaText || "Ver Ofertas en la Tienda";
   const ctaUrl = params.ctaUrl || `${BASE_URL}/catalogo`;
   const unsubscribeUrl = `${BASE_URL}/desuscribir?token=${encodeURIComponent(params.unsubscribeToken)}`;
@@ -144,8 +152,12 @@ export function buildPromotionalEmailHtml(params: {
 /**
  * Obtener estadísticas de newsletter y estado de campaña activa
  */
-export const getCampaignsSummary = createServerFn({ method: "GET" }).handler(
-  async (): Promise<CampaignSummary> => {
+export const getCampaignsSummary = createServerFn({ method: "POST" })
+  .validator((d: { token?: string }) => z.object({ token: z.string().max(4000).optional() }).parse(d ?? {}))
+  .handler(
+  async ({ data }): Promise<CampaignSummary> => {
+    // Solo administradores (ver src/lib/admin-auth.ts)
+    await assertAdmin(undefined, data.token);
     try {
       const [subsRes, unsubsRes, campaignsRes] = await Promise.all([
         (supabaseAdmin as any).from("newsletter_subscribers").select("id", { count: "exact", head: true }).eq("is_active", true),
@@ -194,9 +206,10 @@ export const getCampaignsSummary = createServerFn({ method: "GET" }).handler(
  * Crear una nueva campaña de correo
  */
 export const createNewsletterCampaign = createServerFn({ method: "POST" })
-  .validator((d: { subject: string; headline: string; content: string; cta_text?: string; cta_url?: string; coupon_code?: string }) => {
+  .validator((d: { subject: string; headline: string; content: string; cta_text?: string; cta_url?: string; coupon_code?: string; token?: string }) => {
     return z
       .object({
+        token: z.string().max(4000).optional(),
         subject: z.string().min(3, "El asunto es obligatorio"),
         headline: z.string().min(3, "El título es obligatorio"),
         content: z.string().min(10, "El contenido debe tener al menos 10 caracteres"),
@@ -207,6 +220,8 @@ export const createNewsletterCampaign = createServerFn({ method: "POST" })
       .parse(d);
   })
   .handler(async ({ data }) => {
+    // Solo administradores (ver src/lib/admin-auth.ts)
+    await assertAdmin(undefined, data.token);
     try {
       // 1. Contar suscriptores activos
       const { count: activeCount, error: countErr } = await (supabaseAdmin as any)
@@ -252,15 +267,18 @@ export const createNewsletterCampaign = createServerFn({ method: "POST" })
  * Enviar siguiente tanda de la campaña activa (anti-duplicación)
  */
 export const sendNextCampaignBatch = createServerFn({ method: "POST" })
-  .validator((d: { campaignId: string; batchSize: number }) => {
+  .validator((d: { campaignId: string; batchSize: number; token?: string }) => {
     return z
       .object({
+        token: z.string().max(4000).optional(),
         campaignId: z.string().uuid(),
         batchSize: z.number().min(1).max(80).default(50),
       })
       .parse(d);
   })
   .handler(async ({ data }) => {
+    // Solo administradores (ver src/lib/admin-auth.ts)
+    await assertAdmin(undefined, data.token);
     const { campaignId, batchSize } = data;
 
     try {
@@ -316,8 +334,11 @@ export const sendNextCampaignBatch = createServerFn({ method: "POST" })
       const batch = pendingSubscribers.slice(0, batchSize);
 
       // Obtener API Key de Resend
-      let apiKey = process.env["RESEND_API_KEY"] || process.env["VITE_RESEND_API_KEY"];
-      const fromAddress = "Te Importamos <noreply@teimportamosarg.com>";
+      // Misma clave que los emails de pedido, desde la configuración privada
+      const { getResendConfig } = await import("./secrets.server");
+      const resend = await getResendConfig(supabaseAdmin);
+      let apiKey = resend.apiKey;
+      const fromAddress = resend.from;
 
       let sentCount = 0;
       let failedCount = 0;
@@ -419,15 +440,18 @@ export const sendNextCampaignBatch = createServerFn({ method: "POST" })
  * NO cuenta para las tandas ni registra al usuario en logs de entrega real.
  */
 export const sendCampaignTestEmail = createServerFn({ method: "POST" })
-  .validator((d: { campaignId: string; targetEmail: string }) => {
+  .validator((d: { campaignId: string; targetEmail: string; token?: string }) => {
     return z
       .object({
+        token: z.string().max(4000).optional(),
         campaignId: z.string().uuid(),
         targetEmail: z.string().email("Ingresá un correo electrónico válido"),
       })
       .parse(d);
   })
   .handler(async ({ data }) => {
+    // Solo administradores (ver src/lib/admin-auth.ts)
+    await assertAdmin(undefined, data.token);
     try {
       const { data: campaign, error: campErr } = await (supabaseAdmin as any)
         .from("newsletter_campaigns")
@@ -439,8 +463,11 @@ export const sendCampaignTestEmail = createServerFn({ method: "POST" })
         return { success: false, error: "Campaña no encontrada." };
       }
 
-      let apiKey = process.env["RESEND_API_KEY"] || process.env["VITE_RESEND_API_KEY"];
-      const fromAddress = "Te Importamos <noreply@teimportamosarg.com>";
+      // Misma clave que los emails de pedido, desde la configuración privada
+      const { getResendConfig } = await import("./secrets.server");
+      const resend = await getResendConfig(supabaseAdmin);
+      let apiKey = resend.apiKey;
+      const fromAddress = resend.from;
 
       const html = buildPromotionalEmailHtml({
         nombre: "Admin (Prueba)",
@@ -493,35 +520,53 @@ export const sendCampaignTestEmail = createServerFn({ method: "POST" })
  * Sincronizar nuevo suscriptor al registrar cuenta
  */
 export const syncNewUserSubscriber = createServerFn({ method: "POST" })
-  .validator((d: { email: string; nombre?: string; acceptMarketing: boolean }) => {
-    return z
-      .object({
-        email: z.string().email(),
-        nombre: z.string().optional(),
-        acceptMarketing: z.boolean(),
-      })
-      .parse(d);
-  })
+  .validator(
+    (d: {
+      email: string;
+      nombre?: string;
+      acceptMarketing: boolean;
+      token?: string | undefined;
+    }) => {
+      return z
+        .object({
+          email: z.string().email().max(160),
+          nombre: z.string().max(120).optional(),
+          acceptMarketing: z.boolean(),
+          token: z.string().max(4000).optional(),
+        })
+        .parse(d);
+    },
+  )
   .handler(async ({ data }) => {
     try {
+      if (subscribeLimited(await currentClientIp())) {
+        return { success: false, error: "Demasiados intentos. Probá más tarde." };
+      }
+      // Con sesión: el email sale de la cuenta verificada y se puede actualizar la preferencia.
+      // Sin sesión: solo se puede dar de alta un email nuevo, nunca modificar uno existente
+      // (antes cualquiera podía suscribir, desuscribir o renombrar el email de otra persona).
+      const verified = await verifiedUserFromToken(supabaseAdmin, data.token);
+      const email = (verified?.email || data.email).trim().toLowerCase();
+
       const crypto = await import("crypto");
-      const token = crypto.randomBytes(16).toString("hex");
+      const unsubscribeToken = crypto.randomBytes(16).toString("hex");
 
       await (supabaseAdmin as any).from("newsletter_subscribers").upsert(
         {
-          email: data.email.trim().toLowerCase(),
+          email,
           nombre: data.nombre?.trim() || null,
           is_active: data.acceptMarketing,
-          unsubscribe_token: token,
+          unsubscribe_token: unsubscribeToken,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "email" }
+        { onConflict: "email", ignoreDuplicates: !verified },
       );
 
       return { success: true };
     } catch (err: any) {
-      console.error("[newsletter] Error al registrar suscriptor:", err);
-      return { success: false, error: err.message };
+      console.error("[newsletter] Error al registrar suscriptor:", err?.message ?? err);
+      // Mensaje genérico: el error interno de la base no se le muestra al visitante
+      return { success: false, error: "No pudimos registrar la suscripción." };
     }
   });
 

@@ -16,6 +16,7 @@ import { createCheckout } from "@/lib/checkout.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
+import { track } from "@/lib/analytics";
 import {
   money,
   transferPrice,
@@ -25,7 +26,13 @@ import {
   sanitizeUrl,
 } from "@/lib/store";
 
-type CheckoutItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
+type CheckoutItem = {
+  nombre: string;
+  qty: number;
+  unitPrice: number;
+  productId?: string | undefined;
+  variantId?: string | undefined;
+};
 
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary";
@@ -81,7 +88,7 @@ export function CheckoutFlow({
   appliedCoupon?: { code: string; discountPct: number } | null;
   onBack?: () => void;
 }) {
-  const { user, profile } = useAuth();
+  const { user, profile, session } = useAuth();
   const navigate = useNavigate();
   const cart = useCart();
   const { data: storeData } = useSuspenseQuery(storeQueryOptions);
@@ -201,6 +208,7 @@ export function CheckoutFlow({
 
     setError("");
     setStep("payment");
+    track("checkout_shipping_completed", { items: items.length, total });
   };
 
   const confirmTransfer = async () => {
@@ -213,11 +221,17 @@ export function CheckoutFlow({
           shipping: form,
           userId: user?.id,
           couponCode: couponCode || undefined,
+          token: session?.access_token,
         },
       });
 
       if (res.status === "success" && res.orderCode) {
         cart.clear();
+        track("order_placed", {
+          metodo: "transferencia",
+          total: res.total ?? finalTransferTotal,
+          cupon: couponCode ?? null,
+        });
 
         // Abrir WhatsApp con el comprobante pre-armado
         const finalAmount = res.total ?? finalTransferTotal;
@@ -255,11 +269,13 @@ export function CheckoutFlow({
           origin: window.location.origin,
           userId: user?.id,
           couponCode: couponCode || undefined,
+          token: session?.access_token,
         },
       });
       if (res.url) {
         const safeUrl = sanitizeUrl(res.url);
         if (safeUrl !== "#") {
+          track("order_placed", { metodo: "mercadopago", total, cupon: couponCode ?? null });
           window.location.href = safeUrl;
         } else {
           setError("URL de pago no válida.");

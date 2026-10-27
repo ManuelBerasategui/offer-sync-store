@@ -9,6 +9,7 @@ import { useCart } from "@/lib/cart";
 import { money, waLink, getBankInfo } from "@/lib/store";
 import { verifyOrderPayment } from "@/lib/orders.functions";
 import { SITE_URL } from "@/lib/constants";
+import { track } from "@/lib/analytics";
 
 const graciasSearchSchema = z
   .object({
@@ -89,6 +90,11 @@ function GraciasPage() {
         });
         if (!cancelled) {
           setOrderState({ estado: res.estado, total: res.total, metodo: res.metodoPago });
+          track("order_result", {
+            estado: res.estado,
+            metodo: res.metodoPago ?? null,
+            total: res.total ?? null,
+          });
           if (res.estado === "pagado") {
             cart.clear();
           }

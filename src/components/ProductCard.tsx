@@ -78,8 +78,8 @@ export function ProductCard({
         className="relative block aspect-square bg-surface"
       >
         {offer && !consultar && !hidePrice && (
-          <span className="absolute left-2 top-2 z-10 rounded-md bg-red-600 px-2 py-1 text-[10px] font-extrabold uppercase text-white shadow-sm flex items-center gap-1">
-            🔥 {offerPct > 0 ? `-${offerPct}% OFF` : "OFERTA"}
+          <span className="absolute left-2 top-2 z-10 rounded-md bg-red-600 px-2 py-1 text-[10px] font-extrabold uppercase text-white shadow-sm">
+            {offerPct > 0 ? `-${offerPct}%` : "Oferta"}
           </span>
         )}
         <img
@@ -142,31 +142,33 @@ export function ProductCard({
           ) : (
             <div>
               <div className="flex flex-col">
+                {/* El % de oferta ya está sobre la foto: acá solo el precio anterior tachado */}
                 {isDiscounted && (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
-                    <span className="line-through tabular-nums">{money(origPrice)}</span>
-                    <span className="text-[10px] font-bold text-red-600 dark:text-red-400">
-                      -{offerPct}% OFF
-                    </span>
-                  </div>
+                  <span className="text-xs text-muted-foreground line-through tabular-nums">
+                    {money(origPrice)}
+                  </span>
                 )}
                 <div className="flex items-baseline gap-1.5 flex-wrap">
                   <span className="tabular-nums text-lg font-bold text-foreground">
                     {money(tPrice)}
                   </span>
-                  <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                    {discPct}% OFF Transf.
-                  </span>
+                  {discPct > 0 && (
+                    <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                      con transferencia
+                    </span>
+                  )}
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  o <span className="font-semibold text-foreground/80">{money(basePrice)}</span> con Mercado Pago
-                </p>
+                {discPct > 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {money(basePrice)} con Mercado Pago
+                  </p>
+                )}
               </div>
 
               {maxPercent !== null && (
-                <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
-                  🎁 Hasta {maxPercent}% OFF x mayor
-                </span>
+                <p className="mt-1 text-[11px] font-semibold text-primary">
+                  Hasta {maxPercent}% off por cantidad
+                </p>
               )}
 
               {isCurva(p.nombre) && (
@@ -176,9 +178,9 @@ export function ProductCard({
               )}
 
               {isNfcGoogleProd && (
-                <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">
-                  ℹ️ Mínimo 50 unidades
-                </span>
+                <p className="mt-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                  Mínimo 50 unidades
+                </p>
               )}
             </div>
           )}
@@ -187,7 +189,7 @@ export function ProductCard({
         <Link
           to="/producto/$id"
           params={{ id: String(p.id ?? p.nombre ?? "") }}
-          className="btn-base mt-2 w-full bg-foreground px-3 py-2.5 text-[11px] text-background"
+          className="btn-base mt-3 w-full border border-foreground/15 bg-transparent px-3 py-2.5 text-[11px] text-foreground transition-colors hover:border-foreground hover:bg-foreground hover:text-background"
         >
           {isCamisetaProd ? "Ver opciones y precios" : "Ver producto"}
         </Link>

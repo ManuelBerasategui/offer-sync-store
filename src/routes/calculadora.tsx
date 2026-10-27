@@ -1,12 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { useState, useRef } from "react";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useEffect, useState, useRef } from "react";
+import { z } from "zod";
 import { Calculator, Plus, Trash2, Copy, Printer, Check, MessageCircle } from "lucide-react";
 import { SiteChrome } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import { waLink } from "@/lib/store";
+import { track } from "@/lib/analytics";
+import { getImportUsdRate } from "@/lib/import-ai.functions";
+
+// Datos precargados (ej: desde la lectura de una captura en /importar). Valores inválidos se ignoran.
+const calculadoraSearchSchema = z.object({
+  nombre: z.string().trim().max(80).optional().catch(undefined),
+  cantidad: z.coerce.number().int().positive().max(1_000_000).optional().catch(undefined),
+  fob: z.coerce.number().positive().max(1_000_000).optional().catch(undefined),
+  peso: z.coerce.number().positive().max(10_000).optional().catch(undefined),
+});
 
 export const Route = createFileRoute("/calculadora")({
+  validateSearch: calculadoraSearchSchema,
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(storeQueryOptions);
   },
@@ -61,13 +73,29 @@ type QuoteResult = {
   };
 };
 
+/** Montos de la importación: se calculan y se pagan en dólares. */
 function fmt(n: number) {
-  return "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return "US$ " + n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Equivalente en pesos con la cotización del admin (site_config.dolar_cotizacion). */
+function fmtArs(usd: number, rate: number) {
+  return "$" + Math.round(usd * rate).toLocaleString("es-AR");
 }
 
 export function CalculadoraPage() {
   const { data: storeData } = useSuspenseQuery(storeQueryOptions);
   const config = storeData.config ?? {};
+
+  // Cotización del dólar: la "activa en Base de Datos" del admin (implícita en los precios de los
+  // productos), la misma que se usa al leer capturas en pesos. Respaldo: dolar_cotizacion guardada.
+  const { data: liveRate } = useQuery({
+    queryKey: ["import-usd-rate"],
+    queryFn: () => getImportUsdRate(),
+    staleTime: 10 * 60 * 1000,
+  });
+  const usdRate = Math.max(0, liveRate || Number(config["dolar_cotizacion"]) || 0);
+  const ars = (usd: number) => (usdRate > 0 ? fmtArs(usd, usdRate) : "");
 
   // Tarifas leídas de site_config con fallback
   const rates = {
@@ -83,8 +111,16 @@ export function CalculadoraPage() {
   };
 
   const [client, setClient] = useState<string>("");
+  const prefill = Route.useSearch();
+  const hasPrefill = Boolean(prefill.cantidad && prefill.fob && prefill.peso);
   const [items, setItems] = useState<Item[]>([
-    { id: "item-1", nombre: "", cantidad: 1, fob: 0, peso: 0 },
+    {
+      id: "item-1",
+      nombre: hasPrefill ? prefill.nombre || "Producto importado" : "",
+      cantidad: hasPrefill ? (prefill.cantidad ?? 1) : 1,
+      fob: hasPrefill ? (prefill.fob ?? 0) : 0,
+      peso: hasPrefill ? (prefill.peso ?? 0) : 0,
+    },
   ]);
   const [quote, setQuote] = useState<QuoteResult | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
@@ -176,10 +212,22 @@ export function CalculadoraPage() {
     };
 
     setQuote(res);
+    track("import_quote_calculated", {
+      productos: validItems.length,
+      peso_total_kg: Math.round(totalWeight * 100) / 100,
+      fob_total: Math.round(totalFOB),
+      total: Math.round(grandTotal),
+    });
     setTimeout(() => {
       resultRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 100);
   }
+
+  // Con datos precargados, mostrar la cotización directamente
+  useEffect(() => {
+    if (hasPrefill) handleCalculate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function buildWhatsappMessage() {
     if (!quote) return "";
@@ -190,7 +238,7 @@ export function CalculadoraPage() {
     if (multi) {
       msg += `_Productos por separado (c/u aislado):_\n`;
       quote.itemsIsolated.forEach((i) => {
-        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u puesto en Argentina — subtotal ${fmt(i.total)}\n`;
+        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u${usdRate ? ` (≈ ${ars(i.unitPrice)})` : ""} puesto en Argentina — subtotal ${fmt(i.total)}\n`;
       });
       msg += `\n_Trayendo todos los productos juntos:_\n`;
       quote.items.forEach((i) => {
@@ -200,13 +248,13 @@ export function CalculadoraPage() {
       msg += `• Handling: ${fmt(quote.handlingTotal)}\n`;
       msg += `• Honorarios: ${fmt(quote.honorariosTotal)}\n`;
       msg += `• Impuestos: ${fmt(quote.taxesTotal)}\n`;
-      msg += `\n*Total trayendo todo: ${fmt(quote.grandTotal)}*\n`;
+      msg += `\n*Total trayendo todo: ${fmt(quote.grandTotal)}*${usdRate ? ` (≈ ${ars(quote.grandTotal)})` : ""}\n`;
     } else {
       const i = quote.itemsIsolated[0];
       if (i) {
-        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u puesto en Argentina\n`;
+        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u${usdRate ? ` (≈ ${ars(i.unitPrice)})` : ""} puesto en Argentina\n`;
       }
-      msg += `\n*Total puesto en Argentina: ${fmt(quote.grandTotal)}*\n`;
+      msg += `\n*Total puesto en Argentina: ${fmt(quote.grandTotal)}*${usdRate ? ` (≈ ${ars(quote.grandTotal)})` : ""}\n`;
       msg += `_(incluye flete, handling, honorarios e impuestos)_\n`;
     }
 
@@ -217,6 +265,7 @@ export function CalculadoraPage() {
   function handleConfirmWhatsapp() {
     const msg = buildWhatsappMessage();
     if (!msg) return;
+    track("import_quote_whatsapp", { total: quote ? Math.round(quote.grandTotal) : null });
     const url = waLink(config, msg);
     try {
       const parsed = new URL(url);
@@ -367,7 +416,7 @@ export function CalculadoraPage() {
                   onClick={addItem}
                   className="btn-base border border-dashed border-border hover:border-foreground/50 text-xs text-foreground font-semibold px-4 py-2 w-full sm:w-auto flex items-center justify-center gap-1.5"
                 >
-                  <Plus className="h-3.5 w-3.5" /> + Agregar otro producto
+                  <Plus className="h-3.5 w-3.5" /> Agregar otro producto
                 </button>
 
                 <button
@@ -452,6 +501,11 @@ export function CalculadoraPage() {
                         >
                           {fmt(i.unitPrice)}
                         </div>
+                        {usdRate > 0 && (
+                          <div className="mt-1.5 text-sm font-semibold text-foreground/80">
+                            ≈ {ars(i.unitPrice)} c/u
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -501,12 +555,17 @@ export function CalculadoraPage() {
                       TOTAL TRAYENDO TODO
                     </span>
                     <span
-                      className="price-num font-price-clean text-2xl sm:text-3xl font-bold tracking-tight"
+                      className="price-num font-price-clean whitespace-nowrap text-2xl sm:text-3xl font-bold tracking-tight"
                       style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontVariantNumeric: "normal", fontFeatureSettings: "normal" }}
                     >
                       {fmt(quote.grandTotal)}
                     </span>
                   </div>
+                  {usdRate > 0 && (
+                    <p className="mt-2 text-right text-sm font-semibold text-foreground">
+                      ≈ {ars(quote.grandTotal)}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="mt-2">
@@ -539,12 +598,17 @@ export function CalculadoraPage() {
                       TOTAL PUESTO EN ARGENTINA
                     </span>
                     <span
-                      className="price-num font-price-clean text-2xl sm:text-4xl font-bold text-foreground tracking-tight"
+                      className="price-num font-price-clean whitespace-nowrap text-2xl sm:text-4xl font-bold text-foreground tracking-tight"
                       style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontVariantNumeric: "normal", fontFeatureSettings: "normal" }}
                     >
                       {fmt(quote.grandTotal)}
                     </span>
                   </div>
+                  {usdRate > 0 && (
+                    <p className="mt-1 text-right text-sm font-semibold text-foreground">
+                      ≈ {ars(quote.grandTotal)}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -553,6 +617,12 @@ export function CalculadoraPage() {
                 <p className="text-[11.5px] sm:text-xs text-foreground/80">
                   <span className="font-semibold text-foreground">* Nota:</span> El precio final es estimativo. Si deseás obtener el valor definitivo o confirmar tu pedido, escribinos a WhatsApp.
                 </p>
+                {usdRate > 0 && (
+                  <p className="mt-1.5 text-[11.5px] sm:text-xs">
+                    Montos en dólares. Equivalente en pesos con dólar a {fmtArs(1, usdRate)}{" "}
+                    (cotización del día).
+                  </p>
+                )}
               </div>
 
               {/* Botones de acción */}

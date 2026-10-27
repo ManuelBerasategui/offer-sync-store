@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Banner, Product, SiteConfig, StoreData } from "./store";
+import { isHiddenCategory, isPrivateConfigKey } from "./store";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -55,6 +56,11 @@ async function writeCfCache(data: StoreData): Promise<void> {
   }
 }
 
+// Columnas de products que usa el frontend. ventas_semana (la recalcula cada hora la función
+// refresh_ventas_semana en Supabase) se pide aparte para poder reintentar sin ella si no existiera.
+const PRODUCT_COLUMNS =
+  "id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,imagen_url,descripcion,destacado,oferta,stock,descuento,color_predeterminado,metadata";
+
 /** Ejecuta las 4 queries a Supabase y construye el StoreData. */
 async function fetchFromSupabase(): Promise<StoreData> {
   const [productsResult, variantsResult, bannersResult, configResult] = await Promise.all([
@@ -62,7 +68,7 @@ async function fetchFromSupabase(): Promise<StoreData> {
     // La consulta principal no depende de la tabla opcional de variantes.
     // Así, un error de relación/caché de Supabase nunca deja el catálogo vacío.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from('products').select('id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,imagen_url,descripcion,destacado,oferta,stock,descuento,color_predeterminado,metadata').neq('stock', 'NO'),
+    (supabase as any).from('products').select(`${PRODUCT_COLUMNS},ventas_semana`).neq('stock', 'NO'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).from('product_variants').select('id,product_id,color,precio,precio_usd,precio_base,moneda_base,stock,imagen_url').neq('stock', 'NO'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,7 +77,15 @@ async function fetchFromSupabase(): Promise<StoreData> {
     (supabase as any).from('site_config').select('clave,valor'),
   ]);
 
-  if (productsResult.error) throw productsResult.error;
+  let productsData = productsResult.data;
+  if (productsResult.error) {
+    // Si la columna ventas_semana no existe en la base, traer los productos sin ella (sin "Más vendidos" reales)
+    console.warn("Reintentando productos sin ventas_semana:", productsResult.error.message);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const retry = await (supabase as any).from("products").select(PRODUCT_COLUMNS).neq("stock", "NO");
+    if (retry.error) throw retry.error;
+    productsData = retry.data;
+  }
   if (variantsResult.error) {
     console.warn("No se pudieron cargar las variantes de color:", variantsResult.error.message);
   }
@@ -79,7 +93,7 @@ async function fetchFromSupabase(): Promise<StoreData> {
     console.warn("No se pudieron cargar los banners:", bannersResult.error.message);
   }
 
-  const productsRaw = productsResult.data;
+  const productsRaw = productsData;
   const bannersRaw = bannersResult.data;
   const configRaw = configResult.data;
 
@@ -92,7 +106,11 @@ async function fetchFromSupabase(): Promise<StoreData> {
     variantsByProduct.set(productId, current);
   }
 
-  const products: Product[] = (productsRaw ?? []).map((p: any) => {
+  // Las categorías ocultas (ver HIDDEN_CATEGORIES) no llegan al navegador
+  const visibleRaw = (productsRaw ?? []).filter(
+    (p: { categoria?: string | null }) => !isHiddenCategory(p.categoria),
+  );
+  const products: Product[] = visibleRaw.map((p: any) => {
     // Expand metadata back onto the product object sin URLs de backup pesadas
     const rawMeta = typeof p.metadata === 'object' && p.metadata !== null ? { ...(p.metadata as Record<string, unknown>) } : {};
     delete rawMeta.raw_imagen_url_backup;
@@ -139,7 +157,8 @@ async function fetchFromSupabase(): Promise<StoreData> {
   const config: SiteConfig = {};
   for (const row of configRaw ?? []) {
     const r = row as { clave?: string; valor?: string };
-    if (r.clave) config[r.clave] = r.valor ?? "";
+    // Esta configuración la recibe cualquier visitante: nunca mandar claves privadas
+    if (r.clave && !isPrivateConfigKey(r.clave)) config[r.clave] = r.valor ?? "";
   }
 
   return { products, banners, config };
@@ -199,10 +218,6 @@ export async function invalidateStoreCache(): Promise<void> {
   }
 }
 
-export const invalidateStoreCacheFn = createServerFn({ method: "POST" }).handler(
-  async () => {
-    await invalidateStoreCache();
-    return { success: true };
-  },
-);
+// (Se eliminó invalidateStoreCacheFn: era pública, sin uso, y permitía forzar recargas a Supabase.
+// La caché se invalida desde las funciones del admin con invalidateStoreCache().)
 

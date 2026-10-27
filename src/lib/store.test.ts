@@ -12,6 +12,9 @@ import {
   waOnlyReasonOf,
   normCat,
   parseJerseyItem,
+  isHiddenCategory,
+  rankBestSellers,
+  HOME_BEST_SELLERS,
   calcJerseyUnitPrice,
   JERSEY_PLAYER_TIERS,
   JERSEY_FAN_TIERS,
@@ -680,6 +683,19 @@ describe("parseJerseyItem", () => {
     expect(res.isExtraSize).toBe(true);
   });
 
+  it("detects the patch from the name alone, with the new 'Con Parche' text (server side)", () => {
+    // El servidor recibe solo el nombre (sin id), así que el parche se cobra por este texto
+    const nuevo = parseJerseyItem({
+      nombre: "Camiseta Argentina (Talle: L - Versión Fan (Sin personalizar) - Con Parche)",
+    });
+    expect(nuevo.badge).toBe("yes");
+    expect(nuevo.talle).toBe("L");
+    const sinParche = parseJerseyItem({
+      nombre: "Camiseta Argentina (Talle: L - Versión Fan (Sin personalizar))",
+    });
+    expect(sinParche.badge).toBe("no");
+  });
+
   it("detects 4XL as extra size", () => {
     const res = parseJerseyItem({
       nombre: "Camiseta Real Madrid (Talle: 4XL - Versión Fan (Sin personalizar))",
@@ -890,3 +906,38 @@ describe("NFC Google — Reglas de compra mínima y descuentos", () => {
 });
 
 
+
+describe("isHiddenCategory", () => {
+  it("oculta Electrodomésticos con o sin acento ni mayúsculas", () => {
+    for (const c of [
+      "Electrodomésticos",
+      "electrodomesticos",
+      " ELECTRODOMÉSTICOS ",
+      "Electrodoméstico",
+    ]) {
+      expect(isHiddenCategory(c)).toBe(true);
+    }
+    for (const c of ["Tecnología", "Bazar", "", null, undefined]) {
+      expect(isHiddenCategory(c)).toBe(false);
+    }
+  });
+});
+
+describe("rankBestSellers (home y catálogo usan el mismo ranking)", () => {
+  const mk = (id: string, ventas: number, destacado = "NO") =>
+    ({ id, nombre: id, ventas_semana: ventas, destacado }) as unknown as Product;
+
+  it("ordena por ventas, desempata con destacados y después rellena", () => {
+    const products = [mk("a", 0), mk("b", 5), mk("c", 9), mk("d", 5, "SI"), mk("e", 0, "SI")];
+    const { ranked, topCount } = rankBestSellers(products);
+    expect(ranked.map((p) => p.id)).toEqual(["c", "d", "b", "e", "a"]);
+    expect(topCount).toBe(4); // 3 con ventas + 1 destacado
+  });
+
+  it("si hay menos de 3 con ventas o destacados, los de relleno también cuentan como más vendidos", () => {
+    const products = [mk("a", 0), mk("b", 2), mk("c", 0)];
+    const { ranked, topCount } = rankBestSellers(products);
+    expect(ranked.slice(0, HOME_BEST_SELLERS).map((p) => p.id)).toEqual(["b", "a", "c"]);
+    expect(topCount).toBe(3);
+  });
+});

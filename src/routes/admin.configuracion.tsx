@@ -12,6 +12,8 @@ import {
   upsertCategoryRules,
   testAdminResendEmail,
   getCouponUsagesSummary,
+  getAdminPrivateConfig,
+  generateMissingThumbnails,
   type CategoryRuleInput,
 } from "@/lib/products.functions";
 import {
@@ -21,7 +23,7 @@ import {
   sendCampaignTestEmail,
   type CampaignSummary,
 } from "@/lib/newsletter.functions";
-import { parseCategoryRules, normCat, getBaseCategory, money } from "@/lib/store";
+import { parseCategoryRules, normCat, getBaseCategory, money, impliedUsdRate } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/configuracion")({
   loader: ({ context }) => {
@@ -74,8 +76,14 @@ function AdminConfiguracionPage() {
   const [bankBanco, setBankBanco] = useState<string>(config["transferencia_banco"] ?? "Mercado Pago");
   const [bankDiscountPct, setBankDiscountPct] = useState<string>(config["transferencia_descuento_pct"] ?? "7");
 
-  const [resendApiKey, setResendApiKey] = useState<string>(config["resend_api_key"] ?? "");
-  const [resendFrom, setResendFrom] = useState<string>(config["resend_from"] ?? "Te Importamos <noreply@teimportamosarg.com>");
+  // La clave de Resend nunca se muestra: el campo queda vacío y solo se guarda si se escribe una nueva
+  const [resendApiKey, setResendApiKey] = useState<string>("");
+  const [resendFrom, setResendFrom] = useState<string>("");
+  const [privateConfig, setPrivateConfig] = useState<{
+    resendConfigured: boolean;
+    lastEmailSuccess: string;
+    lastEmailError: string;
+  }>({ resendConfigured: false, lastEmailSuccess: "", lastEmailError: "" });
   const [testingEmail, setTestingEmail] = useState(false);
   const [testEmailMsg, setTestEmailMsg] = useState<{ success?: boolean; text?: string } | null>(null);
 
@@ -83,14 +91,15 @@ function AdminConfiguracionPage() {
   const [couponActive, setCouponActive] = useState<boolean>(
     (config["promo_cupon_activo"] ?? "SI").toUpperCase() === "SI",
   );
-  const [couponCode, setCouponCode] = useState<string>(
-    config["promo_cupon_codigo"] ?? "TEIMPORTAMOS",
-  );
+  // El código del cupón ya no viaja en la configuración pública: se carga desde el servidor
+  const [couponCode, setCouponCode] = useState<string>("");
   const [couponDiscountPct, setCouponDiscountPct] = useState<string>(
     config["promo_cupon_descuento_pct"] ?? "5",
   );
   const [couponUsageCount, setCouponUsageCount] = useState<number | null>(null);
   const [testEmailTarget, setTestEmailTarget] = useState<string>("");
+  const [thumbsRunning, setThumbsRunning] = useState(false);
+  const [thumbsMsg, setThumbsMsg] = useState<{ success: boolean; text: string } | null>(null);
 
   // Estado para Tarifas de Calculadora de Importaciones (solo admin)
   const [calcFleteKg, setCalcFleteKg] = useState<string>(config["calc_flete_kg"] ?? "22");
@@ -107,7 +116,8 @@ function AdminConfiguracionPage() {
   const [newsletterSummary, setNewsletterSummary] = useState<CampaignSummary | null>(null);
   const [batchSize, setBatchSize] = useState<number>(50);
   const [sendingBatch, setSendingBatch] = useState<boolean>(false);
-  const [testCampaignEmail, setTestCampaignEmail] = useState<string>("manuelberasategui1@gmail.com");
+  // Vacío = se usa el email del admin con la sesión iniciada (antes había un email personal fijo)
+  const [testCampaignEmail, setTestCampaignEmail] = useState<string>("");
   const [sendingCampaignTest, setSendingCampaignTest] = useState<boolean>(false);
   const [batchMsg, setBatchMsg] = useState<{ success: boolean; text: string } | null>(null);
   const [showNewCampaignModal, setShowNewCampaignModal] = useState<boolean>(false);
@@ -117,13 +127,13 @@ function AdminConfiguracionPage() {
     headline: "",
     content: "",
     cta_text: "Ver Ofertas en la Tienda",
-    cta_url: "https://teimportamosarg.com/catalogo",
+    cta_url: "https://www.teimportamosarg.com/catalogo",
     coupon_code: "",
   });
 
   async function loadNewsletterData() {
     try {
-      const summary = await getCampaignsSummary();
+      const summary = await getCampaignsSummary({ data: { token: session?.access_token ?? "" } });
       setNewsletterSummary(summary);
     } catch {
       // ignore
@@ -162,6 +172,20 @@ function AdminConfiguracionPage() {
       }
       setIsAuthorized(true);
 
+      // Datos privados (Resend, cupón): ya no vienen en la configuración pública de la tienda
+      getAdminPrivateConfig({ data: { token } })
+        .then((priv) => {
+          if (priv.error) return;
+          setPrivateConfig({
+            resendConfigured: priv.resendConfigured,
+            lastEmailSuccess: priv.lastEmailSuccess,
+            lastEmailError: priv.lastEmailError,
+          });
+          if (priv.resendFrom) setResendFrom(priv.resendFrom);
+          if (priv.cuponCodigo) setCouponCode(priv.cuponCodigo);
+        })
+        .catch(() => { });
+
       // Cargar usos registrados del cupón y newsletter
       getCouponUsagesSummary({ data: { email, token } })
         .then((res) => {
@@ -172,18 +196,8 @@ function AdminConfiguracionPage() {
       void loadNewsletterData();
 
       // Calcular la cotización implícita ponderada usada actualmente en los productos de la DB
-      const prodsWithBoth = res.products.filter((p) => {
-        const ars = Number(p.precio) || 0;
-        const usd = Number((p as any).precio_usd) || 0;
-        return ars > 0 && usd >= 1;
-      });
-
-      if (prodsWithBoth.length > 0) {
-        const totalArs = prodsWithBoth.reduce((acc, p) => acc + Number(p.precio), 0);
-        const totalUsd = prodsWithBoth.reduce((acc, p) => acc + Number((p as any).precio_usd), 0);
-        const rate = Math.round(totalArs / totalUsd);
-        setDbDolarRate(rate);
-      }
+      const rate = impliedUsdRate(res.products);
+      if (rate > 0) setDbDolarRate(rate);
 
       const existing = parseCategoryRules(config);
       const rawCats = res.products.map((p) => (p.categoria ?? "").trim()).filter(Boolean);
@@ -357,6 +371,10 @@ function AdminConfiguracionPage() {
         },
       });
       if (res.error) { setError(res.error); return; }
+      if (resendApiKey.trim()) {
+        setResendApiKey("");
+        setPrivateConfig((p) => ({ ...p, resendConfigured: true }));
+      }
       // Invalidar la cache para que el próximo F5 lea los nuevos valores
       void queryClient.invalidateQueries({ queryKey: ["store"] });
       setSuccessMsg("¡Configuración guardada correctamente!");
@@ -393,12 +411,52 @@ function AdminConfiguracionPage() {
     }
   }
 
+  async function handleGenerateThumbnails() {
+    setThumbsRunning(true);
+    setThumbsMsg(null);
+    let offset = 0;
+    let generated = 0;
+    let failed = 0;
+    try {
+      // La función procesa de a tandas; se llama hasta que termina
+      for (let round = 0; round < 500; round++) {
+        const res = await generateMissingThumbnails({
+          data: { email: userEmail, token: userToken, offset },
+        });
+        if (res.error) throw new Error(res.error);
+        generated += res.generated;
+        failed += res.failed;
+        offset = res.nextOffset;
+        setThumbsMsg({
+          success: true,
+          text: `Revisando fotos… ${Math.min(offset, res.total)} de ${res.total} (${generated} miniaturas nuevas)`,
+        });
+        if (res.done) break;
+      }
+      setThumbsMsg({
+        success: failed === 0,
+        text:
+          `Listo: ${generated} fotos con miniaturas nuevas` +
+          (failed ? `, ${failed} no se pudieron procesar.` : ". Las demás ya las tenían."),
+      });
+    } catch (err) {
+      setThumbsMsg({
+        success: false,
+        text: err instanceof Error ? err.message : "No se pudieron generar las miniaturas.",
+      });
+    } finally {
+      setThumbsRunning(false);
+    }
+  }
+
   async function handleCreateCampaign(e: React.FormEvent) {
     e.preventDefault();
     setCreatingCampaign(true);
     setError("");
     try {
-      const res = await createNewsletterCampaign({ data: campaignForm });
+      const res = await createNewsletterCampaign({
+        data: { ...campaignForm, token: session?.access_token ?? "" },
+      });
       if (res.success) {
         setShowNewCampaignModal(false);
         setCampaignForm({
@@ -406,7 +464,7 @@ function AdminConfiguracionPage() {
           headline: "",
           content: "",
           cta_text: "Ver Ofertas en la Tienda",
-          cta_url: "https://teimportamosarg.com/catalogo",
+          cta_url: "https://www.teimportamosarg.com/catalogo",
           coupon_code: "",
         });
         setBatchMsg({
@@ -432,6 +490,7 @@ function AdminConfiguracionPage() {
         data: {
           campaignId,
           batchSize,
+          token: session?.access_token ?? "",
         },
       });
       setBatchMsg({
@@ -450,7 +509,8 @@ function AdminConfiguracionPage() {
   }
 
   async function handleSendCampaignTest(campaignId: string) {
-    if (!testCampaignEmail.trim()) {
+    const target = testCampaignEmail.trim() || userEmail;
+    if (!target) {
       setBatchMsg({ success: false, text: "Ingresá un correo de prueba válido." });
       return;
     }
@@ -460,7 +520,8 @@ function AdminConfiguracionPage() {
       const res = await sendCampaignTestEmail({
         data: {
           campaignId,
-          targetEmail: testCampaignEmail.trim(),
+          targetEmail: target,
+          token: session?.access_token ?? "",
         },
       });
       setBatchMsg({
@@ -672,6 +733,37 @@ function AdminConfiguracionPage() {
           </div>
         </div>
 
+        {/* Miniaturas de fotos (menos consumo de Supabase) */}
+        <div className="mb-6 rounded-2xl border border-border bg-card p-3.5 sm:p-5">
+          <h2 className="mb-2 flex items-center gap-2 text-base font-bold">
+            🖼️ Miniaturas de fotos
+          </h2>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Las tarjetas de la tienda usan una versión chica de cada foto. Si falta, se carga la
+            foto completa, que pesa mucho más y gasta más transferencia de Supabase. Este botón
+            genera las que falten (las fotos nuevas ya se suben con su miniatura).
+          </p>
+          {thumbsMsg && (
+            <div
+              className={`mb-4 rounded-xl border p-3 text-xs font-medium ${
+                thumbsMsg.success
+                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                  : "border-destructive/20 bg-destructive/10 text-destructive"
+              }`}
+            >
+              {thumbsMsg.text}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleGenerateThumbnails()}
+            disabled={thumbsRunning}
+            className="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+          >
+            {thumbsRunning ? "Generando miniaturas…" : "Generar miniaturas faltantes"}
+          </button>
+        </div>
+
         {/* Configuración de Notificaciones por Email (Resend) */}
         <div className="mb-6 rounded-2xl border border-border bg-card p-3.5 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -699,10 +791,15 @@ function AdminConfiguracionPage() {
               <span className="text-xs font-semibold text-muted-foreground">Resend API Key (re_...)</span>
               <input
                 type="password"
+                autoComplete="off"
                 className="input-base"
                 value={resendApiKey}
                 onChange={(e) => setResendApiKey(e.target.value)}
-                placeholder="re_1234567890abcdef..."
+                placeholder={
+                  privateConfig.resendConfigured
+                    ? "•••••••• Guardada (escribí una nueva solo para reemplazarla)"
+                    : "re_1234567890abcdef..."
+                }
               />
             </label>
 
@@ -741,16 +838,16 @@ function AdminConfiguracionPage() {
           </div>
 
           {/* Registro del último envío */}
-          {(config["last_email_error"] || config["last_email_success"]) && (
+          {(privateConfig.lastEmailError || privateConfig.lastEmailSuccess) && (
             <div className="mt-3 space-y-1.5 pt-2 border-t border-border/40 text-[11px]">
-              {config["last_email_success"] && (
+              {privateConfig.lastEmailSuccess && (
                 <p className="text-emerald-600 dark:text-emerald-400 font-medium">
-                  ✓ Último envío exitoso: {config["last_email_success"]}
+                  ✓ Último envío exitoso: {privateConfig.lastEmailSuccess}
                 </p>
               )}
-              {config["last_email_error"] && (
+              {privateConfig.lastEmailError && (
                 <p className="text-destructive font-mono bg-destructive/10 p-2 rounded-lg break-all">
-                  ⚠️ Último error de Resend: {config["last_email_error"]}
+                  ⚠️ Último error de Resend: {privateConfig.lastEmailError}
                 </p>
               )}
             </div>
@@ -892,7 +989,7 @@ function AdminConfiguracionPage() {
                     className="input-base text-xs"
                     value={testCampaignEmail}
                     onChange={(e) => setTestCampaignEmail(e.target.value)}
-                    placeholder="manuelberasategui1@gmail.com"
+                    placeholder={userEmail || "tu@email.com"}
                   />
                 </label>
                 <button
@@ -1003,7 +1100,7 @@ function AdminConfiguracionPage() {
                       className="input-base"
                       value={campaignForm.cta_url}
                       onChange={(e) => setCampaignForm({ ...campaignForm, cta_url: e.target.value })}
-                      placeholder="https://teimportamosarg.com/catalogo"
+                      placeholder="https://www.teimportamosarg.com/catalogo"
                     />
                   </label>
                 </div>

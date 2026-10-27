@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { jsonForScript } from "@/lib/html-escape";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import { Search, ArrowDownUp, X, Loader2, MessageCircle } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
@@ -9,6 +11,8 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import {
   categoriesOf,
+  orderedCategories,
+  rankBestSellers,
   isYes,
   priceOf,
   isCamiseta,
@@ -18,10 +22,28 @@ import {
   type Product,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
+import { track } from "@/lib/analytics";
 
 type Sort = "destacado" | "precio_asc" | "precio_desc" | "nombre";
 
+// Permite entrar directo a un rubro (ej: /catalogo?cat=Tecnología) o a ofertas/combos (?ver=ofertas).
+// Valores inválidos se ignoran en vez de romper la página.
+const catalogoSearchSchema = z.object({
+  cat: z.string().trim().max(60).optional().catch(undefined),
+  ver: z.enum(["ofertas", "combos"]).optional().catch(undefined),
+});
+
+/** Compara nombres de categoría sin distinguir mayúsculas ni acentos. */
+function normCatName(v: string) {
+  return v
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export const Route = createFileRoute("/catalogo")({
+  validateSearch: catalogoSearchSchema,
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(storeQueryOptions);
   },
@@ -50,7 +72,7 @@ export const Route = createFileRoute("/catalogo")({
     scripts: [
       {
         type: "application/ld+json",
-        children: JSON.stringify({
+        children: jsonForScript({
           "@context": "https://schema.org",
           "@type": "BreadcrumbList",
           itemListElement: [
@@ -78,12 +100,44 @@ function Catalogo() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { products, banners, config } = data;
 
+  const { cat: catParam, ver } = Route.useSearch();
+  // Categoría pedida por URL, resuelta contra las categorías reales (sin importar mayúsculas/acentos)
+  const catFromUrl = useMemo(() => {
+    if (!catParam) return "todas";
+    const wanted = normCatName(catParam);
+    return categoriesOf(products).find((c) => normCatName(c) === wanted) ?? "todas";
+  }, [catParam, products]);
+
   const [search, setSearch] = useState("");
-  const [cat, setCat] = useState("todas");
+  const [cat, setCat] = useState(catFromUrl);
   const [sort, setSort] = useState<Sort>("destacado");
   const [onlyTop, setOnlyTop] = useState(false);
-  const [onlyOffers, setOnlyOffers] = useState(false);
-  const [onlyCombos, setOnlyCombos] = useState(false);
+  const [onlyOffers, setOnlyOffers] = useState(ver === "ofertas");
+  const [onlyCombos, setOnlyCombos] = useState(ver === "combos");
+
+  // Si cambia la URL con la página ya abierta (ej: otro link a /catalogo?cat=...), aplicar el filtro nuevo
+  useEffect(() => {
+    setCat(catFromUrl);
+    setOnlyOffers(ver === "ofertas");
+    setOnlyCombos(ver === "combos");
+  }, [catFromUrl, ver]);
+
+  // Un solo filtro a la vez: combinarlos (ej. Ofertas + Más vendidos + Bazar) solía dejar 0 productos
+  const pickFilter = (f: "todas" | "combos" | "ofertas" | "top" | { cat: string }) => {
+    setOnlyCombos(f === "combos");
+    setOnlyOffers(f === "ofertas");
+    setOnlyTop(f === "top");
+    setCat(typeof f === "object" ? f.cat : "todas");
+  };
+
+  // Al entrar a un rubro desde un link, desplazar la fila de categorías hasta que se vea el elegido
+  const chipsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (catFromUrl === "todas") return;
+    const row = chipsRef.current;
+    const active = row?.querySelector<HTMLElement>('[data-active="true"]');
+    if (row && active) row.scrollLeft = active.offsetLeft - row.offsetLeft - 12;
+  }, [catFromUrl]);
   // Si se borran todos los combos mientras la pestaña está activa, vuelve al catálogo normal
   const showCombos = onlyCombos && banners.length > 0;
 
@@ -97,6 +151,29 @@ function Catalogo() {
     setVisibleCount(PAGE_SIZE);
   }, [search, cat, sort, onlyTop, onlyOffers, onlyCombos]);
 
+  // Medición: qué filtros y búsquedas usan los visitantes (se omite el estado inicial)
+  const filtersTrackedRef = useRef(false);
+  useEffect(() => {
+    if (!filtersTrackedRef.current) {
+      filtersTrackedRef.current = true;
+      return;
+    }
+    track("catalog_filter", {
+      categoria: cat,
+      ofertas: onlyOffers,
+      mas_vendidos: onlyTop,
+      combos: onlyCombos,
+      orden: sort,
+    });
+  }, [cat, sort, onlyTop, onlyOffers, onlyCombos]);
+
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) return;
+    const t = setTimeout(() => track("catalog_search", { query: q.slice(0, 100) }), 1200);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const comboList = useMemo(() => {
     const q = search.trim().toLowerCase();
     // Se conserva el índice original: /combo/$index apunta a la posición en `banners`
@@ -105,16 +182,14 @@ function Catalogo() {
       .filter(({ b }) => !q || (b.titulo ?? "").toLowerCase().includes(q) || (b.subtitulo ?? "").toLowerCase().includes(q));
   }, [banners, search]);
 
-  const cats = useMemo(() => {
-    const all = categoriesOf(products);
-    // Categorías que queremos ver primero (en este orden)
-    const PINNED_FIRST = ["Bazar", "Zapatillas", "Tecnología"];
-    // Categorías que queremos ver al final
-    const PINNED_LAST = ["Vapers"];
-    const pinned = PINNED_FIRST.filter((c) => all.includes(c));
-    const last = PINNED_LAST.filter((c) => all.includes(c));
-    const rest = all.filter((c) => !PINNED_FIRST.includes(c) && !PINNED_LAST.includes(c));
-    return [...pinned, ...rest, ...last];
+  const cats = useMemo(() => orderedCategories(products), [products]);
+
+  // Mismo ranking de "Más vendidos" que la home: posición de cada producto y cuántos entran
+  const bestSellers = useMemo(() => {
+    const { ranked, topCount } = rankBestSellers(products);
+    const rank = new Map<Product, number>();
+    ranked.forEach((p, i) => rank.set(p, i));
+    return { rank, topCount };
   }, [products]);
 
   const list = useMemo(() => {
@@ -127,7 +202,7 @@ function Catalogo() {
         const desc = (p.descripcion ?? "").toLowerCase();
         if (!nom.includes(q) && !cate.includes(q) && !desc.includes(q)) return false;
       }
-      if (onlyTop && (p.ventas_semana ?? 0) <= 0 && !isYes(p.destacado)) return false;
+      if (onlyTop && (bestSellers.rank.get(p) ?? Infinity) >= bestSellers.topCount) return false;
       if (onlyOffers && !isYes(p.oferta)) return false;
       return true;
     });
@@ -146,12 +221,10 @@ function Catalogo() {
       if (sort === "precio_asc") return getSortPrice(a) - getSortPrice(b);
       if (sort === "precio_desc") return getSortPrice(b) - getSortPrice(a);
       if (sort === "nombre") return (a.nombre ?? "").localeCompare(b.nombre ?? "");
-      // "destacado": ordena por ventas semanales reales, luego por flag destacado como desempate
-      const ventasB = (b.ventas_semana ?? 0) - (a.ventas_semana ?? 0);
-      if (ventasB !== 0) return ventasB;
-      return (isYes(b.destacado) ? 1 : 0) - (isYes(a.destacado) ? 1 : 0);
+      // "destacado" (Más vendidos): el mismo orden que la home
+      return (bestSellers.rank.get(a) ?? Infinity) - (bestSellers.rank.get(b) ?? Infinity);
     });
-  }, [products, search, cat, sort, onlyTop, onlyOffers, config]);
+  }, [products, search, cat, sort, onlyTop, onlyOffers, config, bestSellers]);
 
   const visibleProducts = useMemo(() => {
     return list.slice(0, visibleCount);
@@ -221,7 +294,8 @@ function Catalogo() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar por producto o categoría..."
-                  className="h-8.5 sm:h-9.5 w-full rounded-lg border border-input bg-card pl-8 pr-7 text-xs sm:text-sm outline-none focus:border-primary transition-colors"
+                  // Sin la "×" propia del navegador: ya está la nuestra (antes se veían dos)
+                  className="h-8.5 sm:h-9.5 w-full rounded-lg border border-input bg-card pl-8 pr-7 text-xs sm:text-sm outline-none focus:border-primary transition-colors [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
                 />
                 {search && (
                   <button
@@ -250,23 +324,26 @@ function Catalogo() {
             </div>
 
             {/* Fila 2: Chips de categorías y filtros en una sola línea con scroll horizontal suave */}
-            <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto py-0.5 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:flex-wrap">
-              <button className={chip(cat === "todas" && !onlyOffers && !onlyTop && !showCombos)} onClick={() => { setCat("todas"); setOnlyOffers(false); setOnlyTop(false); setOnlyCombos(false); }}>
+            <div
+              ref={chipsRef}
+              className="no-scrollbar flex items-center gap-1.5 overflow-x-auto py-0.5 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:flex-wrap"
+            >
+              <button className={chip(cat === "todas" && !onlyOffers && !onlyTop && !showCombos)} onClick={() => pickFilter("todas")}>
                 Todas
               </button>
               {banners.length > 0 && (
-                <button className={chip(showCombos)} onClick={() => setOnlyCombos((v) => !v)}>
+                <button className={chip(showCombos)} onClick={() => pickFilter(showCombos ? "todas" : "combos")}>
                   Combos
                 </button>
               )}
-              <button className={chip(onlyOffers)} onClick={() => { setOnlyCombos(false); setOnlyOffers((v) => !v); }}>
+              <button className={chip(onlyOffers)} onClick={() => pickFilter(onlyOffers ? "todas" : "ofertas")}>
                 Ofertas
               </button>
-              <button className={chip(onlyTop)} onClick={() => { setOnlyCombos(false); setOnlyTop((v) => !v); }}>
+              <button className={chip(onlyTop)} onClick={() => pickFilter(onlyTop ? "todas" : "top")}>
                 Más vendidos
               </button>
               {cats.map((c) => (
-                <button key={c} className={chip(cat === c)} onClick={() => { setOnlyCombos(false); setCat(c); }}>
+                <button key={c} data-active={cat === c} className={chip(cat === c)} onClick={() => pickFilter(cat === c ? "todas" : { cat: c })}>
                   {c}
                 </button>
               ))}

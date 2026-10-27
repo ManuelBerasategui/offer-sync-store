@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { storeQueryOptions } from "./store-query";
+import { track } from "./analytics";
 import {
   findProduct,
   unitPriceFor,
@@ -353,6 +354,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items, data?.products, data?.banners, data?.config]);
 
   const add = useCallback((item: CartItem) => {
+    track("add_to_cart", {
+      item_id: item.id,
+      nombre: item.nombre,
+      categoria: item.categoria,
+      qty: item.qty,
+      unit_price: item.unitPrice,
+    });
     setItems((prev) => {
       const current = prev.find((entry) => entry.id === item.id);
       const next = current

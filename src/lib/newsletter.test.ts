@@ -8,7 +8,7 @@ describe("Newsletter Promotional Email Builder", () => {
       headline: "¡Ofertas de la Semana!",
       content: "Aprovechá 20% de descuento en tecnología.\n\nEnvíos a todo el país.",
       ctaText: "Ver Catálogo",
-      ctaUrl: "https://teimportamosarg.com/catalogo",
+      ctaUrl: "https://www.teimportamosarg.com/catalogo",
       couponCode: "PROMO20",
       unsubscribeToken: "abc123token456",
     });
@@ -18,7 +18,7 @@ describe("Newsletter Promotional Email Builder", () => {
     expect(html).toContain("Aprovechá 20% de descuento en tecnología.");
     expect(html).toContain("PROMO20");
     expect(html).toContain("Ver Catálogo");
-    expect(html).toContain("https://teimportamosarg.com/desuscribir?token=abc123token456");
+    expect(html).toContain("https://www.teimportamosarg.com/desuscribir?token=abc123token456");
     expect(html).toContain("Desuscribirme de estos correos");
   });
 
@@ -32,6 +32,6 @@ describe("Newsletter Promotional Email Builder", () => {
     expect(html).toContain("¡Hola!");
     expect(html).toContain("Novedades en Bazar");
     expect(html).not.toContain("Cupón de Descuento Exclusivo");
-    expect(html).toContain("https://teimportamosarg.com/desuscribir?token=tokenxyz789");
+    expect(html).toContain("https://www.teimportamosarg.com/desuscribir?token=tokenxyz789");
   });
 });

@@ -45,24 +45,46 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 import { handleImageProxy } from "./lib/image-proxy";
+import { handleMpWebhook } from "./lib/mp-webhook";
+import { withSecurityHeaders } from "./lib/security-headers";
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
-    try {
-      const url = new URL(request.url);
-      if (url.pathname === "/api/img") {
-        return await handleImageProxy(request, ctx as { waitUntil(p: Promise<unknown>): void });
-      }
-
-      const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
-    } catch (error) {
-      console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
-    }
+    return withSecurityHeaders(await handleRequest(request, env, ctx));
   },
 };
+
+function noIndex(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("X-Robots-Tag", "noindex");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+async function handleRequest(request: Request, env: unknown, ctx: unknown): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    if (url.pathname === "/api/img") {
+      // Las imágenes del proxy no son páginas: que Google no las liste como URLs sin indexar
+      return noIndex(
+        await handleImageProxy(request, ctx as { waitUntil(p: Promise<unknown>): void }),
+      );
+    }
+    if (url.pathname === "/api/mp-webhook") {
+      return await handleMpWebhook(request);
+    }
+
+    const handler = await getServerEntry();
+    const response = await handler.fetch(request, env, ctx);
+    return await normalizeCatastrophicSsrResponse(response);
+  } catch (error) {
+    console.error(error);
+    return new Response(renderErrorPage(), {
+      status: 500,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+}

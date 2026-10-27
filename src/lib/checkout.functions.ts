@@ -1,4 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
+import { couponUsedByDni, hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
+import { priceOrderItems } from "./order-pricing";
+import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit";
+
+// Pagos con Mercado Pago iniciados por IP
+const checkoutLimited = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 30 });
 
 /**
  * Orígenes permitidos para back_urls de MercadoPago (CWE-601 — Open Redirect).
@@ -20,26 +26,14 @@ function safeOrigin(raw: string): string {
     return FALLBACK_ORIGIN;
   }
 }
-import {
-  findProduct,
-  priceOf,
-  unitPriceFor,
-  parseCategoryRules,
-  categoryDiscountForUnits,
-  findRuleForCat,
-  normCat,
-  checkCategoryMins,
-  moqGroupOf,
-  isNfcGoogle,
-  isBlackviewGlasses,
-  blackviewUnitPrice,
-  isCamiseta,
-  isLongSleeve,
-  parseJerseyItem,
-  calcJerseyUnitPrice,
-} from "./store";
 
-type CheckoutItem = { nombre: string; qty: number; unitPrice: number; productId?: string | undefined };
+type CheckoutItem = {
+  nombre: string;
+  qty: number;
+  unitPrice: number;
+  productId?: string | undefined;
+  variantId?: string | undefined;
+};
 
 type ShippingInput = {
   nombre: string;
@@ -52,164 +46,6 @@ type ShippingInput = {
   transporte: string;
   sucursal_correo: string;
 };
-
-async function revalidateOrderItems(
-  supabaseAdmin: any,
-  rawItems: CheckoutItem[],
-): Promise<{
-  validatedItems: CheckoutItem[];
-  total: number;
-  error?: string;
-}> {
-  try {
-    const [{ data: dbProducts }, { data: dbConfigRows }] = await Promise.all([
-      supabaseAdmin.from("products").select("id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,oferta,stock,descuento"),
-      supabaseAdmin.from("site_config").select("clave,valor"),
-    ]);
-
-    if (!dbProducts || dbProducts.length === 0) {
-      return { validatedItems: [], total: 0, error: "No se pudieron obtener los productos de la base de datos." };
-    }
-
-    const configObj: Record<string, string> = {};
-    if (Array.isArray(dbConfigRows)) {
-      for (const row of dbConfigRows) {
-        if (row.clave && row.valor !== undefined) configObj[row.clave] = String(row.valor);
-      }
-    }
-
-    const catRules = parseCategoryRules(configObj);
-
-    const catTotals: Record<string, number> = {};
-    const itemsWithCat: { nombre?: string; categoria?: string; moq_group?: string; qty: number; unitPrice: number }[] = [];
-
-    for (const item of rawItems) {
-      const prod = findProduct(dbProducts, item.nombre);
-      const cat = prod?.categoria ?? "";
-      const isNfc = isNfcGoogle(item.nombre) || (prod ? isNfcGoogle(prod.nombre) : false);
-      const isBv = isBlackviewGlasses(item.nombre) || (prod ? isBlackviewGlasses(prod.nombre) : false);
-      const catNorm = normCat(cat);
-      if (catNorm && !isNfc && !isBv) {
-        const match = findRuleForCat(catNorm, catRules);
-        const key = match?.key ?? catNorm;
-        catTotals[key] = (catTotals[key] ?? 0) + item.qty;
-      }
-      const baseP = prod ? priceOf(prod) : item.unitPrice;
-      const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
-      itemsWithCat.push({ nombre: (isNfc && prod?.nombre) || item.nombre, categoria: cat, moq_group, qty: item.qty, unitPrice: baseP });
-    }
-
-    const violations = checkCategoryMins(itemsWithCat, catRules);
-    if (violations.length > 0) {
-      const v = violations[0]!;
-      const msg =
-        v.type === "amount"
-          ? `No se cumple el mínimo de compra para ${v.category} ($${v.min.toLocaleString("es-AR")}).`
-          : `No se cumple el mínimo de compra para ${v.category} (${v.min} unidades).`;
-      return { validatedItems: [], total: 0, error: msg };
-    }
-
-    const { isSuplemento, SUPLEMENTOS_MIN } = await import("./store");
-    const minSuplementos = catRules[normCat("Suplementos")]?.minAmount || SUPLEMENTOS_MIN;
-    const supTotal = rawItems
-      .filter((i) => {
-        const prod = findProduct(dbProducts, i.nombre);
-        return isSuplemento(prod?.categoria, i.nombre);
-      })
-      .reduce((a, i) => a + i.qty * i.unitPrice, 0);
-
-    if (supTotal > 0 && supTotal < minSuplementos) {
-      return {
-        validatedItems: [],
-        total: 0,
-        error: `No se cumple el mínimo de compra para Suplementos ($${minSuplementos.toLocaleString("es-AR")}).`,
-      };
-    }
-
-    const totalJerseyUnits = rawItems
-      .filter((i) => {
-        const prod = findProduct(dbProducts, i.nombre);
-        return isCamiseta(prod?.categoria, prod?.nombre) || isCamiseta(undefined, i.nombre);
-      })
-      .reduce((sum, i) => sum + i.qty, 0);
-    const usdRate = Number(configObj["dolar_cotizacion"] ?? 0);
-
-    const validatedItems: CheckoutItem[] = rawItems.map((item) => {
-      const prod = findProduct(dbProducts, item.nombre);
-
-      if ((prod && isCamiseta(prod.categoria, prod.nombre)) || isCamiseta(undefined, item.nombre)) {
-        const { version, isExtraSize, badge } = parseJerseyItem(item);
-        const effectiveQty = Math.max(item.qty, totalJerseyUnits);
-        const { unitArs } = calcJerseyUnitPrice({
-          qty: effectiveQty,
-          version,
-          isExtraSize,
-          badge,
-          usdRate,
-          isLongSleeve: isLongSleeve(item.nombre) || (prod ? isLongSleeve(prod.nombre) : false),
-        });
-        return {
-          nombre: item.nombre,
-          qty: item.qty,
-          unitPrice: unitArs > 0 ? unitArs : item.unitPrice,
-          ...(item.productId ? { productId: item.productId } : {}),
-        };
-      }
-
-      if (!prod) return item;
-
-      // Blackview BV100: precio fijo US$100 (+7%) desde 3 unidades, sin otros descuentos
-      if (isBlackviewGlasses(item.nombre) || isBlackviewGlasses(prod.nombre)) {
-        return {
-          nombre: item.nombre,
-          qty: item.qty,
-          unitPrice: blackviewUnitPrice(priceOf(prod), item.qty, usdRate),
-          ...(item.productId ? { productId: item.productId } : {}),
-        };
-      }
-
-      // NFC Google: sin descuento por cantidad bajo ningún concepto
-      if (isNfcGoogle(item.nombre) || isNfcGoogle(prod.nombre)) {
-        const base = priceOf(prod);
-        return {
-          nombre: item.nombre,
-          qty: item.qty,
-          unitPrice: base,
-          ...(item.productId ? { productId: item.productId } : {}),
-        };
-      }
-
-      const catNorm = normCat(prod.categoria ?? "");
-      const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
-      const catRule = match?.rule;
-      const ruleKey = match?.key;
-
-      let unitPrice: number;
-      if (catRule?.discountTiers?.length && ruleKey) {
-        const totalCatUnits = catTotals[ruleKey] ?? 0;
-        const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
-        const base = priceOf(prod);
-        unitPrice = Math.round(base * (1 - percent / 100));
-      } else {
-        unitPrice = Math.round(unitPriceFor(prod, item.qty));
-      }
-
-      return {
-        nombre: item.nombre,
-        qty: item.qty,
-        unitPrice: unitPrice > 0 ? unitPrice : item.unitPrice,
-        ...(item.productId ? { productId: item.productId } : {}),
-      };
-    });
-
-    const total = validatedItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-    return { validatedItems, total };
-  } catch (err) {
-    console.error("Error al revalidar items en el servidor:", err);
-    const total = rawItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-    return { validatedItems: rawItems, total };
-  }
-}
 
 /**
  * Crea la preferencia de pago en Mercado Pago Y guarda la orden en Supabase
@@ -224,6 +60,7 @@ export const createCheckout = createServerFn({ method: "POST" })
       shipping: ShippingInput;
       userId?: string | undefined;
       couponCode?: string | undefined;
+      token?: string | undefined;
     }) => {
       if (!data || !Array.isArray(data.items) || data.items.length === 0) {
         throw new Error("Carrito vacío");
@@ -233,9 +70,11 @@ export const createCheckout = createServerFn({ method: "POST" })
         origin: String(data.origin ?? "").slice(0, 200),
         userId: data.userId ? String(data.userId).slice(0, 60) : undefined,
         couponCode: data.couponCode ? String(data.couponCode).slice(0, 40).toUpperCase().trim() : undefined,
+        token: data.token ? String(data.token).slice(0, 4000) : undefined,
         shipping: {
           nombre: String(s.nombre ?? "").slice(0, 120),
-          dni: String(s.dni ?? "").slice(0, 20),
+          // Solo números: así el control del cupón por DNI encuentra los pedidos anteriores
+          dni: String(s.dni ?? "").slice(0, 20).replace(/\D/g, ""),
           telefono: String(s.telefono ?? "").slice(0, 30),
           email: String(s.email ?? "").slice(0, 160),
           provincia: String(s.provincia ?? "").slice(0, 60),
@@ -247,7 +86,10 @@ export const createCheckout = createServerFn({ method: "POST" })
         items: data.items.slice(0, 50).map((i) => ({
           nombre: String(i.nombre ?? "Producto").slice(0, 120),
           qty: Math.max(1, Math.min(9999, Math.round(Number(i.qty) || 1))),
+          // Solo informativo: el precio que se cobra lo calcula el servidor (priceOrderItems)
           unitPrice: Math.max(1, Math.round(Number(i.unitPrice) || 0)),
+          ...(i.productId ? { productId: String(i.productId).slice(0, 100) } : {}),
+          ...(i.variantId ? { variantId: String(i.variantId).slice(0, 100) } : {}),
         })),
       };
     },
@@ -259,6 +101,9 @@ export const createCheckout = createServerFn({ method: "POST" })
         error: "Falta configurar MercadoPago. Escribinos por WhatsApp para completar tu compra.",
       };
     }
+    if (checkoutLimited(await currentClientIp())) {
+      return { error: RATE_LIMIT_MSG };
+    }
 
     if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
       console.error("Supabase no está configurado para crear la orden pendiente.");
@@ -269,31 +114,30 @@ export const createCheckout = createServerFn({ method: "POST" })
     let total = 0;
     let couponDiscountAmount = 0;
     let validCouponApplied: string | null = null;
+    let verifiedEmail = "";
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+      // Cuenta verificada por token (nunca el userId que manda el navegador)
+      const verified = await verifiedUserFromToken(supabaseAdmin, data.token);
+      verifiedEmail = verified?.email ?? "";
+
       // Garantizar que data.shipping tenga el email de la cuenta si el usuario está logueado
-      if (data.userId && (!data.shipping.email || !data.shipping.email.includes("@"))) {
-        try {
-          const { data: userData } = await supabaseAdmin.auth.admin.getUserById(data.userId);
-          if (userData?.user?.email) {
-            data.shipping.email = userData.user.email.trim();
-          }
-        } catch (err) {
-          console.error("Error al obtener email del usuario en checkout:", err);
-        }
+      if (verified?.email && (!data.shipping.email || !data.shipping.email.includes("@"))) {
+        data.shipping.email = verified.email;
       }
 
-      const validation = await revalidateOrderItems(supabaseAdmin, data.items);
+      const validation = await priceOrderItems(supabaseAdmin, data.items);
       if (validation.error) {
         return { error: validation.error };
       }
       items = validation.validatedItems;
       total = validation.total;
 
-      // Revalidación segura del cupón en el servidor
-      if (data.couponCode && data.userId) {
+      // Revalidación segura del cupón en el servidor: la cuenta sale del token verificado
+      // (no del userId que manda el navegador) y, ante cualquier duda, no se aplica el descuento.
+      if (data.couponCode && verified) {
         const { data: dbConfigRows } = await supabaseAdmin.from("site_config").select("clave,valor");
         const configObj: Record<string, string> = {};
         for (const row of dbConfigRows ?? []) {
@@ -304,49 +148,37 @@ export const createCheckout = createServerFn({ method: "POST" })
         const promoCode = (configObj["promo_cupon_codigo"] ?? "TEIMPORTAMOS").toUpperCase().trim();
 
         if (isCouponActive && data.couponCode === promoCode) {
-          const usedKeyUser = `coupon_usage_${promoCode}_${data.userId}`;
-          const usedKeyEmail = data.shipping.email ? `coupon_usage_${promoCode}_${data.shipping.email.trim().toLowerCase()}` : "";
-          const alreadyUsedInConfig = Boolean(configObj[usedKeyUser] || (usedKeyEmail && configObj[usedKeyEmail]));
+          const shippingEmail = (data.shipping.email ?? "").trim().toLowerCase();
+          // Usos viejos registrados en site_config (antes de coupon_usages)
+          const alreadyUsedInConfig = Boolean(
+            configObj[`coupon_usage_${promoCode}_${verified.id}`] ||
+              (verified.email && configObj[`coupon_usage_${promoCode}_${verified.email}`]) ||
+              (shippingEmail && configObj[`coupon_usage_${promoCode}_${shippingEmail}`]),
+          );
+          const used =
+            alreadyUsedInConfig ||
+            (await hasUsedCoupon(supabaseAdmin, promoCode, verified.id, verified.email)) ||
+            (shippingEmail && shippingEmail !== verified.email
+              ? await hasUsedCoupon(supabaseAdmin, promoCode, null, shippingEmail)
+              : false) ||
+            (await couponUsedByDni(supabaseAdmin, promoCode, data.shipping.dni));
 
-          if (!alreadyUsedInConfig) {
-            const filterParts: string[] = [`user_id.eq.${data.userId}`];
-            if (data.shipping.email) {
-              filterParts.push(`user_email.ilike.${data.shipping.email.trim().toLowerCase()}`);
-            }
-            try {
-              const { data: usages } = await supabaseAdmin
-                .from("coupon_usages")
-                .select("id")
-                .eq("coupon_code", promoCode)
-                .or(filterParts.join(","))
-                .limit(1);
-
-              if (!usages || usages.length === 0) {
-                const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
-                validCouponApplied = promoCode;
-                // Aplicar descuento a cada ítem para reflejar el monto en la preferencia de Mercado Pago
-                items = items.map((i) => ({
-                  ...i,
-                  unitPrice: Math.max(1, Math.round(i.unitPrice * (1 - couponPct / 100))),
-                }));
-                const discountedTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-                couponDiscountAmount = Math.max(0, total - discountedTotal);
-                total = discountedTotal;
-              }
-            } catch {
-              const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
-              validCouponApplied = promoCode;
-              items = items.map((i) => ({
-                ...i,
-                unitPrice: Math.max(1, Math.round(i.unitPrice * (1 - couponPct / 100))),
-              }));
-              const discountedTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-              couponDiscountAmount = Math.max(0, total - discountedTotal);
-              total = discountedTotal;
-            }
+          if (!used) {
+            const couponPct = Number(configObj["promo_cupon_descuento_pct"]) || 5;
+            validCouponApplied = promoCode;
+            // Aplicar descuento a cada ítem para reflejar el monto en la preferencia de Mercado Pago
+            items = items.map((i) => ({
+              ...i,
+              unitPrice: Math.max(1, Math.round(i.unitPrice * (1 - couponPct / 100))),
+            }));
+            const discountedTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
+            couponDiscountAmount = Math.max(0, total - discountedTotal);
+            total = discountedTotal;
           }
         }
       }
+      // El pedido queda asociado solo a la cuenta verificada
+      data.userId = verified?.id;
     } catch (err) {
       console.error("Error al revalidar la orden:", err);
       return {
@@ -358,67 +190,34 @@ export const createCheckout = createServerFn({ method: "POST" })
       return { error: "No se pudieron calcular los totales de tu orden. Por favor recargá la página." };
     }
 
-    // Generamos el código de orden
-    const d = new Date();
-    const stamp = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-    const orderCode = `TI-${stamp}-${rand}`;
-
+    // Código aleatorio + cupón reservado antes del pedido (ver src/lib/order-create.server.ts)
+    let orderCode = "";
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { error } = await supabaseAdmin.from("orders").insert({
-        order_code: orderCode,
-        user_id: data.userId ?? null,
-        ...data.shipping,
-        items,
-        total,
-        estado: "pendiente",
-        metodo_pago: "mercadopago",
-      });
-
-      if (error) {
-        console.error("Error al guardar orden pendiente:", error);
-        return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
+      const { createOrderRecord } = await import("./order-create.server");
+      const created = await createOrderRecord(
+        supabaseAdmin,
+        {
+          user_id: data.userId ?? null,
+          ...data.shipping,
+          items,
+          total,
+          estado: "pendiente",
+          metodo_pago: "mercadopago",
+        },
+        validCouponApplied
+          ? {
+              code: validCouponApplied,
+              userId: data.userId ?? null,
+              email: verifiedEmail || data.shipping.email || "",
+              discount: couponDiscountAmount,
+            }
+          : null,
+      );
+      if (!created.orderCode) {
+        return { error: created.error ?? "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
       }
-
-      // Registrar uso del cupón si fue aplicado
-      if (validCouponApplied) {
-        try {
-          await supabaseAdmin.from("coupon_usages").insert({
-            user_id: data.userId ?? null,
-            user_email: (data.shipping.email ?? "").trim().toLowerCase(),
-            coupon_code: validCouponApplied,
-            order_code: orderCode,
-            discount_amount: couponDiscountAmount,
-          });
-        } catch (couponErr) {
-          console.error("Error registrando uso de cupón en MP:", couponErr);
-        }
-
-        // Registrar SIEMPRE en site_config para garantizar persistencia y bloqueo inmediato
-        try {
-          const payload = JSON.stringify({
-            orderCode,
-            email: (data.shipping.email ?? "").trim().toLowerCase(),
-            discount: couponDiscountAmount,
-            at: new Date().toISOString(),
-          });
-          if (data.userId) {
-            await (supabaseAdmin as any).from("site_config").upsert({
-              clave: `coupon_usage_${validCouponApplied}_${data.userId}`,
-              valor: payload,
-            }, { onConflict: "clave" });
-          }
-          if (data.shipping.email) {
-            await (supabaseAdmin as any).from("site_config").upsert({
-              clave: `coupon_usage_${validCouponApplied}_${data.shipping.email.trim().toLowerCase()}`,
-              valor: payload,
-            }, { onConflict: "clave" });
-          }
-        } catch (scErr) {
-          console.error("Error registrando uso de cupón en site_config (MP):", scErr);
-        }
-      }
+      orderCode = created.orderCode;
     } catch (err) {
       console.error("Error al guardar orden pendiente:", err);
       return { error: "No pudimos registrar tu pedido. Probá de nuevo en unos minutos." };
@@ -448,6 +247,8 @@ export const createCheckout = createServerFn({ method: "POST" })
           failure: `${origin}/carrito`,
         },
         auto_return: "approved",
+        // MP avisa acá cuando cambia el pago, aunque el comprador no vuelva a la tienda
+        notification_url: `${origin}/api/mp-webhook`,
         payer: {
           name: data.shipping.nombre,
           email: data.shipping.email,

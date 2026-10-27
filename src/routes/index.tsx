@@ -1,19 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, ChevronRight, Calculator } from "lucide-react";
+import { Flame, ArrowRight, MessageCircle, Mail, Instagram, Tag, ChevronLeft, ChevronRight, Truck, ShieldCheck, CreditCard } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { ComboCard } from "@/components/ComboCard";
-import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { HomeQuiz } from "@/components/HomeQuiz";
+import { SiteFooter, SiteHeader, instagramUrl } from "@/components/SiteChrome";
 import { HowItWorks, ReviewsCarousel } from "@/components/Social";
+import { SectionHead } from "@/components/SectionHead";
 import { storeQueryOptions } from "@/lib/store-query";
 import {
   FALLBACK_IMAGE, imageUrl, thumbnailUrl, hasOffer,
   onImageError, isYes, money, toNumber, waLink, sanitizeUrl, type SiteConfig,
-  parseCategoryRules, normCat, transferPrice, transferDiscountPct,
+  parseCategoryRules, normCat, transferPrice, transferDiscountPct, orderedCategories,
+  findRuleForCat, type CategoryRule, isNfcGoogle, isHiddenCategory,
+  rankBestSellers, HOME_BEST_SELLERS,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
+import { track } from "@/lib/analytics";
 
 export const Route = createFileRoute("/")({
   loader: ({ context }) => {
@@ -50,6 +55,10 @@ function Home() {
   const { products, banners, config } = data;
 
   const combosScrollRef = useRef<HTMLDivElement>(null);
+  const ofertasScrollRef = useRef<HTMLDivElement>(null);
+  // En la home se muestran 4 combos; "Ver todos los combos" lleva al catálogo (sección Combos)
+  const COMBOS_VISIBLES = 4;
+  const visibleCombos = banners.slice(0, COMBOS_VISIBLES);
 
   const scrollCombos = (dir: "left" | "right") => {
     const el = combosScrollRef.current;
@@ -61,118 +70,123 @@ function Home() {
     });
   };
 
+  // Flechas del carrusel de productos en oferta (en PC no se puede deslizar con el dedo)
+  const scrollOfertas = (dir: "left" | "right") => {
+    const el = ofertasScrollRef.current;
+    if (!el) return;
+    const amount = Math.max(276, Math.round(el.clientWidth * 0.8));
+    el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
+  };
+
   const ofertasDelDia = products.filter((p) => hasOffer(p));
 
-  // Más vendidos: toma hasta 3 productos con ventas reales esta semana (ordenados de mayor a menor).
-  // Si hay menos de 3, rellena los cupos restantes con productos marcados como 'destacado' (sin repetir).
-  // Si aún faltan, completa con los primeros productos del catálogo.
-  const conVentas = [...products]
-    .filter((p) => (p.ventas_semana ?? 0) > 0)
-    .sort((a, b) => (b.ventas_semana ?? 0) - (a.ventas_semana ?? 0));
+  // Más vendidos: mismo ranking que el catálogo (rankBestSellers), así los 3 de la home son
+  // siempre los primeros de "Más vendidos" en el catálogo
+  const masVendidos = rankBestSellers(products).ranked.slice(0, HOME_BEST_SELLERS);
 
-  const masVendidos: typeof products = [];
-  const seenIds = new Set<string>();
-
-  // 1. Agregar los que tienen ventas reales (hasta 3)
-  for (const p of conVentas) {
-    if (masVendidos.length >= 3) break;
+  // Fotos del hero (PC): ofertas y más vendidos con imagen, sin repetir
+  const heroProducts: typeof products = [];
+  const heroSeen = new Set<string>();
+  for (const p of [...ofertasDelDia, ...masVendidos, ...products]) {
+    if (heroProducts.length >= 4) break;
     const id = String(p.id ?? p.nombre ?? "");
-    if (!seenIds.has(id)) {
-      seenIds.add(id);
-      masVendidos.push(p);
-    }
+    if (!p.imagen_url || heroSeen.has(id)) continue;
+    heroSeen.add(id);
+    heroProducts.push(p);
   }
-
-  // 2. Rellenar con destacados si hay menos de 3
-  if (masVendidos.length < 3) {
-    const destacados = products.filter((p) => isYes(p.destacado));
-    for (const p of destacados) {
-      if (masVendidos.length >= 3) break;
-      const id = String(p.id ?? p.nombre ?? "");
-      if (!seenIds.has(id)) {
-        seenIds.add(id);
-        masVendidos.push(p);
-      }
-    }
-  }
-
-  // 3. Fallback con catálogo general si aún faltan
-  if (masVendidos.length < 3) {
-    for (const p of products) {
-      if (masVendidos.length >= 3) break;
-      const id = String(p.id ?? p.nombre ?? "");
-      if (!seenIds.has(id)) {
-        seenIds.add(id);
-        masVendidos.push(p);
-      }
-    }
-  }
-
 
   return (
     <div className="min-h-screen">
       <SiteHeader config={config} />
 
       {/* HERO */}
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 pt-10 pb-8 text-center sm:px-6 sm:pt-20 sm:pb-16">
+      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-surface to-surface px-4 pt-10 pb-8 sm:px-6 sm:pt-16 sm:pb-14">
         {/* Decorative color wash & difuminados suaves */}
         <div aria-hidden className="pointer-events-none absolute -top-28 -left-20 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-10 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
 
-        {/* Badge superior: oscuro/neutro, NO naranja */}
-        <span className="relative mb-4 sm:mb-6 inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/[0.06] px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-foreground/60">
-          <Flame className="h-3 w-3 opacity-70" />
-          Precios de Importador
-        </span>
+        <div
+          className={`relative mx-auto grid max-w-[1180px] items-center gap-10 ${
+            heroProducts.length >= 4 ? "lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-14" : ""
+          }`}
+        >
+          <div className="text-center">
+            {/* Badge superior: oscuro/neutro, NO naranja */}
+            <span className="mb-4 sm:mb-6 inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/[0.06] px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-foreground/60">
+              <Flame className="h-3 w-3 opacity-70" />
+              Precios de Importador
+            </span>
 
-        {/* Título */}
-        <h1 className="relative mx-auto max-w-4xl text-[clamp(40px,12vw,84px)] leading-[0.95]">
-          Importamos
-          <br />
-          <span className="text-primary">para que revendas</span>
-        </h1>
+            {/* Título: pregunta de entrada del cuestionario */}
+            <h1 className="mx-auto max-w-4xl text-[clamp(36px,11vw,72px)] leading-[0.95]">
+              ¿Qué querés <span className="text-primary">hacer?</span>
+            </h1>
+            <p className="mx-auto mt-3 mb-6 max-w-md text-sm text-muted-foreground sm:mb-8 sm:text-base">
+              Elegí una opción y te llevamos al camino más corto.
+            </p>
 
-        {/* Línea horizontal divisoria tipo hr */}
-        <hr className="relative mx-auto mt-5 sm:mt-7 w-28 sm:w-40 border-t border-border/70" />
+            {/* Cuestionario: importar / mayorista / minorista → rubro del catálogo */}
+            <HomeQuiz categories={orderedCategories(products)} hasCombos={banners.length > 0} />
 
-        {/* Beneficios sin iconos, centrados con espacio */}
-        <div className="relative mx-auto mt-4 sm:mt-5 flex items-center justify-center gap-4 sm:gap-8 text-xs sm:text-sm font-medium text-muted-foreground/90">
-          <span>Envíos a todo el país</span>
-          <span aria-hidden className="text-muted-foreground/40">•</span>
-          <span>Productos originales</span>
-        </div>
+            {/* Confianza: datos reales del negocio, sin números inventados */}
+            <ul className="mx-auto mt-5 flex max-w-xl flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium text-muted-foreground sm:text-[13px]">
+              <li className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <Truck className="h-4 w-4 shrink-0 text-primary" /> Envíos a todo el país
+              </li>
+              <li className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-primary" /> Productos originales
+              </li>
+              <li className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <CreditCard className="h-4 w-4 shrink-0 text-primary" /> Mercado Pago o transferencia
+              </li>
+            </ul>
 
-        {/* CTA — Catálogo y Calculadora de Importaciones */}
-        <div className="relative mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3">
-          <Link
-            to="/catalogo"
-            className="btn-base grad-urgente inline-flex items-center justify-center gap-2 px-8 py-3.5 text-base font-black uppercase tracking-wide text-primary-foreground shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-95 w-full sm:w-auto"
-          >
-            Ver Catálogo Mayorista
-          </Link>
-          <Link
-            to="/calculadora"
-            className="btn-base border border-border bg-card/80 backdrop-blur-xs hover:bg-muted text-foreground inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-bold shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:scale-95 w-full sm:w-auto"
-          >
-            <Calculator className="h-4 w-4 text-primary" />
-            <span>Calculadora de Importaciones</span>
-          </Link>
-        </div>
+            {/* Aviso mínimos — gris puro, sin ámbar */}
+            <div className="mt-3 text-center">
+              <a
+                href="#minimos"
+                className="text-[11px] font-medium text-muted-foreground/80 transition-colors hover:text-muted-foreground active:scale-95"
+              >
+                Aplican mínimos de compra según categoría. <span className="font-bold">Ver ↓</span>
+              </a>
+            </div>
+          </div>
 
-        {/* Aviso mínimos — gris puro, sin ámbar */}
-        <div className="relative mt-2 text-center">
-          <a
-            href="#minimos"
-            className="text-[11px] font-medium text-muted-foreground/80 transition-colors hover:text-muted-foreground active:scale-95"
-          >
-            Aplican mínimos de compra según categoría. <span className="font-bold">Ver ↓</span>
-          </a>
+          {/* PC: fotos de productos reales, para que se vea qué vendemos */}
+          {heroProducts.length >= 4 && (
+            <div className="hidden grid-cols-2 gap-3 lg:grid" aria-label="Algunos de nuestros productos">
+              {heroProducts.map((p, i) => (
+                <Link
+                  key={String(p.id ?? i)}
+                  to="/producto/$id"
+                  params={{ id: String(p.id ?? p.nombre ?? "") }}
+                  onClick={() => track("home_hero_producto", { producto: p.nombre })}
+                  className={`group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md ${
+                    i % 2 === 1 ? "translate-y-6" : ""
+                  }`}
+                >
+                  <img
+                    src={thumbnailUrl(p.imagen_url, "md") || FALLBACK_IMAGE}
+                    alt={p.nombre ?? "Producto"}
+                    width={320}
+                    height={320}
+                    referrerPolicy="no-referrer"
+                    className="aspect-square w-full bg-surface object-contain p-3"
+                    onError={onImageError(p.imagen_url)}
+                  />
+                  <p className="truncate border-t border-border px-3 py-2 text-xs font-semibold text-foreground">
+                    {p.nombre}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
 
       {/* MÁS VENDIDOS */}
-      <section id="mas-vendidos" className="relative overflow-hidden bg-gradient-to-b from-surface via-surface to-primary/5 px-4 py-14 sm:px-6">
+      <section id="mas-vendidos" className="relative overflow-hidden bg-gradient-to-b from-surface via-surface to-primary/5 px-4 pt-14 pb-10 sm:px-6">
         <div aria-hidden className="pointer-events-none absolute -bottom-20 -left-16 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
 
         <div className="relative mx-auto max-w-[1180px]">
@@ -181,7 +195,8 @@ function Home() {
           {masVendidos.length > 0 && (
             <div className="relative -mx-4 sm:mx-0">
               <div
-                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${masVendidos.length === 1 ? "justify-center" : ""
+                // En PC entran las 3 tarjetas: centradas (antes quedaban pegadas a la izquierda)
+                className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 lg:justify-center lg:overflow-visible ${masVendidos.length === 1 ? "justify-center" : ""
                   }`}
               >
                 {masVendidos.map((p, i) => (
@@ -196,21 +211,8 @@ function Home() {
                   </div>
                 ))}
               </div>
-              {masVendidos.length > 1 && (
-                <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-surface to-transparent sm:block" />
-              )}
             </div>
           )}
-
-          <div className="mt-8 flex justify-center">
-            <Link
-              to="/catalogo"
-              className="btn-base grad-urgente group inline-flex w-full items-center justify-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:w-auto sm:px-12"
-            >
-              Ver más
-              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-            </Link>
-          </div>
         </div>
       </section>
 
@@ -237,34 +239,6 @@ function Home() {
                   </span>
                   <div className="h-px flex-1 bg-gradient-to-r from-primary/30 to-transparent" />
                 </div>
-                {banners.length > 1 && (
-                  <div className="hidden sm:flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        scrollCombos("left");
-                      }}
-                      aria-label="Deslizar combo anterior"
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all active:scale-95 shadow-xs cursor-pointer"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        scrollCombos("right");
-                      }}
-                      aria-label="Deslizar combo siguiente"
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all active:scale-95 shadow-xs cursor-pointer"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
               </div>
 
               <div className="relative group -mx-4 sm:mx-0">
@@ -306,7 +280,7 @@ function Home() {
                       : "grid grid-cols-2 gap-2.5 sm:flex sm:gap-4 sm:overflow-x-auto sm:scroll-smooth"
                   }`}
                 >
-                  {banners.map((b, i) => (
+                  {visibleCombos.map((b, i) => (
                     <ComboCard
                       key={i}
                       banner={b}
@@ -325,6 +299,20 @@ function Home() {
                   <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-background to-transparent sm:block" />
                 )}
               </div>
+              {banners.length > COMBOS_VISIBLES && (
+                <div className="mt-4 flex justify-center">
+                  {/* El número es la cantidad de combos activos cargados en la base */}
+                  <Link
+                    to="/catalogo"
+                    search={{ ver: "combos" }}
+                    onClick={() => track("home_combos_ver_todos", { total: banners.length })}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-card px-5 py-2 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
+                  >
+                    Ver todos los combos ({banners.length})
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 
@@ -339,7 +327,28 @@ function Home() {
                 </div>
               )}
               <div className="relative -mx-4 sm:mx-0">
+                {ofertasDelDia.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => scrollOfertas("left")}
+                      aria-label="Ver productos anteriores"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/95 backdrop-blur-xs text-foreground shadow-md hover:bg-surface hover:border-primary transition-all active:scale-95 cursor-pointer"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollOfertas("right")}
+                      aria-label="Ver más productos"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background/95 backdrop-blur-xs text-foreground shadow-md hover:bg-surface hover:border-primary transition-all active:scale-95 cursor-pointer"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
                 <div
+                  ref={ofertasScrollRef}
                   className={`no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 sm:px-0 ${ofertasDelDia.length === 1 ? "justify-center" : ""
                     }`}
                 >
@@ -367,7 +376,7 @@ function Home() {
               to="/catalogo"
               className="btn-base grad-urgente group inline-flex w-full items-center justify-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:w-auto sm:px-12"
             >
-              Ver más
+              Ver todo el catálogo
               <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
           </div>
@@ -390,7 +399,7 @@ function Home() {
           { key: "zapatillas", label: "Zapatillas", defaultDesc: "3 unidades", icon: "👟" },
         ];
 
-        const minItems: { label: string; desc: string; icon: string }[] = [];
+        const minItems: { key: string; label: string; desc: string; icon: string }[] = [];
         const seenKeys = new Set<string>();
 
         for (const cat of canonicalCategories) {
@@ -401,49 +410,120 @@ function Home() {
           } else if (rule?.minAmount) {
             desc = `${money(rule.minAmount)}`;
           }
-          minItems.push({ label: cat.label, desc, icon: cat.icon });
+          minItems.push({ key: cat.key, label: cat.label, desc, icon: cat.icon });
           seenKeys.add(cat.key);
         }
+
+        // Nombre visible de una clave del admin ("nfc_google" → "NFC Google")
+        const minLabel = (key: string) => {
+          const text = key.replace(/_/g, " ").trim();
+          if (isNfcGoogle(text)) return "NFC Google";
+          return text.charAt(0).toUpperCase() + text.slice(1);
+        };
 
         // Agregar cualquier otra categoría que el admin configure con mínimo
         for (const [key, rule] of Object.entries(catRules)) {
           const norm = normCat(key);
           if (seenKeys.has(norm)) continue;
           if (norm === "perfumes" || norm === "perfume") continue;
+          if (isHiddenCategory(norm)) continue;
 
           if (rule.minUnits) {
             seenKeys.add(norm);
-            const label = key.charAt(0).toUpperCase() + key.slice(1);
-            minItems.push({ label, desc: `${rule.minUnits} unidades`, icon: "📦" });
+            const label = minLabel(key);
+            minItems.push({ key: norm, label, desc: `${rule.minUnits} unidades`, icon: "📦" });
           } else if (rule.minAmount) {
             seenKeys.add(norm);
-            const label = key.charAt(0).toUpperCase() + key.slice(1);
-            minItems.push({ label, desc: `${money(rule.minAmount)}`, icon: "💰" });
+            const label = minLabel(key);
+            minItems.push({ key: norm, label, desc: `${money(rule.minAmount)}`, icon: "💰" });
           }
         }
 
         if (minItems.length === 0) return null;
 
+        // Categoría real del catálogo para cada mínimo, con la misma asociación que usa el carrito
+        // (findRuleForCat). Si no hay productos de esa categoría, la tarjeta queda sin link.
+        const realCats = orderedCategories(products);
+        const catalogCatFor = (key: string) => {
+          // Las claves del admin pueden venir con guion bajo ("nfc_google" ↔ categoría "NFC Google")
+          const keys = [...new Set([key, key.replace(/_/g, " ")])];
+          for (const k of keys) {
+            const matches = realCats.filter(
+              (c) => findRuleForCat(normCat(c), { [k]: {} as CategoryRule })?.key === k,
+            );
+            const found = matches.find((c) => normCat(c) === k) ?? matches[0];
+            if (found) return found;
+          }
+          return undefined;
+        };
+        // NFC Google es un solo producto: la tarjeta lleva directo a ese producto (con stock primero)
+        const nfcCandidates = products.filter((p) => isNfcGoogle(p.nombre));
+        const nfcProduct = nfcCandidates.find((p) => isYes(p.stock)) ?? nfcCandidates[0];
+        const productFor = (key: string) =>
+          nfcProduct && isNfcGoogle(key.replace(/_/g, " ")) ? nfcProduct : undefined;
+
         return (
           <section id="minimos" className="px-4 py-10 sm:px-6">
             <div className="mx-auto max-w-[1180px]">
-              <div className="rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/5 via-amber-500/[0.03] to-transparent p-5 sm:p-7">
-                <div className="mb-4">
-                  <h2 className="font-sans text-base sm:text-lg font-bold tracking-tight">Mínimos de compra por categoría</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Para ciertas categorías aplicamos un mínimo de compra. Podés combinar productos de la misma categoría para llegar al mínimo.
-                  </p>
-                </div>
+              <SectionHead
+                title={
+                  <>
+                    Mínimos <span className="text-primary">de compra</span>
+                  </>
+                }
+                sub="En algunas categorías hay un mínimo. Podés combinar productos de la misma categoría para llegar."
+              />
+              <div className="rounded-2xl border border-border bg-card/60 p-3 sm:p-5">
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-4">
-                  {minItems.map((it) => (
-                    <div key={it.label} className="flex items-center gap-2.5 rounded-xl border border-border bg-card/70 px-3 py-2.5 shadow-2xs">
-                      <span className="text-xl shrink-0">{it.icon}</span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold truncate text-foreground">{it.label}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{it.desc}</p>
+                  {minItems.map((it) => {
+                    const product = productFor(it.key) ?? productFor(it.label);
+                    const target = catalogCatFor(it.key);
+                    const content = (
+                      <>
+                        <span className="text-xl shrink-0">{it.icon}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold leading-tight text-foreground break-words">{it.label}</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">{it.desc}</p>
+                        </div>
+                      </>
+                    );
+                    const base =
+                      "flex items-center gap-2.5 rounded-xl border border-border bg-card/70 px-3 py-2.5 shadow-2xs";
+                    const linkClass = `${base} transition-all hover:border-primary hover:shadow-sm active:scale-[0.99]`;
+                    if (product) {
+                      return (
+                        <Link
+                          key={it.label}
+                          to="/producto/$id"
+                          params={{ id: String(product.id ?? product.nombre ?? "") }}
+                          onClick={() =>
+                            track("minimos_categoria_click", {
+                              categoria: it.label,
+                              producto: product.nombre,
+                            })
+                          }
+                          className={linkClass}
+                        >
+                          {content}
+                        </Link>
+                      );
+                    }
+                    return target ? (
+                      <Link
+                        key={it.label}
+                        to="/catalogo"
+                        search={{ cat: target }}
+                        onClick={() => track("minimos_categoria_click", { categoria: target })}
+                        className={linkClass}
+                      >
+                        {content}
+                      </Link>
+                    ) : (
+                      <div key={it.label} className={base}>
+                        {content}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -458,14 +538,16 @@ function Home() {
         <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
 
         <div className="relative mx-auto max-w-2xl">
-          <h2 className="font-sans text-[clamp(24px,6vw,38px)] font-semibold uppercase tracking-tight text-foreground/90">
-            Importamos para que vos revendas
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] text-muted-foreground sm:text-base">
-            Somos un equipo dedicado a traer productos importados de tecnología, bazar,
-            perfumes y mucho más
-          </p>
-          <a href="#contacto" className="btn-base grad-urgente group mt-8 inline-flex items-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+          <SectionHead
+            align="center"
+            title={
+              <>
+                Importamos para que <span className="text-primary">vos revendas</span>
+              </>
+            }
+            sub="Somos un equipo dedicado a traer productos importados de tecnología, bazar, perfumes y mucho más."
+          />
+          <a href="#contacto" className="btn-base grad-urgente group mt-1 inline-flex items-center gap-2 text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg">
             Emprendé hoy
             <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
           </a>
@@ -487,19 +569,22 @@ function Home() {
             title="Contactanos"
             sub="Escribinos por el formulario o directo por WhatsApp. Respondemos rápido."
           />
-          <div className="grid gap-8 lg:grid-cols-2">
+          <div className="grid items-start gap-8 lg:grid-cols-2">
             <ContactForm config={config} />
             <div className="card-soft flex flex-col gap-4 border-l-4 border-primary p-6 shadow-sm">
+              {/* Si hay link al grupo, la tarjeta invita al grupo; si no, a escribir directo */}
               <h3 className="font-sans text-lg font-bold normal-case tracking-normal">
-                Grupo mayorista de WhatsApp
+                {config["whatsapp_grupo"] ? "Grupo mayorista de WhatsApp" : "Escribinos por WhatsApp"}
               </h3>
               <p className="text-sm text-muted-foreground">
-                Sumate al grupo para recibir las listas de precios y las ofertas antes que nadie.
+                {config["whatsapp_grupo"]
+                  ? "Sumate al grupo para recibir las listas de precios y las ofertas antes que nadie."
+                  : "Consultanos precios, stock y envíos. Te respondemos rápido."}
               </p>
-              {config['whatsapp_grupo'] && (
+              {config["whatsapp_grupo"] && (
                 <a
                   className="btn-base bg-whatsapp text-whatsapp-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-                  href={sanitizeUrl(config['whatsapp_grupo'])}
+                  href={sanitizeUrl(config["whatsapp_grupo"])}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -507,32 +592,58 @@ function Home() {
                 </a>
               )}
               <a
-                className="btn-base border border-primary/30 text-foreground transition-colors duration-200 hover:bg-primary/5"
+                className={
+                  config["whatsapp_grupo"]
+                    ? "btn-base border border-primary/30 text-foreground transition-colors duration-200 hover:bg-primary/5"
+                    : "btn-base bg-whatsapp text-whatsapp-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+                }
                 href={waLink(config)}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Escribirnos directo
+                {config["whatsapp_grupo"] ? "Escribirnos directo" : "Abrir WhatsApp"}
               </a>
-              <div className="mt-2 space-y-2 text-sm text-muted-foreground">
-                {config['whatsapp_individual'] && (
-                  <p className="flex items-center gap-2">
+              {/* Datos de contacto como links: WhatsApp (wa.me), email e Instagram */}
+              <div className="mt-1 flex flex-col items-start gap-2 text-sm text-muted-foreground">
+                {config["whatsapp_individual"] && (
+                  <a
+                    href={waLink(config)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => track("contacto_whatsapp_numero")}
+                    className="inline-flex items-center gap-2 transition-colors hover:text-primary hover:underline"
+                  >
                     <MessageCircle className="h-4 w-4 text-primary" />
-                    {config['whatsapp_individual']}
-                  </p>
+                    {formatWhatsapp(config["whatsapp_individual"])}
+                  </a>
                 )}
-                {config['email'] && (
-                  <p className="flex items-center gap-2">
+                {config["email"] && (
+                  <a
+                    href={sanitizeUrl(`mailto:${config["email"].trim()}`)}
+                    className="inline-flex items-center gap-2 transition-colors hover:text-primary hover:underline"
+                  >
                     <Mail className="h-4 w-4 text-primary" />
-                    {config['email']}
-                  </p>
+                    {config["email"]}
+                  </a>
                 )}
-                {config['instagram'] && (
-                  <p className="flex items-center gap-2">
-                    <Instagram className="h-4 w-4 text-primary" />
-                    {config['instagram']}
-                  </p>
-                )}
+                {config["instagram"] &&
+                  (instagramUrl(config["instagram"]) ? (
+                    <a
+                      href={instagramUrl(config["instagram"])}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => track("contacto_instagram")}
+                      className="inline-flex items-center gap-2 transition-colors hover:text-primary hover:underline"
+                    >
+                      <Instagram className="h-4 w-4 text-primary" />
+                      {config["instagram"]}
+                    </a>
+                  ) : (
+                    <p className="flex items-center gap-2">
+                      <Instagram className="h-4 w-4 text-primary" />
+                      {config["instagram"]}
+                    </p>
+                  ))}
               </div>
             </div>
           </div>
@@ -540,21 +651,29 @@ function Home() {
       </section>
 
       <SiteFooter config={config} />
+
+      {/* Celular: el botón de WhatsApp del header está oculto, así que va uno flotante */}
+      <a
+        href={waLink(config)}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Escribinos por WhatsApp"
+        onClick={() => track("home_whatsapp_flotante")}
+        className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 grid h-14 w-14 place-items-center rounded-full bg-whatsapp text-whatsapp-foreground shadow-lg transition-transform active:scale-95 print:hidden sm:hidden"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+        </svg>
+      </a>
     </div>
   );
 }
 
-function SectionHead({ title, sub, icon }: { title: React.ReactNode; sub?: string; icon?: React.ReactNode }) {
-  return (
-    <div className="mb-7">
-      <div className="mb-3 flex items-center gap-2">
-        <div className="h-1 w-10 rounded-full bg-primary" />
-        {icon && <span className="text-primary">{icon}</span>}
-      </div>
-      <h2 className="text-[clamp(24px,7vw,40px)]">{title}</h2>
-      {sub && <p className="mt-2 max-w-md text-sm text-muted-foreground">{sub}</p>}
-    </div>
-  );
+/** "5493418051515" → "+54 9 341 805 1515" (solo para mostrar; el link usa el número limpio). */
+function formatWhatsapp(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  const m = digits.match(/^549(\d{3})(\d{3})(\d{4})$/);
+  return m ? `+54 9 ${m[1]} ${m[2]} ${m[3]}` : raw;
 }
 
 function ContactForm({ config }: { config: SiteConfig }) {

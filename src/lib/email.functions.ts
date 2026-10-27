@@ -5,6 +5,8 @@
  */
 
 import { money } from "@/lib/store";
+import { escapeHtml } from "@/lib/html-escape";
+import { createRateLimiter } from "./rate-limit";
 
 export type NotifyOrderInput = {
   orderCode: string;
@@ -14,21 +16,76 @@ export type NotifyOrderInput = {
     nombre: string;
     email: string;
     telefono: string;
-    dni?: string;
-    ciudad?: string;
-    provincia?: string;
-    codigo_postal?: string;
-    transporte?: string;
-    sucursal_correo?: string;
+    dni?: string | undefined;
+    ciudad?: string | undefined;
+    provincia?: string | undefined;
+    codigo_postal?: string | undefined;
+    transporte?: string | undefined;
+    sucursal_correo?: string | undefined;
   };
   items: { nombre: string; qty: number; unitPrice: number }[];
-  couponCode?: string;
-  couponDiscountAmount?: number;
+  couponCode?: string | undefined;
+  couponDiscountAmount?: number | undefined;
 };
 
 const ADMIN_EMAILS = [
   "teimportamosar@gmail.com",
 ];
+
+/**
+ * Copia del pedido con todo el texto escapado para HTML. Nombre, dirección y nombres de productos
+ * los escribe el cliente: sin escapar, alguien podría meter links o contenido falso en un email que
+ * sale desde nuestro dominio (por ejemplo, poniendo el email de otra persona).
+ */
+function escapeOrderForHtml(order: NotifyOrderInput): NotifyOrderInput {
+  const shipping = Object.fromEntries(
+    Object.entries(order.shipping).map(([k, v]) => [k, v === undefined ? v : escapeHtml(v)]),
+  ) as NotifyOrderInput["shipping"];
+  return {
+    ...order,
+    orderCode: escapeHtml(order.orderCode),
+    total: Number(order.total) || 0,
+    shipping,
+    items: order.items.map((i) => ({
+      nombre: escapeHtml(i.nombre),
+      qty: Number(i.qty) || 0,
+      unitPrice: Number(i.unitPrice) || 0,
+    })),
+    ...(order.couponCode !== undefined ? { couponCode: escapeHtml(order.couponCode) } : {}),
+  };
+}
+
+/**
+ * site_config es pública (la lee la tienda): el registro del último envío no puede llevar el email
+ * del cliente ni el número de pedido. Se guarda enmascarado ("j***@gmail.com").
+ */
+function maskEmail(email: string): string {
+  const [user = "", domain = ""] = String(email ?? "").split("@");
+  return domain ? `${user.slice(0, 1)}***@${domain}` : "***";
+}
+function redactEmails(text: string): string {
+  return String(text ?? "").replace(/[^\s@"'<>]+@[^\s@"'<>]+/g, (m) => maskEmail(m));
+}
+
+/** Emails de confirmación por destinatario (cada instancia del servidor lleva su cuenta). */
+const customerEmailLimited = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 3 });
+
+export function isSingleEmail(email: string): boolean {
+  // Sin cuantificadores anidados (ReDoS): se separa en usuario y dominio
+  if (email.length > 254) return false;
+  const at = email.indexOf("@");
+  if (at < 1 || at > 64 || at !== email.lastIndexOf("@")) return false;
+  const user = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  return (
+    !/[\s,;<>"'()]/.test(user) &&
+    /^[a-z0-9.-]+$/i.test(domain) &&
+    domain.includes(".") &&
+    !domain.startsWith(".") &&
+    !domain.endsWith(".") &&
+    !domain.includes("..")
+  );
+}
 
 const METODO_LABEL: Record<string, string> = {
   transferencia: "🏦 Transferencia Bancaria",
@@ -36,7 +93,8 @@ const METODO_LABEL: Record<string, string> = {
   mercadopago: "🔵 Mercado Pago",
 };
 
-function buildAdminEmailHtml(order: NotifyOrderInput): string {
+export function buildAdminEmailHtml(rawOrder: NotifyOrderInput): string {
+  const order = escapeOrderForHtml(rawOrder);
   const itemsHtml = order.items
     .map(
       (i) =>
@@ -49,7 +107,7 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
     )
     .join("");
 
-  const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
+  const metodoPago = METODO_LABEL[order.metodoPago] ?? escapeHtml(order.metodoPago);
   const itemsSubtotal = order.items.reduce((acc, i) => acc + i.qty * i.unitPrice, 0);
   const discountAmount = Math.max(0, itemsSubtotal - order.total);
   const hasDiscount = discountAmount > 0;
@@ -182,7 +240,8 @@ function buildAdminEmailHtml(order: NotifyOrderInput): string {
   `;
 }
 
-function buildCustomerEmailHtml(order: NotifyOrderInput): string {
+export function buildCustomerEmailHtml(rawOrder: NotifyOrderInput): string {
+  const order = escapeOrderForHtml(rawOrder);
   const itemsHtml = order.items
     .map(
       (i) =>
@@ -195,7 +254,7 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
     )
     .join("");
 
-  const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
+  const metodoPago = METODO_LABEL[order.metodoPago] ?? escapeHtml(order.metodoPago);
   const isTransfer = order.metodoPago === "transferencia";
   const itemsSubtotal = order.items.reduce((acc, i) => acc + i.qty * i.unitPrice, 0);
   const discountAmount = Math.max(0, itemsSubtotal - order.total);
@@ -349,48 +408,10 @@ function buildCustomerEmailHtml(order: NotifyOrderInput): string {
  * Fire-and-forget: no lanza error si falla, solo loguea.
  */
 export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success: boolean; error?: string }> {
-  let apiKey: string | undefined;
-  let fromAddress: string | undefined;
-
-  // 1. Prioridad: leer credenciales directamente de site_config (configuradas por el admin)
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rows } = await (supabaseAdmin as any)
-      .from("site_config")
-      .select("clave, valor")
-      .in("clave", ["resend_api_key", "resend_from"]);
-
-    if (rows && Array.isArray(rows)) {
-      for (const r of rows) {
-        if (r.clave === "resend_api_key" && r.valor) apiKey = String(r.valor).trim();
-        if (r.clave === "resend_from" && r.valor) fromAddress = String(r.valor).trim();
-      }
-    }
-  } catch (err) {
-    console.error("[email] Error leyendo site_config para Resend:", err);
-  }
-
-  // 2. Fallback a variables de entorno
-  if (!apiKey) {
-    apiKey =
-      process.env["RESEND_API_KEY"] ||
-      process.env["VITE_RESEND_API_KEY"] ||
-      (typeof import.meta !== "undefined" && import.meta.env
-        ? (import.meta.env["VITE_RESEND_API_KEY"] as string | undefined) ||
-          (import.meta.env["RESEND_API_KEY"] as string | undefined)
-        : undefined);
-  }
-
-  if (!fromAddress) {
-    fromAddress =
-      process.env["RESEND_FROM"] ||
-      process.env["VITE_RESEND_FROM"] ||
-      (typeof import.meta !== "undefined" && import.meta.env
-        ? (import.meta.env["VITE_RESEND_FROM"] as string | undefined) ||
-          (import.meta.env["RESEND_FROM"] as string | undefined)
-        : undefined) ||
-      "Te Importamos <noreply@teimportamosarg.com>";
-  }
+  // Clave de Resend desde la configuración privada (nunca desde site_config, que es pública)
+  const { supabaseAdmin: adminForKey } = await import("@/integrations/supabase/client.server");
+  const { getResendConfig } = await import("./secrets.server");
+  const { apiKey, from: fromAddress } = await getResendConfig(adminForKey);
 
   if (!apiKey) {
     const msg = "[email] RESEND_API_KEY no está configurada ni en base de datos ni en variables de entorno — se omite el email.";
@@ -398,7 +419,7 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
     return { success: false, error: msg };
   }
 
-  const metodoPago = METODO_LABEL[order.metodoPago] ?? order.metodoPago;
+  const metodoPago = METODO_LABEL[order.metodoPago] ?? escapeHtml(order.metodoPago);
   let adminSuccess = false;
   let adminError = "";
   let customerSuccess = false;
@@ -447,7 +468,13 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
 
     // 2. Enviar confirmación al comprador si tiene email válido
     const customerEmail = order.shipping.email?.trim();
-    if (customerEmail && customerEmail.includes("@")) {
+    // Una sola dirección válida (sin comas, espacios ni "Nombre <...>") y un límite por
+    // destinatario: el formulario de pedido no puede usarse para mandar emails a terceros en masa
+    if (
+      customerEmail &&
+      isSingleEmail(customerEmail) &&
+      !customerEmailLimited(customerEmail.toLowerCase())
+    ) {
       const resCustomer = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -483,11 +510,12 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
         customerError = `Cliente error ${resCustomer.status}: ${body}`;
         console.error("[email] Error al enviar confirmación al cliente:", resCustomer.status, body);
         try {
+          // Registro interno: va a la configuración privada (site_config es pública)
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          await (supabaseAdmin as any).from("site_config").upsert(
+          await (supabaseAdmin as any).from("app_secrets").upsert(
             {
               clave: "last_email_error",
-              valor: `[${new Date().toLocaleTimeString("es-AR")}] Error enviando a ${customerEmail} (HTTP ${resCustomer.status}): ${body}`,
+              valor: `[${new Date().toLocaleTimeString("es-AR")}] Error enviando a ${maskEmail(customerEmail)} (HTTP ${resCustomer.status}): ${redactEmails(body).slice(0, 300)}`,
             },
             { onConflict: "clave" },
           );
@@ -497,11 +525,12 @@ export async function notifyNewOrder(order: NotifyOrderInput): Promise<{ success
       } else {
         customerSuccess = true;
         try {
+          // Registro interno: va a la configuración privada (site_config es pública)
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          await (supabaseAdmin as any).from("site_config").upsert(
+          await (supabaseAdmin as any).from("app_secrets").upsert(
             {
               clave: "last_email_success",
-              valor: `[${new Date().toLocaleTimeString("es-AR")}] Enviado con éxito a ${customerEmail} (Orden ${order.orderCode})`,
+              valor: `[${new Date().toLocaleTimeString("es-AR")}] Enviado con éxito a ${maskEmail(customerEmail)}`,
             },
             { onConflict: "clave" },
           );
