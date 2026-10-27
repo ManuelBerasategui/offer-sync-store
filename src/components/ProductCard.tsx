@@ -24,6 +24,9 @@ import {
   isLongSleeve,
   isNfcGoogle,
   excludedFromQtyDiscount,
+  findRuleForCat,
+  normCat,
+  parseCategoryRules,
   JERSEY_FAN_TIERS,
   JERSEY_FAN_ML_TIERS,
 } from "@/lib/store";
@@ -59,7 +62,12 @@ export function ProductCard({
   const origPrice = originalPriceOf(p);
   const isDiscounted = offer && origPrice > basePrice;
   const hidePrice = isWaPriceHidden || basePrice <= 0 || isNaN(basePrice);
-  const tiers = tiersOf(p);
+  // Igual que la ficha, el carrito y el cobro: si la categoría tiene tramos propios,
+  // reemplazan a los tramos individuales guardados en el producto.
+  const catRule = config ? findRuleForCat(normCat(p.categoria ?? ""), parseCategoryRules(config)) : undefined;
+  const tiers = catRule?.rule.discountTiers?.length
+    ? [...catRule.rule.discountTiers].sort((a, b) => a.units - b.units)
+    : tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
   // El tercer tramo global (20+ u → 12%) aplica a TODOS los productos con precio.
   // maxPercent es 12 como mínimo universal; más si hay tiers propios por encima de 12%.
