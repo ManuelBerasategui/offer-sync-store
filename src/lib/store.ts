@@ -932,8 +932,13 @@ export function isMate(nombre?: string, categoria?: string): boolean {
   const cat = String(categoria ?? "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
   if (cat === "mates" || cat === "mate") return true;
+
+  // El nombre solo cuenta dentro de Bazar: fuera de ah\u00ed "mate" suele ser un acabado
+  // opaco (ej. "Cera mate x60gr" en Insumos Barber), no un mate.
+  if (cat !== "bazar") return false;
 
   return /(?:^|[\s,;/\-_(])mate(?:[\s,;/\-_)s]|$)/i.test(nom);
 }

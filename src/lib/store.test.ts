@@ -81,11 +81,10 @@ describe("isMate", () => {
     expect(isMate("Smart Watch Pro", "Tecnología")).toBe(false);
   });
 
-  it("NO matchea auricular con finish 'mate' en nombre", () => {
-    // Nombre con 'mate' como adjetivo al final — falso positivo histórico
-    // Ahora isMate sí lo detectaría, pero hasMoq ya NO usa isMate en runtime
-    // Este test documenta el comportamiento de isMate aislado
-    expect(isMate("Auricular Bluetooth Mate", "Tecnología")).toBe(true); // isMate detecta el token
+  it("NO matchea 'mate' en el nombre fuera de la categoría Bazar", () => {
+    expect(isMate("Auricular Bluetooth Mate", "Tecnología")).toBe(false);
+    expect(isMate("Cera mate x60gr", "Insumos Barber")).toBe(false);
+    expect(isMate("Mate de silicona", "")).toBe(false);
   });
 
   it("NO matchea kits, combos, sets o packs que incluyan la palabra mate", () => {
@@ -95,6 +94,7 @@ describe("isMate", () => {
     expect(isMate("Set Matero Acero", "Bazar")).toBe(false);
     expect(isMate("Pack Termo y Mate", "Bazar")).toBe(false);
   });
+
 
   it("NO matchea kit con MATE en nombre si moq_group='none' (runtime)", () => {
     // En runtime, hasMoq usa moq_group, no isMate → el kit no tiene MOQ
@@ -178,14 +178,17 @@ describe("hasMoq", () => {
     expect(info!.minUnits).toBe(5);
   });
 
-  it("isMate fallback aplica aunque la categoría sea 'Tecnología' si el nombre contiene 'mate'", () => {
-    // Falso positivo conocido (aceptado provisionalmente): producto con 'mate' en nombre
-    // queda restringido incluso si no es un Mate. Se resuelve con moq_group='none' en admin.
+  it("isMate fallback NO aplica fuera de Bazar aunque el nombre contenga 'mate'", () => {
+    // Tecnología: usa su propio mínimo, no el de Mates
     const prod = makeProduct("Auricular Bluetooth Mate", "Tecnología", "");
     const info = hasMoq(prod, rules);
-    // isMate detecta 'Mate' al final del nombre → hasMoq retorna MoqInfo
     expect(info).not.toBeNull();
-    expect(info!.group).toBe("mates");
+    expect(info!.group).toBe("tecnologia");
+  });
+
+  it("'Cera mate' de Insumos Barber no pide la compra mínima de Mates", () => {
+    const prod = makeProduct("Cera mate x60gr", "Insumos Barber", "");
+    expect(hasMoq(prod, rules)?.group).not.toBe("mates");
   });
 
   it("moq_group='none' anula isMate fallback (fix para kits/combos)", () => {
