@@ -57,6 +57,8 @@ import {
   categoryDiscountForUnits,
   checkCategoryMins,
   isCamiseta,
+  isCurva,
+  CURVA_UNIDADES,
   isLongSleeve,
   isNfcGoogle,
   isBlackviewGlasses,
@@ -1011,6 +1013,8 @@ function ProductoPage() {
 
   // Detección de categoría camisetas
   const isCamisetaProd = isCamiseta(product?.categoria, product?.nombre);
+  // Curvas: se compran solo por curva completa (qty = cantidad de curvas)
+  const isCurvaProd = isCurva(product?.nombre);
 
   if (!product) {
     // Sugerencias: primero ofertas, después el resto (con foto)
@@ -1046,7 +1050,8 @@ function ProductoPage() {
 
   const productRec = product as Record<string, unknown>;
   const rawTipo = String(productRec["tipo_talles"] ?? "NINGUNO").toUpperCase();
-  const hasTalles = rawTipo === "ZAPATILLAS" || rawTipo === "ROPA";
+  // Las curvas vienen armadas: no se elige talle
+  const hasTalles = !isCurvaProd && (rawTipo === "ZAPATILLAS" || rawTipo === "ROPA");
   const waOnlyReason: WaOnlyReason | null = waOnlyReasonOf(productRec);
   // Retrocompatibilidad: esZapatilla para los guards de tipo_talles que ya existían
   const esZapatilla = waOnlyReason === "zapatillas";
@@ -1287,7 +1292,11 @@ function ProductoPage() {
                   {transferDiscountPct(config) > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {money(unit)} con Mercado Pago
+                      {isCurvaProd && " — precio por curva"}
                     </p>
+                  )}
+                  {isCurvaProd && transferDiscountPct(config) <= 0 && (
+                    <p className="text-xs text-muted-foreground">Precio por curva</p>
                   )}
                 </div>
 
@@ -1610,8 +1619,34 @@ function ProductoPage() {
                   htmlFor="qty-input"
                   className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground"
                 >
-                  Cantidad
+                  {isCurvaProd ? "Cantidad de curvas" : "Cantidad"}
                 </label>
+                {isCurvaProd && (
+                  <p className="mt-1 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
+                    📦 1 curva = {CURVA_UNIDADES} unidades. El precio es por curva completa.
+                  </p>
+                )}
+                {isCurvaProd && (
+                  <div className="mt-2 grid grid-cols-4 gap-2">
+                    {[1, 2, 3, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => {
+                          setQty(n);
+                          setQtyStr(String(n));
+                        }}
+                        className={`rounded-lg border px-2 py-2 text-xs font-bold transition ${
+                          qty === n
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input bg-background text-foreground hover:border-primary"
+                        }`}
+                      >
+                        {n} curva{n !== 1 ? "s" : ""}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-2 flex items-center gap-2">
                   {/* Botón – */}
                   <button
@@ -1668,6 +1703,11 @@ function ProductoPage() {
                   >
                     +
                   </button>
+                  {isCurvaProd && (
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {qty} curva{qty !== 1 ? "s" : ""} = {qty * CURVA_UNIDADES} unidades
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -1754,7 +1794,11 @@ function ProductoPage() {
 
                     {existingInCart && (
                       <div className="rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-center text-xs font-semibold text-primary">
-                        ✓ Ya tenés {existingInCart.qty} {existingInCart.qty === 1 ? "unidad" : "unidades"} en tu carrito
+                        ✓ Ya tenés {existingInCart.qty}{" "}
+                        {isCurvaProd
+                          ? existingInCart.qty === 1 ? "curva" : "curvas"
+                          : existingInCart.qty === 1 ? "unidad" : "unidades"}{" "}
+                        en tu carrito
                       </div>
                     )}
 

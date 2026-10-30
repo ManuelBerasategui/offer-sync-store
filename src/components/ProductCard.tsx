@@ -19,9 +19,14 @@ import {
   toNumber,
   waLink,
   isCamiseta,
+  isCurva,
+  CURVA_UNIDADES,
   isLongSleeve,
   isNfcGoogle,
   excludedFromQtyDiscount,
+  findRuleForCat,
+  normCat,
+  parseCategoryRules,
   JERSEY_FAN_TIERS,
   JERSEY_FAN_ML_TIERS,
 } from "@/lib/store";
@@ -57,7 +62,12 @@ export function ProductCard({
   const origPrice = originalPriceOf(p);
   const isDiscounted = offer && origPrice > basePrice;
   const hidePrice = isWaPriceHidden || basePrice <= 0 || isNaN(basePrice);
-  const tiers = tiersOf(p);
+  // Igual que la ficha, el carrito y el cobro: si la categoría tiene tramos propios,
+  // reemplazan a los tramos individuales guardados en el producto.
+  const catRule = config ? findRuleForCat(normCat(p.categoria ?? ""), parseCategoryRules(config)) : undefined;
+  const tiers = catRule?.rule.discountTiers?.length
+    ? [...catRule.rule.discountTiers].sort((a, b) => a.units - b.units)
+    : tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
   // El tercer tramo global (20+ u → 12%) aplica a TODOS los productos con precio.
   // maxPercent es 12 como mínimo universal; más si hay tiers propios por encima de 12%.
@@ -167,6 +177,12 @@ export function ProductCard({
                 <p className="mt-1 text-[11px] font-semibold text-primary">
                   Hasta {maxPercent}% off por cantidad
                 </p>
+              )}
+
+              {isCurva(p.nombre) && (
+                <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                  📦 Precio por curva · 1 curva = {CURVA_UNIDADES} unidades
+                </span>
               )}
 
               {isNfcGoogleProd && (

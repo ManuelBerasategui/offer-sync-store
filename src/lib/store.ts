@@ -522,7 +522,20 @@ export function orderedCategories(products: Product[]) {
 }
 
 /** Returns true when the product's category or name matches "Camisetas" (accent-insensitive). */
+/** Unidades que trae cada curva (ej. "CURVA CAMISETAS DE BOCA"). */
+export const CURVA_UNIDADES = 5;
+
+/**
+ * Productos que se venden solo por curva completa: la cantidad del carrito
+ * cuenta curvas y el precio cargado es por curva. Se detectan por nombre.
+ */
+export function isCurva(nombre?: string | null): boolean {
+  return String(nombre ?? "").trim().toLowerCase().startsWith("curva ");
+}
+
 export function isCamiseta(categoria?: string | null, nombre?: string | null): boolean {
+  // Las curvas no usan la escala mayorista de camisetas sueltas
+  if (isCurva(nombre)) return false;
   const normCat = String(categoria ?? "")
     .trim()
     .toLowerCase()
@@ -919,8 +932,13 @@ export function isMate(nombre?: string, categoria?: string): boolean {
   const cat = String(categoria ?? "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
   if (cat === "mates" || cat === "mate") return true;
+
+  // El nombre solo cuenta dentro de Bazar: fuera de ah\u00ed "mate" suele ser un acabado
+  // opaco (ej. "Cera mate x60gr" en Insumos Barber), no un mate.
+  if (cat !== "bazar") return false;
 
   return /(?:^|[\s,;/\-_(])mate(?:[\s,;/\-_)s]|$)/i.test(nom);
 }
@@ -1217,6 +1235,8 @@ export function hasMoq(
 
   const nombre = String(product["nombre"] ?? "");
   const categoria = String(product["categoria"] ?? "");
+  // Curvas: el mínimo es 1 curva, sin compra mínima de categoría
+  if (isCurva(nombre)) return null;
 
   // Blackview BV100: sin compra mínima (anula el mínimo por defecto de Tecnología)
   if (isBlackviewGlasses(nombre)) return null;
@@ -1302,8 +1322,8 @@ export function checkCategoryMins(
   for (const item of items) {
     const mg = item.moq_group ?? null;
 
-    // Blackview BV100: sin compra mínima
-    if (isBlackviewGlasses(item.nombre)) continue;
+    // Blackview BV100 y curvas: sin compra mínima
+    if (isBlackviewGlasses(item.nombre) || isCurva(item.nombre)) continue;
 
     const isNfc = isNfcGoogle(item.nombre);
 

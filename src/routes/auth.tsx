@@ -388,7 +388,7 @@ function AuthPage() {
                   <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
                     {profileForm.transporte === "Vía Cargo"
                       ? "Suc. Vía Cargo más cercana"
-                      : "Suc. Correo Argentino más cercana"}
+                      : "Dirección de Sucursal Correo Argentino más cercana"}
                   </span>
                   <input
                     required
@@ -584,7 +584,7 @@ function AuthPage() {
                     <span className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground">
                       {form.transporte === "Vía Cargo"
                         ? "Suc. Vía Cargo más cercana"
-                        : "Suc. Correo Argentino más cercana"}
+                        : "Dirección de Sucursal Correo Argentino más cercana"}
                     </span>
                     <input
                       required
