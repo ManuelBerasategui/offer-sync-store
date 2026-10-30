@@ -190,10 +190,9 @@ function JerseyProductUI({
     if (href) window.open(href, "_blank", "noopener,noreferrer");
   }
 
-  /** Selecciona el parche y abre WhatsApp para coordinar el modelo deseado */
+  /** Selecciona el parche. WhatsApp se abre solo cuando el cliente toca el botón (abrirlo de una era invasivo) */
   function handleSelectBadgeYes() {
     setBadge("yes");
-    handleBadgeWhatsApp();
   }
 
   /** Arma el mensaje de WhatsApp con todos los datos del pedido */
@@ -458,13 +457,16 @@ function JerseyProductUI({
                 <p className={`text-[11px] font-bold mt-1 ${opt.value === "yes" ? "text-primary" : "text-muted-foreground"}`}>
                   {opt.desc}
                 </p>
+                {opt.value === "yes" && (
+                  <p className="mt-1 text-[10px] font-medium text-muted-foreground">Se define por WhatsApp</p>
+                )}
               </button>
             );
           })}
         </div>
         {badge === "yes" && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            El modelo de parche lo elegimos con vos por WhatsApp.{" "}
+          <p className="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+            💬 El parche se define por WhatsApp: te mostramos los disponibles y confirmamos el precio.{" "}
             <button
               type="button"
               onClick={handleBadgeWhatsApp}
