@@ -24,7 +24,7 @@ export const Route = createFileRoute("/admin/ordenes")({
 });
 
 type Tab = "pagadas" | "reservadas";
-type SubFilter = "all" | "transferencia" | "tarjeta" | "mercadopago";
+type SubFilter = "all" | "transferencia" | "mercadopago";
 
 function AdminOrdenesPage() {
   const { data } = useSuspenseQuery(storeQueryOptions);
@@ -98,9 +98,8 @@ function AdminOrdenesPage() {
   const methodCounts = useMemo(() => {
     const all = activeOrders.length;
     const transfer = activeOrders.filter((o) => (o.metodo_pago ?? "").toLowerCase() === "transferencia").length;
-    const card = activeOrders.filter((o) => (o.metodo_pago ?? "").toLowerCase() === "tarjeta").length;
     const mp = activeOrders.filter((o) => (o.metodo_pago ?? "").toLowerCase() === "mercadopago").length;
-    return { all, transfer, card, mp };
+    return { all, transfer, mp };
   }, [activeOrders]);
 
   // Filtrado en tiempo real por método y búsqueda
@@ -341,17 +340,6 @@ TOTAL: ${money(order.total)}`;
           </button>
           <button
             type="button"
-            onClick={() => setSubFilter("tarjeta")}
-            className={`whitespace-nowrap flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
-              subFilter === "tarjeta"
-                ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                : "bg-surface text-muted-foreground border-border hover:text-foreground hover:bg-muted/50"
-            }`}
-          >
-            💳 Tarjeta ({methodCounts.card})
-          </button>
-          <button
-            type="button"
             onClick={() => setSubFilter("mercadopago")}
             className={`whitespace-nowrap flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all ${
               subFilter === "mercadopago"
@@ -486,7 +474,6 @@ TOTAL: ${money(order.total)}`;
                       {order.metodo_pago && (
                         <span className="flex items-center gap-1 rounded-md bg-surface border border-border px-2 py-0.5 text-[11px] sm:text-xs text-muted-foreground capitalize">
                           {order.metodo_pago === "transferencia" && <Building2 className="h-3 w-3 text-emerald-600" />}
-                          {order.metodo_pago === "tarjeta" && "💳 "}
                           {order.metodo_pago === "mercadopago" && "🔵 "}
                           {order.metodo_pago}
                         </span>
