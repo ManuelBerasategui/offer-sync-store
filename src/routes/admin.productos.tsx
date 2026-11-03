@@ -34,7 +34,7 @@ import {
   type YupooAlbumPreview,
   type GetAdminProductsResult,
 } from "@/lib/products.functions";
-import { type Product, type Banner, money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
+import { type Product, type Banner, money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, productMinUnitsOf, parseProductMinUnits, MAX_PRODUCT_MIN_UNITS, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 import { SafeImage } from "@/components/SafeImage";
 
@@ -73,6 +73,7 @@ const emptyProduct = (): ProductInput => ({
   descuento: "NO",
   whatsapp_only_reason: "",
   moq_group: "",
+  moq_min_units: "",
   color_predeterminado: "",
   imagen_url: "",
   tipo_talles: "NINGUNO",
@@ -126,6 +127,7 @@ function productToInput(p: Product): ProductInput {
     // Fuente única: whatsapp_only_reason. Retrocompat: si es_zapatilla=true y no hay reason, usar "zapatillas"
     whatsapp_only_reason: waOnlyReasonOf(pRec) ?? "",
     moq_group: typeof pRec["moq_group"] === "string" ? pRec["moq_group"] : "",
+    moq_min_units: String(productMinUnitsOf(pRec) ?? ""),
     color_predeterminado: p.color_predeterminado ?? "",
     imagen_url: p.imagen_url ?? "",
     tipo_talles,
@@ -1279,9 +1281,32 @@ function ProductModal({
                 <option value="perfumes arabes">Perfumes Árabes — mín. 5 u.</option>
                 <option value="perfumes disenador">Perfumes Diseñador — mín. 3 u.</option>
               </select>
-              {isMate(form.nombre, form.categoria) && !form.moq_group && (
+              {isMate(form.nombre, form.categoria) && !form.moq_group && !form.moq_min_units && (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
                   ⚠ El nombre sugiere que es un Mate. Confirmá o corregí el mínimo.
+                </p>
+              )}
+            </div>
+            {/* Mínimo propio del producto: reemplaza el mínimo de la categoría */}
+            <div className="flex flex-col gap-1 w-[200px]">
+              <label htmlFor="moq_min_units_input" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Mínimo propio (u.)
+              </label>
+              <input
+                id="moq_min_units_input"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={MAX_PRODUCT_MIN_UNITS}
+                step={1}
+                placeholder="Vacío = usa el de arriba"
+                value={form.moq_min_units ?? ""}
+                onChange={(e) => set("moq_min_units", e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="input-base text-sm py-1.5"
+              />
+              {parseProductMinUnits(form.moq_min_units) && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+                  Solo cuenta este mínimo; se ignora el de la categoría.
                 </p>
               )}
             </div>

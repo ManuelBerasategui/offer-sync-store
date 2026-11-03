@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Banner, Product, ProductVariant } from "@/lib/store";
+import { parseProductMinUnits } from "@/lib/store";
 import { invalidateStoreCache } from "./store.functions";
 import { assertAdmin } from "./admin-auth";
 import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
@@ -69,6 +70,11 @@ export type ProductInput = {
    * ""           -> sin asignacion manual (usa match por categoria)
    */
   moq_group?: string;
+  /**
+   * Mínimo de compra propio del producto (unidades). Si tiene valor, reemplaza
+   * el mínimo de la categoría / moq_group. "" -> sin mínimo propio.
+   */
+  moq_min_units?: string;
   /**
    * Tipo de producto WA-only. Si está presente, oculta compra directa
    * y muestra solo un botón de WhatsApp con texto y mensaje específico.
@@ -321,6 +327,11 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       // Solo omitir si no fue tocado por el admin (undefined).
       if (p.moq_group !== undefined) {
         metadata["moq_group"] = p.moq_group;
+      }
+      // moq_min_units: mínimo propio del producto (entero validado o vacío)
+      if (p.moq_min_units !== undefined) {
+        const ownMin = parseProductMinUnits(p.moq_min_units);
+        metadata["moq_min_units"] = ownMin ? String(ownMin) : "";
       }
       // whatsapp_only_reason: fuente de verdad para flujo WA-only
       if (p.whatsapp_only_reason !== undefined) {

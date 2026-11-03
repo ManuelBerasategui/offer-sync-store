@@ -1211,6 +1211,33 @@ export function moqGroupOf(product: Record<string, unknown>): string | null {
   return null;
 }
 
+/** Tope defensivo para el mínimo propio de un producto. */
+export const MAX_PRODUCT_MIN_UNITS = 100000;
+
+/**
+ * Normaliza un mínimo propio de producto: entero entre 1 y MAX_PRODUCT_MIN_UNITS, o null.
+ */
+export function parseProductMinUnits(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  if (!Number.isInteger(n) || n < 1 || n > MAX_PRODUCT_MIN_UNITS) return null;
+  return n;
+}
+
+/**
+ * Lee el campo `moq_min_units` (mínimo propio del producto) desde el metadata.
+ * Si está presente, reemplaza cualquier mínimo de categoría / moq_group / nombre.
+ */
+export function productMinUnitsOf(product: Record<string, unknown>): number | null {
+  const top = parseProductMinUnits(product["moq_min_units"]);
+  if (top) return top;
+  const meta = product["metadata"];
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    return parseProductMinUnits((meta as Record<string, unknown>)["moq_min_units"]);
+  }
+  return null;
+}
+
 /**
  * Información de MOQ para un producto dado.
  * Retorna null si el producto no tiene MOQ aplicable.
@@ -1225,12 +1252,18 @@ export type MoqInfo = {
   group: string;
   minUnits?: number | undefined;
   minAmount?: number | undefined;
+  /** true si el mínimo es propio del producto (no se combina con otros productos). */
+  perProduct?: boolean | undefined;
 };
 
 export function hasMoq(
   product: Record<string, unknown>,
   catRules: Record<string, CategoryRule>,
 ): MoqInfo | null {
+  // Mínimo propio del producto: prioridad absoluta, ignora categoría y moq_group
+  const ownMin = productMinUnitsOf(product);
+  if (ownMin) return { group: "producto", minUnits: ownMin, perProduct: true };
+
   const mg = moqGroupOf(product);
 
   const nombre = String(product["nombre"] ?? "");
@@ -1305,12 +1338,16 @@ export type CategoryMinViolation = {
  *   - moq_group === "none"    → ítem ignorado para cálculos de MOQ
  *   - moq_group === "<key>"   → se acumula bajo esa clave de regla directamente
  *   - moq_group === "" / null → match por categoría (sin fallback de nombre)
+ *   - moq_min_units > 0       → mínimo propio del producto; se suma solo con ítems del
+ *                               mismo producto (product_id o nombre) e ignora la categoría
  */
 export function checkCategoryMins(
   items: {
     categoria?: string | undefined;
     nombre?: string | undefined;
     moq_group?: string | null | undefined;
+    moq_min_units?: number | null | undefined;
+    product_id?: string | null | undefined;
     qty: number;
     unitPrice: number;
   }[],
@@ -1318,8 +1355,18 @@ export function checkCategoryMins(
 ): CategoryMinViolation[] {
   const catUnits: Record<string, number> = {};
   const catAmount: Record<string, number> = {};
+  const ownMins = new Map<string, { nombre: string; min: number; units: number }>();
 
   for (const item of items) {
+    const ownMin = parseProductMinUnits(item.moq_min_units);
+    if (ownMin) {
+      const key = item.product_id ? `id:${item.product_id}` : `nombre:${item.nombre ?? ""}`;
+      const entry = ownMins.get(key) ?? { nombre: item.nombre ?? "este producto", min: ownMin, units: 0 };
+      entry.units += item.qty;
+      ownMins.set(key, entry);
+      continue;
+    }
+
     const mg = item.moq_group ?? null;
 
     // Blackview BV100 y curvas: sin compra mínima
@@ -1406,6 +1453,11 @@ export function checkCategoryMins(
     const amount = catAmount[key] ?? 0;
     if (rule.minAmount && amount < rule.minAmount) {
       violations.push({ category: display, type: "amount", min: rule.minAmount, current: amount });
+    }
+  }
+  for (const { nombre, min, units } of ownMins.values()) {
+    if (units > 0 && units < min) {
+      violations.push({ category: nombre, type: "units", min, current: units });
     }
   }
   return violations;

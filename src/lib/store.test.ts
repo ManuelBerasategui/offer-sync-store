@@ -6,6 +6,8 @@ import {
   hasMoq,
   moqGroupOf,
   meetsMoq,
+  productMinUnitsOf,
+  parseProductMinUnits,
   type MoqInfo,
   sanitizeImageUrl,
   galleryImages,
@@ -942,5 +944,66 @@ describe("rankBestSellers (home y catálogo usan el mismo ranking)", () => {
     const { ranked, topCount } = rankBestSellers(products);
     expect(ranked.slice(0, HOME_BEST_SELLERS).map((p) => p.id)).toEqual(["b", "a", "c"]);
     expect(topCount).toBe(3);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   Mínimo propio por producto (moq_min_units)
+══════════════════════════════════════════════════════════════════ */
+describe("mínimo propio por producto (moq_min_units)", () => {
+  const rules = makeRules();
+  const aspiradora = "Mini Aspiradora de Polvo Portátil de Mano YT-M2041 / 4 en 1 / Recargable USB - Negro";
+
+  it("parseProductMinUnits acepta enteros positivos y rechaza el resto", () => {
+    expect(parseProductMinUnits("15")).toBe(15);
+    expect(parseProductMinUnits(15)).toBe(15);
+    expect(parseProductMinUnits("")).toBeNull();
+    expect(parseProductMinUnits("0")).toBeNull();
+    expect(parseProductMinUnits("-3")).toBeNull();
+    expect(parseProductMinUnits("2.5")).toBeNull();
+    expect(parseProductMinUnits("abc")).toBeNull();
+    expect(parseProductMinUnits("999999")).toBeNull();
+  });
+
+  it("productMinUnitsOf lee de metadata o top-level", () => {
+    expect(productMinUnitsOf({ metadata: { moq_min_units: "15" } })).toBe(15);
+    expect(productMinUnitsOf({ moq_min_units: "15" })).toBe(15);
+    expect(productMinUnitsOf({ metadata: { moq_min_units: "" } })).toBeNull();
+  });
+
+  it("hasMoq usa el mínimo propio e ignora la categoría", () => {
+    const prod = { nombre: aspiradora, categoria: "Tecnología", metadata: { moq_min_units: "15" } };
+    expect(hasMoq(prod, rules)).toEqual({ group: "producto", minUnits: 15, perProduct: true });
+  });
+
+  it("el mínimo propio gana aunque moq_group sea 'none'", () => {
+    const prod = { nombre: "X", categoria: "Bazar", metadata: { moq_group: "none", moq_min_units: "15" } };
+    expect(hasMoq(prod, rules)?.minUnits).toBe(15);
+  });
+
+  it("checkCategoryMins: 14 u. → violación de 15; 15 u. → ok", () => {
+    const base = { nombre: aspiradora, categoria: "Tecnología", moq_min_units: 15, product_id: "a1", unitPrice: 100 };
+    const v = checkCategoryMins([{ ...base, qty: 14 }], rules);
+    expect(v).toEqual([{ category: aspiradora, type: "units", min: 15, current: 14 }]);
+    expect(checkCategoryMins([{ ...base, qty: 15 }], rules)).toHaveLength(0);
+  });
+
+  it("checkCategoryMins: no se suma con otros productos de la categoría", () => {
+    const items = [
+      { nombre: aspiradora, categoria: "Tecnología", moq_min_units: 15, product_id: "a1", qty: 15, unitPrice: 100 },
+      item("Auriculares", "Tecnología", 1),
+    ];
+    const v = checkCategoryMins(items, rules);
+    expect(v.some((x) => x.category === aspiradora)).toBe(false);
+    // Los auriculares siguen con el mínimo de su categoría, sin sumar las 15 aspiradoras
+    expect(v.find((x) => normCat(x.category) === "tecnologia")?.current).toBe(1);
+  });
+
+  it("checkCategoryMins: variantes del mismo producto se suman", () => {
+    const items = [
+      { nombre: aspiradora, moq_min_units: 15, product_id: "a1", qty: 8, unitPrice: 100 },
+      { nombre: aspiradora + " - Blanco", moq_min_units: 15, product_id: "a1", qty: 7, unitPrice: 100 },
+    ];
+    expect(checkCategoryMins(items, rules)).toHaveLength(0);
   });
 });

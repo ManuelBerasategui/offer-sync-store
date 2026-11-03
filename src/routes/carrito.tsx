@@ -18,6 +18,7 @@ import {
   isSuplemento,
   isMate,
   moqGroupOf,
+  productMinUnitsOf,
   findProduct,
   money,
   priceOf,
@@ -251,7 +252,9 @@ function CarritoPage() {
         ? findProduct(products, i.productId)
         : (findProduct(products, i.id) ?? findProduct(products, i.nombre));
       const moq_group = prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined;
-      return { nombre: i.nombre, categoria: i.categoria, moq_group, qty: i.qty, unitPrice: i.unitPrice };
+      const moq_min_units = prod ? productMinUnitsOf(prod as Record<string, unknown>) : null;
+      const product_id = prod?.id != null ? String(prod.id) : null;
+      return { nombre: i.nombre, categoria: i.categoria, moq_group, moq_min_units, product_id, qty: i.qty, unitPrice: i.unitPrice };
     }),
     catRules,
   ).filter((v) => normCat(v.category) !== normCat("Suplementos"));

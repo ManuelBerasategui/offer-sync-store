@@ -33,6 +33,7 @@ import {
   isMate,
   hasMoq,
   moqGroupOf,
+  productMinUnitsOf,
   meetsMoq,
   waOnlyReasonOf,
   stripTrailingColor,
@@ -1171,6 +1172,7 @@ function ProductoPage() {
     );
   }, [cart.items, cartItem.id, product.id, selectedVariant?.id, displayNameWithTalle, displayName]);
 
+  const ownMinUnits = productMinUnitsOf(product as Record<string, unknown>);
   const hasSyncedCartQty = useRef(false);
   useEffect(() => {
     if (existingInCart && existingInCart.qty > 0 && !hasSyncedCartQty.current) {
@@ -1180,24 +1182,33 @@ function ProductoPage() {
       if (![1, 3, 5, 10].includes(existingInCart.qty)) {
         setCustom(true);
       }
+    } else if (!hasSyncedCartQty.current && ownMinUnits) {
+      // Mínimo propio del producto: arrancar ya en el mínimo
+      hasSyncedCartQty.current = true;
+      setQty(ownMinUnits);
+      setQtyStr(String(ownMinUnits));
+      if (![1, 3, 5, 10].includes(ownMinUnits)) setCustom(true);
     } else if (!hasSyncedCartQty.current && isNfcGoogleProduct) {
       hasSyncedCartQty.current = true;
       setQty(50);
       setQtyStr("50");
       setCustom(true);
     }
-  }, [existingInCart, isNfcGoogleProduct]);
+  }, [existingInCart, isNfcGoogleProduct, ownMinUnits]);
 
   const suplemento = isSuplemento(product.categoria);
   const categoryMinViolation = checkCategoryMins(
     [{ nombre: product.nombre, categoria: product.categoria,
        moq_group: moqGroupOf(product as Record<string, unknown>) ?? undefined,
+       moq_min_units: productMinUnitsOf(product as Record<string, unknown>),
        qty, unitPrice: unit }],
     catRules,
   )[0];
   const bloqueaCompra = (suplemento && total < SUPLEMENTOS_MIN) || Boolean(categoryMinViolation);
   const minDialogTitle = categoryMinViolation
-    ? `Compra mínima de ${categoryMinViolation.category}`
+    ? productMinUnitsOf(product as Record<string, unknown>)
+      ? "Compra mínima de este producto"
+      : `Compra mínima de ${categoryMinViolation.category}`
     : "Compra mínima de suplementos";
   const minDialogDescription = categoryMinViolation
     ? `Llevás ${categoryMinViolation.current} unidad${categoryMinViolation.current !== 1 ? "es" : ""}. Te faltan ${categoryMinViolation.min - categoryMinViolation.current} para alcanzar el mínimo de ${categoryMinViolation.min}.`
@@ -1311,12 +1322,15 @@ function ProductoPage() {
 
                   if (moqDisplay?.minUnits) {
                     const groupLabel =
-                      moqDisplay.group === "nfc_google"
+                      moqDisplay.perProduct
+                        ? "este producto"
+                        : moqDisplay.group === "nfc_google"
                         ? "NFC Google"
                         : moqDisplay.group.charAt(0).toUpperCase() + moqDisplay.group.slice(1);
                     const minText = `${moqDisplay.minUnits} unidades`;
-                    const mixMsg =
-                      moqDisplay.group === "nfc_google"
+                    const mixMsg = moqDisplay.perProduct
+                      ? `Este producto requiere una compra mínima de ${moqDisplay.minUnits} unidades.`
+                      : moqDisplay.group === "nfc_google"
                         ? "Este producto requiere una compra mínima de 50 unidades."
                         : moqDisplay.group === "mates"
                         ? "Podés combinar distintos modelos de Mates en tu carrito hasta alcanzar el mínimo."
@@ -1746,7 +1760,7 @@ function ProductoPage() {
                     {moqInfo && !moqMet && moqInfo.minUnits && (
                       <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs">
                         <p className="font-bold text-amber-700 dark:text-amber-400">
-                          Compra mínima de {moqInfo.group === "nfc_google" ? "NFC Google" : moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
+                          Compra mínima de {moqInfo.perProduct ? "este producto" : moqInfo.group === "nfc_google" ? "NFC Google" : moqInfo.group.charAt(0).toUpperCase() + moqInfo.group.slice(1)}
                         </p>
                         <p className="mt-0.5 text-muted-foreground">
                           Llevás {qty} unidad{qty !== 1 ? "es" : ""}. Te falta{moqMissing !== 1 ? "n" : ""}

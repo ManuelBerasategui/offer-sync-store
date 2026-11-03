@@ -22,6 +22,7 @@ import {
   isNfcGoogle,
   isSuplemento,
   moqGroupOf,
+  productMinUnitsOf,
   normCat,
   parseCategoryRules,
   parseJerseyItem,
@@ -314,6 +315,8 @@ export async function priceOrderItems(
         nombre: prod?.nombre ?? item.nombre,
         categoria: prod?.categoria ?? "",
         moq_group: prod ? (moqGroupOf(prod as Record<string, unknown>) ?? undefined) : undefined,
+        moq_min_units: prod ? productMinUnitsOf(prod as Record<string, unknown>) : null,
+        product_id: prod?.id != null ? String(prod.id) : null,
         qty: item.qty,
         unitPrice: validatedItems[idx]!.unitPrice,
       };
