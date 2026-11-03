@@ -976,6 +976,15 @@ describe("mínimo propio por producto (moq_min_units)", () => {
     expect(productMinUnitsOf({ metadata: { moq_min_units: "" } })).toBeNull();
   });
 
+  it("la Aspiradora YT-M2041 tiene 15 u. por defecto aunque la base no lo tenga cargado", () => {
+    const prod = { nombre: aspiradora, categoria: "Tecnología", metadata: { moq_group: "" } };
+    expect(productMinUnitsOf(prod)).toBe(15);
+    expect(hasMoq(prod, rules)?.minUnits).toBe(15);
+    // Un valor guardado desde el panel manda, incluso vacío
+    expect(productMinUnitsOf({ ...prod, metadata: { moq_min_units: "20" } })).toBe(20);
+    expect(productMinUnitsOf({ ...prod, metadata: { moq_min_units: "" } })).toBeNull();
+  });
+
   it("hasMoq usa el mínimo propio e ignora la categoría", () => {
     const prod = { nombre: aspiradora, categoria: "Tecnología", metadata: { moq_min_units: "15" } };
     expect(hasMoq(prod, rules)).toEqual({ group: "producto", minUnits: 15, perProduct: true });

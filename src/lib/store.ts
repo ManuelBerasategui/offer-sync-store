@@ -1294,15 +1294,21 @@ export function parseProductMinUnits(value: unknown): number | null {
 /**
  * Lee el campo `moq_min_units` (mínimo propio del producto) desde el metadata.
  * Si está presente, reemplaza cualquier mínimo de categoría / moq_group / nombre.
+ * Si el producto nunca lo tuvo cargado, la Aspiradora YT-M2041 usa 15 u. por defecto
+ * (un valor guardado desde el panel, incluso vacío, tiene prioridad).
  */
+export const ASPIRADORA_YT_M2041_MIN_UNITS = 15;
+
 export function productMinUnitsOf(product: Record<string, unknown>): number | null {
-  const top = parseProductMinUnits(product["moq_min_units"]);
-  if (top) return top;
   const meta = product["metadata"];
-  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
-    return parseProductMinUnits((meta as Record<string, unknown>)["moq_min_units"]);
+  const metaRec =
+    meta && typeof meta === "object" && !Array.isArray(meta) ? (meta as Record<string, unknown>) : null;
+  const raw =
+    product["moq_min_units"] !== undefined ? product["moq_min_units"] : metaRec?.["moq_min_units"];
+  if (raw === undefined || raw === null) {
+    return isAspiradoraYtM2041(String(product["nombre"] ?? "")) ? ASPIRADORA_YT_M2041_MIN_UNITS : null;
   }
-  return null;
+  return parseProductMinUnits(raw);
 }
 
 /**
