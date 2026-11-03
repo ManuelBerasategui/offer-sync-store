@@ -7,6 +7,9 @@ import {
   moqGroupOf,
   meetsMoq,
   productMinUnitsOf,
+  isAspiradoraYtM2041,
+  noQtyDiscountAtAll,
+  excludedFromQtyDiscount,
   parseProductMinUnits,
   type MoqInfo,
   sanitizeImageUrl,
@@ -1005,5 +1008,27 @@ describe("mínimo propio por producto (moq_min_units)", () => {
       { nombre: aspiradora + " - Blanco", moq_min_units: 15, product_id: "a1", qty: 7, unitPrice: 100 },
     ];
     expect(checkCategoryMins(items, rules)).toHaveLength(0);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   Aspiradora YT-M2041: sin descuentos por cantidad
+══════════════════════════════════════════════════════════════════ */
+describe("Aspiradora YT-M2041 — sin descuentos por cantidad", () => {
+  const nombre = "Mini Aspiradora de Polvo Portátil de Mano YT-M2041 / 4 en 1 / Recargable USB - Negro";
+
+  it("se detecta por modelo, con o sin guion", () => {
+    expect(isAspiradoraYtM2041(nombre)).toBe(true);
+    expect(isAspiradoraYtM2041("Aspiradora YTM2041 Blanca")).toBe(true);
+    expect(isAspiradoraYtM2041("Aspiradora YT-M2040")).toBe(false);
+    expect(noQtyDiscountAtAll(nombre)).toBe(true);
+    expect(excludedFromQtyDiscount(nombre)).toBe(true);
+  });
+
+  it("no tiene tramos propios ni el 12% global de 20+ u.", () => {
+    const p = { nombre, descuento: "SI", "5 unidades": "5%", "10 unidades": "10%" } as unknown as Product;
+    expect(tiersOf(p)).toEqual([]);
+    expect(discountFor(p, 5)).toBe(0);
+    expect(discountFor(p, 50)).toBe(0);
   });
 });

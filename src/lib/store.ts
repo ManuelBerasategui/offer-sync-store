@@ -756,9 +756,25 @@ export function isBlackviewGlasses(nombre?: string): boolean {
 export const BLACKVIEW_TIER_UNITS = 3;
 export const BLACKVIEW_TIER_USD = 100;
 
+/**
+ * Detecta la "Mini Aspiradora YT-M2041". Producto sin ningún descuento por cantidad
+ * (ni individual, ni por categoría, ni global de 20+ u.).
+ */
+export function isAspiradoraYtM2041(nombre?: string): boolean {
+  const nom = String(nombre ?? "")
+    .toLowerCase()
+    .replace(/[\s-]+/g, "");
+  return nom.includes("ytm2041");
+}
+
+/** Productos que se cobran siempre a precio base: sin ningún descuento por cantidad. */
+export function noQtyDiscountAtAll(nombre?: string): boolean {
+  return isNfcGoogle(nombre) || isAspiradoraYtM2041(nombre);
+}
+
 /** Productos que quedan fuera de todo descuento porcentual por cantidad. */
 export function excludedFromQtyDiscount(nombre?: string): boolean {
-  return isNfcGoogle(nombre) || isBlackviewGlasses(nombre);
+  return noQtyDiscountAtAll(nombre) || isBlackviewGlasses(nombre);
 }
 
 /**

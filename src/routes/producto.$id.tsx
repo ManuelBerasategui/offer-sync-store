@@ -62,6 +62,8 @@ import {
   CURVA_UNIDADES,
   isLongSleeve,
   isNfcGoogle,
+  noQtyDiscountAtAll,
+  excludedFromQtyDiscount,
   isBlackviewGlasses,
   blackviewUnitPrice,
   BLACKVIEW_TIER_UNITS,
@@ -1124,7 +1126,7 @@ function ProductoPage() {
   // NFC Google no aplica ningún descuento por cantidad (ni por categoría ni global).
   const isNfcGoogleProduct = isNfcGoogle(product.nombre);
   const categoryPercent =
-    !isNfcGoogleProduct && !isBlackviewGlasses(product.nombre) && categoryRuleMatch?.rule.discountTiers?.length
+    !excludedFromQtyDiscount(product.nombre) && categoryRuleMatch?.rule.discountTiers?.length
       ? categoryDiscountForUnits(
           categoryRuleMatch.rule.discountTiers,
           qty,
@@ -1420,8 +1422,8 @@ function ProductoPage() {
 
                 {/* AVISO DE DESCUENTOS POR CANTIDAD (Categoría o Producto) */}
                 {(() => {
-                  // NFC Google: nunca mostrar descuentos por cantidad
-                  if (isNfcGoogleProduct) return null;
+                  // NFC Google / Aspiradora YT-M2041: nunca mostrar descuentos por cantidad
+                  if (noQtyDiscountAtAll(product.nombre)) return null;
 
                   // Blackview BV100: aviso del precio fijo a partir de 3 unidades
                   if (isBlackviewProduct) {

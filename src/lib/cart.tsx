@@ -16,7 +16,7 @@ import {
   normCat,
   isCamiseta,
   isLongSleeve,
-  isNfcGoogle,
+  noQtyDiscountAtAll,
   isBlackviewGlasses,
   excludedFromQtyDiscount,
   blackviewUnitPrice,
@@ -327,8 +327,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return { ...item, basePrice: rBase, unitPrice: bvUnit };
       }
 
-      // NFC Google: sin descuento por cantidad bajo ningún concepto
-      if (isNfcGoogle(item.nombre) || isNfcGoogle(product.nombre)) {
+      // NFC Google / Aspiradora YT-M2041: sin descuento por cantidad bajo ningún concepto
+      if (noQtyDiscountAtAll(item.nombre) || noQtyDiscountAtAll(product.nombre)) {
         if (item.unitPrice === rBase && item.basePrice === rBase) {
           return item;
         }

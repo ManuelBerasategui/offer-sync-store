@@ -19,7 +19,8 @@ import {
   isCamiseta,
   isHiddenCategory,
   isLongSleeve,
-  isNfcGoogle,
+  noQtyDiscountAtAll,
+  excludedFromQtyDiscount,
   isSuplemento,
   moqGroupOf,
   productMinUnitsOf,
@@ -194,7 +195,7 @@ export async function priceOrderItems(
     for (const item of rawItems) {
       const { prod } = resolve(item);
       if (!prod) continue;
-      if (isNfcGoogle(prod.nombre) || isBlackviewGlasses(prod.nombre)) continue;
+      if (excludedFromQtyDiscount(prod.nombre)) continue;
       const catNorm = normCat(prod.categoria ?? "");
       if (!catNorm) continue;
       const key = findRuleForCat(catNorm, catRules)?.key ?? catNorm;
@@ -271,8 +272,8 @@ export async function priceOrderItems(
         if (isBlackviewGlasses(prod.nombre)) {
           // Blackview BV100: precio fijo desde 3 unidades, sin otros descuentos
           unitPrice = blackviewUnitPrice(base, item.qty, usdRate);
-        } else if (isNfcGoogle(prod.nombre)) {
-          // NFC Google: sin descuento por cantidad
+        } else if (noQtyDiscountAtAll(prod.nombre)) {
+          // NFC Google / Aspiradora YT-M2041: sin descuento por cantidad
           unitPrice = base;
         } else {
           const catNorm = normCat(prod.categoria ?? "");
