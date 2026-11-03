@@ -34,7 +34,7 @@ import {
   type YupooAlbumPreview,
   type GetAdminProductsResult,
 } from "@/lib/products.functions";
-import { type Product, type Banner, money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, productMinUnitsOf, parseProductMinUnits, MAX_PRODUCT_MIN_UNITS, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
+import { type Product, type Banner, money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, productMinUnitsOf, qtyDiscountModeOf, isNfcGoogle, isBlackviewGlasses, parseProductMinUnits, MAX_PRODUCT_MIN_UNITS, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 import { SafeImage } from "@/components/SafeImage";
 
@@ -74,6 +74,7 @@ const emptyProduct = (): ProductInput => ({
   whatsapp_only_reason: "",
   moq_group: "",
   moq_min_units: "",
+  qty_discount_mode: "auto",
   color_predeterminado: "",
   imagen_url: "",
   tipo_talles: "NINGUNO",
@@ -128,6 +129,7 @@ function productToInput(p: Product): ProductInput {
     whatsapp_only_reason: waOnlyReasonOf(pRec) ?? "",
     moq_group: typeof pRec["moq_group"] === "string" ? pRec["moq_group"] : "",
     moq_min_units: String(productMinUnitsOf(pRec) ?? ""),
+    qty_discount_mode: qtyDiscountModeOf(pRec),
     color_predeterminado: p.color_predeterminado ?? "",
     imagen_url: p.imagen_url ?? "",
     tipo_talles,
@@ -1334,16 +1336,44 @@ function ProductModal({
                 <span className="text-sm font-bold text-foreground">Descuento por cantidad</span>
                 <p className="text-xs text-muted-foreground">Configurá escalas de descuento progresivas.</p>
               </div>
-              <button
-                type="button"
-                onClick={addTier}
-                className="btn-base bg-primary/10 text-primary hover:bg-primary/20 text-xs py-1 px-2.5 flex items-center gap-1"
-              >
-                <Plus className="h-3.5 w-3.5" /> Agregar escala
-              </button>
+              {form.qty_discount_mode !== "none" && (
+                <button
+                  type="button"
+                  onClick={addTier}
+                  className="btn-base bg-primary/10 text-primary hover:bg-primary/20 text-xs py-1 px-2.5 flex items-center gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Agregar escala
+                </button>
+              )}
             </div>
 
-            {form.tiers && form.tiers.length > 0 ? (
+            <div className="mb-3 flex flex-col gap-1">
+              <label htmlFor="qty_discount_mode_selector" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Qué descuentos aplica
+              </label>
+              <select
+                id="qty_discount_mode_selector"
+                value={form.qty_discount_mode || "auto"}
+                onChange={(e) => set("qty_discount_mode", e.target.value)}
+                disabled={isNfcGoogle(form.nombre) || isBlackviewGlasses(form.nombre)}
+                className="input-base text-sm py-1.5 max-w-[420px]"
+              >
+                <option value="auto">Automático: los de la categoría + 12% desde 20 u.</option>
+                <option value="custom">Solo las escalas de este producto</option>
+                <option value="none">Sin descuentos por cantidad</option>
+              </select>
+              <p className="text-[11px] text-muted-foreground">
+                {isNfcGoogle(form.nombre) || isBlackviewGlasses(form.nombre)
+                  ? "Este producto tiene su propia regla de precio y no usa descuentos por cantidad."
+                  : form.qty_discount_mode === "none"
+                  ? "Se cobra siempre a precio de lista, lleve las unidades que lleve."
+                  : form.qty_discount_mode === "custom"
+                  ? "Solo cuentan las escalas de abajo (sin las de la categoría ni el 12% desde 20 u.)."
+                  : "Si la categoría tiene escalas, se usan esas; si no, las de abajo. Siempre suma el 12% desde 20 u."}
+              </p>
+            </div>
+
+            {form.qty_discount_mode === "none" ? null : form.tiers && form.tiers.length > 0 ? (
               <div className="space-y-2">
                 {form.tiers.map((tier, idx) => (
                   <div key={idx} className="flex items-center gap-2">

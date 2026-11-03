@@ -24,6 +24,7 @@ import {
   isLongSleeve,
   isNfcGoogle,
   excludedFromQtyDiscount,
+  qtyDiscountModeOf,
   findRuleForCat,
   normCat,
   parseCategoryRules,
@@ -64,16 +65,25 @@ export function ProductCard({
   const hidePrice = isWaPriceHidden || basePrice <= 0 || isNaN(basePrice);
   // Igual que la ficha, el carrito y el cobro: si la categoría tiene tramos propios,
   // reemplazan a los tramos individuales guardados en el producto.
-  const catRule = config ? findRuleForCat(normCat(p.categoria ?? ""), parseCategoryRules(config)) : undefined;
+  // Modo "custom" solo usa los tramos del producto; "none" no muestra descuento.
+  const discountMode = qtyDiscountModeOf(p as Record<string, unknown>);
+  const catRule = config && discountMode === "auto"
+    ? findRuleForCat(normCat(p.categoria ?? ""), parseCategoryRules(config))
+    : undefined;
   const tiers = catRule?.rule.discountTiers?.length
     ? [...catRule.rule.discountTiers].sort((a, b) => a.units - b.units)
     : tiersOf(p);
   const maxTier = tiers.length > 0 ? tiers[tiers.length - 1] : null;
-  // El tercer tramo global (20+ u → 12%) aplica a TODOS los productos con precio.
-  // maxPercent es 12 como mínimo universal; más si hay tiers propios por encima de 12%.
+  // En modo "auto" el tercer tramo global (20+ u → 12%) aplica a todos los productos con precio:
+  // maxPercent es 12 como mínimo; más si hay tiers por encima de 12%.
   // NFC Google: sin descuento por cantidad; no mostrar badge de descuento mayorista
   const isNfcGoogleProd = isNfcGoogle(p.nombre);
-  const maxPercent = (!hidePrice && !consultar && !excludedFromQtyDiscount(p.nombre)) ? Math.max(maxTier?.percent ?? 12, 12) : null;
+  const maxQtyPercent =
+    discountMode === "auto" ? Math.max(maxTier?.percent ?? 12, 12) : (maxTier?.percent ?? 0);
+  const maxPercent =
+    !hidePrice && !consultar && !excludedFromQtyDiscount(p.nombre) && discountMode !== "none" && maxQtyPercent > 0
+      ? maxQtyPercent
+      : null;
 
   const discPct = transferDiscountPct(config);
   const tPrice = transferPrice(basePrice, discPct);

@@ -22,7 +22,6 @@ import {
   FALLBACK_IMAGE,
   SUPLEMENTOS_MIN,
   SUPLEMENTOS_MSG,
-  discountFor,
   findProduct,
   imageUrl,
   thumbnailUrl,
@@ -47,7 +46,6 @@ import {
   originalPriceOf,
   offerDiscountPct,
   tiersOf,
-  unitPriceFor,
   waLink,
   sanitizeUrl,
   normCat,
@@ -55,15 +53,14 @@ import {
   findRuleForCat,
   transferPrice,
   transferDiscountPct,
-  categoryDiscountForUnits,
   checkCategoryMins,
   isCamiseta,
   isCurva,
   CURVA_UNIDADES,
   isLongSleeve,
   isNfcGoogle,
-  noQtyDiscountAtAll,
-  excludedFromQtyDiscount,
+  productQtyDiscountPct,
+  qtyDiscountModeOf,
   isBlackviewGlasses,
   blackviewUnitPrice,
   BLACKVIEW_TIER_UNITS,
@@ -1119,20 +1116,11 @@ function ProductoPage() {
   const displayNameWithTalle = selectedTalle ? `${displayName} (Talle: ${selectedTalle})` : displayName;
   const selectedImage = selectedVariant?.imagen_url || product.imagen_url;
   const catRules = useMemo(() => parseCategoryRules(config), [config]);
-  const categoryRuleMatch = useMemo(() => {
-    const category = normCat(product.categoria ?? "");
-    return category ? findRuleForCat(category, catRules) : undefined;
-  }, [product.categoria, catRules]);
   // NFC Google no aplica ningún descuento por cantidad (ni por categoría ni global).
   const isNfcGoogleProduct = isNfcGoogle(product.nombre);
-  const categoryPercent =
-    !excludedFromQtyDiscount(product.nombre) && categoryRuleMatch?.rule.discountTiers?.length
-      ? categoryDiscountForUnits(
-          categoryRuleMatch.rule.discountTiers,
-          qty,
-          isNfcGoogleProduct, // noGlobal12 = true para NFC Google (nunca se llega aquí, pero defensivo)
-        )
-      : 0;
+  // Mismo cálculo que el carrito y el cobro: respeta el modo de descuento del producto
+  // ("auto" = categoría + 12% global, "custom" = solo sus tramos, "none" = sin descuento).
+  const qtyPercent = productQtyDiscountPct(product, qty, catRules, () => qty);
   // Blackview BV100: precio fijo (US$100 + 7%) desde 3 unidades, sin descuentos porcentuales.
   const isBlackviewProduct = isBlackviewGlasses(product.nombre);
   const blackviewUnit = isBlackviewProduct
@@ -1141,13 +1129,11 @@ function ProductoPage() {
   const percent =
     blackviewUnit !== null
       ? basePrice > 0 ? Math.round((1 - blackviewUnit / basePrice) * 100) : 0
-      : categoryPercent || discountFor(product, qty);
+      : qtyPercent;
   const unit =
     blackviewUnit !== null
       ? blackviewUnit
-      : categoryPercent > 0
-      ? Math.round(basePrice * (1 - categoryPercent / 100))
-      : unitPriceFor(product, qty, basePrice);
+      : Math.round(basePrice * (1 - qtyPercent / 100));
   const total = unit * qty;
 
   const cartItem = {
@@ -1422,8 +1408,9 @@ function ProductoPage() {
 
                 {/* AVISO DE DESCUENTOS POR CANTIDAD (Categoría o Producto) */}
                 {(() => {
-                  // NFC Google / Aspiradora YT-M2041: nunca mostrar descuentos por cantidad
-                  if (noQtyDiscountAtAll(product.nombre)) return null;
+                  // Modo "none" (NFC Google, Aspiradora YT-M2041 o elegido en el panel): sin aviso
+                  const discountMode = qtyDiscountModeOf(product as Record<string, unknown>);
+                  if (discountMode === "none") return null;
 
                   // Blackview BV100: aviso del precio fijo a partir de 3 unidades
                   if (isBlackviewProduct) {
@@ -1446,7 +1433,7 @@ function ProductoPage() {
                   const ruleMatch = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
                   const rule = ruleMatch?.rule;
 
-                  if (rule?.discountTiers?.length && ruleMatch) {
+                  if (discountMode === "auto" && rule?.discountTiers?.length && ruleMatch) {
                     const categoryName = ruleMatch.key.charAt(0).toUpperCase() + ruleMatch.key.slice(1);
                     const allTiers = rule.discountTiers.some(t => t.units >= 20)
                       ? rule.discountTiers

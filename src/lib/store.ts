@@ -767,14 +767,13 @@ export function isAspiradoraYtM2041(nombre?: string): boolean {
   return nom.includes("ytm2041");
 }
 
-/** Productos que se cobran siempre a precio base: sin ningún descuento por cantidad. */
-export function noQtyDiscountAtAll(nombre?: string): boolean {
-  return isNfcGoogle(nombre) || isAspiradoraYtM2041(nombre);
-}
-
-/** Productos que quedan fuera de todo descuento porcentual por cantidad. */
+/**
+ * Productos que quedan fuera de todo descuento porcentual por cantidad, sin importar lo que
+ * se elija en el panel. (La Aspiradora YT-M2041 no está acá: arranca en modo "none" pero
+ * se puede cambiar desde el panel, ver qtyDiscountModeOf.)
+ */
 export function excludedFromQtyDiscount(nombre?: string): boolean {
-  return noQtyDiscountAtAll(nombre) || isBlackviewGlasses(nombre);
+  return isNfcGoogle(nombre) || isBlackviewGlasses(nombre);
 }
 
 /**
@@ -788,9 +787,60 @@ export function blackviewUnitPrice(basePrice: number, qty: number, usdRate: numb
   return basePrice > 0 ? Math.min(basePrice, tierArs) : tierArs;
 }
 
+/**
+ * Modo de descuento por cantidad de un producto (metadata.qty_discount_mode):
+ *   "auto"   → tramos de la categoría (o los del producto si la categoría no tiene) + 12% global 20+ u.
+ *   "none"   → sin ningún descuento por cantidad
+ *   "custom" → solo los tramos propios del producto (sin categoría ni 12% global)
+ * NFC Google es siempre "none". Sin valor explícito: Aspiradora YT-M2041 → "none"; el resto → "auto".
+ */
+export type QtyDiscountMode = "auto" | "none" | "custom";
+
+export function qtyDiscountModeOf(p: Record<string, unknown>): QtyDiscountMode {
+  const read = (v: unknown): QtyDiscountMode | null =>
+    v === "auto" || v === "none" || v === "custom" ? v : null;
+  const meta = p["metadata"];
+  const explicit =
+    read(p["qty_discount_mode"]) ??
+    (meta && typeof meta === "object" && !Array.isArray(meta)
+      ? read((meta as Record<string, unknown>)["qty_discount_mode"])
+      : null);
+  const nombre = String(p["nombre"] ?? "");
+  if (isNfcGoogle(nombre)) return "none";
+  if (explicit) return explicit;
+  return isAspiradoraYtM2041(nombre) ? "none" : "auto";
+}
+
+/** ¿Las unidades de este producto suman (y reciben) el descuento de su categoría? */
+export function usesCategoryQtyDiscount(p: Product): boolean {
+  return !excludedFromQtyDiscount(p.nombre) && qtyDiscountModeOf(p as Record<string, unknown>) === "auto";
+}
+
+/**
+ * Porcentaje de descuento por cantidad de un producto (no aplica a camisetas ni Blackview,
+ * que tienen su propio precio). `catUnits` = unidades acumuladas de la categoría.
+ */
+export function productQtyDiscountPct(
+  p: Product,
+  qty: number,
+  catRules: Record<string, CategoryRule>,
+  catUnits: (ruleKey: string) => number,
+): number {
+  if (excludedFromQtyDiscount(p.nombre)) return 0;
+  if (qtyDiscountModeOf(p as Record<string, unknown>) === "auto") {
+    const catNorm = normCat(p.categoria ?? "");
+    const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
+    if (match?.rule.discountTiers?.length) {
+      return categoryDiscountForUnits(match.rule.discountTiers, catUnits(match.key));
+    }
+  }
+  return discountFor(p, qty);
+}
+
 export function tiersOf(p: Product): Tier[] {
-  // NFC Google / Blackview no tienen descuentos por cantidad individuales
+  // NFC Google / Blackview y productos en modo "none" no tienen descuentos por cantidad
   if (excludedFromQtyDiscount(p.nombre)) return [];
+  if (qtyDiscountModeOf(p as Record<string, unknown>) === "none") return [];
   if (!isYes(p.descuento)) return [];
   const tiers: Tier[] = [];
   for (const [key, value] of Object.entries(p)) {
@@ -809,13 +859,14 @@ export function tiersOf(p: Product): Tier[] {
 }
 
 export function discountFor(p: Product, qty: number) {
-  // NFC Google / Blackview: sin descuento porcentual por cantidad
-  if (excludedFromQtyDiscount(p.nombre)) return 0;
+  // Blackview / modo "none": sin descuento porcentual por cantidad
+  const mode = qtyDiscountModeOf(p as Record<string, unknown>);
+  if (excludedFromQtyDiscount(p.nombre) || mode === "none") return 0;
   const tiers = tiersOf(p);
   let percent = 0;
   for (const t of tiers) if (qty >= t.units) percent = t.percent;
-  // Tercer tramo global: 20+ unidades → mínimo 12% para TODOS los productos.
-  if (qty >= 20) percent = Math.max(percent, 12);
+  // Tercer tramo global: 20+ unidades → mínimo 12% (no aplica en modo "custom").
+  if (mode === "auto" && qty >= 20) percent = Math.max(percent, 12);
   return percent;
 }
 

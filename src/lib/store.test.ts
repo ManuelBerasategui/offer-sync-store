@@ -8,7 +8,8 @@ import {
   meetsMoq,
   productMinUnitsOf,
   isAspiradoraYtM2041,
-  noQtyDiscountAtAll,
+  qtyDiscountModeOf,
+  productQtyDiscountPct,
   excludedFromQtyDiscount,
   parseProductMinUnits,
   type MoqInfo,
@@ -30,6 +31,7 @@ import {
   tiersOf,
   discountFor,
   categoryDiscountForUnits,
+  findRuleForCat,
   type Product,
 } from "./store";
 
@@ -1021,8 +1023,9 @@ describe("Aspiradora YT-M2041 — sin descuentos por cantidad", () => {
     expect(isAspiradoraYtM2041(nombre)).toBe(true);
     expect(isAspiradoraYtM2041("Aspiradora YTM2041 Blanca")).toBe(true);
     expect(isAspiradoraYtM2041("Aspiradora YT-M2040")).toBe(false);
-    expect(noQtyDiscountAtAll(nombre)).toBe(true);
-    expect(excludedFromQtyDiscount(nombre)).toBe(true);
+    expect(qtyDiscountModeOf({ nombre })).toBe("none");
+    // No es una exclusión fija: se puede cambiar desde el panel
+    expect(excludedFromQtyDiscount(nombre)).toBe(false);
   });
 
   it("no tiene tramos propios ni el 12% global de 20+ u.", () => {
@@ -1030,5 +1033,55 @@ describe("Aspiradora YT-M2041 — sin descuentos por cantidad", () => {
     expect(tiersOf(p)).toEqual([]);
     expect(discountFor(p, 5)).toBe(0);
     expect(discountFor(p, 50)).toBe(0);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   Modo de descuento por cantidad (qty_discount_mode)
+══════════════════════════════════════════════════════════════════ */
+describe("modo de descuento por cantidad (qty_discount_mode)", () => {
+  const rules = makeRules();
+  const prod = (mode?: string, nombre = "Auriculares X") =>
+    ({
+      nombre,
+      categoria: "Tecnología",
+      descuento: "SI",
+      "5 unidades": "4%",
+      "30 unidades": "15%",
+      ...(mode !== undefined ? { metadata: { qty_discount_mode: mode } } : {}),
+    }) as unknown as Product;
+
+  it("lee el modo y usa 'auto' por defecto", () => {
+    expect(qtyDiscountModeOf(prod() as unknown as Record<string, unknown>)).toBe("auto");
+    expect(qtyDiscountModeOf(prod("none") as unknown as Record<string, unknown>)).toBe("none");
+    expect(qtyDiscountModeOf(prod("custom") as unknown as Record<string, unknown>)).toBe("custom");
+    expect(qtyDiscountModeOf(prod("raro") as unknown as Record<string, unknown>)).toBe("auto");
+  });
+
+  it("'none' → 0% siempre", () => {
+    expect(productQtyDiscountPct(prod("none"), 50, rules, () => 50)).toBe(0);
+  });
+
+  it("'custom' → solo tramos propios, sin categoría ni 12% global", () => {
+    expect(productQtyDiscountPct(prod("custom"), 4, rules, () => 4)).toBe(0);
+    expect(productQtyDiscountPct(prod("custom"), 5, rules, () => 5)).toBe(4);
+    expect(productQtyDiscountPct(prod("custom"), 25, rules, () => 25)).toBe(4);
+    expect(productQtyDiscountPct(prod("custom"), 30, rules, () => 30)).toBe(15);
+  });
+
+  it("'auto' en categoría con tramos → usa los de la categoría", () => {
+    const tech = findRuleForCat(normCat("Tecnología"), rules)!;
+    expect(productQtyDiscountPct(prod(), 3, rules, () => 25)).toBe(
+      categoryDiscountForUnits(tech.rule.discountTiers, 25),
+    );
+  });
+
+  it("la Aspiradora YT-M2041 puede volver a tener descuentos si se elige en el panel", () => {
+    const asp = prod("custom", "Mini Aspiradora YT-M2041");
+    expect(productQtyDiscountPct(asp, 5, rules, () => 5)).toBe(4);
+  });
+
+  it("NFC Google sigue sin descuentos aunque se elija otro modo", () => {
+    expect(productQtyDiscountPct(prod("custom", "Llavero NFC Google"), 30, rules, () => 30)).toBe(0);
   });
 });

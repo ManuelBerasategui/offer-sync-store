@@ -8,7 +8,6 @@
 import {
   blackviewUnitPrice,
   calcJerseyUnitPrice,
-  categoryDiscountForUnits,
   checkCategoryMins,
   comboUnitPrice,
   findComboByName,
@@ -19,8 +18,9 @@ import {
   isCamiseta,
   isHiddenCategory,
   isLongSleeve,
-  noQtyDiscountAtAll,
   excludedFromQtyDiscount,
+  usesCategoryQtyDiscount,
+  productQtyDiscountPct,
   isSuplemento,
   moqGroupOf,
   productMinUnitsOf,
@@ -29,7 +29,6 @@ import {
   parseJerseyItem,
   stripTrailingColor,
   SUPLEMENTOS_MIN,
-  unitPriceFor,
   variantBasePrice,
   waOnlyReasonOf,
   type Product,
@@ -196,6 +195,8 @@ export async function priceOrderItems(
       const { prod } = resolve(item);
       if (!prod) continue;
       if (excludedFromQtyDiscount(prod.nombre)) continue;
+      // Productos con descuento "none" o "custom" no suman al descuento de su categoría
+      if (!usesCategoryQtyDiscount(prod)) continue;
       const catNorm = normCat(prod.categoria ?? "");
       if (!catNorm) continue;
       const key = findRuleForCat(catNorm, catRules)?.key ?? catNorm;
@@ -272,21 +273,11 @@ export async function priceOrderItems(
         if (isBlackviewGlasses(prod.nombre)) {
           // Blackview BV100: precio fijo desde 3 unidades, sin otros descuentos
           unitPrice = blackviewUnitPrice(base, item.qty, usdRate);
-        } else if (noQtyDiscountAtAll(prod.nombre)) {
-          // NFC Google / Aspiradora YT-M2041: sin descuento por cantidad
-          unitPrice = base;
         } else {
-          const catNorm = normCat(prod.categoria ?? "");
-          const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
-          if (match?.rule.discountTiers?.length) {
-            const percent = categoryDiscountForUnits(
-              match.rule.discountTiers,
-              catTotals[match.key] ?? 0,
-            );
-            unitPrice = Math.round(base * (1 - percent / 100));
-          } else {
-            unitPrice = Math.round(unitPriceFor(prod, item.qty, base));
-          }
+          // Modo de descuento del producto: "auto" (categoría + 12% global), "custom" (solo sus
+          // tramos) o "none" (NFC Google, Aspiradora YT-M2041… → precio base)
+          const percent = productQtyDiscountPct(prod, item.qty, catRules, (key) => catTotals[key] ?? 0);
+          unitPrice = Math.round(base * (1 - percent / 100));
         }
       } else {
         // Combos: se identifican por el título y se cobran con sus tramos por cantidad

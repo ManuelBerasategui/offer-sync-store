@@ -8,17 +8,16 @@ import { storeQueryOptions } from "./store-query";
 import { track } from "./analytics";
 import {
   findProduct,
-  unitPriceFor,
   priceOf,
   parseCategoryRules,
-  categoryDiscountForUnits,
   findRuleForCat,
   normCat,
   isCamiseta,
   isLongSleeve,
-  noQtyDiscountAtAll,
   isBlackviewGlasses,
   excludedFromQtyDiscount,
+  usesCategoryQtyDiscount,
+  productQtyDiscountPct,
   blackviewUnitPrice,
   parseJerseyItem,
   calcJerseyUnitPrice,
@@ -204,9 +203,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     // Agrupa por clave de regla (no categoría exacta) — subcategorías quedan juntas
     // NFC Google se excluye porque no tiene descuentos por cantidad
+    const findItemProduct = (item: CartItem) =>
+      (item.productId ? findProduct(products, item.productId) : undefined) ??
+      findProduct(products, item.id) ??
+      findProduct(products, item.nombre) ??
+      products.find((p) => item.id && String(item.id).startsWith(String(p.id) + "-")) ??
+      products.find((p) => item.nombre && p.nombre && item.nombre.toLowerCase().startsWith(p.nombre.toLowerCase()));
+
     const catTotals: Record<string, number> = {};
     for (const item of items) {
       if (excludedFromQtyDiscount(item.nombre)) continue;
+      // Productos con descuento "none" o "custom" no suman al descuento de su categoría
+      const itemProd = item.id.startsWith("combo-") ? undefined : findItemProduct(item);
+      if (itemProd && !usesCategoryQtyDiscount(itemProd)) continue;
       const catNorm = normCat(item.categoria ?? "");
       if (!catNorm) continue;
       const match = findRuleForCat(catNorm, catRules);
@@ -285,12 +294,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return item;
       }
 
-      const product =
-        (item.productId ? findProduct(products, item.productId) : undefined) ??
-        findProduct(products, item.id) ??
-        findProduct(products, item.nombre) ??
-        products.find((p) => item.id && String(item.id).startsWith(String(p.id) + "-")) ??
-        products.find((p) => item.nombre && p.nombre && item.nombre.toLowerCase().startsWith(p.nombre.toLowerCase()));
+      const product = findItemProduct(item);
       if (!product) return item;
 
       if (isCamiseta(product.categoria, product.nombre)) {
@@ -312,11 +316,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return item;
       }
 
-      const catNorm = normCat(item.categoria ?? "");
-      const match = catNorm ? findRuleForCat(catNorm, catRules) : undefined;
-      const catRule = match?.rule;
-      const ruleKey = match?.key;
-
       const base = item.basePrice && item.basePrice > 0 ? item.basePrice : priceOf(product);
       const rBase = Math.round(base);
 
@@ -327,24 +326,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return { ...item, basePrice: rBase, unitPrice: bvUnit };
       }
 
-      // NFC Google / Aspiradora YT-M2041: sin descuento por cantidad bajo ningún concepto
-      if (noQtyDiscountAtAll(item.nombre) || noQtyDiscountAtAll(product.nombre)) {
-        if (item.unitPrice === rBase && item.basePrice === rBase) {
-          return item;
-        }
-        return { ...item, basePrice: rBase, unitPrice: rBase };
-      }
-
-      let unitPrice: number;
-      if (Array.isArray(catRule?.discountTiers) && catRule.discountTiers.length > 0 && ruleKey) {
-        // Descuento de categoría: reemplaza al individual del producto
-        const totalCatUnits = catTotals[ruleKey] ?? 0;
-        const percent = categoryDiscountForUnits(catRule.discountTiers, totalCatUnits);
-        unitPrice = Math.round(base * (1 - percent / 100));
-      } else {
-        // Fallback: descuento individual por cantidad del producto
-        unitPrice = Math.round(unitPriceFor(product, item.qty, base));
-      }
+      // Modo de descuento del producto: "auto" usa la categoría (sobre el total de la categoría),
+      // "custom" solo sus tramos propios y "none" (NFC Google, Aspiradora YT-M2041…) ninguno
+      // La categoría del ítem es la misma con la que se acumuló catTotals
+      const percent = productQtyDiscountPct(
+        { ...product, categoria: item.categoria ?? "" },
+        item.qty,
+        catRules,
+        (key) => catTotals[key] ?? 0,
+      );
+      const unitPrice = Math.round(base * (1 - percent / 100));
 
       if (item.unitPrice === unitPrice && item.basePrice === rBase) {
         return item;

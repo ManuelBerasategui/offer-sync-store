@@ -76,6 +76,11 @@ export type ProductInput = {
    */
   moq_min_units?: string;
   /**
+   * Modo de descuento por cantidad: "" / "auto" (categoría + 12% global),
+   * "none" (sin descuentos) o "custom" (solo los tramos de este producto).
+   */
+  qty_discount_mode?: string;
+  /**
    * Tipo de producto WA-only. Si está presente, oculta compra directa
    * y muestra solo un botón de WhatsApp con texto y mensaje específico.
    * Valores: "zapatillas" | "vapers" | "remeras" | "" (compra normal)
@@ -332,6 +337,11 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       if (p.moq_min_units !== undefined) {
         const ownMin = parseProductMinUnits(p.moq_min_units);
         metadata["moq_min_units"] = ownMin ? String(ownMin) : "";
+      }
+      // qty_discount_mode: solo valores conocidos; cualquier otro vuelve a automático
+      if (p.qty_discount_mode !== undefined) {
+        const mode = p.qty_discount_mode;
+        metadata["qty_discount_mode"] = mode === "auto" || mode === "none" || mode === "custom" ? mode : "";
       }
       // whatsapp_only_reason: fuente de verdad para flujo WA-only
       if (p.whatsapp_only_reason !== undefined) {
