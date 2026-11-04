@@ -35,7 +35,7 @@ import {
   CURVA_UNIDADES,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
-import { track } from "@/lib/analytics";
+import { track, trackWhatsappClick } from "@/lib/analytics";
 
 /**
  * Input de cantidad para el carrito con buffer de display.
@@ -607,6 +607,7 @@ function CarritoPage() {
               href={waLink(config)}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackWhatsappClick({ destino: "privado", ubicacion: "carrito" })}
             >
               Contactar por WhatsApp
             </a>

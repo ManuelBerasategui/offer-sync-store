@@ -18,7 +18,7 @@ import {
   rankBestSellers, HOME_BEST_SELLERS,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
-import { track } from "@/lib/analytics";
+import { track, trackWhatsappClick } from "@/lib/analytics";
 
 export const Route = createFileRoute("/")({
   loader: ({ context }) => {
@@ -587,6 +587,7 @@ function Home() {
                   href={sanitizeUrl(config["whatsapp_grupo"])}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackWhatsappClick({ destino: "grupos", ubicacion: "inicio_contacto" })}
                 >
                   Entrar al grupo
                 </a>
@@ -600,6 +601,7 @@ function Home() {
                 href={waLink(config)}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackWhatsappClick({ destino: "privado", ubicacion: "inicio_contacto" })}
               >
                 {config["whatsapp_grupo"] ? "Escribirnos directo" : "Abrir WhatsApp"}
               </a>
@@ -610,7 +612,10 @@ function Home() {
                     href={waLink(config)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => track("contacto_whatsapp_numero")}
+                    onClick={() => {
+                      track("contacto_whatsapp_numero");
+                      trackWhatsappClick({ destino: "privado", ubicacion: "inicio_numero" });
+                    }}
                     className="inline-flex items-center gap-2 transition-colors hover:text-primary hover:underline"
                   >
                     <MessageCircle className="h-4 w-4 text-primary" />
@@ -658,7 +663,10 @@ function Home() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Escribinos por WhatsApp"
-        onClick={() => track("home_whatsapp_flotante")}
+        onClick={() => {
+          track("home_whatsapp_flotante");
+          trackWhatsappClick({ destino: "privado", ubicacion: "flotante" });
+        }}
         className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 grid h-14 w-14 place-items-center rounded-full bg-whatsapp text-whatsapp-foreground shadow-lg transition-transform active:scale-95 print:hidden sm:hidden"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -688,6 +696,7 @@ function ContactForm({ config }: { config: SiteConfig }) {
     const text = encodeURIComponent(
       `Hola! Soy ${nombre}.\nContacto: ${contacto}\n${mensaje}`,
     );
+    trackWhatsappClick({ destino: "privado", ubicacion: "inicio_formulario" });
     window.open(sanitizeUrl(`https://wa.me/${phone}?text=${text}`), "_blank", "noopener,noreferrer");
   };
 

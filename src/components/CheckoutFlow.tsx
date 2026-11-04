@@ -16,7 +16,7 @@ import { createCheckout } from "@/lib/checkout.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { storeQueryOptions } from "@/lib/store-query";
 import { useCart } from "@/lib/cart";
-import { track } from "@/lib/analytics";
+import { track, trackWhatsappClick } from "@/lib/analytics";
 import {
   money,
   transferPrice,
@@ -238,6 +238,7 @@ export function CheckoutFlow({
         const couponText = couponCode ? ` (con cupón ${couponCode})` : "";
         const waMsg = `¡Hola! Acabo de hacer el pedido ${res.orderCode} por ${money(finalAmount)} mediante Transferencia Bancaria${couponText}. Adjunto el comprobante de pago.`;
         const waUrl = waLink(config ?? {}, waMsg);
+        trackWhatsappClick({ destino: "privado", ubicacion: "checkout_transferencia" });
         window.open(sanitizeUrl(waUrl), "_blank", "noopener,noreferrer");
 
         // Navegar a la página de gracias

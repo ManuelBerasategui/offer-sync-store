@@ -6,7 +6,7 @@ import { Calculator, Plus, Trash2, Copy, Printer, Check, MessageCircle } from "l
 import { SiteChrome } from "@/components/SiteChrome";
 import { storeQueryOptions } from "@/lib/store-query";
 import { waLink } from "@/lib/store";
-import { track } from "@/lib/analytics";
+import { track, trackWhatsappClick } from "@/lib/analytics";
 import { getImportUsdRate } from "@/lib/import-ai.functions";
 
 // Datos precargados (ej: desde la lectura de una captura en /importar). Valores inválidos se ignoran.
@@ -266,6 +266,7 @@ export function CalculadoraPage() {
     const msg = buildWhatsappMessage();
     if (!msg) return;
     track("import_quote_whatsapp", { total: quote ? Math.round(quote.grandTotal) : null });
+    trackWhatsappClick({ destino: "privado", ubicacion: "calculadora" });
     const url = waLink(config, msg);
     try {
       const parsed = new URL(url);

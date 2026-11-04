@@ -9,7 +9,7 @@ import { useCart } from "@/lib/cart";
 import { money, waLink, getBankInfo } from "@/lib/store";
 import { verifyOrderPayment } from "@/lib/orders.functions";
 import { SITE_URL } from "@/lib/constants";
-import { track } from "@/lib/analytics";
+import { track, trackWhatsappClick } from "@/lib/analytics";
 
 const graciasSearchSchema = z
   .object({
@@ -239,6 +239,7 @@ function GraciasPage() {
               )}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackWhatsappClick({ destino: "privado", ubicacion: "gracias_comprobante" })}
             >
               Enviar comprobante por WhatsApp
             </a>
@@ -258,6 +259,7 @@ function GraciasPage() {
               href={waLink(config, code ? `Consulta sobre pedido ${code}` : undefined)}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackWhatsappClick({ destino: "privado", ubicacion: "gracias_consulta" })}
             >
               Escribinos por WhatsApp
             </a>

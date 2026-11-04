@@ -15,7 +15,7 @@ import { ScreenshotQuote } from "@/components/ScreenshotQuote";
 import { storeQueryOptions } from "@/lib/store-query";
 import { sanitizeUrl, waLink } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
-import { track } from "@/lib/analytics";
+import { track, trackWhatsappClick } from "@/lib/analytics";
 
 export const Route = createFileRoute("/importar")({
   loader: ({ context }) => {
@@ -103,12 +103,14 @@ function ImportarPage() {
       dominio: parsed.hostname.slice(0, 60),
       cantidad: units,
     });
+    trackWhatsappClick({ destino: "privado", ubicacion: "importar_link", cantidad: units });
     const href = sanitizeUrl(waLink(config, msg));
     if (href !== "#") window.open(href, "_blank", "noopener,noreferrer");
   }
 
   function askHelpOnWhatsapp() {
     track("import_help_whatsapp", { pantalla: screen });
+    trackWhatsappClick({ destino: "privado", ubicacion: "importar_ayuda" });
     const msg =
       "Hola! Quiero importar un producto de Alibaba y necesito ayuda para encontrar el precio y el peso para cotizarlo.";
     const href = sanitizeUrl(waLink(config, msg));

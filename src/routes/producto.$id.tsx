@@ -75,7 +75,7 @@ import {
   type SiteConfig,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
-import { track } from "@/lib/analytics";
+import { track, trackWhatsappClick } from "@/lib/analytics";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sanitización segura de texto libre (CWE-79 / Snyk XSS)
@@ -187,6 +187,7 @@ function JerseyProductUI({
     }).unitArs;
     const priceStr = withPatch > 0 ? ` — $${withPatch.toLocaleString("es-AR")} c/u` : "";
     const totalStr = withPatch > 0 ? ` — Total: $${(withPatch * qty).toLocaleString("es-AR")}` : "";
+    trackWhatsappClick({ destino: "producto", ubicacion: "ficha_camiseta_parche", producto: productName, cantidad: qty });
     const msg = `Hola! Quiero pedir ${productName} con parche. ¿Qué parches tienen?\n• Talle: ${talleStr}\n• Versión: ${versionStr}\n• Cantidad: ${qty} unidades${priceStr}${totalStr}`;
     const href = sanitizeUrl(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
     if (href) window.open(href, "_blank", "noopener,noreferrer");
@@ -214,6 +215,7 @@ function JerseyProductUI({
       setSelectedTalle(talleToUse);
     }
     const msg = buildWaMessage();
+    trackWhatsappClick({ destino: "producto", ubicacion: "ficha_camiseta", producto: productName, cantidad: qty });
     const href = sanitizeUrl(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
     if (href) window.open(href, "_blank", "noopener,noreferrer");
   }
@@ -1353,7 +1355,10 @@ function ProductoPage() {
                                   )}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  onClick={() => track("nfc_cupo_whatsapp", { producto: product.nombre ?? "" })}
+                                  onClick={() => {
+                                    track("nfc_cupo_whatsapp", { producto: product.nombre ?? "" });
+                                    trackWhatsappClick({ destino: "producto", ubicacion: "ficha_nfc_cupo", producto: product.nombre, cantidad: qty });
+                                  }}
                                   className="btn-base mt-2.5 inline-flex w-full items-center justify-center gap-2 bg-whatsapp text-whatsapp-foreground py-2.5 text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity"
                                 >
                                   <MessageCircle className="h-4 w-4" /> Consultar cupo por WhatsApp
@@ -1726,6 +1731,7 @@ function ProductoPage() {
                       : waLink(config, product.nombre)}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => trackWhatsappClick({ destino: "producto", ubicacion: "ficha_producto", producto: product.nombre, cantidad: qty })}
                   >
                     {waOnlyReason ? WA_ONLY_CONFIG[waOnlyReason].btnText : "Consultar por WhatsApp"}
                   </a>
@@ -1873,6 +1879,7 @@ function ProductoPage() {
           href={waLink(config, product.nombre)}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => trackWhatsappClick({ destino: "producto", ubicacion: "ficha_producto_abajo", producto: product.nombre, cantidad: qty })}
         >
           Contactar por WhatsApp
         </a>

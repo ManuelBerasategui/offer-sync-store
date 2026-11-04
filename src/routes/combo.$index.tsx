@@ -19,6 +19,7 @@ import {
 } from "@/lib/store";
 import type { ComboQuantityTier } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
+import { trackWhatsappClick } from "@/lib/analytics";
 
 export const Route = createFileRoute("/combo/$index")({
   loader: ({ context }) => {
@@ -338,6 +339,7 @@ function ComboPage() {
               href={waLink(config, banner.titulo)}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackWhatsappClick({ destino: "producto", ubicacion: "combo", producto: banner.titulo })}
             >
               Contactar por WhatsApp
             </a>

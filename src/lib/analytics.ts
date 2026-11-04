@@ -10,6 +10,7 @@ import type { PostHog } from "posthog-js";
  */
 
 type Props = Record<string, string | number | boolean | null | undefined>;
+type CaptureOpts = { send_instantly?: boolean; transport?: "XHR" | "fetch" | "sendBeacon" };
 
 const KEY = import.meta.env["VITE_POSTHOG_KEY"] as string | undefined;
 const HOST =
@@ -17,7 +18,7 @@ const HOST =
 
 let client: PostHog | null = null;
 let loading = false;
-const queue: Array<[string, Props | undefined]> = [];
+const queue: Array<[string, Props | undefined, CaptureOpts | undefined]> = [];
 
 function isAdminUrl(url: unknown): boolean {
   if (typeof url !== "string") return false;
@@ -92,7 +93,7 @@ export function initAnalytics(): void {
       // El link de recuperación de contraseña abre /reset-password con los tokens en la URL:
       // en esa página no se graba la sesión
       if (isSensitiveUrl(window.location.href)) posthog.stopSessionRecording();
-      for (const [name, props] of queue.splice(0)) posthog.capture(name, props);
+      for (const [name, props, opts] of queue.splice(0)) posthog.capture(name, props, opts);
     })
     .catch(() => {
       // Si PostHog no carga (bloqueador de anuncios, red), la tienda sigue funcionando igual
@@ -103,12 +104,41 @@ export function initAnalytics(): void {
 }
 
 /** Registra un evento del embudo. Nunca lanza errores. */
-export function track(name: string, props?: Props): void {
+export function track(name: string, props?: Props, opts?: CaptureOpts): void {
   if (typeof window === "undefined" || !KEY) return;
   try {
-    if (client) client.capture(name, props);
-    else if (queue.length < 50) queue.push([name, props]);
+    if (client) client.capture(name, props, opts);
+    else if (queue.length < 50) queue.push([name, props, opts]);
   } catch {
     // La medición nunca debe romper la tienda
   }
+}
+
+/**
+ * Clic a WhatsApp. Un solo evento (`whatsapp_click`) para todos los botones, así en PostHog se
+ * puede contar cuántos clics hubo por día (antes y después de cada reel) y desde qué botón.
+ *   destino:   "privado" (chat con el número), "grupos" (grupo mayorista) o "producto" (desde una ficha)
+ *   ubicacion: qué botón fue ("header", "footer", "flotante", "ficha_producto", "carrito"…)
+ * Se manda al instante con sendBeacon para que no se pierda al abrir WhatsApp en otra pestaña o la app.
+ */
+export type WhatsappDestino = "privado" | "grupos" | "producto";
+
+export function trackWhatsappClick(info: {
+  destino: WhatsappDestino;
+  ubicacion: string;
+  producto?: string | null | undefined;
+  cantidad?: number | null | undefined;
+}): void {
+  if (typeof window === "undefined") return;
+  track(
+    "whatsapp_click",
+    {
+      destino: info.destino,
+      ubicacion: info.ubicacion,
+      producto: info.producto ? info.producto.slice(0, 160) : null,
+      cantidad: info.cantidad ?? null,
+      pagina: window.location.pathname,
+    },
+    { send_instantly: true, transport: "sendBeacon" },
+  );
 }

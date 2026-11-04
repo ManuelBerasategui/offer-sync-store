@@ -22,7 +22,7 @@ import {
   type Product,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
-import { track } from "@/lib/analytics";
+import { track, trackWhatsappClick } from "@/lib/analytics";
 
 type Sort = "destacado" | "precio_asc" | "precio_desc" | "nombre";
 
@@ -368,6 +368,7 @@ function Catalogo() {
           return (
             <a
               id="banner-camisetas-whatsapp"
+              onClick={() => trackWhatsappClick({ destino: "privado", ubicacion: "catalogo_camisetas" })}
               href={waUrl}
               target="_blank"
               rel="noopener noreferrer"

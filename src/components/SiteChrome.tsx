@@ -8,6 +8,7 @@ import {
   Truck,
 } from "lucide-react";
 import { sanitizeUrl, waLink } from "@/lib/store";
+import { trackWhatsappClick } from "@/lib/analytics";
 import type { SiteConfig } from "@/lib/store";
 import { useCart } from "@/lib/cart";
 import { HeaderAuth } from "@/components/HeaderAuth";
@@ -81,6 +82,7 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
             href={waLink(config)}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackWhatsappClick({ destino: "privado", ubicacion: "header" })}
           >
             WhatsApp
           </a>
@@ -137,6 +139,7 @@ export function SiteFooter({ config }: { config: SiteConfig }) {
             href={waLink(config)}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackWhatsappClick({ destino: "privado", ubicacion: "footer" })}
             className={`inline-flex items-center gap-1.5 ${linkClass}`}
           >
             <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
