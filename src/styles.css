@@ -215,7 +215,7 @@ input[name*="cvv"] {
 
 @page {
   size: A4;
-  margin: 14mm;
+  margin: 10mm;
 }
 
 @media print {
@@ -234,6 +234,12 @@ input[name*="cvv"] {
   header,
   footer {
     display: none !important;
+  }
+
+  /* Cotización de la calculadora: que entre en una sola hoja A4 */
+  .quote-print {
+    zoom: 0.84;
+    break-inside: avoid;
   }
 }
 

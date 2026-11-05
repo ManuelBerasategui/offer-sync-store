@@ -463,10 +463,10 @@ export function CalculadoraPage() {
           {quote && (
             <div
               ref={resultRef}
-              className="rounded-xl border border-border border-t-4 border-t-[#E8590F] bg-card p-6 sm:p-9 shadow-sm relative print:p-5 print:shadow-none"
+              className="quote-print rounded-xl border border-border border-t-4 border-t-[#E8590F] bg-card p-6 sm:p-9 shadow-sm relative print:p-0 print:border-x-0 print:border-b-0 print:pt-3 print:shadow-none"
             >
               {/* Encabezado del comprobante */}
-              <div className="flex items-end justify-between border-b-2 border-foreground/90 pb-3.5 mb-5 gap-4">
+              <div className="flex items-end justify-between border-b-2 border-foreground/90 pb-3.5 mb-5 gap-4 print:pb-2 print:mb-3">
                 <div className="flex flex-col gap-2">
                   <img
                     src="/businessicon-header.jpg?v=3"
@@ -485,7 +485,7 @@ export function CalculadoraPage() {
               </div>
 
               {/* Cliente */}
-              <div className="mb-6">
+              <div className="mb-6 print:mb-3">
                 <span className="block font-mono text-[10.5px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">
                   CLIENTE
                 </span>
@@ -505,7 +505,7 @@ export function CalculadoraPage() {
                   </div>
                 )}
 
-                <div className="space-y-4">
+                <div className="space-y-4 print:space-y-2">
                   {quote.itemsIsolated.map((i) => (
                     <div key={i.id} className="q-product-block">
                       <div className="flex justify-between items-baseline gap-2 mb-2">
@@ -521,12 +521,12 @@ export function CalculadoraPage() {
                       </div>
 
                       {/* Caja destacada de Precio Unitario */}
-                      <div className="bg-[#FBEADD]/80 dark:bg-amber-950/25 border-l-4 border-[#E8590F] p-3.5 sm:p-4 mb-4 rounded-r-md">
+                      <div className="bg-[#FBEADD]/80 dark:bg-amber-950/25 border-l-4 border-[#E8590F] p-3.5 sm:p-4 mb-4 rounded-r-md print:p-2.5 print:mb-2">
                         <div className="font-mono text-[10.5px] uppercase tracking-wider text-[#4B5A6B] dark:text-muted-foreground mb-1 font-medium">
                           PRECIO UNITARIO PUESTO EN ARGENTINA
                         </div>
                         <div
-                          className="price-num font-price-clean font-bold text-3xl sm:text-4xl text-[#E8590F] tracking-tight leading-none"
+                          className="price-num font-price-clean font-bold text-3xl sm:text-4xl text-[#E8590F] tracking-tight leading-none print:text-3xl"
                           style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontVariantNumeric: "normal", fontFeatureSettings: "normal" }}
                         >
                           {fmt(i.unitPrice)}
@@ -628,7 +628,7 @@ export function CalculadoraPage() {
                   </div>
 
                   {/* Total en una sola fila limpia como en la imagen */}
-                  <div className="flex justify-between items-baseline pt-6 sm:pt-8 mt-2">
+                  <div className="flex justify-between items-baseline pt-6 sm:pt-8 mt-2 print:pt-2 print:mt-1">
                     <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                       TOTAL PUESTO EN ARGENTINA
                     </span>
@@ -652,7 +652,7 @@ export function CalculadoraPage() {
                 const pay = splitPayment(quote.grandTotal, terms.senaPct);
                 const fullUpfront = terms.senaPct >= 100;
                 return (
-                  <div className="mt-7 break-inside-avoid">
+                  <div className="mt-7 print:mt-4">
                     <div className="font-mono text-[11.5px] uppercase tracking-wider text-muted-foreground border-b border-border pb-1 mb-3">
                       Cómo seguimos
                     </div>
@@ -757,7 +757,7 @@ export function CalculadoraPage() {
               })()}
 
               {/* Aclaración precio estimativo (visible en pantalla y en PDF) */}
-              <div className="mt-6 pt-3.5 border-t border-border/70 text-xs text-muted-foreground leading-relaxed">
+              <div className="mt-6 pt-3.5 border-t border-border/70 text-xs text-muted-foreground leading-relaxed print:mt-3 print:pt-2">
                 <p className="text-[11.5px] sm:text-xs text-foreground/80">
                   <span className="font-semibold text-foreground">* Nota:</span> El precio final es estimativo. Si deseás obtener el valor definitivo o confirmar tu pedido, escribinos a WhatsApp.
                 </p>
