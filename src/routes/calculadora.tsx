@@ -8,6 +8,7 @@ import { storeQueryOptions } from "@/lib/store-query";
 import { waLink } from "@/lib/store";
 import { track, trackWhatsappClick } from "@/lib/analytics";
 import { getImportUsdRate } from "@/lib/import-ai.functions";
+import { addBusinessDays, calcHonorarios, readQuoteTerms, splitPayment } from "@/lib/quote-terms";
 
 // Datos precargados (ej: desde la lectura de una captura en /importar). Valores inválidos se ignoran.
 const calculadoraSearchSchema = z.object({
@@ -60,10 +61,13 @@ type QuoteResult = {
   honorariosTotal: number;
   taxesTotal: number;
   grandTotal: number;
+  /** El envío completo supera el umbral de barco. */
+  viaMaritima: boolean;
   rates: {
     fleteKg: number;
     handling: number;
-    honorarios: number;
+    honorariosPct: number;
+    honorariosTope: number;
     impuestosPct: number;
     aereoFijo: number;
     aereoDesde: number;
@@ -101,7 +105,9 @@ export function CalculadoraPage() {
   const rates = {
     fleteKg: Number(config["calc_flete_kg"]) || 22,
     handling: Number(config["calc_handling"]) || 30,
-    honorarios: Number(config["calc_honorarios"]) || 220,
+    // Honorarios propios: % de la mercadería con tope (10% hasta US$ 250)
+    honorariosPct: Number(config["calc_honorarios_pct"]) || 10,
+    honorariosTope: Number(config["calc_honorarios_tope"]) || 250,
     impuestosPct: Number(config["calc_impuestos_pct"]) || 70,
     aereoFijo: Number(config["calc_aereo_fijo"]) || 950,
     aereoDesde: Number(config["calc_aereo_desde"]) || 50,
@@ -109,6 +115,7 @@ export function CalculadoraPage() {
     barcoFijo: Number(config["calc_barco_fijo"]) || 100,
     barcoDesde: Number(config["calc_barco_desde"]) || 250,
   };
+  const terms = readQuoteTerms(config);
 
   const [client, setClient] = useState<string>("");
   const prefill = Route.useSearch();
@@ -153,8 +160,9 @@ export function CalculadoraPage() {
   // - Si pasa 250 kg (barcoDesde): barco fijo (100 USD)
   // - Si está en rango 50 a 250 kg: aéreo fijo
   // - Menor a 50 kg: flete por kg
+  const barcoThreshold = rates.barcoDesde > 0 ? rates.barcoDesde : 250;
+
   function calcFreightCost(weight: number) {
-    const barcoThreshold = rates.barcoDesde > 0 ? rates.barcoDesde : 250;
     if (weight > barcoThreshold) {
       return rates.barcoFijo > 0 ? rates.barcoFijo : 100;
     }
@@ -179,7 +187,7 @@ export function CalculadoraPage() {
       const fobTotal = i.cantidad * i.fob;
       const freightCost = calcFreightCost(weight);
       const handling = rates.handling;
-      const honorarios = rates.honorarios;
+      const honorarios = calcHonorarios(fobTotal, rates.honorariosPct, rates.honorariosTope);
       const base = fobTotal + freightCost + handling;
       const tax = base * (rates.impuestosPct / 100);
       const total = base + tax + honorarios;
@@ -192,7 +200,7 @@ export function CalculadoraPage() {
     const totalFOB = validItems.reduce((s, i) => s + i.cantidad * i.fob, 0);
     const freightTotal = calcFreightCost(totalWeight);
     const handlingTotal = rates.handling;
-    const honorariosTotal = rates.honorarios;
+    const honorariosTotal = calcHonorarios(totalFOB, rates.honorariosPct, rates.honorariosTope);
     const baseTotal = totalFOB + freightTotal + handlingTotal;
     const taxesTotal = baseTotal * (rates.impuestosPct / 100);
     const grandTotal = baseTotal + taxesTotal + honorariosTotal;
@@ -208,6 +216,7 @@ export function CalculadoraPage() {
       honorariosTotal,
       taxesTotal,
       grandTotal,
+      viaMaritima: totalWeight > barcoThreshold,
       rates,
     };
 
@@ -258,8 +267,26 @@ export function CalculadoraPage() {
       msg += `_(incluye flete, handling, honorarios e impuestos)_\n`;
     }
 
+    const pay = splitPayment(quote.grandTotal, terms.senaPct);
+    msg += `\n*Cómo se paga:*\n`;
+    if (terms.senaPct >= 100) {
+      msg += `• 100% al confirmar: ${fmt(quote.grandTotal)}\n`;
+    } else {
+      msg += `• Seña ${terms.senaPct}% para confirmar: ${fmt(pay.sena)}\n`;
+      msg += `• Resto ${100 - terms.senaPct}% ${terms.saldoCuando}: ${fmt(pay.saldo)}\n`;
+    }
+    msg += `\n*Plazo:* ${quoteDeliveryTime(quote)} puerta a puerta (${quote.viaMaritima ? "marítimo" : "aéreo"}).\n`;
+    msg += `*Incluye:* ${terms.incluye.join("; ")}.\n`;
+    msg += `*No incluye:* ${terms.noIncluye.join("; ")}.\n`;
+    msg += `*Factura:* ${terms.factura}\n`;
+    msg += `*Validez:* ${terms.validezDias} días hábiles (hasta el ${addBusinessDays(new Date(), terms.validezDias).toLocaleDateString("es-AR")}).\n`;
+    msg += `*Demoras o aduana:* ${terms.demoras}\n`;
     msg += `\n*Nota:* El precio final es estimativo. Me gustaría confirmar el pedido y obtener el valor definitivo.`;
     return msg;
+  }
+
+  function quoteDeliveryTime(q: QuoteResult) {
+    return q.viaMaritima ? terms.plazoMaritimo : terms.plazoAereo;
   }
 
   function handleConfirmWhatsapp() {
@@ -295,6 +322,7 @@ export function CalculadoraPage() {
   }
 
   const multi = quote ? quote.items.length > 1 : false;
+  const validUntil = addBusinessDays(new Date(), terms.validezDias).toLocaleDateString("es-AR");
 
   return (
     <SiteChrome config={config}>
@@ -451,7 +479,8 @@ export function CalculadoraPage() {
                 </div>
                 <div className="text-right text-xs font-mono text-muted-foreground whitespace-nowrap leading-relaxed">
                   <div>COT-{Date.now().toString(36).toUpperCase()}</div>
-                  <div>{new Date().toLocaleDateString("es-AR")}</div>
+                  <div>Emitida: {new Date().toLocaleDateString("es-AR")}</div>
+                  <div>Válida hasta: {validUntil}</div>
                 </div>
               </div>
 
@@ -544,8 +573,13 @@ export function CalculadoraPage() {
                       <span className="text-foreground">Honorarios</span>
                       <span className="font-mono text-foreground">{fmt(quote.honorariosTotal)}</span>
                     </div>
-                    <div className="flex justify-between py-2 text-sm font-medium">
-                      <span className="text-foreground">Impuestos</span>
+                    <div className="flex justify-between gap-3 py-2 text-sm font-medium">
+                      <span className="text-foreground">
+                        Impuestos{" "}
+                        <span className="font-normal text-muted-foreground">
+                          (derechos, tasa, IVA y percepciones)
+                        </span>
+                      </span>
                       <span className="font-mono text-foreground">{fmt(quote.taxesTotal)}</span>
                     </div>
                   </div>
@@ -587,8 +621,8 @@ export function CalculadoraPage() {
                       <span>Honorarios</span>
                       <span>{fmt(quote.honorariosTotal)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Impuestos</span>
+                    <div className="flex justify-between gap-3">
+                      <span>Impuestos (derechos, tasa, IVA y percepciones)</span>
                       <span>{fmt(quote.taxesTotal)}</span>
                     </div>
                   </div>
@@ -612,6 +646,115 @@ export function CalculadoraPage() {
                   )}
                 </div>
               )}
+
+              {/* Condiciones: cómo se paga, plazo, factura, qué no incluye, demoras/aduana */}
+              {(() => {
+                const pay = splitPayment(quote.grandTotal, terms.senaPct);
+                const fullUpfront = terms.senaPct >= 100;
+                return (
+                  <div className="mt-7 break-inside-avoid">
+                    <div className="font-mono text-[11.5px] uppercase tracking-wider text-muted-foreground border-b border-border pb-1 mb-3">
+                      Cómo seguimos
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-lg border border-border p-3.5">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                          Cómo se paga
+                        </div>
+                        {fullUpfront ? (
+                          <div className="flex justify-between gap-3 text-sm">
+                            <span className="text-foreground">100% al confirmar</span>
+                            <span className="font-mono font-semibold text-foreground whitespace-nowrap">
+                              {fmt(quote.grandTotal)}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between gap-3">
+                              <span className="text-foreground">
+                                <span className="font-semibold">Seña {terms.senaPct}%</span>{" "}
+                                <span className="text-muted-foreground">para confirmar</span>
+                              </span>
+                              <span className="font-mono font-semibold text-[#E8590F] whitespace-nowrap">
+                                {fmt(pay.sena)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <span className="text-foreground">
+                                <span className="font-semibold">Resto {100 - terms.senaPct}%</span>{" "}
+                                <span className="text-muted-foreground">{terms.saldoCuando}</span>
+                              </span>
+                              <span className="font-mono font-semibold text-foreground whitespace-nowrap">
+                                {fmt(pay.saldo)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {usdRate > 0 && !fullUpfront && (
+                          <p className="mt-2 text-[11px] text-muted-foreground">
+                            Seña ≈ {ars(pay.sena)} · Resto ≈ {ars(pay.saldo)}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg border border-border p-3.5">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                          Plazo de entrega
+                        </div>
+                        <div className="text-lg font-bold text-foreground leading-tight">
+                          {quoteDeliveryTime(quote)}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Puerta a puerta, por envío {quote.viaMaritima ? "marítimo" : "aéreo"}, desde
+                          que se confirma el pedido.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs leading-relaxed">
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-foreground mb-1.5">
+                          ✓ Incluye
+                        </div>
+                        <ul className="list-disc pl-4 space-y-0.5 text-foreground/80">
+                          {terms.incluye.map((line) => (
+                            <li key={line}>{line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-foreground mb-1.5">
+                          ✕ No incluye
+                        </div>
+                        <ul className="list-disc pl-4 space-y-0.5 text-foreground/80">
+                          {terms.noIncluye.map((line) => (
+                            <li key={line}>{line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <dl className="mt-4 space-y-2.5 text-xs leading-relaxed">
+                      <div className="sm:grid sm:grid-cols-[9rem_1fr] sm:gap-3">
+                        <dt className="font-semibold text-foreground">Factura</dt>
+                        <dd className="text-foreground/80">{terms.factura}</dd>
+                      </div>
+                      <div className="sm:grid sm:grid-cols-[9rem_1fr] sm:gap-3">
+                        <dt className="font-semibold text-foreground">Validez</dt>
+                        <dd className="text-foreground/80">
+                          {terms.validezDias} días hábiles (hasta el {validUntil}). Precios y plazos
+                          estimativos, sujetos al tipo de cambio y a la operatoria de comercio exterior.
+                        </dd>
+                      </div>
+                      <div className="sm:grid sm:grid-cols-[9rem_1fr] sm:gap-3">
+                        <dt className="font-semibold text-foreground">Demoras o aduana</dt>
+                        <dd className="text-foreground/80">{terms.demoras}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                );
+              })()}
 
               {/* Aclaración precio estimativo (visible en pantalla y en PDF) */}
               <div className="mt-6 pt-3.5 border-t border-border/70 text-xs text-muted-foreground leading-relaxed">

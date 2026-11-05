@@ -1447,13 +1447,25 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
       calculatorRates?: {
         fleteKg?: number;
         handling?: number;
-        honorarios?: number;
+        honorariosPct?: number;
+        honorariosTope?: number;
         impuestosPct?: number;
         aereoFijo?: number;
         aereoDesde?: number;
         aereoHasta?: number;
         barcoFijo?: number;
         barcoDesde?: number;
+      };
+      quoteTerms?: {
+        senaPct?: number | undefined;
+        validezDias?: number | undefined;
+        incluye?: string;
+        saldoCuando?: string;
+        plazoAereo?: string;
+        plazoMaritimo?: string;
+        factura?: string;
+        noIncluye?: string;
+        demoras?: string;
       };
     }) => ({
       email: str(data?.email, 160).toLowerCase(),
@@ -1464,6 +1476,8 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
       resendConfig: data.resendConfig,
       couponConfig: data.couponConfig,
       calculatorRates: data.calculatorRates,
+      quoteTerms:
+        data?.quoteTerms && typeof data.quoteTerms === "object" ? data.quoteTerms : undefined,
     }),
   )
   .handler(async ({ data }): Promise<{ error?: string }> => {
@@ -1564,7 +1578,14 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         const calcRows = [
           { clave: "calc_flete_kg", valor: String(data.calculatorRates.fleteKg ?? 22) },
           { clave: "calc_handling", valor: String(data.calculatorRates.handling ?? 30) },
-          { clave: "calc_honorarios", valor: String(data.calculatorRates.honorarios ?? 220) },
+          {
+            clave: "calc_honorarios_pct",
+            valor: String(Math.min(100, Math.max(0, Number(data.calculatorRates.honorariosPct) || 10))),
+          },
+          {
+            clave: "calc_honorarios_tope",
+            valor: String(Math.max(0, Number(data.calculatorRates.honorariosTope) || 250)),
+          },
           { clave: "calc_impuestos_pct", valor: String(data.calculatorRates.impuestosPct ?? 70) },
           { clave: "calc_aereo_fijo", valor: String(data.calculatorRates.aereoFijo ?? 950) },
           { clave: "calc_aereo_desde", valor: String(data.calculatorRates.aereoDesde ?? 50) },
@@ -1573,6 +1594,15 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
           { clave: "calc_barco_desde", valor: String(data.calculatorRates.barcoDesde ?? 250) },
         ];
         for (const row of calcRows) {
+          await (supabaseAdmin as any).from("site_config").upsert(row, { onConflict: "clave" });
+        }
+      }
+
+      // Condiciones de la cotización (seña, plazos, factura, no incluye, demoras/aduana).
+      // Un texto vacío se guarda vacío y la calculadora usa el valor por defecto.
+      if (data.quoteTerms) {
+        const { toQuoteTermsRows } = await import("./quote-terms");
+        for (const row of toQuoteTermsRows(data.quoteTerms)) {
           await (supabaseAdmin as any).from("site_config").upsert(row, { onConflict: "clave" });
         }
       }

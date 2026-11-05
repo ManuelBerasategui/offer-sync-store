@@ -25,6 +25,31 @@ import {
   type CampaignSummary,
 } from "@/lib/newsletter.functions";
 import { parseCategoryRules, normCat, getBaseCategory, money, impliedUsdRate, whatsappGroupUrl } from "@/lib/store";
+import { readQuoteTerms, QUOTE_TERMS_LIMITS, type QuoteTerms } from "@/lib/quote-terms";
+
+type QuoteTermsForm = Omit<QuoteTerms, "senaPct" | "validezDias" | "incluye" | "noIncluye"> & {
+  senaPct: string;
+  validezDias: string;
+  incluye: string;
+  noIncluye: string;
+};
+
+/** Campos de texto de "Condiciones de la cotización" en el panel. */
+const QUOTE_TERMS_FIELDS: {
+  key: Exclude<keyof QuoteTermsForm, "senaPct" | "validezDias">;
+  label: string;
+  hint: string;
+  rows: number;
+  max: number;
+}[] = [
+  { key: "saldoCuando", label: "Cuándo se paga el resto", hint: "Se lee: \"Resto 50% …\"", rows: 1, max: QUOTE_TERMS_LIMITS.short },
+  { key: "plazoAereo", label: "Plazo envío aéreo", hint: "Ej: 25 a 40 días", rows: 1, max: QUOTE_TERMS_LIMITS.short },
+  { key: "plazoMaritimo", label: "Plazo envío marítimo", hint: "Se usa cuando la carga va en barco", rows: 1, max: QUOTE_TERMS_LIMITS.short },
+  { key: "factura", label: "Factura", hint: "Si hay factura o no, y de qué tipo", rows: 2, max: QUOTE_TERMS_LIMITS.long },
+  { key: "incluye", label: "Qué incluye", hint: `Un ítem por renglón (máx. ${QUOTE_TERMS_LIMITS.noIncluyeItems})`, rows: 4, max: QUOTE_TERMS_LIMITS.long * 2 },
+  { key: "noIncluye", label: "Qué NO incluye", hint: `Un ítem por renglón (máx. ${QUOTE_TERMS_LIMITS.noIncluyeItems})`, rows: 3, max: QUOTE_TERMS_LIMITS.long * 2 },
+  { key: "demoras", label: "Demoras o aduana", hint: "Qué pasa si se demora o la aduana pide un control", rows: 3, max: QUOTE_TERMS_LIMITS.long },
+];
 
 export const Route = createFileRoute("/admin/configuracion")({
   loader: ({ context }) => {
@@ -111,13 +136,26 @@ function AdminConfiguracionPage() {
   // Estado para Tarifas de Calculadora de Importaciones (solo admin)
   const [calcFleteKg, setCalcFleteKg] = useState<string>(config["calc_flete_kg"] ?? "22");
   const [calcHandling, setCalcHandling] = useState<string>(config["calc_handling"] ?? "30");
-  const [calcHonorarios, setCalcHonorarios] = useState<string>(config["calc_honorarios"] ?? "220");
+  const [calcHonorariosPct, setCalcHonorariosPct] = useState<string>(config["calc_honorarios_pct"] ?? "10");
+  const [calcHonorariosTope, setCalcHonorariosTope] = useState<string>(config["calc_honorarios_tope"] ?? "250");
   const [calcImpuestosPct, setCalcImpuestosPct] = useState<string>(config["calc_impuestos_pct"] ?? "70");
   const [calcAereoFijo, setCalcAereoFijo] = useState<string>(config["calc_aereo_fijo"] ?? "950");
   const [calcAereoDesde, setCalcAereoDesde] = useState<string>(config["calc_aereo_desde"] ?? "50");
   const [calcAereoHasta, setCalcAereoHasta] = useState<string>(config["calc_aereo_hasta"] ?? "250");
   const [calcBarcoFijo, setCalcBarcoFijo] = useState<string>(config["calc_barco_fijo"] ?? "100");
   const [calcBarcoDesde, setCalcBarcoDesde] = useState<string>(config["calc_barco_desde"] ?? "250");
+
+  // Condiciones que se muestran en cada cotización (arranca con lo guardado o los valores por defecto)
+  const [quoteTerms, setQuoteTerms] = useState<QuoteTermsForm>(() => {
+    const t = readQuoteTerms(config);
+    return {
+      ...t,
+      senaPct: String(t.senaPct),
+      validezDias: String(t.validezDias),
+      incluye: t.incluye.join("\n"),
+      noIncluye: t.noIncluye.join("\n"),
+    };
+  });
 
   // Estado para Campañas de Email por Tandas
   const [newsletterSummary, setNewsletterSummary] = useState<CampaignSummary | null>(null);
@@ -367,13 +405,19 @@ function AdminConfiguracionPage() {
           calculatorRates: {
             fleteKg: Number(calcFleteKg) || 22,
             handling: Number(calcHandling) || 30,
-            honorarios: Number(calcHonorarios) || 220,
+            honorariosPct: Number(calcHonorariosPct) || 10,
+            honorariosTope: Number(calcHonorariosTope) || 250,
             impuestosPct: Number(calcImpuestosPct) || 70,
             aereoFijo: Number(calcAereoFijo) || 950,
             aereoDesde: Number(calcAereoDesde) || 50,
             aereoHasta: Number(calcAereoHasta) || 250,
             barcoFijo: Number(calcBarcoFijo) || 100,
             barcoDesde: Number(calcBarcoDesde) || 250,
+          },
+          quoteTerms: {
+            ...quoteTerms,
+            senaPct: quoteTerms.senaPct.trim() === "" ? undefined : Number(quoteTerms.senaPct),
+            validezDias: quoteTerms.validezDias.trim() === "" ? undefined : Number(quoteTerms.validezDias),
           },
         },
       });
@@ -1308,18 +1352,38 @@ function AdminConfiguracionPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-muted-foreground uppercase">Honorarios fijos por envío</label>
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Honorarios (% mercadería)</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-muted-foreground">%</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  className="input-base text-xs font-bold"
+                  value={calcHonorariosPct}
+                  onChange={(e) => setCalcHonorariosPct(e.target.value)}
+                  placeholder="10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Tope de honorarios</label>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-bold text-muted-foreground">u$d</span>
                 <input
                   type="number"
-                  step="1"
+                  step="10"
+                  min="0"
                   className="input-base text-xs font-bold"
-                  value={calcHonorarios}
-                  onChange={(e) => setCalcHonorarios(e.target.value)}
-                  placeholder="220"
+                  value={calcHonorariosTope}
+                  onChange={(e) => setCalcHonorariosTope(e.target.value)}
+                  placeholder="250"
                 />
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                Ej: 10% con tope 250 → desde US$ {Math.round((Number(calcHonorariosTope) || 250) / ((Number(calcHonorariosPct) || 10) / 100)).toLocaleString("es-AR")} de mercadería se cobra el fijo.
+              </p>
             </div>
 
             <div className="space-y-1">
@@ -1419,6 +1483,75 @@ function AdminConfiguracionPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Tarjeta: Condiciones que acompañan a cada cotización */}
+        <div className="mb-6 rounded-2xl border border-primary/30 bg-card p-3.5 sm:p-5 shadow-xs">
+          <h2 className="text-base font-bold text-foreground mb-1">📝 Condiciones de la cotización</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Aparecen debajo del total en cada cotización de la calculadora (y en el mensaje de WhatsApp): seña,
+            plazo, factura, qué no incluye y qué pasa si hay demora o aduana. Si dejás un campo vacío se usa el texto
+            por defecto.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Seña para confirmar (%)</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-muted-foreground">%</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="5"
+                  className="input-base text-xs font-bold"
+                  value={quoteTerms.senaPct}
+                  onChange={(e) => setQuoteTerms((p) => ({ ...p, senaPct: e.target.value }))}
+                  placeholder="50"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">100 = se paga todo al confirmar.</p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Validez (días hábiles)</label>
+              <input
+                type="number"
+                min="1"
+                max="90"
+                step="1"
+                className="input-base text-xs font-bold"
+                value={quoteTerms.validezDias}
+                onChange={(e) => setQuoteTerms((p) => ({ ...p, validezDias: e.target.value }))}
+                placeholder="15"
+              />
+              <p className="text-[11px] text-muted-foreground">Se muestra "Válida hasta" con la fecha.</p>
+            </div>
+
+            {QUOTE_TERMS_FIELDS.map((f) => (
+              <div key={f.key} className={f.rows > 1 ? "space-y-1 sm:col-span-2" : "space-y-1"}>
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">{f.label}</label>
+                {f.rows > 1 ? (
+                  <textarea
+                    rows={f.rows}
+                    maxLength={f.max}
+                    className="input-base text-xs w-full"
+                    value={quoteTerms[f.key]}
+                    onChange={(e) => setQuoteTerms((p) => ({ ...p, [f.key]: e.target.value }))}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    maxLength={f.max}
+                    className="input-base text-xs"
+                    value={quoteTerms[f.key]}
+                    onChange={(e) => setQuoteTerms((p) => ({ ...p, [f.key]: e.target.value }))}
+                  />
+                )}
+                <p className="text-[11px] text-muted-foreground">{f.hint}</p>
+              </div>
+            ))}
           </div>
         </div>
 
