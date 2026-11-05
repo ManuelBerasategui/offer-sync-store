@@ -14,6 +14,7 @@ import {
   getCouponUsagesSummary,
   getAdminPrivateConfig,
   generateMissingThumbnails,
+  updateWhatsappGroupLink,
   type CategoryRuleInput,
 } from "@/lib/products.functions";
 import {
@@ -23,7 +24,7 @@ import {
   sendCampaignTestEmail,
   type CampaignSummary,
 } from "@/lib/newsletter.functions";
-import { parseCategoryRules, normCat, getBaseCategory, money, impliedUsdRate } from "@/lib/store";
+import { parseCategoryRules, normCat, getBaseCategory, money, impliedUsdRate, whatsappGroupUrl } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/configuracion")({
   loader: ({ context }) => {
@@ -100,6 +101,12 @@ function AdminConfiguracionPage() {
   const [testEmailTarget, setTestEmailTarget] = useState<string>("");
   const [thumbsRunning, setThumbsRunning] = useState(false);
   const [thumbsMsg, setThumbsMsg] = useState<{ success: boolean; text: string } | null>(null);
+
+  // Link al grupo de WhatsApp (se guarda aparte: los grupos se llenan y se cambia seguido)
+  const [grupoLink, setGrupoLink] = useState<string>(config["whatsapp_grupo"] ?? "");
+  const [savedGrupoLink, setSavedGrupoLink] = useState<string>(config["whatsapp_grupo"] ?? "");
+  const [savingGrupo, setSavingGrupo] = useState(false);
+  const [grupoMsg, setGrupoMsg] = useState<{ success: boolean; text: string } | null>(null);
 
   // Estado para Tarifas de Calculadora de Importaciones (solo admin)
   const [calcFleteKg, setCalcFleteKg] = useState<string>(config["calc_flete_kg"] ?? "22");
@@ -386,6 +393,42 @@ function AdminConfiguracionPage() {
     }
   }
 
+  async function handleSaveGrupo() {
+    const value = grupoLink.trim();
+    if (value && !whatsappGroupUrl(value)) {
+      setGrupoMsg({
+        success: false,
+        text: "El link no es válido. Tiene que ser una invitación tipo https://chat.whatsapp.com/…",
+      });
+      return;
+    }
+    setSavingGrupo(true);
+    setGrupoMsg(null);
+    try {
+      const res = await updateWhatsappGroupLink({
+        data: { email: userEmail, token: userToken, url: value },
+      });
+      if (res.error) {
+        setGrupoMsg({ success: false, text: res.error });
+        return;
+      }
+      const saved = res.url ?? "";
+      setGrupoLink(saved);
+      setSavedGrupoLink(saved);
+      await queryClient.invalidateQueries({ queryKey: ["store"] });
+      setGrupoMsg({
+        success: true,
+        text: saved
+          ? "¡Link del grupo actualizado en toda la tienda!"
+          : "Link quitado: los botones del grupo ya no se muestran.",
+      });
+    } catch (err) {
+      setGrupoMsg({ success: false, text: err instanceof Error ? err.message : "Error al guardar." });
+    } finally {
+      setSavingGrupo(false);
+    }
+  }
+
   async function handleTestEmail() {
     setTestingEmail(true);
     setTestEmailMsg(null);
@@ -587,6 +630,63 @@ function AdminConfiguracionPage() {
             ✓ {successMsg}
           </div>
         )}
+
+        {/* Link al grupo de WhatsApp (header, footer y contacto de toda la tienda) */}
+        <div className="mb-6 rounded-2xl border border-whatsapp/40 bg-card p-3.5 sm:p-5 shadow-xs">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-xl">👥</span>
+            <div>
+              <h2 className="text-base font-bold text-foreground">Link al grupo de WhatsApp</h2>
+              <p className="text-xs text-muted-foreground">
+                Es el botón "Grupo" del menú, el del pie de página y el de Contacto. Cuando se llene el
+                grupo, pegá acá el link del nuevo y guardá: se cambia en toda la página.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <label className="flex flex-1 flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Link de invitación</span>
+              <input
+                type="url"
+                inputMode="url"
+                className="input-base font-mono text-xs"
+                value={grupoLink}
+                onChange={(e) => {
+                  setGrupoLink(e.target.value);
+                  setGrupoMsg(null);
+                }}
+                placeholder="https://chat.whatsapp.com/…"
+                maxLength={300}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => void handleSaveGrupo()}
+              disabled={savingGrupo || grupoLink.trim() === savedGrupoLink.trim()}
+              className="btn-base bg-whatsapp px-4 py-2 text-xs font-semibold text-whatsapp-foreground hover:opacity-90 disabled:opacity-50 sm:text-sm"
+            >
+              {savingGrupo ? "Guardando..." : "Guardar link"}
+            </button>
+          </div>
+          {whatsappGroupUrl(savedGrupoLink) && (
+            <a
+              href={whatsappGroupUrl(savedGrupoLink)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-block text-xs font-semibold text-primary underline-offset-2 hover:underline"
+            >
+              Probar link actual ↗
+            </a>
+          )}
+          {grupoMsg && (
+            <p
+              className={`mt-2 text-xs font-semibold ${grupoMsg.success ? "text-emerald-600" : "text-destructive"}`}
+            >
+              {grupoMsg.success ? "✓ " : ""}
+              {grupoMsg.text}
+            </p>
+          )}
+        </div>
 
         {/* Cupón Promocional de Lanzamiento (Switch ON/OFF) */}
         <div className="mb-6 rounded-2xl border border-primary/30 bg-card p-3.5 sm:p-5 shadow-xs">

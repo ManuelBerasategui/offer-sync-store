@@ -6,8 +6,9 @@ import {
   MessageCircle,
   ShoppingCart,
   Truck,
+  Users,
 } from "lucide-react";
-import { sanitizeUrl, waLink } from "@/lib/store";
+import { sanitizeUrl, waLink, whatsappGroupUrl } from "@/lib/store";
 import { trackWhatsappClick } from "@/lib/analytics";
 import type { SiteConfig } from "@/lib/store";
 import { useCart } from "@/lib/cart";
@@ -15,6 +16,8 @@ import { HeaderAuth } from "@/components/HeaderAuth";
 
 export function SiteHeader({ config }: { config: SiteConfig }) {
   const cart = useCart();
+  // Link al grupo de WhatsApp: se edita desde Admin → Configuración (site_config.whatsapp_grupo)
+  const grupoUrl = whatsappGroupUrl(config["whatsapp_grupo"]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md print:hidden">
@@ -39,9 +42,21 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
             <Link to="/catalogo" className="text-muted-foreground hover:text-primary">
               Catálogo
             </Link>
-            <Link to="/calculadora" className="text-muted-foreground hover:text-primary">
-              Calculadora
-            </Link>
+            {grupoUrl ? (
+              <a
+                href={grupoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackWhatsappClick({ destino: "grupos", ubicacion: "header" })}
+                className="text-muted-foreground hover:text-primary"
+              >
+                Grupo de WhatsApp
+              </a>
+            ) : (
+              <Link to="/calculadora" className="text-muted-foreground hover:text-primary">
+                Calculadora
+              </Link>
+            )}
             <Link to="/" hash="nosotros" className="text-muted-foreground hover:text-primary">
               Nosotros
             </Link>
@@ -57,13 +72,27 @@ export function SiteHeader({ config }: { config: SiteConfig }) {
             <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
             <span>Catálogo</span>
           </Link>
-          <Link
-            to="/calculadora"
-            aria-label="Calculadora de importaciones"
-            className="inline-flex items-center rounded-full border border-border px-2 py-1 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
-          >
-            <span>Calculadora</span>
-          </Link>
+          {grupoUrl ? (
+            <a
+              href={grupoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Unirme al grupo de WhatsApp"
+              onClick={() => trackWhatsappClick({ destino: "grupos", ubicacion: "header" })}
+              className="inline-flex items-center gap-1 rounded-full bg-whatsapp px-2 py-1 text-xs font-semibold text-whatsapp-foreground hover:opacity-90 md:hidden"
+            >
+              <Users className="h-3.5 w-3.5 shrink-0" />
+              <span>Grupo</span>
+            </a>
+          ) : (
+            <Link
+              to="/calculadora"
+              aria-label="Calculadora de importaciones"
+              className="inline-flex items-center rounded-full border border-border px-2 py-1 text-xs font-semibold text-foreground hover:border-primary hover:text-primary md:hidden"
+            >
+              <span>Calculadora</span>
+            </Link>
+          )}
           <HeaderAuth />
           <Link
             to="/carrito"
@@ -106,6 +135,7 @@ export function instagramUrl(raw?: string): string {
 
 export function SiteFooter({ config }: { config: SiteConfig }) {
   const ig = instagramUrl(config["instagram"]);
+  const grupoUrl = whatsappGroupUrl(config["whatsapp_grupo"]);
   const linkClass = "transition-colors hover:text-foreground";
   return (
     <footer className="border-t border-border bg-surface px-4 pt-10 pb-6 text-[13px] text-muted-foreground print:hidden sm:px-6">
@@ -144,6 +174,17 @@ export function SiteFooter({ config }: { config: SiteConfig }) {
           >
             <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
           </a>
+          {grupoUrl && (
+            <a
+              href={grupoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackWhatsappClick({ destino: "grupos", ubicacion: "footer" })}
+              className={`inline-flex items-center gap-1.5 ${linkClass}`}
+            >
+              <Users className="h-3.5 w-3.5" /> Grupo de WhatsApp
+            </a>
+          )}
           {ig && (
             <a
               href={ig}

@@ -15,7 +15,7 @@ import {
   onImageError, isYes, money, toNumber, waLink, sanitizeUrl, type SiteConfig,
   parseCategoryRules, normCat, transferPrice, transferDiscountPct, orderedCategories,
   findRuleForCat, type CategoryRule, isNfcGoogle, isHiddenCategory,
-  rankBestSellers, HOME_BEST_SELLERS,
+  rankBestSellers, HOME_BEST_SELLERS, whatsappGroupUrl,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
 import { track, trackWhatsappClick } from "@/lib/analytics";
@@ -53,6 +53,7 @@ export const Route = createFileRoute("/")({
 function Home() {
   const { data } = useSuspenseQuery(storeQueryOptions);
   const { products, banners, config } = data;
+  const grupoUrl = whatsappGroupUrl(config["whatsapp_grupo"]);
 
   const combosScrollRef = useRef<HTMLDivElement>(null);
   const ofertasScrollRef = useRef<HTMLDivElement>(null);
@@ -574,17 +575,17 @@ function Home() {
             <div className="card-soft flex flex-col gap-4 border-l-4 border-primary p-6 shadow-sm">
               {/* Si hay link al grupo, la tarjeta invita al grupo; si no, a escribir directo */}
               <h3 className="font-sans text-lg font-bold normal-case tracking-normal">
-                {config["whatsapp_grupo"] ? "Grupo mayorista de WhatsApp" : "Escribinos por WhatsApp"}
+                {grupoUrl ? "Grupo mayorista de WhatsApp" : "Escribinos por WhatsApp"}
               </h3>
               <p className="text-sm text-muted-foreground">
-                {config["whatsapp_grupo"]
+                {grupoUrl
                   ? "Sumate al grupo para recibir las listas de precios y las ofertas antes que nadie."
                   : "Consultanos precios, stock y envíos. Te respondemos rápido."}
               </p>
-              {config["whatsapp_grupo"] && (
+              {grupoUrl && (
                 <a
                   className="btn-base bg-whatsapp text-whatsapp-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-                  href={sanitizeUrl(config["whatsapp_grupo"])}
+                  href={grupoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => trackWhatsappClick({ destino: "grupos", ubicacion: "inicio_contacto" })}
@@ -594,7 +595,7 @@ function Home() {
               )}
               <a
                 className={
-                  config["whatsapp_grupo"]
+                  grupoUrl
                     ? "btn-base border border-primary/30 text-foreground transition-colors duration-200 hover:bg-primary/5"
                     : "btn-base bg-whatsapp text-whatsapp-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
                 }
@@ -603,7 +604,7 @@ function Home() {
                 rel="noopener noreferrer"
                 onClick={() => trackWhatsappClick({ destino: "privado", ubicacion: "inicio_contacto" })}
               >
-                {config["whatsapp_grupo"] ? "Escribirnos directo" : "Abrir WhatsApp"}
+                {grupoUrl ? "Escribirnos directo" : "Abrir WhatsApp"}
               </a>
               {/* Datos de contacto como links: WhatsApp (wa.me), email e Instagram */}
               <div className="mt-1 flex flex-col items-start gap-2 text-sm text-muted-foreground">

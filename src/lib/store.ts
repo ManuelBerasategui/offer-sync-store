@@ -403,6 +403,25 @@ export function waLink(config: SiteConfig, messageOrProduct?: string) {
   return sanitizeUrl(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
 }
 
+/**
+ * Link de invitación al grupo de WhatsApp (site_config.whatsapp_grupo) validado: solo se aceptan
+ * links https de chat.whatsapp.com con código de invitación. Devuelve "" si no hay o no es válido.
+ */
+export function whatsappGroupUrl(raw?: string): string {
+  const value = String(raw ?? "").trim();
+  if (!value || value.length > 300) return "";
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:") return "";
+    if (parsed.hostname.toLowerCase() !== "chat.whatsapp.com") return "";
+    if (parsed.pathname.replace(/\//g, "").length < 6) return "";
+    if (parsed.username || parsed.password) return "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
 export function categoriesOf(products: Product[]) {
   return [...new Set(products.map((p) => (p.categoria ?? "").trim()).filter(Boolean))];
 }

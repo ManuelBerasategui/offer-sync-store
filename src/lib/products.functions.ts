@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Banner, Product, ProductVariant } from "@/lib/store";
-import { parseProductMinUnits } from "@/lib/store";
+import { parseProductMinUnits, whatsappGroupUrl } from "@/lib/store";
 import { invalidateStoreCache } from "./store.functions";
 import { assertAdmin } from "./admin-auth";
 import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
@@ -1381,6 +1381,41 @@ export const uploadAdminProductImage = createServerFn({ method: "POST" })
     } catch (err) {
       console.error("Error al subir imagen:", err);
       return { error: err instanceof Error ? err.message : "Error al subir la imagen." };
+    }
+  });
+
+/* ─── Link al grupo de WhatsApp (site_config.whatsapp_grupo) ─── */
+
+/**
+ * Cambia el link de invitación al grupo de WhatsApp que usa toda la tienda (header, footer,
+ * contacto). Los grupos se llenan seguido, por eso se edita aparte del "Guardar todo".
+ * Vacío = se quita el link (los botones del grupo dejan de mostrarse).
+ */
+export const updateWhatsappGroupLink = createServerFn({ method: "POST" })
+  .validator((data: { email?: string; token?: string; url?: string }) => ({
+    email: str(data?.email, 160).toLowerCase(),
+    token: str(data?.token, 2000),
+    url: str(data?.url, 300).trim(),
+  }))
+  .handler(async ({ data }): Promise<{ error?: string; url?: string }> => {
+    try {
+      const supabaseAdmin = await assertAdmin(data.email, data.token);
+      const url = data.url ? whatsappGroupUrl(data.url) : "";
+      if (data.url && !url) {
+        return {
+          error: "El link no es válido. Tiene que ser una invitación tipo https://chat.whatsapp.com/…",
+        };
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabaseAdmin as any)
+        .from("site_config")
+        .upsert({ clave: "whatsapp_grupo", valor: url }, { onConflict: "clave" });
+      if (error) throw error;
+      await invalidateStoreCache();
+      return { url };
+    } catch (err) {
+      console.error("Error in updateWhatsappGroupLink:", err);
+      return { error: err instanceof Error ? err.message : "Error al guardar el link del grupo." };
     }
   });
 
