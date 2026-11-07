@@ -67,14 +67,29 @@ export function priceListOf(product: Record<string, unknown>): string[] {
 }
 
 /**
- * Mensaje de WhatsApp para un producto con galería: dice qué foto eligió el cliente,
- * así se sabe qué modelo quiere sin tener que preguntar.
+ * Lee el parámetro ?foto=N de la ficha (1 = primera foto). Devuelve el número
+ * validado o undefined si no vino o no es un entero razonable.
+ */
+export function parseFotoParam(raw: unknown): number | undefined {
+  const n = typeof raw === "number" ? raw : typeof raw === "string" && /^\d{1,3}$/.test(raw) ? Number(raw) : NaN;
+  return Number.isInteger(n) && n >= 1 && n <= MAX_EXTRA_IMAGES + 1 ? n : undefined;
+}
+
+/** Link a la ficha con una foto de la galería elegida (la vista previa muestra esa foto). */
+export function galleryPhotoLink(siteUrl: string, productId: string, photoIndex: number): string {
+  return `${siteUrl}/producto/${encodeURIComponent(productId)}?foto=${photoIndex + 1}`;
+}
+
+/**
+ * Mensaje de WhatsApp para un producto con galería: manda el link a la foto elegida,
+ * así en el chat aparece la imagen del modelo y se sabe cuál quiere sin preguntar.
  */
 export function galleryWhatsappMessage(
   baseMsg: string,
   photoIndex: number,
   totalPhotos: number,
+  photoLink?: string,
 ): string {
-  if (totalPhotos <= 1 || photoIndex < 0 || photoIndex >= totalPhotos) return baseMsg;
-  return `${baseMsg} Me interesa el modelo de la foto ${photoIndex + 1} (de ${totalPhotos}).`;
+  if (totalPhotos <= 1 || photoIndex < 0 || photoIndex >= totalPhotos || !photoLink) return baseMsg;
+  return `${baseMsg} Quiero este modelo: ${photoLink}`;
 }

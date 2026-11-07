@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_EXTRA_IMAGES,
   extraImagesOf,
+  galleryPhotoLink,
   galleryWhatsappMessage,
+  parseFotoParam,
   priceListOf,
   sanitizeExtraImages,
   sanitizePriceList,
@@ -62,14 +64,37 @@ describe("price list", () => {
 });
 
 describe("galleryWhatsappMessage", () => {
-  it("adds the chosen photo number", () => {
-    expect(galleryWhatsappMessage("Hola.", 4, 34)).toBe(
-      "Hola. Me interesa el modelo de la foto 5 (de 34).",
+  const link = galleryPhotoLink("https://tienda.com", "abc-1", 4);
+
+  it("builds the photo link (1-based)", () => {
+    expect(link).toBe("https://tienda.com/producto/abc-1?foto=5");
+  });
+
+  it("adds the link to the chosen photo", () => {
+    expect(galleryWhatsappMessage("Hola.", 4, 34, link)).toBe(
+      "Hola. Quiero este modelo: https://tienda.com/producto/abc-1?foto=5",
     );
   });
 
-  it("leaves the message alone with one photo or bad index", () => {
-    expect(galleryWhatsappMessage("Hola.", 0, 1)).toBe("Hola.");
-    expect(galleryWhatsappMessage("Hola.", 9, 3)).toBe("Hola.");
+  it("leaves the message alone with one photo, bad index or no link", () => {
+    expect(galleryWhatsappMessage("Hola.", 0, 1, link)).toBe("Hola.");
+    expect(galleryWhatsappMessage("Hola.", 9, 3, link)).toBe("Hola.");
+    expect(galleryWhatsappMessage("Hola.", 1, 3)).toBe("Hola.");
+  });
+});
+
+describe("parseFotoParam", () => {
+  it("accepts small positive integers", () => {
+    expect(parseFotoParam("21")).toBe(21);
+    expect(parseFotoParam(3)).toBe(3);
+  });
+
+  it("rejects junk", () => {
+    expect(parseFotoParam("0")).toBeUndefined();
+    expect(parseFotoParam("-1")).toBeUndefined();
+    expect(parseFotoParam("2.5")).toBeUndefined();
+    expect(parseFotoParam("999")).toBeUndefined();
+    expect(parseFotoParam("abc")).toBeUndefined();
+    expect(parseFotoParam(undefined)).toBeUndefined();
   });
 });

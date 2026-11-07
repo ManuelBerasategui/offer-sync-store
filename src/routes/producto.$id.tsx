@@ -75,7 +75,7 @@ import {
   type SiteConfig,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
-import { galleryWhatsappMessage, priceListOf } from "@/lib/product-gallery";
+import { galleryPhotoLink, galleryWhatsappMessage, parseFotoParam, priceListOf } from "@/lib/product-gallery";
 import { track, trackWhatsappClick } from "@/lib/analytics";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -782,10 +782,13 @@ function ProductGallery({
   selectedVariantImage,
   onActiveChange,
   numbered = false,
+  initialIdx = 0,
 }: {
   images: string[];
   productName: string;
   selectedVariantImage?: string | null | undefined;
+  /** Foto con la que arranca (ej. la del link ?foto=N). */
+  initialIdx?: number;
   /** Avisa qué foto quedó seleccionada (índice dentro de la galería). */
   onActiveChange?: (idx: number) => void;
   /** Muestra el número de cada foto (para que el cliente diga cuál quiere). */
@@ -795,14 +798,21 @@ function ProductGallery({
   const allImages = selectedVariantImage
     ? [selectedVariantImage, ...images.filter((u) => u !== selectedVariantImage)]
     : images;
-  const [activeIdx, setActiveIdxState] = useState(0);
+  const startIdx = !selectedVariantImage && initialIdx > 0 && initialIdx < allImages.length ? initialIdx : 0;
+  const [activeIdx, setActiveIdxState] = useState(startIdx);
   const setActiveIdx = (i: number) => {
     setActiveIdxState(i);
     onActiveChange?.(i);
   };
 
-  // Resetear al cambiar variante
+  // Resetear solo cuando cambia de verdad la variante (al montar se respeta la foto inicial)
+  const prevVariantImage = useRef(selectedVariantImage);
   useEffect(() => {
+    if (prevVariantImage.current === selectedVariantImage) {
+      onActiveChange?.(activeIdx);
+      return;
+    }
+    prevVariantImage.current = selectedVariantImage;
     setActiveIdxState(0);
     onActiveChange?.(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -883,21 +893,40 @@ function ProductGallery({
 }
 
 export const Route = createFileRoute("/producto/$id")({
-  loader: async ({ context, params }) => {
+  // ?foto=N abre la ficha en esa foto de la galería (lo usa el link que se manda por WhatsApp)
+  validateSearch: (search: Record<string, unknown>): { foto?: number } => {
+    const foto = parseFotoParam(search["foto"]);
+    return foto ? { foto } : {};
+  },
+  loaderDeps: ({ search }) => ({ foto: search.foto }),
+  loader: async ({ context, params, deps }) => {
     const data = await context.queryClient.ensureQueryData(storeQueryOptions);
     const product = findProduct(data.products, params.id);
-    return { product };
+    return { product, foto: deps.foto };
   },
   head: ({ loaderData }) => {
     const product = loaderData?.product;
-    const title = product?.nombre ? `${product.nombre} — Te importamos` : "Producto — Te importamos";
+    // Foto elegida de la galería: la vista previa del link (WhatsApp) muestra esa foto
+    const chosenPhoto =
+      product && loaderData?.foto ? galleryImages(product)[loaderData.foto - 1] : undefined;
+    const title = product?.nombre
+      ? chosenPhoto
+        ? `${product.nombre} — Modelo foto ${loaderData?.foto} — Te importamos`
+        : `${product.nombre} — Te importamos`
+      : "Producto — Te importamos";
     const rawDesc = product?.descripcion?.replace(/[\r\n]+/g, " ").trim() || "";
     const description = rawDesc
       ? rawDesc.length > 160
         ? rawDesc.slice(0, 157) + "..."
         : rawDesc
       : "Comprá online productos importados originales con descuentos por cantidad y envíos a todo el país.";
-    const image = product?.imagen_url ? imageUrl(product.imagen_url) : undefined;
+    const rawImage = chosenPhoto
+      ? imageUrl(chosenPhoto)
+      : product?.imagen_url ? imageUrl(product.imagen_url) : undefined;
+    // og:image tiene que ser una URL completa: WhatsApp/Facebook no resuelven rutas relativas (/api/img?...)
+    const image = rawImage && rawImage.startsWith("/") && !rawImage.startsWith("//")
+      ? `${SITE_URL}${rawImage}`
+      : rawImage;
     const canonicalUrl = product?.id
       ? `${SITE_URL}/producto/${product.id}`
       : `${SITE_URL}/catalogo`;
@@ -1046,7 +1075,9 @@ function ProductoPage() {
   const [showCheckout, setShowCheckout] = useState(false);
   const [showMin, setShowMin] = useState(false);
   // Foto de la galería que está mirando el cliente (se manda por WhatsApp en productos WA-only)
-  const [galleryIdx, setGalleryIdx] = useState(0);
+  const { foto: fotoParam } = Route.useSearch();
+  const initialGalleryIdx = fotoParam ? fotoParam - 1 : 0;
+  const [galleryIdx, setGalleryIdx] = useState(initialGalleryIdx);
   const tiers = useMemo(() => (product ? tiersOf(product) : []), [product]);
   const variants = product?.variants ?? [];
   const [selectedVariantId, setSelectedVariantId] = useState("");
@@ -1286,6 +1317,7 @@ function ProductoPage() {
             selectedVariantImage={selectedVariant?.imagen_url}
             onActiveChange={setGalleryIdx}
             numbered={Boolean(waOnlyReason) && galleryCount > 1}
+            initialIdx={initialGalleryIdx}
           />
 
           <div className="min-w-0 w-full max-w-full">
@@ -1784,20 +1816,20 @@ function ProductoPage() {
                   <>
                     {waOnlyReason && galleryCount > 1 && (
                       <p className="text-xs text-muted-foreground">
-                        Tocá la foto del modelo que te gusta y pedilo por WhatsApp: te llega con el número de foto.
+                        Tocá la foto del modelo que te gusta y pedilo por WhatsApp: le llega la foto de ese modelo.
                       </p>
                     )}
                     <a
                       className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
                       href={waOnlyReason
-                        ? sanitizeUrl(`https://wa.me/5493418051515?text=${encodeURIComponent(galleryWhatsappMessage(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""), galleryIdx, galleryCount))}`)
+                        ? sanitizeUrl(`https://wa.me/5493418051515?text=${encodeURIComponent(galleryWhatsappMessage(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""), galleryIdx, galleryCount, galleryPhotoLink(SITE_URL, String(product.id ?? ""), galleryIdx)))}`)
                         : waLink(config, product.nombre)}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackWhatsappClick({ destino: "producto", ubicacion: "ficha_producto", producto: product.nombre, cantidad: qty })}
                     >
                       {waOnlyReason && galleryCount > 1
-                        ? `Pedir el modelo de la foto ${galleryIdx + 1} por WhatsApp`
+                        ? "Pedir este modelo por WhatsApp"
                         : waOnlyReason ? WA_ONLY_CONFIG[waOnlyReason].btnText : "Consultar por WhatsApp"}
                     </a>
                   </>
