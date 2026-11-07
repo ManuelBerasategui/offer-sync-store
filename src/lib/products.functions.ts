@@ -3,6 +3,7 @@ import type { Banner, Product, ProductVariant } from "@/lib/store";
 import { parseProductMinUnits, whatsappGroupUrl } from "@/lib/store";
 import { invalidateStoreCache } from "./store.functions";
 import { assertAdmin } from "./admin-auth";
+import { extraImagesOf, sanitizeExtraImages, sanitizePriceList } from "./product-gallery";
 import { hasUsedCoupon, verifiedUserFromToken } from "./coupon-usage";
 import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit";
 
@@ -86,6 +87,10 @@ export type ProductInput = {
    * Valores: "zapatillas" | "vapers" | "remeras" | "" (compra normal)
    */
   whatsapp_only_reason?: string;
+  /** Fotos extra de la galería (además de imagen_url). undefined = conservar las guardadas. */
+  extra_images?: string[];
+  /** Lista de precios en texto (un renglón por precio). undefined = conservar la guardada. */
+  price_list?: string;
 };
 
 /* ─── Helper de autorización: ver src/lib/admin-auth.ts (solo acepta tokens verificados) ── */
@@ -324,7 +329,7 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       const p = data.product;
 
       // Construir metadata de descuentos y talles
-      const metadata: Record<string, string> = {};
+      const metadata: Record<string, string | string[]> = {};
       if (p.es_zapatilla) {
         metadata["es_zapatilla"] = "true";
       }
@@ -451,6 +456,31 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
           }
         }
       }
+
+      // Galería y lista de precios: si el formulario no las manda, se conservan las guardadas
+      // (antes, editar un producto importado de Yupoo borraba sus fotos extra).
+      let savedMeta: Record<string, unknown> = {};
+      if (p.id && (p.extra_images === undefined || p.price_list === undefined)) {
+        const { data: cur } = await (supabaseAdmin as any)
+          .from("products")
+          .select("metadata")
+          .eq("id", p.id)
+          .maybeSingle();
+        if (cur?.metadata && typeof cur.metadata === "object" && !Array.isArray(cur.metadata)) {
+          savedMeta = cur.metadata as Record<string, unknown>;
+        }
+      }
+      const extraImages = sanitizeExtraImages(
+        p.extra_images !== undefined ? p.extra_images : extraImagesOf(savedMeta),
+        p.imagen_url,
+      );
+      const optimizedExtra: string[] = [];
+      for (const url of extraImages) {
+        optimizedExtra.push(await optimizeImageOnServer(supabaseAdmin, url, "products"));
+      }
+      if (optimizedExtra.length > 0) metadata["extra_images"] = optimizedExtra;
+      const priceList = sanitizePriceList(p.price_list !== undefined ? p.price_list : savedMeta["price_list"]);
+      if (priceList) metadata["price_list"] = priceList;
 
       const isNew = !p.id;
 

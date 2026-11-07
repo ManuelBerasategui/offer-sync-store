@@ -37,6 +37,7 @@ import {
 import { type Product, type Banner, money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, productMinUnitsOf, qtyDiscountModeOf, isNfcGoogle, isBlackviewGlasses, parseProductMinUnits, MAX_PRODUCT_MIN_UNITS, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 import { SafeImage } from "@/components/SafeImage";
+import { MAX_EXTRA_IMAGES, extraImagesOf, priceListOf } from "@/lib/product-gallery";
 
 export const Route = createFileRoute("/admin/productos")({
   loader: ({ context }) => {
@@ -81,6 +82,8 @@ const emptyProduct = (): ProductInput => ({
   talles_disponibles: [],
   tiers: [],
   variants: [],
+  extra_images: [],
+  price_list: "",
 });
 
 function productToInput(p: Product): ProductInput {
@@ -135,6 +138,8 @@ function productToInput(p: Product): ProductInput {
     tipo_talles,
     talles_disponibles,
     tiers: tiers.sort((a, b) => a.units - b.units),
+    extra_images: extraImagesOf(pRec),
+    price_list: priceListOf(pRec).join("\n"),
     variants: (p.variants ?? []).map((v) => {
       const vRec = v as Record<string, unknown>;
       return {
@@ -150,6 +155,37 @@ function productToInput(p: Product): ProductInput {
       };
     }),
   };
+}
+
+/* ───────────────────────────────────────────────────────── */
+/*  Subida de una foto: compresión a WebP + función admin    */
+/* ───────────────────────────────────────────────────────── */
+
+async function uploadProductImageFile(
+  file: File,
+  opts: { folder: string; bucket: string; email: string; token: string },
+): Promise<{ url?: string; error?: string; stats?: { orig: number; comp: number; pct: number } }> {
+  if (!file.type.startsWith("image/")) {
+    return { error: "El archivo seleccionado debe ser una imagen (JPG, PNG, WebP)." };
+  }
+  // Compresión automática a WebP (máx 900px, 80% calidad - optimizado para CDN y ahorro de egress)
+  const compressed = await compressImageFile(file, { maxWidth: 900, maxHeight: 900, quality: 0.80 });
+  // Siempre por la función del servidor, que verifica que sea admin y genera las miniaturas.
+  // (Antes se intentaba primero subir directo desde el navegador con la sesión del usuario:
+  // si las reglas de Storage lo permitían, cualquier cuenta podía subir o pisar imágenes.)
+  const res = await uploadAdminProductImage({
+    data: {
+      email: opts.email,
+      token: opts.token,
+      filename: `${opts.folder}/${crypto.randomUUID()}.webp`,
+      base64: compressed.base64,
+      bucket: opts.bucket,
+      contentType: "image/webp",
+    },
+  });
+  const stats = { orig: compressed.originalSize, comp: compressed.compressedSize, pct: compressed.savingsPct };
+  if (res.publicUrl) return { url: res.publicUrl, stats };
+  return { error: res.error ?? "No se pudo guardar la imagen.", stats };
 }
 
 /* ───────────────────────────────────────────────────────── */
@@ -186,32 +222,15 @@ function ImageDropzone({
     setOptimizedStats(null);
 
     try {
-      // 1. Compresión automática a WebP (máx 900px, 80% calidad - optimizado para CDN y ahorro de egress)
-      const compressed = await compressImageFile(file, { maxWidth: 900, maxHeight: 900, quality: 0.80 });
-      setOptimizedStats({
-        orig: compressed.originalSize,
-        comp: compressed.compressedSize,
-        pct: compressed.savingsPct,
+      const res = await uploadProductImageFile(file, {
+        folder,
+        bucket,
+        email: user?.email ?? "",
+        token: session?.access_token ?? "",
       });
-
-      const filename = `${folder}/${crypto.randomUUID()}.webp`;
-
-      // 2. Siempre por la función del servidor, que verifica que sea admin y genera las miniaturas.
-      // (Antes se intentaba primero subir directo desde el navegador con la sesión del usuario:
-      // si las reglas de Storage lo permitían, cualquier cuenta podía subir o pisar imágenes.)
-      const res = await uploadAdminProductImage({
-        data: {
-          email: user?.email ?? "",
-          token: session?.access_token ?? "",
-          filename,
-          base64: compressed.base64,
-          bucket,
-          contentType: "image/webp",
-        },
-      });
-
-      if (res.publicUrl) {
-        onChange(res.publicUrl);
+      if (res.stats) setOptimizedStats(res.stats);
+      if (res.url) {
+        onChange(res.url);
       } else {
         setErrorMsg(res.error ?? "No se pudo guardar la imagen.");
       }
@@ -304,6 +323,188 @@ function ImageDropzone({
         )}
       </div>
       {errorMsg && <p className="text-xs text-destructive font-semibold">{errorMsg}</p>}
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────── */
+/*  Galería: subir muchas fotos de una vez                   */
+/* ───────────────────────────────────────────────────────── */
+
+const GALLERY_UPLOAD_CONCURRENCY = 3;
+
+function GalleryUploader({
+  mainImage,
+  images,
+  onAdd,
+  onRemove,
+  onMakeMain,
+  bucket,
+  folder,
+}: {
+  mainImage: string;
+  images: string[];
+  /** Agrega las fotos subidas, en el mismo orden en que se eligieron. */
+  onAdd: (urls: string[]) => void;
+  onRemove: (idx: number) => void;
+  onMakeMain: (idx: number) => void;
+  bucket: string;
+  folder: string;
+}) {
+  const { user, session } = useAuth();
+  const [dragging, setDragging] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [failed, setFailed] = useState<string[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const totalPhotos = (mainImage ? 1 : 0) + images.length;
+  const room = MAX_EXTRA_IMAGES + (mainImage ? 0 : 1) - images.length;
+  const firstExtraNumber = mainImage ? 2 : 1;
+
+  async function uploadMany(fileList: File[]) {
+    const all = fileList.filter((f) => f.type.startsWith("image/"));
+    if (all.length === 0) return;
+    const files = all.slice(0, Math.max(0, room));
+    const skipped = all.length - files.length;
+    setFailed([]);
+    setProgress({ done: 0, total: files.length });
+    const errors: string[] = [];
+    let done = 0;
+    // De a 3 fotos por vez; cada tanda se agrega en el orden en que se eligieron
+    for (let i = 0; i < files.length; i += GALLERY_UPLOAD_CONCURRENCY) {
+      const batch = files.slice(i, i + GALLERY_UPLOAD_CONCURRENCY);
+      const results = await Promise.all(
+        batch.map((file) =>
+          uploadProductImageFile(file, {
+            folder,
+            bucket,
+            email: user?.email ?? "",
+            token: session?.access_token ?? "",
+          }).catch((err: unknown): { url?: string; error?: string } => ({
+            error: err instanceof Error ? err.message : "Error al subir.",
+          })),
+        ),
+      );
+      const urls: string[] = [];
+      results.forEach((r, j) => {
+        if (r.url) urls.push(r.url);
+        else errors.push(`${batch[j]?.name ?? "foto"}: ${r.error ?? "no se pudo subir"}`);
+      });
+      if (urls.length > 0) onAdd(urls);
+      done += batch.length;
+      setProgress({ done, total: files.length });
+    }
+    if (skipped > 0) {
+      errors.push(`${skipped} foto(s) no se subieron: el máximo es ${MAX_EXTRA_IMAGES + 1} por producto.`);
+    }
+    setFailed(errors);
+    setProgress(null);
+    const ok = files.length - (errors.length - (skipped > 0 ? 1 : 0));
+    if (ok > 0) toast.success(`${ok} foto${ok !== 1 ? "s" : ""} subida${ok !== 1 ? "s" : ""}. Acordate de guardar el producto.`);
+  }
+
+  return (
+    <div className="space-y-2">
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          if (!progress && e.dataTransfer.files.length > 0) void uploadMany(Array.from(e.dataTransfer.files));
+        }}
+        onClick={() => {
+          if (!progress) inputRef.current?.click();
+        }}
+        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors ${dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/30"}`}
+        style={{ minHeight: 96 }}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="sr-only"
+          onChange={(e) => {
+            const files = e.target.files ? Array.from(e.target.files) : [];
+            e.target.value = "";
+            if (files.length > 0) void uploadMany(files);
+          }}
+        />
+        {progress ? (
+          <div className="w-full max-w-xs space-y-1.5 text-primary">
+            <div className="flex items-center justify-center gap-2 text-xs font-semibold">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Subiendo {progress.done} de {progress.total}…
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            <Upload className="h-6 w-6 text-primary/70" />
+            <span className="text-xs font-medium text-muted-foreground">
+              Elegí o arrastrá varias fotos juntas (podés seleccionarlas todas de una vez)
+            </span>
+          </>
+        )}
+      </div>
+
+      {failed.length > 0 && (
+        <ul className="space-y-0.5 text-xs font-semibold text-destructive">
+          {failed.map((m, i) => (
+            <li key={i}>{m}</li>
+          ))}
+        </ul>
+      )}
+
+      {totalPhotos > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          {totalPhotos} foto{totalPhotos !== 1 ? "s" : ""} en total (la principal es la n.º 1). En la tienda se ven numeradas en este orden.
+        </p>
+      )}
+      {images.length > 0 && (
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+          {images.map((url, i) => (
+            <div key={url} className="group relative overflow-hidden rounded-lg border border-border bg-surface">
+              <img
+                src={imageUrl(url)}
+                alt={`Foto ${i + firstExtraNumber}`}
+                loading="lazy"
+                className="aspect-square w-full object-contain p-1"
+              />
+              <span className="absolute left-1 top-1 rounded bg-black/70 px-1.5 text-[10px] font-bold text-white">
+                {i + firstExtraNumber}
+              </span>
+              <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/60 p-0.5 sm:opacity-0 sm:group-hover:opacity-100">
+                <button
+                  type="button"
+                  onClick={() => onMakeMain(i)}
+                  className="rounded px-1 text-[10px] font-semibold text-white hover:bg-white/20"
+                  title="Usar como foto principal"
+                >
+                  Principal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemove(i)}
+                  className="rounded p-0.5 text-white hover:bg-white/20"
+                  title="Quitar foto"
+                  aria-label={`Quitar foto ${i + firstExtraNumber}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1030,6 +1231,42 @@ function ProductModal({
             />
           </div>
 
+          {/* Galería de fotos (muchas a la vez) */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Galería de fotos ({form.extra_images?.length ?? 0} extra)
+            </label>
+            <GalleryUploader
+              mainImage={form.imagen_url ?? ""}
+              images={form.extra_images ?? []}
+              bucket="storage-images"
+              folder="products"
+              onAdd={(urls) =>
+                setForm((prev) => {
+                  const extra = [...(prev.extra_images ?? [])];
+                  let main = prev.imagen_url ?? "";
+                  for (const u of urls) {
+                    if (!main) main = u;
+                    else if (u !== main && !extra.includes(u)) extra.push(u);
+                  }
+                  return { ...prev, imagen_url: main, extra_images: extra };
+                })
+              }
+              onRemove={(idx) =>
+                setForm((prev) => ({ ...prev, extra_images: (prev.extra_images ?? []).filter((_, i) => i !== idx) }))
+              }
+              onMakeMain={(idx) =>
+                setForm((prev) => {
+                  const extra = [...(prev.extra_images ?? [])];
+                  const [chosen] = extra.splice(idx, 1);
+                  if (!chosen) return prev;
+                  if (prev.imagen_url) extra.unshift(prev.imagen_url);
+                  return { ...prev, imagen_url: chosen, extra_images: extra };
+                })
+              }
+            />
+          </div>
+
           {/* Campos básicos */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="col-span-1 sm:col-span-2">
@@ -1233,6 +1470,19 @@ function ProductModal({
             <div className="col-span-1 sm:col-span-2">
               <label className="label-sm">Descripción</label>
               <textarea className="input-base min-h-[80px] resize-y" value={form.descripcion ?? ""} onChange={(e) => set("descripcion", e.target.value)} placeholder="Descripción del producto..." />
+            </div>
+            <div className="col-span-1 sm:col-span-2">
+              <label className="label-sm">Lista de precios (opcional, un precio por renglón)</label>
+              <textarea
+                className="input-base min-h-[110px] resize-y font-mono text-xs"
+                value={form.price_list ?? ""}
+                onChange={(e) => set("price_list", e.target.value)}
+                maxLength={2000}
+                placeholder={"1/2 Docena x $15.000 c/u\n1 Docena x $13.000 c/u\n3 Docenas x $12.000 c/u"}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Se muestra tal cual en la ficha del producto. Sirve para productos por WhatsApp con precios por cantidad.
+              </p>
             </div>
           </div>
 

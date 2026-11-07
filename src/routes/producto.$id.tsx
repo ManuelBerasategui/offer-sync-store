@@ -75,6 +75,7 @@ import {
   type SiteConfig,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
+import { galleryWhatsappMessage, priceListOf } from "@/lib/product-gallery";
 import { track, trackWhatsappClick } from "@/lib/analytics";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -779,28 +780,50 @@ function ProductGallery({
   images,
   productName,
   selectedVariantImage,
+  onActiveChange,
+  numbered = false,
 }: {
   images: string[];
   productName: string;
   selectedVariantImage?: string | null | undefined;
+  /** Avisa qué foto quedó seleccionada (índice dentro de la galería). */
+  onActiveChange?: (idx: number) => void;
+  /** Muestra el número de cada foto (para que el cliente diga cuál quiere). */
+  numbered?: boolean;
 }) {
   // Si hay imagen de variante, la ponemos primero; si no, usamos las del producto
   const allImages = selectedVariantImage
     ? [selectedVariantImage, ...images.filter((u) => u !== selectedVariantImage)]
     : images;
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [activeIdx, setActiveIdxState] = useState(0);
+  const setActiveIdx = (i: number) => {
+    setActiveIdxState(i);
+    onActiveChange?.(i);
+  };
 
   // Resetear al cambiar variante
-  useEffect(() => { setActiveIdx(0); }, [selectedVariantImage]);
+  useEffect(() => {
+    setActiveIdxState(0);
+    onActiveChange?.(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVariantImage]);
 
   const current = allImages[activeIdx] ?? allImages[0] ?? "";
+  const showNumbers = numbered && allImages.length > 1;
+  // Muchas fotos (ej. 34 modelos): miniaturas en grilla en vez de una tira con scroll
+  const thumbsAsGrid = allImages.length > 8;
 
   return (
     // En PC, foto y miniaturas van juntas como bloque fijo (si se habilita sticky en la página);
     // antes solo la foto era sticky y las miniaturas podían quedar por encima.
     <div className="flex flex-col gap-2.5 min-w-0 w-full max-w-full lg:sticky lg:top-24">
       {/* Imagen principal */}
-      <div className="mx-auto w-full max-w-[460px] overflow-hidden rounded-2xl border border-border bg-surface">
+      <div className="relative mx-auto w-full max-w-[460px] overflow-hidden rounded-2xl border border-border bg-surface">
+        {showNumbers && (
+          <span className="absolute left-3 top-3 z-10 rounded-full bg-black/75 px-3 py-1 text-xs font-bold text-white">
+            Foto {activeIdx + 1} de {allImages.length}
+          </span>
+        )}
         <img
           key={current}
           src={imageUrl(current) || FALLBACK_IMAGE}
@@ -813,20 +836,35 @@ function ProductGallery({
       </div>
       {/* Strip de miniaturas (solo si hay más de 1 foto) */}
       {allImages.length > 1 && (
-        <div className="mx-auto flex w-full max-w-[460px] gap-2 overflow-x-auto pb-1 no-scrollbar min-w-0">
+        <div
+          className={
+            thumbsAsGrid
+              ? "mx-auto grid w-full max-w-[460px] grid-cols-5 gap-2 sm:grid-cols-6 min-w-0"
+              : "mx-auto flex w-full max-w-[460px] gap-2 overflow-x-auto pb-1 no-scrollbar min-w-0"
+          }
+        >
           {allImages.map((url, i) => (
             <button
               key={url + i}
               type="button"
               onClick={() => setActiveIdx(i)}
               aria-label={`Ver foto ${i + 1}`}
+              aria-pressed={i === activeIdx}
               className={[
-                "shrink-0 h-16 w-16 sm:h-[72px] sm:w-[72px] rounded-xl border-2 overflow-hidden bg-surface transition-all",
+                thumbsAsGrid
+                  ? "relative aspect-square w-full"
+                  : "relative shrink-0 h-16 w-16 sm:h-[72px] sm:w-[72px]",
+                "rounded-xl border-2 overflow-hidden bg-surface transition-all",
                 i === activeIdx
                   ? "border-primary"
                   : "border-transparent opacity-70 hover:opacity-100 hover:border-primary/40",
               ].join(" ")}
             >
+              {showNumbers && (
+                <span className="absolute left-0.5 top-0.5 z-10 rounded bg-black/70 px-1 text-[10px] font-bold leading-4 text-white">
+                  {i + 1}
+                </span>
+              )}
               <img
                 src={thumbnailUrl(url) || FALLBACK_IMAGE}
                 alt={`Miniatura ${i + 1}`}
@@ -1007,6 +1045,8 @@ function ProductoPage() {
   const [custom, setCustom] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showMin, setShowMin] = useState(false);
+  // Foto de la galería que está mirando el cliente (se manda por WhatsApp en productos WA-only)
+  const [galleryIdx, setGalleryIdx] = useState(0);
   const tiers = useMemo(() => (product ? tiersOf(product) : []), [product]);
   const variants = product?.variants ?? [];
   const [selectedVariantId, setSelectedVariantId] = useState("");
@@ -1055,6 +1095,8 @@ function ProductoPage() {
   // Las curvas vienen armadas: no se elige talle
   const hasTalles = !isCurvaProd && (rawTipo === "ZAPATILLAS" || rawTipo === "ROPA");
   const waOnlyReason: WaOnlyReason | null = waOnlyReasonOf(productRec);
+  const galleryCount = galleryImages(product).length;
+  const priceList = priceListOf(productRec);
   // Retrocompatibilidad: esZapatilla para los guards de tipo_talles que ya existían
   const esZapatilla = waOnlyReason === "zapatillas";
 
@@ -1242,6 +1284,8 @@ function ProductoPage() {
             images={galleryImages(product)}
             productName={product.nombre ?? "Producto"}
             selectedVariantImage={selectedVariant?.imagen_url}
+            onActiveChange={setGalleryIdx}
+            numbered={Boolean(waOnlyReason) && galleryCount > 1}
           />
 
           <div className="min-w-0 w-full max-w-full">
@@ -1252,7 +1296,20 @@ function ProductoPage() {
               {displayName}
             </h1>
 
-            {!isCamisetaProd && ((consultar || (waOnlyReason && (WA_ONLY_CONFIG[waOnlyReason]?.hidePrice || unit <= 0)) || unit <= 0) ? (
+            {priceList.length > 0 && (
+              <div className="mt-4 rounded-xl border border-border bg-surface p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lista de precios</p>
+                <ul className="mt-2 space-y-1.5">
+                  {priceList.map((line, i) => (
+                    <li key={i} className="text-sm font-semibold tabular-nums text-foreground break-words">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {!isCamisetaProd && priceList.length > 0 && (consultar || waOnlyReason) ? null : !isCamisetaProd && ((consultar || (waOnlyReason && (WA_ONLY_CONFIG[waOnlyReason]?.hidePrice || unit <= 0)) || unit <= 0) ? (
               <p className="mt-4 text-sm font-semibold text-muted-foreground">
                 Consultá el precio y disponibilidad por WhatsApp.
               </p>
@@ -1724,17 +1781,27 @@ function ProductoPage() {
             {!isCamisetaProd && (
               <div className="mt-6 flex flex-col gap-3">
                 {consultar || waOnlyReason ? (
-                  <a
-                    className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
-                    href={waOnlyReason
-                      ? sanitizeUrl(`https://wa.me/5493418051515?text=${encodeURIComponent(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""))}`)
-                      : waLink(config, product.nombre)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => trackWhatsappClick({ destino: "producto", ubicacion: "ficha_producto", producto: product.nombre, cantidad: qty })}
-                  >
-                    {waOnlyReason ? WA_ONLY_CONFIG[waOnlyReason].btnText : "Consultar por WhatsApp"}
-                  </a>
+                  <>
+                    {waOnlyReason && galleryCount > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        Tocá la foto del modelo que te gusta y pedilo por WhatsApp: te llega con el número de foto.
+                      </p>
+                    )}
+                    <a
+                      className="btn-base w-full bg-whatsapp text-whatsapp-foreground"
+                      href={waOnlyReason
+                        ? sanitizeUrl(`https://wa.me/5493418051515?text=${encodeURIComponent(galleryWhatsappMessage(WA_ONLY_CONFIG[waOnlyReason].waMsg(product.nombre ?? ""), galleryIdx, galleryCount))}`)
+                        : waLink(config, product.nombre)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackWhatsappClick({ destino: "producto", ubicacion: "ficha_producto", producto: product.nombre, cantidad: qty })}
+                    >
+                      {waOnlyReason && galleryCount > 1
+                        ? `Pedir el modelo de la foto ${galleryIdx + 1} por WhatsApp`
+                        : waOnlyReason ? WA_ONLY_CONFIG[waOnlyReason].btnText : "Consultar por WhatsApp"}
+                    </a>
+                  </>
+
                 ) : showCheckout ? (
                   <CheckoutFlow
                     items={[
