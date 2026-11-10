@@ -25,7 +25,7 @@ import {
   type CampaignSummary,
 } from "@/lib/newsletter.functions";
 import { parseCategoryRules, normCat, getBaseCategory, money, impliedUsdRate, whatsappGroupUrl } from "@/lib/store";
-import { readQuoteTerms, QUOTE_TERMS_LIMITS, type QuoteTerms } from "@/lib/quote-terms";
+import { DEFAULT_DESPACHANTE_TRAMOS, readQuoteTerms, QUOTE_TERMS_LIMITS, type QuoteTerms } from "@/lib/quote-terms";
 
 type QuoteTermsForm = Omit<QuoteTerms, "senaPct" | "validezDias" | "incluye" | "noIncluye"> & {
   senaPct: string;
@@ -138,6 +138,10 @@ function AdminConfiguracionPage() {
   const [calcHandling, setCalcHandling] = useState<string>(config["calc_handling"] ?? "30");
   const [calcHonorariosPct, setCalcHonorariosPct] = useState<string>(config["calc_honorarios_pct"] ?? "10");
   const [calcHonorariosTope, setCalcHonorariosTope] = useState<string>(config["calc_honorarios_tope"] ?? "250");
+  const [calcHonorariosMin, setCalcHonorariosMin] = useState<string>(config["calc_honorarios_min"] ?? "30");
+  const [calcDespachanteTramos, setCalcDespachanteTramos] = useState<string>(
+    config["calc_despachante_tramos"] ?? DEFAULT_DESPACHANTE_TRAMOS,
+  );
   const [calcImpuestosPct, setCalcImpuestosPct] = useState<string>(config["calc_impuestos_pct"] ?? "70");
   const [calcAereoFijo, setCalcAereoFijo] = useState<string>(config["calc_aereo_fijo"] ?? "950");
   const [calcAereoDesde, setCalcAereoDesde] = useState<string>(config["calc_aereo_desde"] ?? "50");
@@ -407,6 +411,9 @@ function AdminConfiguracionPage() {
             handling: Number(calcHandling) || 30,
             honorariosPct: Number(calcHonorariosPct) || 10,
             honorariosTope: Number(calcHonorariosTope) || 250,
+            // Vacío = valor por defecto; 0 es válido (sin piso / sin despachante)
+            honorariosMin: calcHonorariosMin.trim() === "" ? 30 : Number(calcHonorariosMin),
+            despachanteTramos: calcDespachanteTramos,
             impuestosPct: Number(calcImpuestosPct) || 70,
             aereoFijo: Number(calcAereoFijo) || 950,
             aereoDesde: Number(calcAereoDesde) || 50,
@@ -1383,6 +1390,41 @@ function AdminConfiguracionPage() {
               </div>
               <p className="text-[11px] text-muted-foreground">
                 Ej: 10% con tope 250 → desde US$ {Math.round((Number(calcHonorariosTope) || 250) / ((Number(calcHonorariosPct) || 10) / 100)).toLocaleString("es-AR")} de mercadería se cobra el fijo.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Piso de honorarios</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-muted-foreground">u$d</span>
+                <input
+                  type="number"
+                  step="5"
+                  min="0"
+                  className="input-base text-xs font-bold"
+                  value={calcHonorariosMin}
+                  onChange={(e) => setCalcHonorariosMin(e.target.value)}
+                  placeholder="30"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Mínimo que se cobra aunque el % dé menos. Ej: 10% con piso {Number(calcHonorariosMin) || 0} → hasta US$ {Math.round((Number(calcHonorariosMin) || 0) / ((Number(calcHonorariosPct) || 10) / 100)).toLocaleString("es-AR")} de mercadería se cobra el piso. 0 = sin piso.
+              </p>
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Gestión aduanera / despachante (estimado)</label>
+              <input
+                type="text"
+                className="input-base text-xs font-bold"
+                value={calcDespachanteTramos}
+                onChange={(e) => setCalcDespachanteTramos(e.target.value)}
+                placeholder={DEFAULT_DESPACHANTE_TRAMOS}
+                maxLength={400}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Lo que cobra el despachante varía, por eso es una escala: <b>mercadería desde u$d : monto u$d</b>, separados por coma.
+                Ej: 0:100, 1000:150, 2000:200 → hasta u$d 999 de mercadería se suman 100; de 1.000 a 1.999, 150; desde 2.000, 200.
               </p>
             </div>
 

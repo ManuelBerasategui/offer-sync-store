@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Banner, Product, ProductVariant } from "@/lib/store";
 import { parseProductMinUnits, whatsappGroupUrl } from "@/lib/store";
+import { parseDespachanteTramos } from "@/lib/quote-terms";
 import { invalidateStoreCache } from "./store.functions";
 import { assertAdmin } from "./admin-auth";
 import { extraImagesOf, sanitizeExtraImages, sanitizePriceList } from "./product-gallery";
@@ -11,6 +12,12 @@ import { createRateLimiter, currentClientIp, RATE_LIMIT_MSG } from "./rate-limit
 const couponLimited = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 15 });
 
 const str = (v: unknown, max = 2000) => String(v ?? "").slice(0, max);
+
+/** Número >= 0 que respeta el 0; si no es válido usa el valor por defecto. */
+const nonNegative = (v: unknown, fallback: number) => {
+  const n = Number(v);
+  return v === undefined || v === null || v === "" || !Number.isFinite(n) || n < 0 ? fallback : n;
+};
 
 /* ─── Tipos de entrada ─────────────────────────────────── */
 
@@ -1479,6 +1486,8 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         handling?: number;
         honorariosPct?: number;
         honorariosTope?: number;
+        honorariosMin?: number;
+        despachanteTramos?: string;
         impuestosPct?: number;
         aereoFijo?: number;
         aereoDesde?: number;
@@ -1615,6 +1624,14 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
           {
             clave: "calc_honorarios_tope",
             valor: String(Math.max(0, Number(data.calculatorRates.honorariosTope) || 250)),
+          },
+          // Estos permiten 0 (sin piso / sin despachante), por eso no usan `|| default`
+          { clave: "calc_honorarios_min", valor: String(nonNegative(data.calculatorRates.honorariosMin, 30)) },
+          {
+            clave: "calc_despachante_tramos",
+            valor: parseDespachanteTramos(str(data.calculatorRates.despachanteTramos, 400))
+              .map((t) => `${t.desde}:${t.monto}`)
+              .join(", "),
           },
           { clave: "calc_impuestos_pct", valor: String(data.calculatorRates.impuestosPct ?? 70) },
           { clave: "calc_aereo_fijo", valor: String(data.calculatorRates.aereoFijo ?? 950) },

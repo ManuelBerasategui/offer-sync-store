@@ -146,12 +146,50 @@ export function splitPayment(total: number, senaPct: number) {
 }
 
 /**
- * Honorarios de TE.IMPORTAMOS: un % del valor de la mercadería (FOB) con tope.
- * Con 10% y tope US$ 250, a partir de US$ 2.500 de mercadería se cobra el fijo de 250.
+ * Honorarios de TE.IMPORTAMOS: un % del valor de la mercadería (FOB) con piso y tope.
+ * Con 10%, piso US$ 30 y tope US$ 250: una carga de US$ 500 paga 50, una de US$ 100 paga el
+ * piso de 30 y desde US$ 2.500 de mercadería se cobra el fijo de 250.
  */
-export function calcHonorarios(fob: number, pct: number, tope: number): number {
+export function calcHonorarios(fob: number, pct: number, tope: number, piso = 0): number {
   const safeFob = Number.isFinite(fob) && fob > 0 ? fob : 0;
+  if (safeFob === 0) return 0;
   const safePct = Number.isFinite(pct) && pct > 0 ? pct : 0;
   const byPct = Math.round(safeFob * safePct) / 100;
-  return Number.isFinite(tope) && tope > 0 ? Math.min(byPct, tope) : byPct;
+  const capped = Number.isFinite(tope) && tope > 0 ? Math.min(byPct, tope) : byPct;
+  const safePiso = Number.isFinite(piso) && piso > 0 ? piso : 0;
+  return Math.max(capped, safePiso);
+}
+
+export type DespachanteTramo = { desde: number; monto: number };
+
+/**
+ * Estimado de lo que cobra el despachante (Pedro) según el valor de la mercadería (FOB).
+ * Sus cotizaciones varían mucho, por eso es una escala editable: `desde:monto` separados por coma.
+ * Ej: "0:100, 1000:150, 2000:200" → hasta 999 paga 100, de 1.000 a 1.999 paga 150, desde 2.000 paga 200.
+ */
+export const DEFAULT_DESPACHANTE_TRAMOS = "0:100, 1000:150, 2000:200";
+
+/** Lee la escala sin regex: ignora pares inválidos y devuelve los tramos ordenados por `desde`. */
+export function parseDespachanteTramos(raw: string | undefined | null): DespachanteTramo[] {
+  const parse = (text: string): DespachanteTramo[] =>
+    text
+      .slice(0, 400)
+      .split(",")
+      .map((pair) => pair.split(":"))
+      .filter((parts) => parts.length === 2)
+      .map(([d, m]) => ({ desde: Number(d.trim()), monto: Number(m.trim()) }))
+      .filter((t) => Number.isFinite(t.desde) && t.desde >= 0 && Number.isFinite(t.monto) && t.monto >= 0)
+      .sort((a, b) => a.desde - b.desde);
+  const tramos = parse(raw ?? "");
+  return tramos.length > 0 ? tramos : parse(DEFAULT_DESPACHANTE_TRAMOS);
+}
+
+/** Monto del tramo más alto que la mercadería alcanza. Sin mercadería no hay operación: 0. */
+export function calcDespachante(fob: number, tramos: DespachanteTramo[]): number {
+  if (!(Number.isFinite(fob) && fob > 0)) return 0;
+  let monto = 0;
+  for (const t of tramos) {
+    if (fob >= t.desde) monto = t.monto;
+  }
+  return monto;
 }

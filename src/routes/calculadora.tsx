@@ -8,7 +8,7 @@ import { storeQueryOptions } from "@/lib/store-query";
 import { waLink } from "@/lib/store";
 import { track, trackWhatsappClick } from "@/lib/analytics";
 import { getImportUsdRate } from "@/lib/import-ai.functions";
-import { addBusinessDays, calcHonorarios, readQuoteTerms, splitPayment } from "@/lib/quote-terms";
+import { addBusinessDays, calcDespachante, calcHonorarios, parseDespachanteTramos, readQuoteTerms, splitPayment, type DespachanteTramo } from "@/lib/quote-terms";
 
 // Datos precargados (ej: desde la lectura de una captura en /importar). Valores inválidos se ignoran.
 const calculadoraSearchSchema = z.object({
@@ -49,6 +49,7 @@ type QuoteResult = {
     freightCost: number;
     handling: number;
     honorarios: number;
+    despachante: number;
     base: number;
     tax: number;
     total: number;
@@ -59,6 +60,7 @@ type QuoteResult = {
   freightTotal: number;
   handlingTotal: number;
   honorariosTotal: number;
+  despachanteTotal: number;
   taxesTotal: number;
   grandTotal: number;
   /** El envío completo supera el umbral de barco. */
@@ -68,6 +70,8 @@ type QuoteResult = {
     handling: number;
     honorariosPct: number;
     honorariosTope: number;
+    honorariosMin: number;
+    despachanteTramos: DespachanteTramo[];
     impuestosPct: number;
     aereoFijo: number;
     aereoDesde: number;
@@ -76,6 +80,13 @@ type QuoteResult = {
     barcoDesde: number;
   };
 };
+
+/** Lee un número de site_config respetando el 0 (a diferencia de `|| default`). */
+function numConfig(raw: string | undefined, fallback: number) {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
 
 /** Montos de la importación: se calculan y se pagan en dólares. */
 function fmt(n: number) {
@@ -108,6 +119,10 @@ export function CalculadoraPage() {
     // Honorarios propios: % de la mercadería con tope (10% hasta US$ 250)
     honorariosPct: Number(config["calc_honorarios_pct"]) || 10,
     honorariosTope: Number(config["calc_honorarios_tope"]) || 250,
+    // Piso para que una carga chica no termine pagando de más "de onda" (permite 0 = sin piso)
+    honorariosMin: numConfig(config["calc_honorarios_min"], 30),
+    // Gestión aduanera (despachante, Pedro): estimado por tramos según la mercadería
+    despachanteTramos: parseDespachanteTramos(config["calc_despachante_tramos"]),
     impuestosPct: Number(config["calc_impuestos_pct"]) || 70,
     aereoFijo: Number(config["calc_aereo_fijo"]) || 950,
     aereoDesde: Number(config["calc_aereo_desde"]) || 50,
@@ -187,12 +202,13 @@ export function CalculadoraPage() {
       const fobTotal = i.cantidad * i.fob;
       const freightCost = calcFreightCost(weight);
       const handling = rates.handling;
-      const honorarios = calcHonorarios(fobTotal, rates.honorariosPct, rates.honorariosTope);
+      const honorarios = calcHonorarios(fobTotal, rates.honorariosPct, rates.honorariosTope, rates.honorariosMin);
+      const despachante = calcDespachante(fobTotal, rates.despachanteTramos);
       const base = fobTotal + freightCost + handling;
       const tax = base * (rates.impuestosPct / 100);
-      const total = base + tax + honorarios;
+      const total = base + tax + honorarios + despachante;
       const unitPrice = i.cantidad > 0 ? total / i.cantidad : 0;
-      return { ...i, weight, fobTotal, freightCost, handling, honorarios, base, tax, total, unitPrice };
+      return { ...i, weight, fobTotal, freightCost, handling, honorarios, despachante, base, tax, total, unitPrice };
     });
 
     // Cálculo combinado (todos juntos)
@@ -200,10 +216,11 @@ export function CalculadoraPage() {
     const totalFOB = validItems.reduce((s, i) => s + i.cantidad * i.fob, 0);
     const freightTotal = calcFreightCost(totalWeight);
     const handlingTotal = rates.handling;
-    const honorariosTotal = calcHonorarios(totalFOB, rates.honorariosPct, rates.honorariosTope);
+    const honorariosTotal = calcHonorarios(totalFOB, rates.honorariosPct, rates.honorariosTope, rates.honorariosMin);
+    const despachanteTotal = calcDespachante(totalFOB, rates.despachanteTramos);
     const baseTotal = totalFOB + freightTotal + handlingTotal;
     const taxesTotal = baseTotal * (rates.impuestosPct / 100);
-    const grandTotal = baseTotal + taxesTotal + honorariosTotal;
+    const grandTotal = baseTotal + taxesTotal + honorariosTotal + despachanteTotal;
 
     const res: QuoteResult = {
       client: clientName,
@@ -214,6 +231,7 @@ export function CalculadoraPage() {
       freightTotal,
       handlingTotal,
       honorariosTotal,
+      despachanteTotal,
       taxesTotal,
       grandTotal,
       viaMaritima: totalWeight > barcoThreshold,
@@ -256,6 +274,7 @@ export function CalculadoraPage() {
       msg += `• Flete: ${fmt(quote.freightTotal)}\n`;
       msg += `• Handling: ${fmt(quote.handlingTotal)}\n`;
       msg += `• Honorarios: ${fmt(quote.honorariosTotal)}\n`;
+      msg += `• Gestión aduanera (estimado): ${fmt(quote.despachanteTotal)}\n`;
       msg += `• Impuestos: ${fmt(quote.taxesTotal)}\n`;
       msg += `\n*Total trayendo todo: ${fmt(quote.grandTotal)}*${usdRate ? ` (≈ ${ars(quote.grandTotal)})` : ""}\n`;
     } else {
@@ -264,7 +283,7 @@ export function CalculadoraPage() {
         msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u${usdRate ? ` (≈ ${ars(i.unitPrice)})` : ""} puesto en Argentina\n`;
       }
       msg += `\n*Total puesto en Argentina: ${fmt(quote.grandTotal)}*${usdRate ? ` (≈ ${ars(quote.grandTotal)})` : ""}\n`;
-      msg += `_(incluye flete, handling, honorarios e impuestos)_\n`;
+      msg += `_(incluye flete, handling, honorarios, gestión aduanera e impuestos)_\n`;
     }
 
     const pay = splitPayment(quote.grandTotal, terms.senaPct);
@@ -573,6 +592,10 @@ export function CalculadoraPage() {
                       <span className="text-foreground">Honorarios</span>
                       <span className="font-mono text-foreground">{fmt(quote.honorariosTotal)}</span>
                     </div>
+                    <div className="flex justify-between py-2 text-sm">
+                      <span className="text-foreground">Gestión aduanera (estimado)</span>
+                      <span className="font-mono text-foreground">{fmt(quote.despachanteTotal)}</span>
+                    </div>
                     <div className="flex justify-between gap-3 py-2 text-sm font-medium">
                       <span className="text-foreground">
                         Impuestos{" "}
@@ -620,6 +643,10 @@ export function CalculadoraPage() {
                     <div className="flex justify-between">
                       <span>Honorarios</span>
                       <span>{fmt(quote.honorariosTotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gestión aduanera (estimado)</span>
+                      <span>{fmt(quote.despachanteTotal)}</span>
                     </div>
                     <div className="flex justify-between gap-3">
                       <span>Impuestos (derechos, tasa, IVA y percepciones)</span>

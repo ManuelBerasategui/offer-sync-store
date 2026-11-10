@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_QUOTE_TERMS,
+  DEFAULT_DESPACHANTE_TRAMOS,
+  calcDespachante,
   calcHonorarios,
+  parseDespachanteTramos,
   QUOTE_TERMS_KEYS,
   readQuoteTerms,
   splitPayment,
@@ -58,5 +61,38 @@ describe("calcHonorarios", () => {
   it("sin tope o con valores inválidos", () => {
     expect(calcHonorarios(5000, 10, 0)).toBe(500);
     expect(calcHonorarios(-1, 10, 250)).toBe(0);
+  });
+  it("piso de 30: hasta US$ 300 se cobra 30, desde 400 el 10%", () => {
+    for (const fob of [48, 100, 200, 300]) expect(calcHonorarios(fob, 10, 250, 30)).toBe(30);
+    expect(calcHonorarios(400, 10, 250, 30)).toBe(40);
+    expect(calcHonorarios(500, 10, 250, 30)).toBe(50);
+    expect(calcHonorarios(5000, 10, 250, 30)).toBe(250);
+  });
+  it("sin mercadería no hay honorarios, ni con piso", () => {
+    expect(calcHonorarios(0, 10, 250, 30)).toBe(0);
+  });
+});
+
+describe("despachante por tramos", () => {
+  const tramos = parseDespachanteTramos("0:100, 1000:150, 2000:200");
+  it("elige el tramo más alto que alcanza la mercadería", () => {
+    expect(calcDespachante(500, tramos)).toBe(100);
+    expect(calcDespachante(999.99, tramos)).toBe(100);
+    expect(calcDespachante(1000, tramos)).toBe(150);
+    expect(calcDespachante(2100, tramos)).toBe(200);
+    expect(calcDespachante(50000, tramos)).toBe(200);
+  });
+  it("sin mercadería no cobra", () => {
+    expect(calcDespachante(0, tramos)).toBe(0);
+  });
+  it("ordena los tramos y descarta pares inválidos", () => {
+    expect(parseDespachanteTramos("2000:300, x:1, 0:90, 5:-1, 1000")).toEqual([
+      { desde: 0, monto: 90 },
+      { desde: 2000, monto: 300 },
+    ]);
+  });
+  it("si no hay nada válido usa la escala por defecto", () => {
+    expect(parseDespachanteTramos("")).toEqual(parseDespachanteTramos(DEFAULT_DESPACHANTE_TRAMOS));
+    expect(parseDespachanteTramos(undefined)).toHaveLength(3);
   });
 });
