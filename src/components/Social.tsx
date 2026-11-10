@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { SectionHead } from "@/components/SectionHead";
-import { ChevronLeft, ChevronRight, Star, CheckCircle2, Quote } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star, CheckCircle2, Quote, Instagram } from "lucide-react";
 
 export const REVIEWS = [
   {
@@ -85,7 +85,8 @@ export function Stars({ value }: { value: number }) {
 
 export function ReviewsCarousel({
   className = "mx-auto mt-12 max-w-2xl px-2",
-}: { className?: string } = {}) {
+  instagramHref = "",
+}: { className?: string; instagramHref?: string } = {}) {
   const [active, setActive] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -181,6 +182,32 @@ export function ReviewsCarousel({
           </div>
         </div>
       </div>
+
+      {/* Más referencias en las historias destacadas de Instagram */}
+      {instagramHref ? (
+        <a
+          href={instagramHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group mx-auto mt-4 block max-w-md text-balance text-center text-sm leading-relaxed text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Instagram className="mr-1.5 inline h-4 w-4 -translate-y-px align-middle text-primary" />
+          <span>
+            ¿Querés ver más? Tenemos muchas más referencias en las{" "}
+            <span className="font-bold text-primary underline-offset-2 group-hover:underline">
+              destacadas de nuestro Instagram
+            </span>
+          </span>
+        </a>
+      ) : (
+        <p className="mx-auto mt-4 max-w-md text-balance text-center text-sm leading-relaxed text-muted-foreground">
+          <Instagram className="mr-1.5 inline h-4 w-4 -translate-y-px align-middle text-primary" />
+          <span>
+            ¿Querés ver más? Tenemos muchas más referencias en las{" "}
+            <span className="font-bold text-foreground">destacadas de nuestro Instagram</span>
+          </span>
+        </p>
+      )}
     </div>
   );
 }

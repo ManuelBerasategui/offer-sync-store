@@ -4,7 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Award, Ban, CheckCircle2, MessageCircle, PenLine, Shirt } from "lucide-react";
 
-import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { SiteFooter, SiteHeader, instagramUrl } from "@/components/SiteChrome";
 import { CheckoutFlow } from "@/components/CheckoutFlow";
 import { ReviewsCarousel } from "@/components/Social";
 import { ProductCard } from "@/components/ProductCard";
@@ -1970,7 +1970,7 @@ function ProductoPage() {
           </div>
 
           {/* Una reseña a la vez (antes eran 6 tarjetas: casi dos pantallas en el celular) */}
-          <ReviewsCarousel className="max-w-2xl" />
+          <ReviewsCarousel className="max-w-2xl" instagramHref={instagramUrl(config["instagram"])} />
         </section>
 
         <a
