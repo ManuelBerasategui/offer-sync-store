@@ -8,7 +8,18 @@ import { storeQueryOptions } from "@/lib/store-query";
 import { waLink } from "@/lib/store";
 import { track, trackWhatsappClick } from "@/lib/analytics";
 import { getImportUsdRate } from "@/lib/import-ai.functions";
-import { addBusinessDays, calcDespachante, calcHonorarios, parseDespachanteTramos, readQuoteTerms, splitPayment, type DespachanteTramo } from "@/lib/quote-terms";
+import {
+  addBusinessDays,
+  calcDespachante,
+  calcFleteMaritimo,
+  calcHonorarios,
+  DEFAULT_BARCO_USD_M3,
+  DEFAULT_IMPUESTOS_BARCO_PCT,
+  parseDespachanteTramos,
+  readQuoteTerms,
+  splitPayment,
+  type DespachanteTramo,
+} from "@/lib/quote-terms";
 
 // Datos precargados (ej: desde la lectura de una captura en /importar). Valores inválidos se ignoran.
 const calculadoraSearchSchema = z.object({
@@ -38,7 +49,15 @@ type Item = {
   cantidad: number;
   fob: number;
   peso: number;
+  /** Volumen total de este producto (todas las unidades) en m³. Solo se usa por barco. */
+  volumen: number;
 };
+
+type Via = "aereo" | "maritimo";
+
+function fmtM3(n: number) {
+  return n.toLocaleString("es-AR", { maximumFractionDigits: 3 }) + " m³";
+}
 
 type QuoteResult = {
   client: string;
@@ -56,6 +75,10 @@ type QuoteResult = {
     unitPrice: number;
   })[];
   totalWeight: number;
+  /** Volumen total en m³ (solo por barco). */
+  totalVolume: number;
+  /** % de impuestos aplicado según la vía. */
+  impuestosPct: number;
   totalFOB: number;
   freightTotal: number;
   handlingTotal: number;
@@ -63,7 +86,7 @@ type QuoteResult = {
   despachanteTotal: number;
   taxesTotal: number;
   grandTotal: number;
-  /** El envío completo supera el umbral de barco. */
+  /** La carga viaja en barco (flete por m³). */
   viaMaritima: boolean;
   rates: {
     fleteKg: number;
@@ -76,7 +99,8 @@ type QuoteResult = {
     aereoFijo: number;
     aereoDesde: number;
     aereoHasta: number;
-    barcoFijo: number;
+    barcoM3: number;
+    impuestosBarcoPct: number;
     barcoDesde: number;
   };
 };
@@ -127,12 +151,15 @@ export function CalculadoraPage() {
     aereoFijo: Number(config["calc_aereo_fijo"]) || 950,
     aereoDesde: Number(config["calc_aereo_desde"]) || 50,
     aereoHasta: Number(config["calc_aereo_hasta"]) || 250,
-    barcoFijo: Number(config["calc_barco_fijo"]) || 100,
+    // Barco: flete por m³ e impuestos estimados propios (provisional)
+    barcoM3: Number(config["calc_barco_m3"]) || DEFAULT_BARCO_USD_M3,
+    impuestosBarcoPct: Number(config["calc_impuestos_barco_pct"]) || DEFAULT_IMPUESTOS_BARCO_PCT,
     barcoDesde: Number(config["calc_barco_desde"]) || 250,
   };
   const terms = readQuoteTerms(config);
 
   const [client, setClient] = useState<string>("");
+  const [via, setVia] = useState<Via>("aereo");
   const prefill = Route.useSearch();
   const hasPrefill = Boolean(prefill.cantidad && prefill.fob && prefill.peso);
   const [items, setItems] = useState<Item[]>([
@@ -142,6 +169,7 @@ export function CalculadoraPage() {
       cantidad: hasPrefill ? (prefill.cantidad ?? 1) : 1,
       fob: hasPrefill ? (prefill.fob ?? 0) : 0,
       peso: hasPrefill ? (prefill.peso ?? 0) : 0,
+      volumen: 0,
     },
   ]);
   const [quote, setQuote] = useState<QuoteResult | null>(null);
@@ -151,7 +179,7 @@ export function CalculadoraPage() {
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { id: `item-${Date.now()}`, nombre: "", cantidad: 1, fob: 0, peso: 0 },
+      { id: `item-${Date.now()}`, nombre: "", cantidad: 1, fob: 0, peso: 0, volumen: 0 },
     ]);
   }
 
@@ -171,16 +199,15 @@ export function CalculadoraPage() {
     );
   }
 
-  // Decide flete para un peso determinado:
-  // - Si pasa 250 kg (barcoDesde): barco fijo (100 USD)
-  // - Si está en rango 50 a 250 kg: aéreo fijo
-  // - Menor a 50 kg: flete por kg
+  // Flete según la vía:
+  // - Barco: por volumen (m³ × tarifa por m³)
+  // - Aéreo, rango 50 a 250 kg: aéreo fijo
+  // - Aéreo, menos de 50 kg: flete por kg
+  // Una carga aérea que pasa el umbral (barcoDesde) se cotiza por barco: hay que cargar los m³.
   const barcoThreshold = rates.barcoDesde > 0 ? rates.barcoDesde : 250;
 
-  function calcFreightCost(weight: number) {
-    if (weight > barcoThreshold) {
-      return rates.barcoFijo > 0 ? rates.barcoFijo : 100;
-    }
+  function calcFreightCost(weight: number, volumen: number, v: Via) {
+    if (v === "maritimo") return calcFleteMaritimo(volumen, rates.barcoM3);
     if (rates.aereoHasta > 0 && weight >= rates.aereoDesde && weight <= rates.aereoHasta) {
       return rates.aereoFijo > 0 ? rates.aereoFijo : 950;
     }
@@ -194,18 +221,33 @@ export function CalculadoraPage() {
       return;
     }
 
+    const maritimo = via === "maritimo";
+    if (maritimo && validItems.some((i) => !(i.volumen > 0))) {
+      alert("Para cotizar por barco cargá el volumen total (m³) de cada producto. Lo pasa el proveedor como CBM.");
+      return;
+    }
+    if (!maritimo && validItems.reduce((s, i) => s + i.cantidad * i.peso, 0) > barcoThreshold) {
+      setVia("maritimo");
+      setQuote(null);
+      alert(
+        `Esta carga supera los ${barcoThreshold} kg: viaja por barco y el flete se cobra por volumen. Cargá el volumen total (m³) de cada producto y volvé a cotizar.`,
+      );
+      return;
+    }
+    const impuestosPct = maritimo ? rates.impuestosBarcoPct : rates.impuestosPct;
+
     const clientName = client.trim() || "Cliente";
 
     // Cálculo aislado (producto por separado)
     const itemsIsolated = validItems.map((i) => {
       const weight = i.cantidad * i.peso;
       const fobTotal = i.cantidad * i.fob;
-      const freightCost = calcFreightCost(weight);
+      const freightCost = calcFreightCost(weight, i.volumen, via);
       const handling = rates.handling;
       const honorarios = calcHonorarios(fobTotal, rates.honorariosPct, rates.honorariosTope, rates.honorariosMin);
       const despachante = calcDespachante(fobTotal, rates.despachanteTramos);
       const base = fobTotal + freightCost + handling;
-      const tax = base * (rates.impuestosPct / 100);
+      const tax = base * (impuestosPct / 100);
       const total = base + tax + honorarios + despachante;
       const unitPrice = i.cantidad > 0 ? total / i.cantidad : 0;
       return { ...i, weight, fobTotal, freightCost, handling, honorarios, despachante, base, tax, total, unitPrice };
@@ -214,12 +256,13 @@ export function CalculadoraPage() {
     // Cálculo combinado (todos juntos)
     const totalWeight = validItems.reduce((s, i) => s + i.cantidad * i.peso, 0);
     const totalFOB = validItems.reduce((s, i) => s + i.cantidad * i.fob, 0);
-    const freightTotal = calcFreightCost(totalWeight);
+    const totalVolume = maritimo ? validItems.reduce((s, i) => s + i.volumen, 0) : 0;
+    const freightTotal = calcFreightCost(totalWeight, totalVolume, via);
     const handlingTotal = rates.handling;
     const honorariosTotal = calcHonorarios(totalFOB, rates.honorariosPct, rates.honorariosTope, rates.honorariosMin);
     const despachanteTotal = calcDespachante(totalFOB, rates.despachanteTramos);
     const baseTotal = totalFOB + freightTotal + handlingTotal;
-    const taxesTotal = baseTotal * (rates.impuestosPct / 100);
+    const taxesTotal = baseTotal * (impuestosPct / 100);
     const grandTotal = baseTotal + taxesTotal + honorariosTotal + despachanteTotal;
 
     const res: QuoteResult = {
@@ -227,6 +270,8 @@ export function CalculadoraPage() {
       items: validItems,
       itemsIsolated,
       totalWeight,
+      totalVolume,
+      impuestosPct,
       totalFOB,
       freightTotal,
       handlingTotal,
@@ -234,13 +279,14 @@ export function CalculadoraPage() {
       despachanteTotal,
       taxesTotal,
       grandTotal,
-      viaMaritima: totalWeight > barcoThreshold,
+      viaMaritima: maritimo,
       rates,
     };
 
     setQuote(res);
     track("import_quote_calculated", {
       productos: validItems.length,
+      via,
       peso_total_kg: Math.round(totalWeight * 100) / 100,
       fob_total: Math.round(totalFOB),
       total: Math.round(grandTotal),
@@ -271,7 +317,7 @@ export function CalculadoraPage() {
       quote.items.forEach((i) => {
         msg += `• ${i.nombre} — FOB (x${i.cantidad}): ${fmt(i.cantidad * i.fob)}\n`;
       });
-      msg += `• Flete: ${fmt(quote.freightTotal)}\n`;
+      msg += `• ${fleteLabel(quote)}: ${fmt(quote.freightTotal)}\n`;
       msg += `• Handling: ${fmt(quote.handlingTotal)}\n`;
       msg += `• Honorarios: ${fmt(quote.honorariosTotal)}\n`;
       msg += `• Gestión aduanera (estimado): ${fmt(quote.despachanteTotal)}\n`;
@@ -302,6 +348,10 @@ export function CalculadoraPage() {
     msg += `*Demoras o aduana:* ${terms.demoras}\n`;
     msg += `\n*Nota:* El precio final es estimativo. Me gustaría confirmar el pedido y obtener el valor definitivo.`;
     return msg;
+  }
+
+  function fleteLabel(q: QuoteResult) {
+    return q.viaMaritima ? `Flete marítimo (${fmtM3(q.totalVolume)})` : "Flete";
   }
 
   function quoteDeliveryTime(q: QuoteResult) {
@@ -374,12 +424,47 @@ export function CalculadoraPage() {
                 />
               </div>
 
+              <div className="mb-6">
+                <span className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+                  Vía de transporte
+                </span>
+                <div className="inline-flex rounded-xl border border-border p-1 bg-muted/25" role="group">
+                  {(
+                    [
+                      { id: "aereo", label: "✈️ Avión" },
+                      { id: "maritimo", label: "🚢 Barco" },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      aria-pressed={via === opt.id}
+                      onClick={() => setVia(opt.id)}
+                      className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-colors ${
+                        via === opt.id
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {via === "maritimo"
+                    ? "Por barco el flete se cobra por volumen: cargá los m³ totales de cada producto (el CBM que pasa el proveedor)."
+                    : `Por avión el flete se cobra por peso. Cargas de más de ${barcoThreshold} kg van por barco.`}
+                </p>
+              </div>
+
               <div className="space-y-3 mb-6">
                 <div className="flex items-center justify-between pb-2 border-b border-border">
                   <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Productos a cotizar
                   </span>
-                  <span className="text-[11px] text-muted-foreground">FOB y peso unitarios</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {via === "maritimo" ? "FOB unitario · volumen total del producto" : "FOB y peso unitarios"}
+                  </span>
                 </div>
 
                 {items.map((item, idx) => (
@@ -428,20 +513,37 @@ export function CalculadoraPage() {
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                        Peso unit. (kg)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.peso || ""}
-                        onChange={(e) => updateItem(item.id, "peso", e.target.value)}
-                        placeholder="0.20"
-                        className="input-base text-xs font-bold"
-                      />
-                    </div>
+                    {via === "maritimo" ? (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Volumen total (m³)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={item.volumen || ""}
+                          onChange={(e) => updateItem(item.id, "volumen", e.target.value)}
+                          placeholder="1.5"
+                          className="input-base text-xs font-bold"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Peso unit. (kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.peso || ""}
+                          onChange={(e) => updateItem(item.id, "peso", e.target.value)}
+                          placeholder="0.20"
+                          className="input-base text-xs font-bold"
+                        />
+                      </div>
+                    )}
 
                     <div className="flex justify-end pb-0.5">
                       <button
@@ -581,7 +683,7 @@ export function CalculadoraPage() {
                       </div>
                     ))}
                     <div className="flex justify-between py-2 text-sm font-medium">
-                      <span className="text-foreground">Flete</span>
+                      <span className="text-foreground">{fleteLabel(quote)}</span>
                       <span className="font-mono text-foreground">{fmt(quote.freightTotal)}</span>
                     </div>
                     <div className="flex justify-between py-2 text-sm">
@@ -633,7 +735,7 @@ export function CalculadoraPage() {
                       <span>{fmt(quote.totalFOB)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Flete</span>
+                      <span>{fleteLabel(quote)}</span>
                       <span>{fmt(quote.freightTotal)}</span>
                     </div>
                     <div className="flex justify-between">

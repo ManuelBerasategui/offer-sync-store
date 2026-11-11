@@ -160,6 +160,21 @@ export function calcHonorarios(fob: number, pct: number, tope: number, piso = 0)
   return Math.max(capped, safePiso);
 }
 
+/**
+ * Flete marítimo: se cobra por volumen (m³), no por peso. Referencia de Pedro: un contenedor
+ * de 20' (el peor escenario) son 33 m³ y entre flete y consolidación cuesta como máximo
+ * US$ 5.000 → 5.000 / 33 ≈ US$ 151,52 por m³. Es editable desde el panel (`calc_barco_m3`).
+ */
+export const DEFAULT_BARCO_USD_M3 = 151.52;
+/** Impuestos estimados para cargas marítimas (provisional, hasta tener un número más certero). */
+export const DEFAULT_IMPUESTOS_BARCO_PCT = 50;
+
+export function calcFleteMaritimo(volumenM3: number, usdPorM3: number): number {
+  const vol = Number.isFinite(volumenM3) && volumenM3 > 0 ? volumenM3 : 0;
+  const rate = Number.isFinite(usdPorM3) && usdPorM3 > 0 ? usdPorM3 : DEFAULT_BARCO_USD_M3;
+  return Math.round(vol * rate * 100) / 100;
+}
+
 export type DespachanteTramo = { desde: number; monto: number };
 
 /**

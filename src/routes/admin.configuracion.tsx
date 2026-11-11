@@ -146,7 +146,8 @@ function AdminConfiguracionPage() {
   const [calcAereoFijo, setCalcAereoFijo] = useState<string>(config["calc_aereo_fijo"] ?? "950");
   const [calcAereoDesde, setCalcAereoDesde] = useState<string>(config["calc_aereo_desde"] ?? "50");
   const [calcAereoHasta, setCalcAereoHasta] = useState<string>(config["calc_aereo_hasta"] ?? "250");
-  const [calcBarcoFijo, setCalcBarcoFijo] = useState<string>(config["calc_barco_fijo"] ?? "100");
+  const [calcBarcoM3, setCalcBarcoM3] = useState<string>(config["calc_barco_m3"] ?? "151.52");
+  const [calcImpuestosBarcoPct, setCalcImpuestosBarcoPct] = useState<string>(config["calc_impuestos_barco_pct"] ?? "50");
   const [calcBarcoDesde, setCalcBarcoDesde] = useState<string>(config["calc_barco_desde"] ?? "250");
 
   // Condiciones que se muestran en cada cotización (arranca con lo guardado o los valores por defecto)
@@ -418,7 +419,8 @@ function AdminConfiguracionPage() {
             aereoFijo: Number(calcAereoFijo) || 950,
             aereoDesde: Number(calcAereoDesde) || 50,
             aereoHasta: Number(calcAereoHasta) || 250,
-            barcoFijo: Number(calcBarcoFijo) || 100,
+            barcoM3: Number(calcBarcoM3) || 151.52,
+            impuestosBarcoPct: Number(calcImpuestosBarcoPct) || 50,
             barcoDesde: Number(calcBarcoDesde) || 250,
           },
           quoteTerms: {
@@ -1429,7 +1431,7 @@ function AdminConfiguracionPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-muted-foreground uppercase">Impuestos (%)</label>
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Impuestos Avión (%)</label>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-bold text-muted-foreground">%</span>
                 <input
@@ -1490,28 +1492,47 @@ function AdminConfiguracionPage() {
 
           <div className="border-t border-dashed border-border pt-3 bg-muted/20 p-3 rounded-xl">
             <h3 className="text-xs font-bold text-primary mb-1.5 flex items-center gap-1.5">
-              🚢 Tramo Marítimo (Barco: si supera los 250 kg)
+              🚢 Marítimo (Barco: flete por m³)
             </h3>
             <p className="text-[11px] text-muted-foreground mb-2">
-              Si la carga supera los 250 kg (o el umbral configurado), se transporta por barco con una tarifa plana fija.
+              Por barco el flete se cobra por volumen. Referencia: un contenedor de 20 pies son 33 m³ y cuesta como
+              máximo u$d 5.000 entre flete y consolidación → 5.000 / 33 ≈ u$d 151,52 por m³. Los impuestos de barco son
+              un estimado provisional. Si en la calculadora se elige avión y la carga supera el umbral de kg, se pide
+              cotizarla por barco.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase">Flete Barco Fijo (USD)</label>
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Flete Barco por m³ (USD)</label>
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-bold text-muted-foreground">u$d</span>
                   <input
                     type="number"
-                    step="10"
+                    step="0.01"
+                    min="0"
                     className="input-base text-xs font-bold border-primary/40 focus:border-primary"
-                    value={calcBarcoFijo}
-                    onChange={(e) => setCalcBarcoFijo(e.target.value)}
-                    placeholder="100"
+                    value={calcBarcoM3}
+                    onChange={(e) => setCalcBarcoM3(e.target.value)}
+                    placeholder="151.52"
                   />
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase">Aplica a partir de (kg)</label>
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Impuestos Barco (%)</label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-muted-foreground">%</span>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    className="input-base text-xs font-bold"
+                    value={calcImpuestosBarcoPct}
+                    onChange={(e) => setCalcImpuestosBarcoPct(e.target.value)}
+                    placeholder="50"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Barco obligatorio desde (kg)</label>
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-bold text-muted-foreground">kg</span>
                   <input

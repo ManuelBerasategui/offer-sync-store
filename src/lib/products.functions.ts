@@ -1492,7 +1492,8 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
         aereoFijo?: number;
         aereoDesde?: number;
         aereoHasta?: number;
-        barcoFijo?: number;
+        barcoM3?: number;
+        impuestosBarcoPct?: number;
         barcoDesde?: number;
       };
       quoteTerms?: {
@@ -1637,7 +1638,14 @@ export const upsertCategoryRules = createServerFn({ method: "POST" })
           { clave: "calc_aereo_fijo", valor: String(data.calculatorRates.aereoFijo ?? 950) },
           { clave: "calc_aereo_desde", valor: String(data.calculatorRates.aereoDesde ?? 50) },
           { clave: "calc_aereo_hasta", valor: String(data.calculatorRates.aereoHasta ?? 250) },
-          { clave: "calc_barco_fijo", valor: String(data.calculatorRates.barcoFijo ?? 100) },
+          {
+            clave: "calc_barco_m3",
+            valor: String(Math.min(100_000, Math.max(0, Number(data.calculatorRates.barcoM3) || 151.52))),
+          },
+          {
+            clave: "calc_impuestos_barco_pct",
+            valor: String(Math.min(300, Math.max(0, Number(data.calculatorRates.impuestosBarcoPct) || 50))),
+          },
           { clave: "calc_barco_desde", valor: String(data.calculatorRates.barcoDesde ?? 250) },
         ];
         for (const row of calcRows) {

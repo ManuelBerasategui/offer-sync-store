@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_QUOTE_TERMS,
+  DEFAULT_BARCO_USD_M3,
   DEFAULT_DESPACHANTE_TRAMOS,
+  calcFleteMaritimo,
   calcDespachante,
   calcHonorarios,
   parseDespachanteTramos,
@@ -94,5 +96,17 @@ describe("despachante por tramos", () => {
   it("si no hay nada válido usa la escala por defecto", () => {
     expect(parseDespachanteTramos("")).toEqual(parseDespachanteTramos(DEFAULT_DESPACHANTE_TRAMOS));
     expect(parseDespachanteTramos(undefined)).toHaveLength(3);
+  });
+});
+
+describe("calcFleteMaritimo", () => {
+  it("cobra por m³ con la tarifa dada", () => {
+    expect(calcFleteMaritimo(2, 151.52)).toBe(303.04);
+    expect(calcFleteMaritimo(33, DEFAULT_BARCO_USD_M3)).toBeCloseTo(5000, 0);
+  });
+  it("sin volumen no hay flete y una tarifa inválida cae a la de referencia", () => {
+    expect(calcFleteMaritimo(0, 151.52)).toBe(0);
+    expect(calcFleteMaritimo(-1, 151.52)).toBe(0);
+    expect(calcFleteMaritimo(1, 0)).toBe(DEFAULT_BARCO_USD_M3);
   });
 });
