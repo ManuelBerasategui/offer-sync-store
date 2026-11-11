@@ -19,6 +19,7 @@ import {
   isLongSleeve,
   JERSEY_FAN_TIERS,
   JERSEY_FAN_ML_TIERS,
+  sanitizeUrl,
   type Product,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
@@ -40,6 +41,45 @@ function normCatName(v: string) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * Aviso para cuando la búsqueda no trae nada: invita a pedir el producto por WhatsApp.
+ * El mensaje ya lleva lo que el cliente escribió en el buscador, y el clic se cuenta
+ * en `whatsapp_click` con ubicacion "catalogo_sin_resultados" (producto = lo buscado).
+ */
+function NoResultsWhatsapp({ config, search }: { config: Record<string, string>; search: string }) {
+  const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "").replace(/\D/g, "");
+  if (!phone) return null;
+  const buscado = search.trim().replace(/\s+/g, " ").slice(0, 80);
+  const msg = buscado
+    ? `Hola! Quiero importar o conseguir "${buscado}". Lo busqué en el catálogo y no lo encontré.`
+    : "Hola! Quiero importar o conseguir un producto que no encontré en el catálogo.";
+  return (
+    <div className="mt-6 w-full max-w-md rounded-2xl border border-whatsapp/40 bg-whatsapp/8 p-4 sm:p-5">
+      <p className="text-sm font-bold text-foreground">¿No encontrás el producto que querés?</p>
+      <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+        Escribinos al WhatsApp y te lo importamos o te lo conseguimos.
+      </p>
+      <a
+        id="catalogo-sin-resultados-whatsapp"
+        href={sanitizeUrl(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`)}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() =>
+          trackWhatsappClick({
+            destino: "privado",
+            ubicacion: "catalogo_sin_resultados",
+            producto: buscado || null,
+          })
+        }
+        className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-whatsapp px-4 py-2.5 text-sm font-bold text-whatsapp-foreground shadow-sm transition hover:opacity-90 active:scale-95"
+      >
+        <MessageCircle className="h-4 w-4" fill="currentColor" />
+        Pedir por WhatsApp
+      </a>
+    </div>
+  );
 }
 
 export const Route = createFileRoute("/catalogo")({
@@ -402,9 +442,12 @@ function Catalogo() {
               ))}
             </div>
           ) : (
-            <p className="my-10 text-center text-sm text-muted-foreground">
-              No hay combos que coincidan con "{search}".
-            </p>
+            <div className="my-10 flex flex-col items-center text-center">
+              <p className="text-sm text-muted-foreground">
+                No hay combos que coincidan con "{search}".
+              </p>
+              <NoResultsWhatsapp config={config} search={search} />
+            </div>
           )
         ) : list.length ? (
           <>
@@ -477,6 +520,7 @@ function Catalogo() {
                 Limpiar filtros
               </button>
             </div>
+            <NoResultsWhatsapp config={config} search={search} />
           </div>
         )}
 
