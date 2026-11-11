@@ -53,13 +53,13 @@ function NoResultsWhatsapp({ config, search }: { config: Record<string, string>;
   if (!phone) return null;
   const buscado = search.trim().replace(/\s+/g, " ").slice(0, 80);
   const msg = buscado
-    ? `Hola! Quiero importar o conseguir "${buscado}". Lo busqué en el catálogo y no lo encontré.`
-    : "Hola! Quiero importar o conseguir un producto que no encontré en el catálogo.";
+    ? `Hola! Quiero conseguir "${buscado}". Lo busqué en el catálogo y no lo encontré.`
+    : "Hola! Quiero conseguir un producto que no encontré en el catálogo.";
   return (
     <div className="mt-6 w-full max-w-md rounded-2xl border border-whatsapp/40 bg-whatsapp/8 p-4 sm:p-5">
       <p className="text-sm font-bold text-foreground">¿No encontrás el producto que querés?</p>
       <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-        Escribinos al WhatsApp y te lo importamos o te lo conseguimos.
+        Escribinos al WhatsApp y te lo conseguimos.
       </p>
       <a
         id="catalogo-sin-resultados-whatsapp"
