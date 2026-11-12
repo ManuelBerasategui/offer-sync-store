@@ -167,7 +167,19 @@ export function calcHonorarios(fob: number, pct: number, tope: number, piso = 0)
  */
 export const DEFAULT_BARCO_USD_M3 = 151.52;
 /** Impuestos estimados para cargas marítimas (provisional, hasta tener un número más certero). */
-export const DEFAULT_IMPUESTOS_BARCO_PCT = 50;
+export const DEFAULT_IMPUESTOS_BARCO_PCT = 75;
+/**
+ * Gastos fijos de una carga marítima (estimado de Pedro: US$ 1.700 + IVA). Por ahora es un fijo
+ * por carga, sin importar los m³. Se guarda sin IVA (`calc_barco_gastos_fijos`); 0 = no se cobra.
+ */
+export const DEFAULT_BARCO_GASTOS_FIJOS = 1700;
+export const IVA_PCT = 21;
+
+/** Gastos fijos de barco con IVA incluido, redondeados a centavos. */
+export function calcGastosFijosBarco(sinIva: number): number {
+  const base = Number.isFinite(sinIva) && sinIva > 0 ? sinIva : 0;
+  return Math.round(base * (100 + IVA_PCT)) / 100;
+}
 
 export function calcFleteMaritimo(volumenM3: number, usdPorM3: number): number {
   const vol = Number.isFinite(volumenM3) && volumenM3 > 0 ? volumenM3 : 0;

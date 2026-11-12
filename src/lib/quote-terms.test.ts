@@ -4,6 +4,7 @@ import {
   DEFAULT_BARCO_USD_M3,
   DEFAULT_DESPACHANTE_TRAMOS,
   calcFleteMaritimo,
+  calcGastosFijosBarco,
   calcDespachante,
   calcHonorarios,
   parseDespachanteTramos,
@@ -108,5 +109,13 @@ describe("calcFleteMaritimo", () => {
     expect(calcFleteMaritimo(0, 151.52)).toBe(0);
     expect(calcFleteMaritimo(-1, 151.52)).toBe(0);
     expect(calcFleteMaritimo(1, 0)).toBe(DEFAULT_BARCO_USD_M3);
+  });
+});
+
+describe("calcGastosFijosBarco", () => {
+  it("suma el IVA al fijo por carga", () => {
+    expect(calcGastosFijosBarco(1700)).toBe(2057);
+    expect(calcGastosFijosBarco(0)).toBe(0);
+    expect(calcGastosFijosBarco(Number.NaN)).toBe(0);
   });
 });

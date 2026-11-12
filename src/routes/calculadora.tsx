@@ -12,7 +12,9 @@ import {
   addBusinessDays,
   calcDespachante,
   calcFleteMaritimo,
+  calcGastosFijosBarco,
   calcHonorarios,
+  DEFAULT_BARCO_GASTOS_FIJOS,
   DEFAULT_BARCO_USD_M3,
   DEFAULT_IMPUESTOS_BARCO_PCT,
   parseDespachanteTramos,
@@ -82,6 +84,8 @@ type QuoteResult = {
   totalFOB: number;
   freightTotal: number;
   handlingTotal: number;
+  /** Gastos fijos de barco con IVA incluido (0 por avión). */
+  gastosFijosTotal: number;
   honorariosTotal: number;
   despachanteTotal: number;
   taxesTotal: number;
@@ -101,6 +105,7 @@ type QuoteResult = {
     aereoHasta: number;
     barcoM3: number;
     impuestosBarcoPct: number;
+    barcoGastosFijos: number;
     barcoDesde: number;
   };
 };
@@ -154,6 +159,8 @@ export function CalculadoraPage() {
     // Barco: flete por m³ e impuestos estimados propios (provisional)
     barcoM3: Number(config["calc_barco_m3"]) || DEFAULT_BARCO_USD_M3,
     impuestosBarcoPct: Number(config["calc_impuestos_barco_pct"]) || DEFAULT_IMPUESTOS_BARCO_PCT,
+    // Gastos fijos por carga marítima, sin IVA (permite 0 = no se cobra)
+    barcoGastosFijos: numConfig(config["calc_barco_gastos_fijos"], DEFAULT_BARCO_GASTOS_FIJOS),
     barcoDesde: Number(config["calc_barco_desde"]) || 250,
   };
   const terms = readQuoteTerms(config);
@@ -235,6 +242,8 @@ export function CalculadoraPage() {
       return;
     }
     const impuestosPct = maritimo ? rates.impuestosBarcoPct : rates.impuestosPct;
+    // Fijo por carga (no por m³): cada producto aislado lo paga entero; juntos, una sola vez.
+    const gastosFijos = maritimo ? calcGastosFijosBarco(rates.barcoGastosFijos) : 0;
 
     const clientName = client.trim() || "Cliente";
 
@@ -248,7 +257,7 @@ export function CalculadoraPage() {
       const despachante = calcDespachante(fobTotal, rates.despachanteTramos);
       const base = fobTotal + freightCost + handling;
       const tax = base * (impuestosPct / 100);
-      const total = base + tax + honorarios + despachante;
+      const total = base + tax + honorarios + despachante + gastosFijos;
       const unitPrice = i.cantidad > 0 ? total / i.cantidad : 0;
       return { ...i, weight, fobTotal, freightCost, handling, honorarios, despachante, base, tax, total, unitPrice };
     });
@@ -263,7 +272,7 @@ export function CalculadoraPage() {
     const despachanteTotal = calcDespachante(totalFOB, rates.despachanteTramos);
     const baseTotal = totalFOB + freightTotal + handlingTotal;
     const taxesTotal = baseTotal * (impuestosPct / 100);
-    const grandTotal = baseTotal + taxesTotal + honorariosTotal + despachanteTotal;
+    const grandTotal = baseTotal + taxesTotal + honorariosTotal + despachanteTotal + gastosFijos;
 
     const res: QuoteResult = {
       client: clientName,
@@ -275,6 +284,7 @@ export function CalculadoraPage() {
       totalFOB,
       freightTotal,
       handlingTotal,
+      gastosFijosTotal: gastosFijos,
       honorariosTotal,
       despachanteTotal,
       taxesTotal,
@@ -319,6 +329,9 @@ export function CalculadoraPage() {
       });
       msg += `• ${fleteLabel(quote)}: ${fmt(quote.freightTotal)}\n`;
       msg += `• Handling: ${fmt(quote.handlingTotal)}\n`;
+      if (quote.gastosFijosTotal > 0) {
+        msg += `• Gastos fijos de barco (IVA incluido): ${fmt(quote.gastosFijosTotal)}\n`;
+      }
       msg += `• Honorarios: ${fmt(quote.honorariosTotal)}\n`;
       msg += `• Gestión aduanera (estimado): ${fmt(quote.despachanteTotal)}\n`;
       msg += `• Impuestos: ${fmt(quote.taxesTotal)}\n`;
@@ -329,7 +342,7 @@ export function CalculadoraPage() {
         msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u${usdRate ? ` (≈ ${ars(i.unitPrice)})` : ""} puesto en Argentina\n`;
       }
       msg += `\n*Total puesto en Argentina: ${fmt(quote.grandTotal)}*${usdRate ? ` (≈ ${ars(quote.grandTotal)})` : ""}\n`;
-      msg += `_(incluye flete, handling, honorarios, gestión aduanera e impuestos)_\n`;
+      msg += `_(incluye flete, handling, ${quote.gastosFijosTotal > 0 ? "gastos fijos de barco, " : ""}honorarios, gestión aduanera e impuestos)_\n`;
     }
 
     const pay = splitPayment(quote.grandTotal, terms.senaPct);
@@ -690,6 +703,12 @@ export function CalculadoraPage() {
                       <span className="text-foreground">Handling</span>
                       <span className="font-mono text-foreground">{fmt(quote.handlingTotal)}</span>
                     </div>
+                    {quote.gastosFijosTotal > 0 && (
+                      <div className="flex justify-between py-2 text-sm">
+                        <span className="text-foreground">Gastos fijos de barco (IVA incluido)</span>
+                        <span className="font-mono text-foreground">{fmt(quote.gastosFijosTotal)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between py-2 text-sm">
                       <span className="text-foreground">Honorarios</span>
                       <span className="font-mono text-foreground">{fmt(quote.honorariosTotal)}</span>
@@ -742,6 +761,12 @@ export function CalculadoraPage() {
                       <span>Handling</span>
                       <span>{fmt(quote.handlingTotal)}</span>
                     </div>
+                    {quote.gastosFijosTotal > 0 && (
+                      <div className="flex justify-between gap-3">
+                        <span>Gastos fijos de barco (IVA incluido)</span>
+                        <span>{fmt(quote.gastosFijosTotal)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span>Honorarios</span>
                       <span>{fmt(quote.honorariosTotal)}</span>

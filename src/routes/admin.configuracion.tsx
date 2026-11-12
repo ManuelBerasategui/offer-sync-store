@@ -147,7 +147,8 @@ function AdminConfiguracionPage() {
   const [calcAereoDesde, setCalcAereoDesde] = useState<string>(config["calc_aereo_desde"] ?? "50");
   const [calcAereoHasta, setCalcAereoHasta] = useState<string>(config["calc_aereo_hasta"] ?? "250");
   const [calcBarcoM3, setCalcBarcoM3] = useState<string>(config["calc_barco_m3"] ?? "151.52");
-  const [calcImpuestosBarcoPct, setCalcImpuestosBarcoPct] = useState<string>(config["calc_impuestos_barco_pct"] ?? "50");
+  const [calcImpuestosBarcoPct, setCalcImpuestosBarcoPct] = useState<string>(config["calc_impuestos_barco_pct"] ?? "75");
+  const [calcBarcoGastosFijos, setCalcBarcoGastosFijos] = useState<string>(config["calc_barco_gastos_fijos"] ?? "1700");
   const [calcBarcoDesde, setCalcBarcoDesde] = useState<string>(config["calc_barco_desde"] ?? "250");
 
   // Condiciones que se muestran en cada cotización (arranca con lo guardado o los valores por defecto)
@@ -420,7 +421,9 @@ function AdminConfiguracionPage() {
             aereoDesde: Number(calcAereoDesde) || 50,
             aereoHasta: Number(calcAereoHasta) || 250,
             barcoM3: Number(calcBarcoM3) || 151.52,
-            impuestosBarcoPct: Number(calcImpuestosBarcoPct) || 50,
+            impuestosBarcoPct: Number(calcImpuestosBarcoPct) || 75,
+            // Vacío = valor por defecto; 0 es válido (sin gastos fijos)
+            barcoGastosFijos: calcBarcoGastosFijos.trim() === "" ? 1700 : Number(calcBarcoGastosFijos),
             barcoDesde: Number(calcBarcoDesde) || 250,
           },
           quoteTerms: {
@@ -1496,11 +1499,12 @@ function AdminConfiguracionPage() {
             </h3>
             <p className="text-[11px] text-muted-foreground mb-2">
               Por barco el flete se cobra por volumen. Referencia: un contenedor de 20 pies son 33 m³ y cuesta como
-              máximo u$d 5.000 entre flete y consolidación → 5.000 / 33 ≈ u$d 151,52 por m³. Los impuestos de barco son
-              un estimado provisional. Si en la calculadora se elige avión y la carga supera el umbral de kg, se pide
+              máximo u$d 5.000 entre flete y consolidación → 5.000 / 33 ≈ u$d 151,52 por m³. Los impuestos y los
+              gastos fijos de barco son estimados provisionales; los gastos fijos se cobran una vez por carga (no por
+              m³) y se les suma 21% de IVA. Si en la calculadora se elige avión y la carga supera el umbral de kg, se pide
               cotizarla por barco.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-muted-foreground uppercase">Flete Barco por m³ (USD)</label>
                 <div className="flex items-center gap-1.5">
@@ -1527,7 +1531,22 @@ function AdminConfiguracionPage() {
                     className="input-base text-xs font-bold"
                     value={calcImpuestosBarcoPct}
                     onChange={(e) => setCalcImpuestosBarcoPct(e.target.value)}
-                    placeholder="50"
+                    placeholder="75"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Gastos fijos Barco (USD, sin IVA)</label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-muted-foreground">u$d</span>
+                  <input
+                    type="number"
+                    step="50"
+                    min="0"
+                    className="input-base text-xs font-bold"
+                    value={calcBarcoGastosFijos}
+                    onChange={(e) => setCalcBarcoGastosFijos(e.target.value)}
+                    placeholder="1700"
                   />
                 </div>
               </div>
