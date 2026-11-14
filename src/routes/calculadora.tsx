@@ -65,6 +65,9 @@ type QuoteResult = {
   client: string;
   items: Item[];
   itemsIsolated: (Item & {
+    /** Vía de esta fila cotizada sola (puede no coincidir con la de la carga junta). */
+    viaMaritima: boolean;
+    gastosFijos: number;
     weight: number;
     fobTotal: number;
     freightCost: number;
@@ -167,6 +170,9 @@ export function CalculadoraPage() {
 
   const [client, setClient] = useState<string>("");
   const [via, setVia] = useState<Via>("aereo");
+  // La carga pasó a barco sola por el peso total (el usuario había elegido avión). Las filas que
+  // por su cuenta no llegan al umbral se siguen cotizando por avión, como si se cotizaran solas.
+  const [viaAuto, setViaAuto] = useState(false);
   const prefill = Route.useSearch();
   const hasPrefill = Boolean(prefill.cantidad && prefill.fob && prefill.peso);
   const [items, setItems] = useState<Item[]>([
@@ -235,6 +241,7 @@ export function CalculadoraPage() {
     }
     if (!maritimo && validItems.reduce((s, i) => s + i.cantidad * i.peso, 0) > barcoThreshold) {
       setVia("maritimo");
+      setViaAuto(true);
       setQuote(null);
       alert(
         `Esta carga supera los ${barcoThreshold} kg: viaja por barco y el flete se cobra por volumen. Cargá el volumen total (m³) de cada producto y volvé a cotizar.`,
@@ -247,19 +254,46 @@ export function CalculadoraPage() {
 
     const clientName = client.trim() || "Cliente";
 
-    // Cálculo aislado (producto por separado)
+    // Una fila que va a ir por avión necesita su peso (con la carga pasada a barco el campo sigue visible)
+    if (maritimo && viaAuto && validItems.some((i) => i.cantidad * i.peso <= barcoThreshold && !(i.peso > 0))) {
+      alert("Cargá también el peso unitario (kg) de cada producto: las cantidades chicas se cotizan por avión.");
+      return;
+    }
+
+    // Cálculo aislado (producto por separado): cada fila se cotiza exactamente como si fuera la
+    // única de la cotización, con su propia vía. Antes usaba la vía de la carga junta: en una lista
+    // de cantidades (ej. 100/250/500 u.) el peso sumado pasaba a barco y una fila que sola va por
+    // avión cargaba impuestos de barco y los gastos fijos enteros, y daba otro precio unitario.
     const itemsIsolated = validItems.map((i) => {
       const weight = i.cantidad * i.peso;
+      const rowMaritimo = weight > barcoThreshold || (maritimo && !viaAuto);
+      const rowVia: Via = rowMaritimo ? "maritimo" : "aereo";
+      const rowImpuestosPct = rowMaritimo ? rates.impuestosBarcoPct : rates.impuestosPct;
+      const rowGastosFijos = rowMaritimo ? calcGastosFijosBarco(rates.barcoGastosFijos) : 0;
       const fobTotal = i.cantidad * i.fob;
-      const freightCost = calcFreightCost(weight, i.volumen, via);
+      const freightCost = calcFreightCost(weight, i.volumen, rowVia);
       const handling = rates.handling;
       const honorarios = calcHonorarios(fobTotal, rates.honorariosPct, rates.honorariosTope, rates.honorariosMin);
       const despachante = calcDespachante(fobTotal, rates.despachanteTramos);
       const base = fobTotal + freightCost + handling;
-      const tax = base * (impuestosPct / 100);
-      const total = base + tax + honorarios + despachante + gastosFijos;
+      const tax = base * (rowImpuestosPct / 100);
+      const total = base + tax + honorarios + despachante + rowGastosFijos;
       const unitPrice = i.cantidad > 0 ? total / i.cantidad : 0;
-      return { ...i, weight, fobTotal, freightCost, handling, honorarios, despachante, base, tax, total, unitPrice };
+      return {
+        ...i,
+        viaMaritima: rowMaritimo,
+        gastosFijos: rowGastosFijos,
+        weight,
+        fobTotal,
+        freightCost,
+        handling,
+        honorarios,
+        despachante,
+        base,
+        tax,
+        total,
+        unitPrice,
+      };
     });
 
     // Cálculo combinado (todos juntos)
@@ -320,8 +354,10 @@ export function CalculadoraPage() {
 
     if (multi) {
       msg += `_Productos por separado (c/u aislado):_\n`;
+      const mixed = new Set(quote.itemsIsolated.map((i) => i.viaMaritima)).size > 1;
       quote.itemsIsolated.forEach((i) => {
-        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u${usdRate ? ` (≈ ${ars(i.unitPrice)})` : ""} puesto en Argentina — subtotal ${fmt(i.total)}\n`;
+        const viaTxt = mixed ? (i.viaMaritima ? " por barco" : " por avión") : "";
+        msg += `• ${i.nombre} (x${i.cantidad}): ${fmt(i.unitPrice)} c/u${usdRate ? ` (≈ ${ars(i.unitPrice)})` : ""} puesto en Argentina${viaTxt} — subtotal ${fmt(i.total)}\n`;
       });
       msg += `\n_Trayendo todos los productos juntos:_\n`;
       quote.items.forEach((i) => {
@@ -452,7 +488,10 @@ export function CalculadoraPage() {
                       key={opt.id}
                       type="button"
                       aria-pressed={via === opt.id}
-                      onClick={() => setVia(opt.id)}
+                      onClick={() => {
+                        setVia(opt.id);
+                        setViaAuto(false);
+                      }}
                       className={`rounded-lg px-4 py-1.5 text-xs font-bold transition-colors ${
                         via === opt.id
                           ? "bg-primary text-primary-foreground shadow-xs"
@@ -483,7 +522,7 @@ export function CalculadoraPage() {
                 {items.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1.2fr_1.2fr_auto] gap-2.5 items-end p-3 rounded-xl bg-muted/25 border border-border/60"
+                    className={`grid grid-cols-1 ${via === "maritimo" && viaAuto ? "sm:grid-cols-[2fr_1fr_1.2fr_1.2fr_1.2fr_auto]" : "sm:grid-cols-[2fr_1fr_1.2fr_1.2fr_auto]"} gap-2.5 items-end p-3 rounded-xl bg-muted/25 border border-border/60`}
                   >
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-muted-foreground uppercase">
@@ -525,6 +564,23 @@ export function CalculadoraPage() {
                         className="input-base text-xs font-bold"
                       />
                     </div>
+
+                    {via === "maritimo" && viaAuto && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Peso unit. (kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.peso || ""}
+                          onChange={(e) => updateItem(item.id, "peso", e.target.value)}
+                          placeholder="0.20"
+                          className="input-base text-xs font-bold"
+                        />
+                      </div>
+                    )}
 
                     {via === "maritimo" ? (
                       <div className="space-y-1">
@@ -648,6 +704,11 @@ export function CalculadoraPage() {
                           <span className="font-mono text-xs font-normal text-muted-foreground ml-2">
                             x{i.cantidad}
                           </span>
+                          {multi && new Set(quote.itemsIsolated.map((x) => x.viaMaritima)).size > 1 && (
+                            <span className="font-mono text-[10.5px] font-normal text-muted-foreground ml-2">
+                              {i.viaMaritima ? "🚢 por barco" : "✈️ por avión"}
+                            </span>
+                          )}
                         </div>
                         <div className="font-mono text-sm font-semibold text-foreground whitespace-nowrap">
                           {fmt(i.total)}
