@@ -1364,7 +1364,7 @@ function AdminConfiguracionPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-muted-foreground uppercase">Honorarios (% mercadería)</label>
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Honorarios (% del total)</label>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-bold text-muted-foreground">%</span>
                 <input
@@ -1394,7 +1394,7 @@ function AdminConfiguracionPage() {
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Ej: 10% con tope 250 → desde US$ {Math.round((Number(calcHonorariosTope) || 250) / ((Number(calcHonorariosPct) || 10) / 100)).toLocaleString("es-AR")} de mercadería se cobra el fijo.
+                Ej: 10% con tope 250 → desde US$ {Math.round((Number(calcHonorariosTope) || 250) / ((Number(calcHonorariosPct) || 10) / 100)).toLocaleString("es-AR")} de total puesto en Argentina se cobra el fijo.
               </p>
             </div>
 
@@ -1413,7 +1413,7 @@ function AdminConfiguracionPage() {
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Mínimo que se cobra aunque el % dé menos. Ej: 10% con piso {Number(calcHonorariosMin) || 0} → hasta US$ {Math.round((Number(calcHonorariosMin) || 0) / ((Number(calcHonorariosPct) || 10) / 100)).toLocaleString("es-AR")} de mercadería se cobra el piso. 0 = sin piso.
+                Mínimo que se cobra aunque el % dé menos. Ej: 10% con piso {Number(calcHonorariosMin) || 0} → hasta US$ {Math.round((Number(calcHonorariosMin) || 0) / ((Number(calcHonorariosPct) || 10) / 100)).toLocaleString("es-AR")} de total se cobra el piso. 0 = sin piso. El % se aplica al total puesto en Argentina (mercadería, flete, handling, impuestos, gestión aduanera y gastos fijos).
               </p>
             </div>
 

@@ -148,7 +148,7 @@ export function CalculadoraPage() {
   const rates = {
     fleteKg: Number(config["calc_flete_kg"]) || 22,
     handling: Number(config["calc_handling"]) || 30,
-    // Honorarios propios: % de la mercadería con tope (10% hasta US$ 250)
+    // Honorarios propios: % del total puesto en Argentina con piso y tope (10%, de US$ 30 a US$ 250)
     honorariosPct: Number(config["calc_honorarios_pct"]) || 10,
     honorariosTope: Number(config["calc_honorarios_tope"]) || 250,
     // Piso para que una carga chica no termine pagando de más "de onda" (permite 0 = sin piso)
@@ -265,11 +265,13 @@ export function CalculadoraPage() {
       const fobTotal = i.cantidad * i.fob;
       const freightCost = calcFreightCost(weight, i.volumen, rowVia);
       const handling = rates.handling;
-      const honorarios = calcHonorarios(fobTotal, rates.honorariosPct, rates.honorariosTope, rates.honorariosMin);
       const despachante = calcDespachante(fobTotal, rates.despachanteTramos);
       const base = fobTotal + freightCost + handling;
       const tax = base * (rowImpuestosPct / 100);
-      const total = base + tax + honorarios + despachante + rowGastosFijos;
+      // Honorarios: % sobre el total puesto en Argentina (todo menos los propios honorarios)
+      const subtotal = base + tax + despachante + rowGastosFijos;
+      const honorarios = calcHonorarios(subtotal, rates.honorariosPct, rates.honorariosTope, rates.honorariosMin);
+      const total = subtotal + honorarios;
       const unitPrice = i.cantidad > 0 ? total / i.cantidad : 0;
       return {
         ...i,
@@ -294,11 +296,12 @@ export function CalculadoraPage() {
     const totalVolume = maritimo ? validItems.reduce((s, i) => s + i.volumen, 0) : 0;
     const freightTotal = calcFreightCost(totalWeight, totalVolume, maritimo ? "maritimo" : "aereo");
     const handlingTotal = rates.handling;
-    const honorariosTotal = calcHonorarios(totalFOB, rates.honorariosPct, rates.honorariosTope, rates.honorariosMin);
     const despachanteTotal = calcDespachante(totalFOB, rates.despachanteTramos);
     const baseTotal = totalFOB + freightTotal + handlingTotal;
     const taxesTotal = baseTotal * (impuestosPct / 100);
-    const grandTotal = baseTotal + taxesTotal + honorariosTotal + despachanteTotal + gastosFijos;
+    const subtotal = baseTotal + taxesTotal + despachanteTotal + gastosFijos;
+    const honorariosTotal = calcHonorarios(subtotal, rates.honorariosPct, rates.honorariosTope, rates.honorariosMin);
+    const grandTotal = subtotal + honorariosTotal;
 
     const res: QuoteResult = {
       client: clientName,

@@ -146,9 +146,10 @@ export function splitPayment(total: number, senaPct: number) {
 }
 
 /**
- * Honorarios de TE.IMPORTAMOS: un % del valor de la mercadería (FOB) con piso y tope.
- * Con 10%, piso US$ 30 y tope US$ 250: una carga de US$ 500 paga 50, una de US$ 100 paga el
- * piso de 30 y desde US$ 2.500 de mercadería se cobra el fijo de 250.
+ * Honorarios de TE.IMPORTAMOS: un % del total puesto en Argentina (mercadería, flete, handling,
+ * impuestos, gestión aduanera y gastos fijos; sin los propios honorarios) con piso y tope.
+ * Con 10%, piso US$ 30 y tope US$ 250: un total de US$ 500 paga 50, uno de US$ 100 paga el
+ * piso de 30 y desde US$ 2.500 de total se cobra el fijo de 250.
  */
 export function calcHonorarios(fob: number, pct: number, tope: number, piso = 0): number {
   const safeFob = Number.isFinite(fob) && fob > 0 ? fob : 0;
