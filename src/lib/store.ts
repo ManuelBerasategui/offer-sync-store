@@ -505,9 +505,13 @@ export const HOME_BEST_SELLERS = 3;
  * (metadata.mas_vendido_fijo = "SI"), sin importar sus ventas.
  */
 export function isPinnedBestSeller(product: Record<string, unknown>): boolean {
+  // La tienda y el admin "aplanan" metadata sobre el producto: el campo llega suelto.
+  // Se acepta también dentro de metadata por si el producto viene crudo de la base.
   const meta = product["metadata"];
-  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return false;
-  const raw = (meta as Record<string, unknown>)["mas_vendido_fijo"];
+  const metaRec =
+    meta && typeof meta === "object" && !Array.isArray(meta) ? (meta as Record<string, unknown>) : null;
+  const raw =
+    product["mas_vendido_fijo"] !== undefined ? product["mas_vendido_fijo"] : metaRec?.["mas_vendido_fijo"];
   return typeof raw === "string" && isYes(raw);
 }
 

@@ -20,6 +20,7 @@ import {
   parseJerseyItem,
   isHiddenCategory,
   rankBestSellers,
+  isPinnedBestSeller,
   HOME_BEST_SELLERS,
   calcJerseyUnitPrice,
   JERSEY_PLAYER_TIERS,
@@ -958,6 +959,13 @@ describe("rankBestSellers (home y catálogo usan el mismo ranking)", () => {
       "a",
       "nfc",
     ]);
+  });
+
+  it("reconoce el fijado con metadata aplanada (como llega a la tienda y al admin)", () => {
+    const fijo = { ...mk("nfc", 0), mas_vendido_fijo: "SI" } as unknown as Product;
+    expect(isPinnedBestSeller(fijo)).toBe(true);
+    expect(rankBestSellers([mk("a", 0), mk("c", 9), fijo]).ranked[0]?.id).toBe("nfc");
+    expect(isPinnedBestSeller({ ...mk("nfc", 0), mas_vendido_fijo: "" })).toBe(false);
   });
 
   it("si hay menos de 3 con ventas o destacados, los de relleno también cuentan como más vendidos", () => {
