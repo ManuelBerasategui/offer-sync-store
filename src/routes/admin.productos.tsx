@@ -34,7 +34,7 @@ import {
   type YupooAlbumPreview,
   type GetAdminProductsResult,
 } from "@/lib/products.functions";
-import { type Product, type Banner, money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, productMinUnitsOf, qtyDiscountModeOf, isNfcGoogle, isBlackviewGlasses, parseProductMinUnits, MAX_PRODUCT_MIN_UNITS, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
+import { type Product, type Banner, money, toNumber, FALLBACK_IMAGE, imageUrl, sanitizeImageUrl, onImageError, isMate, isCamiseta, isLongSleeve, waOnlyReasonOf, productMinUnitsOf, isPinnedBestSeller, qtyDiscountModeOf, isNfcGoogle, isBlackviewGlasses, parseProductMinUnits, MAX_PRODUCT_MIN_UNITS, transferPrice, transferDiscountPct, priceOf, originalPriceOf } from "@/lib/store";
 import { compressImageFile, formatBytes } from "@/lib/image-compressor";
 import { SafeImage } from "@/components/SafeImage";
 import { MAX_EXTRA_IMAGES, extraImagesOf, priceListOf } from "@/lib/product-gallery";
@@ -75,6 +75,7 @@ const emptyProduct = (): ProductInput => ({
   whatsapp_only_reason: "",
   moq_group: "",
   moq_min_units: "",
+  mas_vendido_fijo: "NO",
   qty_discount_mode: "auto",
   color_predeterminado: "",
   imagen_url: "",
@@ -132,6 +133,7 @@ function productToInput(p: Product): ProductInput {
     whatsapp_only_reason: waOnlyReasonOf(pRec) ?? "",
     moq_group: typeof pRec["moq_group"] === "string" ? pRec["moq_group"] : "",
     moq_min_units: String(productMinUnitsOf(pRec) ?? ""),
+    mas_vendido_fijo: isPinnedBestSeller(pRec) ? "SI" : "NO",
     qty_discount_mode: qtyDiscountModeOf(pRec),
     color_predeterminado: p.color_predeterminado ?? "",
     imagen_url: p.imagen_url ?? "",
@@ -1562,6 +1564,21 @@ function ProductModal({
                 </p>
               )}
             </div>
+            {/* Fijar primero en "Más vendidos" (home y catálogo), sin importar las ventas */}
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={form.mas_vendido_fijo === "SI"}
+                onClick={() => set("mas_vendido_fijo", form.mas_vendido_fijo === "SI" ? "NO" : "SI")}
+                className={`h-5 w-9 rounded-full p-0.5 transition-colors ${form.mas_vendido_fijo === "SI" ? "bg-primary" : "bg-muted-foreground/30"}`}
+              >
+                <div
+                  className={`h-4 w-4 rounded-full bg-white transition-transform ${form.mas_vendido_fijo === "SI" ? "translate-x-4" : "translate-x-0"}`}
+                />
+              </button>
+              <span>🔥 Fijar 1° en Más vendidos</span>
+            </label>
             {(["destacado", "oferta", "stock"] as const).map((field) => (
               <label key={field} className="flex cursor-pointer items-center gap-2 text-sm font-medium capitalize">
                 <div

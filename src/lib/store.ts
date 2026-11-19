@@ -501,15 +501,29 @@ export function allowedTallesFor(product: Record<string, unknown>, color?: strin
 export const HOME_BEST_SELLERS = 3;
 
 /**
+ * Producto fijado a mano desde el panel como primero de "Más vendidos"
+ * (metadata.mas_vendido_fijo = "SI"), sin importar sus ventas.
+ */
+export function isPinnedBestSeller(product: Record<string, unknown>): boolean {
+  const meta = product["metadata"];
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return false;
+  const raw = (meta as Record<string, unknown>)["mas_vendido_fijo"];
+  return typeof raw === "string" && isYes(raw);
+}
+
+/**
  * Ranking único de "Más vendidos", compartido por la home y el catálogo (así siempre coinciden).
  *
- * Orden: 1) con ventas de la semana, de más a menos (empate: destacados primero);
+ * Orden: 0) fijados desde el panel ("Fijar 1° en Más vendidos"), en el orden del catálogo;
+ * 1) con ventas de la semana, de más a menos (empate: destacados primero);
  * 2) destacados sin ventas; 3) el resto, en el orden del catálogo.
- * `topCount` es cuántos cuentan como "Más vendidos": los de 1) y 2), y como mínimo los
+ * `topCount` es cuántos cuentan como "Más vendidos": los de 0), 1) y 2), y como mínimo los
  * HOME_BEST_SELLERS que muestra la home (aunque alguno haya entrado de relleno desde 3).
  */
 export function rankBestSellers(products: Product[]): { ranked: Product[]; topCount: number } {
-  const indexed = products.map((p, i) => ({ p, i, ventas: Number(p.ventas_semana ?? 0) || 0 }));
+  const all = products.map((p, i) => ({ p, i, ventas: Number(p.ventas_semana ?? 0) || 0 }));
+  const fijados = all.filter((x) => isPinnedBestSeller(x.p));
+  const indexed = all.filter((x) => !isPinnedBestSeller(x.p));
   const conVentas = indexed
     .filter((x) => x.ventas > 0)
     .sort(
@@ -520,10 +534,10 @@ export function rankBestSellers(products: Product[]): { ranked: Product[]; topCo
     );
   const destacados = indexed.filter((x) => x.ventas <= 0 && isYes(x.p.destacado));
   const resto = indexed.filter((x) => x.ventas <= 0 && !isYes(x.p.destacado));
-  const ranked = [...conVentas, ...destacados, ...resto].map((x) => x.p);
+  const ranked = [...fijados, ...conVentas, ...destacados, ...resto].map((x) => x.p);
   const topCount = Math.min(
     ranked.length,
-    Math.max(conVentas.length + destacados.length, HOME_BEST_SELLERS),
+    Math.max(fijados.length + conVentas.length + destacados.length, HOME_BEST_SELLERS),
   );
   return { ranked, topCount };
 }

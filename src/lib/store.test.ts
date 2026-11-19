@@ -944,6 +944,22 @@ describe("rankBestSellers (home y catálogo usan el mismo ranking)", () => {
     expect(topCount).toBe(4); // 3 con ventas + 1 destacado
   });
 
+  it("un producto fijado desde el panel sale primero aunque no tenga ventas", () => {
+    const fijo = { ...mk("nfc", 0), metadata: { mas_vendido_fijo: "SI" } } as unknown as Product;
+    const products = [mk("a", 0), mk("b", 5), mk("c", 9), fijo];
+    const { ranked, topCount } = rankBestSellers(products);
+    expect(ranked.map((p) => p.id)).toEqual(["nfc", "c", "b", "a"]);
+    expect(topCount).toBe(3); // fijado + 2 con ventas
+    // Al desfijarlo vuelve a su lugar por ventas
+    const suelto = { ...mk("nfc", 0), metadata: { mas_vendido_fijo: "" } } as unknown as Product;
+    expect(rankBestSellers([mk("a", 0), mk("b", 5), mk("c", 9), suelto]).ranked.map((p) => p.id)).toEqual([
+      "c",
+      "b",
+      "a",
+      "nfc",
+    ]);
+  });
+
   it("si hay menos de 3 con ventas o destacados, los de relleno también cuentan como más vendidos", () => {
     const products = [mk("a", 0), mk("b", 2), mk("c", 0)];
     const { ranked, topCount } = rankBestSellers(products);

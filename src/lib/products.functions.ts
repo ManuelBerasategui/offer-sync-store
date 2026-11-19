@@ -83,6 +83,8 @@ export type ProductInput = {
    * el mínimo de la categoría / moq_group. "" -> sin mínimo propio.
    */
   moq_min_units?: string;
+  /** "SI" = aparece primero en "Más vendidos" (home y catálogo). undefined = conservar. */
+  mas_vendido_fijo?: string;
   /**
    * Modo de descuento por cantidad: "" / "auto" (categoría + 12% global),
    * "none" (sin descuentos) o "custom" (solo los tramos de este producto).
@@ -349,6 +351,10 @@ export const upsertAdminProduct = createServerFn({ method: "POST" })
       if (p.moq_min_units !== undefined) {
         const ownMin = parseProductMinUnits(p.moq_min_units);
         metadata["moq_min_units"] = ownMin ? String(ownMin) : "";
+      }
+      // mas_vendido_fijo: primero en "Más vendidos" (solo "SI" o vacío)
+      if (p.mas_vendido_fijo !== undefined) {
+        metadata["mas_vendido_fijo"] = p.mas_vendido_fijo === "SI" ? "SI" : "";
       }
       // qty_discount_mode: solo valores conocidos; cualquier otro vuelve a automático
       if (p.qty_discount_mode !== undefined) {
