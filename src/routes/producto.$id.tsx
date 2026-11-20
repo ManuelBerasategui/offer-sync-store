@@ -19,6 +19,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  curvaSelectorUnitsOf,
+  curvaSelectorOptions,
+  curvaLabel,
+  roundUpToCurva,
+  discountFor,
+  fotoCodigo,
+  modeloItemName,
   FALLBACK_IMAGE,
   SUPLEMENTOS_MIN,
   SUPLEMENTOS_MSG,
@@ -1088,6 +1095,13 @@ function ProductoPage() {
   const isCamisetaProd = isCamiseta(product?.categoria, product?.nombre);
   // Curvas: se compran solo por curva completa (qty = cantidad de curvas)
   const isCurvaProd = isCurva(product?.nombre);
+  // Curva surtida con selector (ej. mallas): la cantidad va en unidades, de a curvas completas
+  const curvaUnits = product ? curvaSelectorUnitsOf(product as Record<string, unknown>) : null;
+  const curvaOptions = useMemo(
+    () => (curvaUnits ? curvaSelectorOptions(curvaUnits, tiers) : []),
+    [curvaUnits, tiers],
+  );
+  const qtyStep = curvaUnits ?? 1;
 
   if (!product) {
     // Sugerencias: primero ofertas, después el resto (con foto)
@@ -1211,21 +1225,31 @@ function ProductoPage() {
       : Math.round(basePrice * (1 - qtyPercent / 100));
   const total = unit * qty;
 
+  // Curva surtida: el modelo es la foto elegida en la galería (con su código fijo)
+  const modeloFotos = curvaUnits ? galleryImages(product) : [];
+  const modeloIdx = Math.min(Math.max(galleryIdx, 0), Math.max(modeloFotos.length - 1, 0));
+  const modeloCodigo = modeloFotos[modeloIdx] ? fotoCodigo(modeloFotos[modeloIdx]) : "";
+  const cartItemName = modeloCodigo
+    ? modeloItemName(displayNameWithTalle, modeloIdx + 1, modeloCodigo)
+    : displayNameWithTalle;
+
   const cartItem = {
-    id: `${String(product.id ?? product.nombre ?? "")}:${selectedVariant?.id === "default_base" ? "" : (selectedVariant?.id ?? "")}:${selectedTalle ?? ""}`,
+    id: `${String(product.id ?? product.nombre ?? "")}:${selectedVariant?.id === "default_base" ? "" : (selectedVariant?.id ?? "")}:${selectedTalle ?? ""}${modeloCodigo ? `:${modeloCodigo}` : ""}`,
     productId: product.id ? String(product.id) : undefined,
-    nombre: displayNameWithTalle,
+    nombre: cartItemName,
     qty,
     unitPrice: Math.round(unit),
     basePrice,
     variantId: selectedVariant?.id === "default_base" ? undefined : selectedVariant?.id,
     variantColor: selectedVariant?.color,
-    imagen: imageUrl(selectedImage),
+    imagen: imageUrl(modeloCodigo ? modeloFotos[modeloIdx] : selectedImage),
     categoria: product.categoria ?? "",
   };
 
   // Buscar si este producto ya está en el carrito para inicializar y recordar la cantidad elegida
   const existingInCart = useMemo(() => {
+    // Curva surtida: cada modelo es un ítem distinto del carrito
+    if (modeloCodigo) return cart.items.find((i) => i.id === cartItem.id);
     return cart.items.find(
       (i) =>
         i.id === cartItem.id ||
@@ -1233,7 +1257,7 @@ function ProductoPage() {
         i.nombre === displayNameWithTalle ||
         i.nombre === displayName,
     );
-  }, [cart.items, cartItem.id, product.id, selectedVariant?.id, displayNameWithTalle, displayName]);
+  }, [cart.items, cartItem.id, product.id, selectedVariant?.id, displayNameWithTalle, displayName, modeloCodigo]);
 
   const ownMinUnits = productMinUnitsOf(product as Record<string, unknown>);
   const hasSyncedCartQty = useRef(false);
@@ -1316,7 +1340,7 @@ function ProductoPage() {
             productName={product.nombre ?? "Producto"}
             selectedVariantImage={selectedVariant?.imagen_url}
             onActiveChange={setGalleryIdx}
-            numbered={Boolean(waOnlyReason) && galleryCount > 1}
+            numbered={(Boolean(waOnlyReason) || Boolean(curvaUnits)) && galleryCount > 1}
             initialIdx={initialGalleryIdx}
           />
 
@@ -1571,7 +1595,8 @@ function ProductoPage() {
                     );
                   }
 
-                  if (tiers.length > 0) {
+                  // Curva surtida: los precios por cantidad ya están en el selector de curvas
+                  if (tiers.length > 0 && !curvaUnits) {
                     const catName = product.categoria ? product.categoria.trim() : "este producto";
                     const activeProdTier = [...tiers].sort((a, b) => b.units - a.units).find(t => qty >= t.units);
                     const nextProdTier = [...tiers].sort((a, b) => a.units - b.units).find(t => t.units > qty);
@@ -1716,8 +1741,50 @@ function ProductoPage() {
                   htmlFor="qty-input"
                   className="text-[11px] font-bold uppercase tracking-[1px] text-muted-foreground"
                 >
-                  {isCurvaProd ? "Cantidad de curvas" : "Cantidad"}
+                  {isCurvaProd ? "Cantidad de curvas" : curvaUnits ? "Elegí tu curva" : "Cantidad"}
                 </label>
+                {curvaUnits && (
+                  <p className="mt-1 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
+                    📦 Se vende por curva surtida de {curvaUnits} unidades: los talles vienen surtidos.
+                  </p>
+                )}
+                {curvaUnits && modeloFotos.length > 1 && (
+                  <p className="mt-2 text-sm font-bold text-foreground">
+                    Modelo elegido: N° {modeloIdx + 1}{" "}
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      (tocá una foto de la galería para cambiarlo)
+                    </span>
+                  </p>
+                )}
+                {curvaUnits && curvaOptions.length > 0 && (
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {curvaOptions.map((n) => {
+                      const optUnit = Math.round(basePrice * (1 - discountFor(product, n) / 100));
+                      const active = qty === n;
+                      return (
+                        <button
+                          key={n}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => {
+                            setQty(n);
+                            setQtyStr(String(n));
+                          }}
+                          className={`flex flex-col items-start rounded-lg border px-3 py-2 text-left transition ${
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-input bg-background text-foreground hover:border-primary"
+                          }`}
+                        >
+                          <span className="text-sm font-bold">{curvaLabel(n)}</span>
+                          <span className={`text-[11px] font-semibold ${active ? "" : "text-muted-foreground"}`}>
+                            {n} u. · {money(optUnit)} c/u
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 {isCurvaProd && (
                   <p className="mt-1 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
                     📦 1 curva = {CURVA_UNIDADES} unidades. El precio es por curva completa.
@@ -1751,7 +1818,7 @@ function ProductoPage() {
                     id="qty-decrement"
                     aria-label="Reducir cantidad"
                     onClick={() => {
-                      const next = Math.max(1, qty - 1);
+                      const next = Math.max(qtyStep, qty - qtyStep);
                       setQty(next);
                       setQtyStr(String(next));
                     }}
@@ -1778,7 +1845,9 @@ function ProductoPage() {
                     onBlur={() => {
                       // Al salir del campo, garantizar entero >= 1
                       const parsed = parseInt(qtyStr, 10);
-                      const clamped = isNaN(parsed) || parsed < 1 ? 1 : parsed;
+                      const base = isNaN(parsed) || parsed < 1 ? 1 : parsed;
+                      // Curva surtida: siempre curvas completas
+                      const clamped = curvaUnits ? roundUpToCurva(base, curvaUnits) : base;
                       setQty(clamped);
                       setQtyStr(String(clamped));
                     }}
@@ -1792,7 +1861,7 @@ function ProductoPage() {
                     id="qty-increment"
                     aria-label="Aumentar cantidad"
                     onClick={() => {
-                      const next = qty + 1;
+                      const next = qty + qtyStep;
                       setQty(next);
                       setQtyStr(String(next));
                     }}
@@ -1803,6 +1872,11 @@ function ProductoPage() {
                   {isCurvaProd && (
                     <span className="text-xs font-semibold text-muted-foreground">
                       {qty} curva{qty !== 1 ? "s" : ""} = {qty * CURVA_UNIDADES} unidades
+                    </span>
+                  )}
+                  {curvaUnits && (
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      unidades ({Math.floor(qty / curvaUnits)} curva{Math.floor(qty / curvaUnits) !== 1 ? "s" : ""})
                     </span>
                   )}
                 </div>

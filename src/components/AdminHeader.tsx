@@ -1,11 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { Package, ShoppingBag, Settings, ArrowLeft } from "lucide-react";
+import { Package, ShoppingBag, Settings, ArrowLeft, Images } from "lucide-react";
 import type { ReactNode } from "react";
 
 interface AdminHeaderProps {
   title: string;
   subtitle?: string;
-  currentRoute: "productos" | "ordenes" | "configuracion";
+  currentRoute: "productos" | "mallas" | "ordenes" | "configuracion";
   actions?: ReactNode;
 }
 
@@ -17,6 +17,13 @@ export function AdminHeader({ title, subtitle, currentRoute, actions }: AdminHea
       mobileLabel: "Productos",
       href: "/admin/productos" as const,
       icon: Package,
+    },
+    {
+      id: "mallas",
+      label: "Fotos de mallas",
+      mobileLabel: "Mallas",
+      href: "/admin/mallas" as const,
+      icon: Images,
     },
     {
       id: "ordenes",

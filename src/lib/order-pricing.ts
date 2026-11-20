@@ -21,6 +21,11 @@ import {
   excludedFromQtyDiscount,
   usesCategoryQtyDiscount,
   productQtyDiscountPct,
+  curvaSelectorUnitsOf,
+  fotoCodigo,
+  galleryImages,
+  modeloItemName,
+  requestedModeloCodigo,
   isSuplemento,
   moqGroupOf,
   productMinUnitsOf,
@@ -51,7 +56,7 @@ type RawItem = {
 };
 
 const PRODUCT_COLUMNS =
-  "id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,oferta,stock,descuento,metadata,color_predeterminado";
+  "id,nombre,categoria,precio,precio_usd,precio_base,moneda_base,precio_oferta,precio_oferta_usd,precio_oferta_base,moneda_oferta_base,oferta,stock,descuento,metadata,color_predeterminado,imagen_url";
 
 /** Talles de camiseta que se pueden comprar por la web (los mismos que ofrece la ficha). */
 const JERSEY_TALLES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"];
@@ -269,6 +274,21 @@ export async function priceOrderItems(
         const built = buildItemName(item, prod, variant);
         if (built.error) return fail(`${built.error} ${RELOAD_MSG}`);
         nombre = built.nombre;
+        // Curva surtida con selector (ej. mallas): solo curvas completas
+        const curva = curvaSelectorUnitsOf(prod as Record<string, unknown>);
+        if (curva && item.qty % curva !== 0) {
+          return fail(`"${nombre}" se vende por curvas de ${curva} unidades. ${RELOAD_MSG}`);
+        }
+        if (curva) {
+          // El modelo es una de las fotos actuales del producto (por su código fijo)
+          const codigo = requestedModeloCodigo(item.nombre);
+          const fotos = galleryImages(prod);
+          const idx = codigo ? fotos.findIndex((u) => fotoCodigo(u) === codigo) : -1;
+          if (idx === -1) {
+            return fail(`El modelo elegido de "${nombre}" ya no está disponible. ${RELOAD_MSG}`);
+          }
+          nombre = modeloItemName(nombre, idx + 1, codigo as string);
+        }
         const base = variantBasePrice(prod, variant ?? null);
         if (isBlackviewGlasses(prod.nombre)) {
           // Blackview BV100: precio fijo desde 3 unidades, sin otros descuentos

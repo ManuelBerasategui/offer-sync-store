@@ -880,7 +880,13 @@ export function tiersOf(p: Product): Tier[] {
   if (qtyDiscountModeOf(p as Record<string, unknown>) === "none") return [];
   if (!isYes(p.descuento)) return [];
   const tiers: Tier[] = [];
-  for (const [key, value] of Object.entries(p)) {
+  // La tienda recibe metadata "aplanado" sobre el producto; el servidor (cobro) recibe la fila
+  // cruda con los tramos dentro de metadata. Se leen ambos para que los dos calculen igual.
+  const meta = (p as Record<string, unknown>)["metadata"];
+  const metaEntries =
+    meta && typeof meta === "object" && !Array.isArray(meta) ? Object.entries(meta) : [];
+  const seen = new Set<number>();
+  for (const [key, value] of [...Object.entries(p), ...metaEntries]) {
     const m = key.match(/^(\d+)\s*unidad/i);
     if (!m) continue;
     const percent =
@@ -890,7 +896,11 @@ export function tiersOf(p: Product): Tier[] {
           .replace(",", "."),
       ) || 0;
     const units = Number(m[1]);
-    if (units > 0 && percent > 0) tiers.push({ units, percent });
+    // Si el tramo está arriba y en metadata, vale el primero (el de arriba)
+    if (units > 0 && percent > 0 && !seen.has(units)) {
+      seen.add(units);
+      tiers.push({ units, percent });
+    }
   }
   return tiers.sort((a, b) => a.units - b.units);
 }
@@ -1346,6 +1356,69 @@ export function productMinUnitsOf(product: Record<string, unknown>): number | nu
     return isAspiradoraYtM2041(String(product["nombre"] ?? "")) ? ASPIRADORA_YT_M2041_MIN_UNITS : null;
   }
   return parseProductMinUnits(raw);
+}
+
+/**
+ * Productos que se venden por curva surtida con selector (metadata.selector_curva = "SI"),
+ * ej. las mallas: 1 curva = el mínimo propio del producto (moq_min_units) y el cliente elige
+ * entre ½ docena, 1 docena, 3 docenas... Los precios salen de los tramos por cantidad del
+ * producto (modo "custom"), que el servidor vuelve a calcular al cobrar.
+ * Devuelve las unidades de una curva, o null si el producto no usa selector.
+ */
+export function curvaSelectorUnitsOf(product: Record<string, unknown>): number | null {
+  const meta = product["metadata"];
+  const metaRec =
+    meta && typeof meta === "object" && !Array.isArray(meta) ? (meta as Record<string, unknown>) : null;
+  const raw =
+    product["selector_curva"] !== undefined ? product["selector_curva"] : metaRec?.["selector_curva"];
+  if (typeof raw !== "string" || !isYes(raw)) return null;
+  return productMinUnitsOf(product);
+}
+
+/** Opciones del selector de curvas: la curva mínima y cada tramo que sea múltiplo de ella. */
+export function curvaSelectorOptions(curvaUnits: number, tiers: Tier[]): number[] {
+  if (!(curvaUnits > 0)) return [];
+  const units = [curvaUnits, ...tiers.map((t) => t.units)].filter(
+    (u) => Number.isInteger(u) && u >= curvaUnits && u % curvaUnits === 0,
+  );
+  return [...new Set(units)].sort((a, b) => a - b);
+}
+
+/** "½ docena", "1 docena", "3 docenas"... o "N unidades" si no es múltiplo de 6. */
+export function curvaLabel(units: number): string {
+  if (units === 6) return "½ docena";
+  if (units > 0 && units % 12 === 0) {
+    const d = units / 12;
+    return `${d} docena${d !== 1 ? "s" : ""}`;
+  }
+  return `${units} unidades`;
+}
+
+/**
+ * Código fijo de una foto (para identificar el modelo elegido aunque después se agreguen
+ * o saquen fotos y cambie la numeración): primeros 8 caracteres alfanuméricos del archivo.
+ */
+export function fotoCodigo(url: string): string {
+  const file = String(url ?? "").split(/[?#]/)[0]?.split("/").pop() ?? "";
+  return file.replace(/\.[a-z0-9]+$/i, "").replace(/[^a-z0-9]/gi, "").slice(0, 8).toLowerCase();
+}
+
+/** Nombre del ítem con el modelo elegido: "Mallas … — Modelo 5 (Cód: 1072905b)". */
+export function modeloItemName(baseName: string, numero: number, codigo: string): string {
+  return `${baseName} — Modelo ${numero} (Cód: ${codigo})`;
+}
+
+/** Código de modelo pedido en el nombre del ítem, o null. */
+export function requestedModeloCodigo(nombre: string): string | null {
+  const m = String(nombre ?? "").match(/\(Cód:\s*([a-z0-9]{1,8})\)/i);
+  return m?.[1] ? m[1].toLowerCase() : null;
+}
+
+/** Redondea una cantidad hacia arriba a curvas completas (mínimo 1 curva). */
+export function roundUpToCurva(qty: number, curvaUnits: number): number {
+  if (!(curvaUnits > 0)) return Math.max(1, Math.floor(qty) || 1);
+  const n = Math.max(1, Math.ceil((Number.isFinite(qty) ? qty : 0) / curvaUnits));
+  return n * curvaUnits;
 }
 
 /**

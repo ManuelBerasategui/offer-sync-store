@@ -20,6 +20,7 @@ import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminConfiguracionRouteImport } from './routes/admin.configuracion'
+import { Route as AdminMallasRouteImport } from './routes/admin.mallas'
 import { Route as AdminOrdenesRouteImport } from './routes/admin.ordenes'
 import { Route as AdminProductosRouteImport } from './routes/admin.productos'
 import { Route as ComboIndexRouteImport } from './routes/combo.$index'
@@ -80,6 +81,11 @@ const AdminConfiguracionRoute = AdminConfiguracionRouteImport.update({
   path: '/admin/configuracion',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminMallasRoute = AdminMallasRouteImport.update({
+  id: '/admin/mallas',
+  path: '/admin/mallas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminOrdenesRoute = AdminOrdenesRouteImport.update({
   id: '/admin/ordenes',
   path: '/admin/ordenes',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/importar': typeof ImportarRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/configuracion': typeof AdminConfiguracionRoute
+  '/admin/mallas': typeof AdminMallasRoute
   '/admin/ordenes': typeof AdminOrdenesRoute
   '/admin/productos': typeof AdminProductosRoute
   '/combo/$index': typeof ComboIndexRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/importar': typeof ImportarRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/configuracion': typeof AdminConfiguracionRoute
+  '/admin/mallas': typeof AdminMallasRoute
   '/admin/ordenes': typeof AdminOrdenesRoute
   '/admin/productos': typeof AdminProductosRoute
   '/combo/$index': typeof ComboIndexRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/importar': typeof ImportarRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/configuracion': typeof AdminConfiguracionRoute
+  '/admin/mallas': typeof AdminMallasRoute
   '/admin/ordenes': typeof AdminOrdenesRoute
   '/admin/productos': typeof AdminProductosRoute
   '/combo/$index': typeof ComboIndexRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/reset-password'
     | '/admin/configuracion'
+    | '/admin/mallas'
     | '/admin/ordenes'
     | '/admin/productos'
     | '/combo/$index'
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/reset-password'
     | '/admin/configuracion'
+    | '/admin/mallas'
     | '/admin/ordenes'
     | '/admin/productos'
     | '/combo/$index'
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/reset-password'
     | '/admin/configuracion'
+    | '/admin/mallas'
     | '/admin/ordenes'
     | '/admin/productos'
     | '/combo/$index'
@@ -218,6 +230,7 @@ export interface RootRouteChildren {
   ImportarRoute: typeof ImportarRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   AdminConfiguracionRoute: typeof AdminConfiguracionRoute
+  AdminMallasRoute: typeof AdminMallasRoute
   AdminOrdenesRoute: typeof AdminOrdenesRoute
   AdminProductosRoute: typeof AdminProductosRoute
   ComboIndexRoute: typeof ComboIndexRoute
@@ -304,6 +317,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminConfiguracionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/mallas': {
+      id: '/admin/mallas'
+      path: '/admin/mallas'
+      fullPath: '/admin/mallas'
+      preLoaderRoute: typeof AdminMallasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/ordenes': {
       id: '/admin/ordenes'
       path: '/admin/ordenes'
@@ -346,6 +366,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImportarRoute: ImportarRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   AdminConfiguracionRoute: AdminConfiguracionRoute,
+  AdminMallasRoute: AdminMallasRoute,
   AdminOrdenesRoute: AdminOrdenesRoute,
   AdminProductosRoute: AdminProductosRoute,
   ComboIndexRoute: ComboIndexRoute,

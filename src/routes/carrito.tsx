@@ -19,6 +19,8 @@ import {
   isMate,
   moqGroupOf,
   productMinUnitsOf,
+  curvaSelectorUnitsOf,
+  roundUpToCurva,
   findProduct,
   money,
   priceOf,
@@ -306,6 +308,8 @@ function CarritoPage() {
                   products.find((p) => i.id && String(i.id).startsWith(String(p.id) + "-")) ??
                   products.find((p) => i.nombre && p.nombre && i.nombre.toLowerCase().startsWith(p.nombre.toLowerCase()));
                 const isSupp = isSuplemento(i.categoria, i.nombre);
+                // Curva surtida (ej. mallas): el carrito sube y baja de a curvas completas
+                const curvaStep = prod ? (curvaSelectorUnitsOf(prod as Record<string, unknown>) ?? 1) : 1;
                 const isCombo = i.id.startsWith("combo-");
                 const rawComboIndex = isCombo ? i.id.replace("combo-", "") : null;
                 const comboBanner =
@@ -453,9 +457,9 @@ function CarritoPage() {
                         itemId={i.id}
                         qty={i.qty}
                         nombre={i.nombre}
-                        onDecrease={() => cart.setQty(i.id, i.qty - 1)}
-                        onIncrease={() => cart.setQty(i.id, i.qty + 1)}
-                        onSetQty={(q) => cart.setQty(i.id, q)}
+                        onDecrease={() => cart.setQty(i.id, i.qty - curvaStep)}
+                        onIncrease={() => cart.setQty(i.id, i.qty + curvaStep)}
+                        onSetQty={(q) => cart.setQty(i.id, curvaStep > 1 ? roundUpToCurva(q, curvaStep) : q)}
                       />
                       <p className="w-20 shrink-0 text-right tabular-nums text-sm font-bold sm:w-24">
                         {money(i.unitPrice * i.qty)}
