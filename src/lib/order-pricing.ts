@@ -149,6 +149,8 @@ export async function priceOrderItems(
   total: number;
   /** Parte del total sin descuento por transferencia (mallas). */
   transferExemptTotal?: number;
+  /** Por ítem: true si no lleva descuento por transferencia (y por Mercado Pago cobra el recargo). */
+  transferExempt?: boolean[];
   config: Record<string, string>;
   error?: string;
 }> {
@@ -363,10 +365,13 @@ export async function priceOrderItems(
 
     const total = validatedItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
     // Lo que no lleva descuento por transferencia (mallas): se cobra igual que por Mercado Pago
+    const transferExempt = validatedItems.map(
+      (_, idx) => !hasTransferDiscount(resolve(rawItems[idx]!).prod as Record<string, unknown> | undefined),
+    );
     const transferExemptTotal = validatedItems
-      .filter((_, idx) => !hasTransferDiscount(resolve(rawItems[idx]!).prod as Record<string, unknown> | undefined))
+      .filter((_, idx) => transferExempt[idx])
       .reduce((a, i) => a + i.qty * i.unitPrice, 0);
-    return { validatedItems, total, transferExemptTotal, config };
+    return { validatedItems, total, transferExemptTotal, transferExempt, config };
   } catch (err) {
     // Ante cualquier error, rechazar: nunca cobrar con los precios del navegador
     console.error("[order-pricing] error al calcular precios:", err);

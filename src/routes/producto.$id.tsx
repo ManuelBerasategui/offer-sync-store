@@ -61,6 +61,7 @@ import {
   transferPrice,
   transferDiscountPct,
   hasTransferDiscount,
+  mpSurchargePrice,
   checkCategoryMins,
   isCamiseta,
   isCurva,
@@ -1105,10 +1106,12 @@ function ProductoPage() {
   const isCurvaProd = isCurva(product?.nombre);
   // Curva surtida con selector (ej. mallas): la cantidad va en unidades, de a curvas completas
   const curvaUnits = product ? curvaSelectorUnitsOf(product as Record<string, unknown>) : null;
-  // Las mallas cuestan lo mismo por transferencia que por Mercado Pago (ver hasTransferDiscount)
-  const transferPct = hasTransferDiscount(product as Record<string, unknown> | undefined)
-    ? transferDiscountPct(config)
-    : 0;
+  // Mallas: su precio es el de transferencia (sin descuento) y Mercado Pago cobra ese % de más
+  // (ver hasTransferDiscount / mpSurchargePrice). El resto: descuento por transferencia.
+  const sinDescuentoTransf = !hasTransferDiscount(product as Record<string, unknown> | undefined);
+  const transferPct = sinDescuentoTransf ? 0 : transferDiscountPct(config);
+  const mpSurchargePct = sinDescuentoTransf ? transferDiscountPct(config) : 0;
+  const showsTwoPrices = transferPct > 0 || mpSurchargePct > 0;
   // Mallas: los precios salen tal cual de su lista de precios (en pesos, no se mueven con el dólar)
   const listTiers = useMemo(
     () => (curvaUnits && product ? priceListTiers(product as Record<string, unknown>) : []),
@@ -1430,7 +1433,7 @@ function ProductoPage() {
                     <span className="tabular-nums text-3xl font-bold text-foreground">
                       {money(transferPrice(unit, transferPct))}
                     </span>
-                    {transferPct > 0 && (
+                    {showsTwoPrices && (
                       <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
                         con transferencia
                       </span>
@@ -1441,13 +1444,13 @@ function ProductoPage() {
                       -{Math.round(percent)}% por cantidad aplicado
                     </p>
                   )}
-                  {transferPct > 0 && (
+                  {showsTwoPrices && (
                     <p className="text-xs text-muted-foreground">
-                      {money(unit)} con Mercado Pago
+                      {money(mpSurchargePct > 0 ? mpSurchargePrice(unit, mpSurchargePct) : unit)} con Mercado Pago
                       {isCurvaProd && " — precio por curva"}
                     </p>
                   )}
-                  {isCurvaProd && transferPct <= 0 && (
+                  {isCurvaProd && !showsTwoPrices && (
                     <p className="text-xs text-muted-foreground">Precio por curva</p>
                   )}
                 </div>
@@ -1818,7 +1821,7 @@ function ProductoPage() {
                         >
                           <span className="text-sm font-bold">{curvaLabel(n)}</span>
                           <span className={`text-[11px] font-semibold ${active ? "" : "text-muted-foreground"}`}>
-                            {n} u. · {money(transferPrice(optUnit, transferPct))} c/u{transferPct > 0 ? " transf." : ""}
+                            {n} u. · {money(transferPrice(optUnit, transferPct))} c/u{showsTwoPrices ? " transf." : ""}
                           </span>
                         </button>
                       );

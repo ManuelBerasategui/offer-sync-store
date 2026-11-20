@@ -17,6 +17,8 @@ import {
   transferPrice,
   transferDiscountPct,
   hasTransferDiscount,
+  mpSurchargePrice,
+  curvaSelectorUnitsOf,
   toNumber,
   waLink,
   isCamiseta,
@@ -33,6 +35,7 @@ import {
   JERSEY_FAN_ML_TIERS,
 } from "@/lib/store";
 import type { Product, SiteConfig } from "@/lib/store";
+import { priceListTiers } from "@/lib/product-gallery";
 
 export function ProductCard({
   p,
@@ -60,7 +63,11 @@ export function ProductCard({
   const consultar = isWhatsappOnly(p);
   const waOnlyReason = waOnlyReasonOf(p as unknown as Record<string, unknown>);
   const isWaPriceHidden = waOnlyReason ? Boolean(WA_ONLY_CONFIG[waOnlyReason]?.hidePrice) : false;
-  const basePrice = priceOf(p);
+  // Mallas: precio "desde" = la primera curva de su lista de precios (no se mueve con el dólar)
+  const listTiers = curvaSelectorUnitsOf(p as Record<string, unknown>)
+    ? priceListTiers(p as Record<string, unknown>)
+    : [];
+  const basePrice = listTiers.length ? listTiers[0]!.price : priceOf(p);
   const origPrice = originalPriceOf(p);
   const isDiscounted = offer && origPrice > basePrice;
   const hidePrice = isWaPriceHidden || basePrice <= 0 || isNaN(basePrice);
@@ -86,9 +93,13 @@ export function ProductCard({
       ? maxQtyPercent
       : null;
 
-  // Las mallas cuestan lo mismo por transferencia que por Mercado Pago
-  const discPct = hasTransferDiscount(p as Record<string, unknown>) ? transferDiscountPct(config) : 0;
+  // Mallas: su precio es el de transferencia (sin descuento) y Mercado Pago cobra ese % de más
+  const sinDescuentoTransf = !hasTransferDiscount(p as Record<string, unknown>);
+  const discPct = sinDescuentoTransf ? 0 : transferDiscountPct(config);
+  const mpPct = sinDescuentoTransf ? transferDiscountPct(config) : 0;
+  const showsTwoPrices = discPct > 0 || mpPct > 0;
   const tPrice = transferPrice(basePrice, discPct);
+  const mpPrice = mpPct > 0 ? mpSurchargePrice(basePrice, mpPct) : basePrice;
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-[0_10px_30px_-18px_oklch(0_0_0/0.35)]">
@@ -172,15 +183,15 @@ export function ProductCard({
                   <span className="tabular-nums text-lg font-bold text-foreground">
                     {money(tPrice)}
                   </span>
-                  {discPct > 0 && (
+                  {showsTwoPrices && (
                     <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
                       con transferencia
                     </span>
                   )}
                 </div>
-                {discPct > 0 && (
+                {showsTwoPrices && (
                   <p className="text-[11px] text-muted-foreground">
-                    {money(basePrice)} con Mercado Pago
+                    {money(mpPrice)} con Mercado Pago
                   </p>
                 )}
               </div>

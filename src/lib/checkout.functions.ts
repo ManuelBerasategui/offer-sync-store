@@ -133,7 +133,14 @@ export const createCheckout = createServerFn({ method: "POST" })
         return { error: validation.error };
       }
       items = validation.validatedItems;
-      total = validation.total;
+      // Mallas: su precio de lista es el de transferencia; por Mercado Pago se cobra ese % de más
+      const exempt = validation.transferExempt ?? [];
+      if (exempt.some(Boolean)) {
+        const { mpSurchargePrice, transferDiscountPct } = await import("./store");
+        const pct = transferDiscountPct(validation.config);
+        items = items.map((i, idx) => (exempt[idx] ? { ...i, unitPrice: mpSurchargePrice(i.unitPrice, pct) } : i));
+      }
+      total = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
 
       // Revalidación segura del cupón en el servidor: la cuenta sale del token verificado
       // (no del userId que manda el navegador) y, ante cualquier duda, no se aplica el descuento.

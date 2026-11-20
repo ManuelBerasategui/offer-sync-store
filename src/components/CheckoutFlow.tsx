@@ -22,6 +22,7 @@ import {
   transferTotal,
   transferDiscountPct,
   hasTransferDiscount,
+  mpSurchargePrice,
   getBankInfo,
   waLink,
   sanitizeUrl,
@@ -112,14 +113,20 @@ export function CheckoutFlow({
   const couponCode = appliedCoupon?.code;
 
   // Totales finales con cupón si existe
-  // Las mallas cuestan lo mismo por transferencia que por Mercado Pago (ver hasTransferDiscount)
-  const transferExempt = useMemo(() => {
+  // Mallas: su precio de lista es el de transferencia (sin descuento) y por Mercado Pago se cobra
+  // ese mismo % de más (ver hasTransferDiscount / mpSurchargePrice; el servidor cobra igual)
+  const { transferExempt, transferExemptMp } = useMemo(() => {
     const products = storeData?.products ?? [];
-    return items.reduce((sum, i) => {
+    let list = 0;
+    let mp = 0;
+    for (const i of items) {
       const prod = i.productId ? products.find((p) => String(p.id) === String(i.productId)) : undefined;
-      return hasTransferDiscount(prod as Record<string, unknown> | undefined) ? sum : sum + i.qty * i.unitPrice;
-    }, 0);
-  }, [items, storeData]);
+      if (hasTransferDiscount(prod as Record<string, unknown> | undefined)) continue;
+      list += i.qty * i.unitPrice;
+      mp += i.qty * mpSurchargePrice(i.unitPrice, discPct);
+    }
+    return { transferExempt: list, transferExemptMp: mp };
+  }, [items, storeData, discPct]);
 
   const finalTransferTotal = useMemo(() => {
     const baseTransfer = transferTotal(total, transferExempt, discPct);
@@ -128,9 +135,10 @@ export function CheckoutFlow({
   }, [total, transferExempt, discPct, couponDiscountPct]);
 
   const finalMpTotal = useMemo(() => {
-    if (!couponDiscountPct) return total;
-    return Math.max(1, total - Math.round(total * (couponDiscountPct / 100)));
-  }, [total, couponDiscountPct]);
+    const mpTotal = total - transferExempt + transferExemptMp;
+    if (!couponDiscountPct) return mpTotal;
+    return Math.max(1, mpTotal - Math.round(mpTotal * (couponDiscountPct / 100)));
+  }, [total, transferExempt, transferExemptMp, couponDiscountPct]);
 
   // Autocompletar con los datos guardados si el usuario inició sesión.
   useEffect(() => {
@@ -449,7 +457,7 @@ export function CheckoutFlow({
                 <span className="text-xs font-bold">Mercado Pago</span>
               </div>
               <span className="mt-1 text-[10px] text-muted-foreground">
-                Precio de lista
+                {transferExempt > 0 && discPct > 0 ? `Mallas +${discPct}%` : "Precio de lista"}
               </span>
               <span className="mt-1 tabular-nums text-sm font-bold text-foreground">
                 {money(finalMpTotal)}

@@ -1383,6 +1383,15 @@ export function hasTransferDiscount(product: Record<string, unknown> | null | un
   return !(product && curvaSelectorUnitsOf(product) !== null);
 }
 
+/**
+ * Precio por Mercado Pago de lo que NO tiene descuento por transferencia (mallas): su precio de
+ * lista es el de transferencia y Mercado Pago cobra ese mismo porcentaje de más.
+ */
+export function mpSurchargePrice(price: number, pct: number): number {
+  if (!(price > 0)) return 0;
+  return Math.round(price * (1 + Math.max(0, pct) / 100));
+}
+
 /** Total por transferencia: el descuento solo se aplica a lo que lo tiene (ver hasTransferDiscount). */
 export function transferTotal(listTotal: number, exemptTotal: number, discountPct: number): number {
   const exempt = Math.min(Math.max(0, exemptTotal), Math.max(0, listTotal));

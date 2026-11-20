@@ -344,6 +344,8 @@ describe("mallas: mismo precio por transferencia que por Mercado Pago", () => {
     ]);
     expect(res.error).toBeUndefined();
     expect(res.transferExemptTotal).toBe(36000);
+    // por ítem: la malla no lleva descuento (y por Mercado Pago lleva recargo), el parlante sí
+    expect(res.transferExempt).toEqual([true, false]);
     // 7% solo sobre el parlante: 20000 → 18600; las mallas quedan en 36000
     expect(transferTotal(res.total, res.transferExemptTotal ?? 0, 7)).toBe(36000 + 18600);
   });

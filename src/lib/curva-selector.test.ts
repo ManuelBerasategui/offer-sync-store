@@ -126,3 +126,13 @@ describe("descuento por transferencia", () => {
     expect(transferTotal(10000, 0, 7)).toBe(9300);
   });
 });
+
+describe("mallas por Mercado Pago", () => {
+  it("cobran el % de más sobre el precio de lista", async () => {
+    const { mpSurchargePrice } = await import("./store");
+    expect(mpSurchargePrice(15000, 7)).toBe(16050);
+    expect(mpSurchargePrice(13000, 7)).toBe(13910);
+    expect(mpSurchargePrice(10500, 7)).toBe(11235);
+    expect(mpSurchargePrice(15000, 0)).toBe(15000);
+  });
+});
