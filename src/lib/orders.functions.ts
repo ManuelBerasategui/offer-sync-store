@@ -412,8 +412,9 @@ export const createTransferOrder = createServerFn({ method: "POST" })
       const configMap = pricing.config;
       items = pricing.validatedItems;
       const listTotal = items.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-      const { transferPrice, transferDiscountPct } = await import("./store");
-      total = transferPrice(listTotal, transferDiscountPct(configMap));
+      const { transferTotal, transferDiscountPct } = await import("./store");
+      // Las mallas no llevan descuento por transferencia (ver hasTransferDiscount)
+      total = transferTotal(listTotal, pricing.transferExemptTotal ?? 0, transferDiscountPct(configMap));
 
       // Revalidación segura del cupón en el servidor
       if (data.couponCode && data.userId) {

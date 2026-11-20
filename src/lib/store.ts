@@ -1375,6 +1375,20 @@ export function curvaSelectorUnitsOf(product: Record<string, unknown>): number |
   return productMinUnitsOf(product);
 }
 
+/**
+ * Las mallas (productos por curva con selector) cuestan lo mismo por transferencia que por
+ * Mercado Pago: no llevan el descuento por transferencia.
+ */
+export function hasTransferDiscount(product: Record<string, unknown> | null | undefined): boolean {
+  return !(product && curvaSelectorUnitsOf(product) !== null);
+}
+
+/** Total por transferencia: el descuento solo se aplica a lo que lo tiene (ver hasTransferDiscount). */
+export function transferTotal(listTotal: number, exemptTotal: number, discountPct: number): number {
+  const exempt = Math.min(Math.max(0, exemptTotal), Math.max(0, listTotal));
+  return transferPrice(listTotal - exempt, discountPct) + exempt;
+}
+
 /** Opciones del selector de curvas: la curva mínima y cada tramo que sea múltiplo de ella. */
 export function curvaSelectorOptions(curvaUnits: number, tiers: Tier[]): number[] {
   if (!(curvaUnits > 0)) return [];

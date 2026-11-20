@@ -115,3 +115,14 @@ describe("modelo elegido por foto", () => {
     expect(isStoreStorageImage(42)).toBe(false);
   });
 });
+
+describe("descuento por transferencia", () => {
+  it("las mallas (curva con selector) no lo llevan", async () => {
+    const { hasTransferDiscount, transferTotal } = await import("./store");
+    expect(hasTransferDiscount({ metadata: mallasMeta })).toBe(false);
+    expect(hasTransferDiscount({ nombre: "Parlante" })).toBe(true);
+    expect(hasTransferDiscount(undefined)).toBe(true);
+    expect(transferTotal(10000, 10000, 7)).toBe(10000);
+    expect(transferTotal(10000, 0, 7)).toBe(9300);
+  });
+});

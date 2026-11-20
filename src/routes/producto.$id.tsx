@@ -60,6 +60,7 @@ import {
   findRuleForCat,
   transferPrice,
   transferDiscountPct,
+  hasTransferDiscount,
   checkCategoryMins,
   isCamiseta,
   isCurva,
@@ -1097,6 +1098,10 @@ function ProductoPage() {
   const isCurvaProd = isCurva(product?.nombre);
   // Curva surtida con selector (ej. mallas): la cantidad va en unidades, de a curvas completas
   const curvaUnits = product ? curvaSelectorUnitsOf(product as Record<string, unknown>) : null;
+  // Las mallas cuestan lo mismo por transferencia que por Mercado Pago (ver hasTransferDiscount)
+  const transferPct = hasTransferDiscount(product as Record<string, unknown> | undefined)
+    ? transferDiscountPct(config)
+    : 0;
   const curvaOptions = useMemo(
     () => (curvaUnits ? curvaSelectorOptions(curvaUnits, tiers) : []),
     [curvaUnits, tiers],
@@ -1398,9 +1403,9 @@ function ProductoPage() {
                       </span>
                     )}
                     <span className="tabular-nums text-3xl font-bold text-foreground">
-                      {money(transferPrice(unit, transferDiscountPct(config)))}
+                      {money(transferPrice(unit, transferPct))}
                     </span>
-                    {transferDiscountPct(config) > 0 && (
+                    {transferPct > 0 && (
                       <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
                         con transferencia
                       </span>
@@ -1411,13 +1416,13 @@ function ProductoPage() {
                       -{Math.round(percent)}% por cantidad aplicado
                     </p>
                   )}
-                  {transferDiscountPct(config) > 0 && (
+                  {transferPct > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {money(unit)} con Mercado Pago
                       {isCurvaProd && " — precio por curva"}
                     </p>
                   )}
-                  {isCurvaProd && transferDiscountPct(config) <= 0 && (
+                  {isCurvaProd && transferPct <= 0 && (
                     <p className="text-xs text-muted-foreground">Precio por curva</p>
                   )}
                 </div>
@@ -1546,7 +1551,7 @@ function ProductoPage() {
                     return (
                       <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 sm:p-3.5 text-xs text-foreground">
                         <p className="font-bold text-primary text-xs sm:text-sm">
-                          🎁 Llevando {BLACKVIEW_TIER_UNITS} u. o más: {money(transferPrice(tierPrice, transferDiscountPct(config)))} c/u con Transferencia
+                          🎁 Llevando {BLACKVIEW_TIER_UNITS} u. o más: {money(transferPrice(tierPrice, transferPct))} c/u con Transferencia
                         </p>
                         <p className="mt-0.5 text-[11px] sm:text-xs text-muted-foreground">
                           o {money(tierPrice)} c/u con Mercado Pago. Sin compra mínima.
@@ -1786,7 +1791,7 @@ function ProductoPage() {
                         >
                           <span className="text-sm font-bold">{curvaLabel(n)}</span>
                           <span className={`text-[11px] font-semibold ${active ? "" : "text-muted-foreground"}`}>
-                            {n} u. · {money(transferPrice(optUnit, transferDiscountPct(config)))} c/u transf.
+                            {n} u. · {money(transferPrice(optUnit, transferPct))} c/u{transferPct > 0 ? " transf." : ""}
                           </span>
                         </button>
                       );

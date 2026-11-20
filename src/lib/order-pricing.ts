@@ -22,6 +22,7 @@ import {
   usesCategoryQtyDiscount,
   productQtyDiscountPct,
   curvaSelectorUnitsOf,
+  hasTransferDiscount,
   fotoCodigo,
   galleryImages,
   modeloItemName,
@@ -145,6 +146,8 @@ export async function priceOrderItems(
 ): Promise<{
   validatedItems: PricedItem[];
   total: number;
+  /** Parte del total sin descuento por transferencia (mallas). */
+  transferExemptTotal?: number;
   config: Record<string, string>;
   error?: string;
 }> {
@@ -353,7 +356,11 @@ export async function priceOrderItems(
     }
 
     const total = validatedItems.reduce((a, i) => a + i.qty * i.unitPrice, 0);
-    return { validatedItems, total, config };
+    // Lo que no lleva descuento por transferencia (mallas): se cobra igual que por Mercado Pago
+    const transferExemptTotal = validatedItems
+      .filter((_, idx) => !hasTransferDiscount(resolve(rawItems[idx]!).prod as Record<string, unknown> | undefined))
+      .reduce((a, i) => a + i.qty * i.unitPrice, 0);
+    return { validatedItems, total, transferExemptTotal, config };
   } catch (err) {
     // Ante cualquier error, rechazar: nunca cobrar con los precios del navegador
     console.error("[order-pricing] error al calcular precios:", err);

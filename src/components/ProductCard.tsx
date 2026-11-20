@@ -16,6 +16,7 @@ import {
   tiersOf,
   transferPrice,
   transferDiscountPct,
+  hasTransferDiscount,
   toNumber,
   waLink,
   isCamiseta,
@@ -85,7 +86,8 @@ export function ProductCard({
       ? maxQtyPercent
       : null;
 
-  const discPct = transferDiscountPct(config);
+  // Las mallas cuestan lo mismo por transferencia que por Mercado Pago
+  const discPct = hasTransferDiscount(p as Record<string, unknown>) ? transferDiscountPct(config) : 0;
   const tPrice = transferPrice(basePrice, discPct);
 
   return (

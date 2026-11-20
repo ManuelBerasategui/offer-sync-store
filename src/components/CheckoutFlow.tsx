@@ -19,8 +19,9 @@ import { useCart } from "@/lib/cart";
 import { track, trackWhatsappClick } from "@/lib/analytics";
 import {
   money,
-  transferPrice,
+  transferTotal,
   transferDiscountPct,
+  hasTransferDiscount,
   getBankInfo,
   waLink,
   sanitizeUrl,
@@ -111,11 +112,20 @@ export function CheckoutFlow({
   const couponCode = appliedCoupon?.code;
 
   // Totales finales con cupón si existe
+  // Las mallas cuestan lo mismo por transferencia que por Mercado Pago (ver hasTransferDiscount)
+  const transferExempt = useMemo(() => {
+    const products = storeData?.products ?? [];
+    return items.reduce((sum, i) => {
+      const prod = i.productId ? products.find((p) => String(p.id) === String(i.productId)) : undefined;
+      return hasTransferDiscount(prod as Record<string, unknown> | undefined) ? sum : sum + i.qty * i.unitPrice;
+    }, 0);
+  }, [items, storeData]);
+
   const finalTransferTotal = useMemo(() => {
-    const baseTransfer = transferPrice(total, discPct);
+    const baseTransfer = transferTotal(total, transferExempt, discPct);
     if (!couponDiscountPct) return baseTransfer;
     return Math.max(1, baseTransfer - Math.round(baseTransfer * (couponDiscountPct / 100)));
-  }, [total, discPct, couponDiscountPct]);
+  }, [total, transferExempt, discPct, couponDiscountPct]);
 
   const finalMpTotal = useMemo(() => {
     if (!couponDiscountPct) return total;
@@ -415,9 +425,11 @@ export function CheckoutFlow({
                 <Building2 className={`h-4 w-4 ${paymentMethod === "transfer" ? "text-emerald-600" : "text-muted-foreground"}`} />
                 <span className="text-xs font-bold">Transferencia</span>
               </div>
-              <span className="mt-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                {discPct}% OFF
-              </span>
+              {discPct > 0 && transferExempt < total && (
+                <span className="mt-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                  {discPct}% OFF{transferExempt > 0 ? " (salvo mallas)" : ""}
+                </span>
+              )}
               <span className="mt-1 tabular-nums text-sm font-bold text-foreground">
                 {money(finalTransferTotal)}
               </span>

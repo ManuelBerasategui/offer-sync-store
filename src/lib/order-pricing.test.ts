@@ -315,3 +315,45 @@ describe("priceOrderItems — mínimos por categoría", () => {
     expect(res.error).toMatch(/mínimo de compra/);
   });
 });
+
+describe("mallas: mismo precio por transferencia que por Mercado Pago", () => {
+  const foto =
+    "https://abc.supabase.co/storage/v1/object/public/storage-images/products/ce58b101-eeca-4c61-91ac-28c9ed8e7130.webp";
+  const rows: Rows = {
+    ...baseRows,
+    products: [
+      ...(baseRows["products"] ?? []),
+      {
+        id: "m1",
+        nombre: "Mallas",
+        categoria: "Mallas",
+        precio: "6000",
+        oferta: "NO",
+        stock: "SI",
+        imagen_url: foto,
+        metadata: { selector_curva: "SI", moq_min_units: "6", qty_discount_mode: "none" },
+      },
+    ],
+  };
+
+  it("el servidor separa lo que no lleva descuento y el total por transferencia lo respeta", async () => {
+    const { transferTotal } = await import("./store");
+    const res = await priceOrderItems(fakeSupabase(rows), [
+      { nombre: "Mallas — Modelo 1 (Cód: ce58b101)", qty: 6, unitPrice: 1, productId: "m1" },
+      { nombre: "Parlante JBL", qty: 1, unitPrice: 1, productId: "p1" },
+    ]);
+    expect(res.error).toBeUndefined();
+    expect(res.transferExemptTotal).toBe(36000);
+    // 7% solo sobre el parlante: 20000 → 18600; las mallas quedan en 36000
+    expect(transferTotal(res.total, res.transferExemptTotal ?? 0, 7)).toBe(36000 + 18600);
+  });
+
+  it("un carrito sin mallas no cambia", async () => {
+    const { transferTotal, transferPrice } = await import("./store");
+    const res = await priceOrderItems(fakeSupabase(rows), [
+      { nombre: "Parlante JBL", qty: 2, unitPrice: 1, productId: "p1" },
+    ]);
+    expect(res.transferExemptTotal).toBe(0);
+    expect(transferTotal(res.total, 0, 7)).toBe(transferPrice(res.total, 7));
+  });
+});
