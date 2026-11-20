@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { storeQueryOptions } from "./store-query";
 import { track } from "./analytics";
+import { priceListTiers, priceListUnitPrice } from "./product-gallery";
 import {
   findProduct,
   priceOf,
@@ -18,6 +19,7 @@ import {
   excludedFromQtyDiscount,
   usesCategoryQtyDiscount,
   productQtyDiscountPct,
+  curvaSelectorUnitsOf,
   blackviewUnitPrice,
   parseJerseyItem,
   calcJerseyUnitPrice,
@@ -335,12 +337,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
         catRules,
         (key) => catTotals[key] ?? 0,
       );
-      const unitPrice = Math.round(base * (1 - percent / 100));
+      // Mallas: precio exacto de su lista de precios (igual que al cobrar)
+      const listTiers = curvaSelectorUnitsOf(product as Record<string, unknown>)
+        ? priceListTiers(product as Record<string, unknown>)
+        : [];
+      const listPrice = listTiers.length ? priceListUnitPrice(product as Record<string, unknown>, item.qty) : null;
+      const unitPrice = listPrice ?? Math.round(base * (1 - percent / 100));
+      // Precio de referencia (tachado): el de la primera curva de la lista
+      const refBase = listPrice !== null ? listTiers[0]!.price : rBase;
 
-      if (item.unitPrice === unitPrice && item.basePrice === rBase) {
+      if (item.unitPrice === unitPrice && item.basePrice === refBase) {
         return item;
       }
-      return { ...item, basePrice: rBase, unitPrice };
+      return { ...item, basePrice: refBase, unitPrice };
     });
   }, [items, data?.products, data?.banners, data?.config]);
 

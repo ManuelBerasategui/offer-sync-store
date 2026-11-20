@@ -93,3 +93,46 @@ export function galleryWhatsappMessage(
   if (totalPhotos <= 1 || photoIndex < 0 || photoIndex >= totalPhotos || !photoLink) return baseMsg;
   return `${baseMsg} Quiero este modelo: ${photoLink}`;
 }
+
+export type PriceListTier = { units: number; price: number };
+
+// Un renglón de la lista: "1/2 Docena x $15.000 C/u", "3 Docenas x $12.000", "6 unidades x $15.000"
+const PRICE_LIST_LINE =
+  /^(\d{1,4}\s*\/\s*\d{1,2}|\d{1,5}(?:[.,]\d{1,2})?)\s*(docenas?|unidades?|u\.?)\s*(?:x|a|:|-|=)?\s*\$\s*(\d{1,3}(?:\.\d{3})+|\d{1,9})(?:,\d{1,2})?/i;
+
+/**
+ * Tramos de la lista de precios del producto, en pesos y por unidad, ordenados por cantidad.
+ * Los renglones que no se entienden se ignoran. Vacío si la lista no tiene ninguno válido.
+ */
+export function priceListTiers(product: Record<string, unknown>): PriceListTier[] {
+  const tiers = new Map<number, number>();
+  for (const line of priceListOf(product)) {
+    const m = PRICE_LIST_LINE.exec(line.trim());
+    if (!m) continue;
+    const [, rawQty, rawUnit, rawPrice] = m;
+    let qty: number;
+    if (rawQty!.includes("/")) {
+      const [a, b] = rawQty!.split("/").map((n) => Number(n.trim()));
+      qty = b ? a! / b : NaN;
+    } else {
+      qty = Number(rawQty!.replace(",", "."));
+    }
+    const units = Math.round(/^docena/i.test(rawUnit!) ? qty * 12 : qty);
+    const price = Number(rawPrice!.replace(/\./g, ""));
+    if (!Number.isInteger(units) || units <= 0 || !(price > 0)) continue;
+    tiers.set(units, price);
+  }
+  return [...tiers.entries()].map(([units, price]) => ({ units, price })).sort((a, b) => a.units - b.units);
+}
+
+/**
+ * Precio por unidad para esa cantidad según la lista de precios (el tramo más alto alcanzado).
+ * null si el producto no tiene una lista de precios con tramos válidos.
+ */
+export function priceListUnitPrice(product: Record<string, unknown>, qty: number): number | null {
+  const tiers = priceListTiers(product);
+  if (!tiers.length) return null;
+  let price = tiers[0]!.price;
+  for (const t of tiers) if (qty >= t.units) price = t.price;
+  return price;
+}

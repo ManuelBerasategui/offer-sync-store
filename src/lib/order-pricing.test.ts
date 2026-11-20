@@ -357,3 +357,45 @@ describe("mallas: mismo precio por transferencia que por Mercado Pago", () => {
     expect(transferTotal(res.total, 0, 7)).toBe(transferPrice(res.total, 7));
   });
 });
+
+describe("mallas: se cobra el precio de la lista", () => {
+  const foto =
+    "https://abc.supabase.co/storage/v1/object/public/storage-images/products/ce58b101-eeca-4c61-91ac-28c9ed8e7130.webp";
+  const rows: Rows = {
+    ...baseRows,
+    products: [
+      {
+        id: "m1",
+        nombre: "Mallas Retro",
+        categoria: "Ropa",
+        // precio base movido por el dólar: no tiene que importar
+        precio: "15873",
+        oferta: "NO",
+        stock: "SI",
+        imagen_url: foto,
+        metadata: {
+          selector_curva: "SI",
+          moq_min_units: "6",
+          qty_discount_mode: "custom",
+          "12 unidades": "13.3333333333%",
+          price_list:
+            "1/2 Docena x $15.000 C/u\n1 Docena x $13.000 C/u\n3 Docenas x $12.000 C/u\n5 Docenas x $11.500 C/u\n10 Docenas x $11.000 C/u\n20 Docenas x $10.500 C/u",
+        },
+      },
+    ],
+  };
+  const item = (qty: number) => ({ nombre: "Mallas Retro — Modelo 1 (Cód: ce58b101)", qty, unitPrice: 1, productId: "m1" });
+
+  it.each([
+    [6, 15000],
+    [12, 13000],
+    [36, 12000],
+    [60, 11500],
+    [120, 11000],
+    [240, 10500],
+  ])("%i u. → $%i c/u", async (qty, price) => {
+    const res = await priceOrderItems(fakeSupabase(rows), [item(qty)]);
+    expect(res.error).toBeUndefined();
+    expect(res.validatedItems[0]!.unitPrice).toBe(price);
+  });
+});

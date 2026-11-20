@@ -83,7 +83,14 @@ import {
   type SiteConfig,
 } from "@/lib/store";
 import { SITE_URL } from "@/lib/constants";
-import { galleryPhotoLink, galleryWhatsappMessage, parseFotoParam, priceListOf } from "@/lib/product-gallery";
+import {
+  galleryPhotoLink,
+  galleryWhatsappMessage,
+  parseFotoParam,
+  priceListOf,
+  priceListTiers,
+  priceListUnitPrice,
+} from "@/lib/product-gallery";
 import { track, trackWhatsappClick } from "@/lib/analytics";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1102,9 +1109,20 @@ function ProductoPage() {
   const transferPct = hasTransferDiscount(product as Record<string, unknown> | undefined)
     ? transferDiscountPct(config)
     : 0;
+  // Mallas: los precios salen tal cual de su lista de precios (en pesos, no se mueven con el dólar)
+  const listTiers = useMemo(
+    () => (curvaUnits && product ? priceListTiers(product as Record<string, unknown>) : []),
+    [curvaUnits, product],
+  );
   const curvaOptions = useMemo(
-    () => (curvaUnits ? curvaSelectorOptions(curvaUnits, tiers) : []),
-    [curvaUnits, tiers],
+    () =>
+      curvaUnits
+        ? curvaSelectorOptions(
+            curvaUnits,
+            listTiers.length ? listTiers.map((t) => ({ units: t.units, percent: 0 })) : tiers,
+          )
+        : [],
+    [curvaUnits, tiers, listTiers],
   );
   const qtyStep = curvaUnits ?? 1;
 
@@ -1220,14 +1238,21 @@ function ProductoPage() {
   const blackviewUnit = isBlackviewProduct
     ? blackviewUnitPrice(basePrice, qty, Number(config["dolar_cotizacion"] ?? 0))
     : null;
+  const listUnit = listTiers.length ? priceListUnitPrice(productRec, qty) : null;
+  // Precio de referencia (tachado): el de la primera curva de la lista, o el base
+  const refPrice = listUnit !== null ? listTiers[0]!.price : basePrice;
   const percent =
-    blackviewUnit !== null
-      ? basePrice > 0 ? Math.round((1 - blackviewUnit / basePrice) * 100) : 0
-      : qtyPercent;
+    listUnit !== null
+      ? refPrice > 0 ? Math.round((1 - listUnit / refPrice) * 100) : 0
+      : blackviewUnit !== null
+        ? basePrice > 0 ? Math.round((1 - blackviewUnit / basePrice) * 100) : 0
+        : qtyPercent;
   const unit =
-    blackviewUnit !== null
-      ? blackviewUnit
-      : Math.round(basePrice * (1 - qtyPercent / 100));
+    listUnit !== null
+      ? listUnit
+      : blackviewUnit !== null
+        ? blackviewUnit
+        : Math.round(basePrice * (1 - qtyPercent / 100));
   const total = unit * qty;
 
   // Curva surtida: el modelo es la foto elegida en la galería (con su código fijo)
@@ -1399,7 +1424,7 @@ function ProductoPage() {
                   <div className="flex flex-wrap items-baseline gap-2">
                     {percent > 0 && (
                       <span className="tabular-nums text-base text-muted-foreground line-through">
-                        {money(basePrice)}
+                        {money(refPrice)}
                       </span>
                     )}
                     <span className="tabular-nums text-3xl font-bold text-foreground">
@@ -1772,7 +1797,9 @@ function ProductoPage() {
                 {curvaUnits && curvaOptions.length > 0 && (
                   <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {curvaOptions.map((n) => {
-                      const optUnit = Math.round(basePrice * (1 - discountFor(product, n) / 100));
+                      const optUnit =
+                        (listTiers.length ? priceListUnitPrice(productRec, n) : null) ??
+                        Math.round(basePrice * (1 - discountFor(product, n) / 100));
                       const active = qty === n;
                       return (
                         <button

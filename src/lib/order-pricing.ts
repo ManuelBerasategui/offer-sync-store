@@ -5,6 +5,7 @@
  * base (producto + variante, combo o camiseta) y se le calcula el precio con la misma lógica que la
  * tienda. Si un ítem no se puede identificar o su precio no se puede calcular, el pedido se rechaza.
  */
+import { priceListUnitPrice } from "./product-gallery";
 import {
   blackviewUnitPrice,
   calcJerseyUnitPrice,
@@ -301,6 +302,11 @@ export async function priceOrderItems(
           // tramos) o "none" (NFC Google, Aspiradora YT-M2041… → precio base)
           const percent = productQtyDiscountPct(prod, item.qty, catRules, (key) => catTotals[key] ?? 0);
           unitPrice = Math.round(base * (1 - percent / 100));
+        }
+        // Mallas: se cobra exactamente el precio de su lista (en pesos, no se mueve con el dólar)
+        if (curva) {
+          const listPrice = priceListUnitPrice(prod as Record<string, unknown>, item.qty);
+          if (listPrice) unitPrice = listPrice;
         }
       } else {
         // Combos: se identifican por el título y se cobran con sus tramos por cantidad
