@@ -1283,6 +1283,14 @@ function ProductoPage() {
     }
   }, [existingInCart, isNfcGoogleProduct, ownMinUnits]);
 
+  // Productos por curva: nunca menos de una curva completa
+  useEffect(() => {
+    if (curvaUnits && qty < curvaUnits) {
+      setQty(curvaUnits);
+      setQtyStr(String(curvaUnits));
+    }
+  }, [curvaUnits, qty]);
+
   const suplemento = isSuplemento(product.categoria);
   const categoryMinViolation = checkCategoryMins(
     [{ nombre: product.nombre, categoria: product.categoria,
@@ -1400,7 +1408,7 @@ function ProductoPage() {
                   </div>
                   {percent > 0 && (
                     <p className="text-xs font-semibold text-primary">
-                      -{percent}% por cantidad aplicado
+                      -{Math.round(percent)}% por cantidad aplicado
                     </p>
                   )}
                   {transferDiscountPct(config) > 0 && (
@@ -1778,7 +1786,7 @@ function ProductoPage() {
                         >
                           <span className="text-sm font-bold">{curvaLabel(n)}</span>
                           <span className={`text-[11px] font-semibold ${active ? "" : "text-muted-foreground"}`}>
-                            {n} u. · {money(optUnit)} c/u
+                            {n} u. · {money(transferPrice(optUnit, transferDiscountPct(config)))} c/u transf.
                           </span>
                         </button>
                       );
