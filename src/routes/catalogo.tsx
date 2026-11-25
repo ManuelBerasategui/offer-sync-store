@@ -399,16 +399,26 @@ function Catalogo() {
           </span>
         </div>
 
-        {/* Banner WhatsApp para camisetas */}
-        {cat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes("camiseta") && (() => {
+        {/* Banner WhatsApp: en todas las categor\u00edas */}
+        {(() => {
           const phone = (config["whatsapp_individual"] ?? config["whatsapp_numero"] ?? "").replace(/\D/g, "");
           if (!phone) return null;
-          const msg = encodeURIComponent("Hola! Estaba viendo las camisetas en el catálogo y no encontré el modelo que buscaba. ¿Me podés ayudar?");
+          const catName = cat && !showCombos ? cat.trim().slice(0, 60) : "";
+          const esCamisetas = catName
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[̀-ͯ]/g, "")
+            .includes("camiseta");
+          const msg = encodeURIComponent(
+            catName
+              ? `Hola! Estaba viendo ${catName} en el catálogo y no encontré lo que buscaba. ¿Me podés ayudar?`
+              : "Hola! Estaba viendo el catálogo y no encontré lo que buscaba. ¿Me podés ayudar?",
+          );
           const waUrl = `https://wa.me/${phone}?text=${msg}`;
           return (
             <a
-              id="banner-camisetas-whatsapp"
-              onClick={() => trackWhatsappClick({ destino: "privado", ubicacion: "catalogo_camisetas" })}
+              id="banner-catalogo-whatsapp"
+              onClick={() => trackWhatsappClick({ destino: "privado", ubicacion: "catalogo" })}
               href={waUrl}
               target="_blank"
               rel="noopener noreferrer"
@@ -422,7 +432,7 @@ function Catalogo() {
                   ¿No encontrás lo que buscás?
                 </p>
                 <p className="mt-0.5 text-xs text-foreground/80 sm:text-[13px]">
-                  Tenemos modelos que no siempre están en el catálogo online.{" "}
+                  Tenemos {esCamisetas ? "modelos" : "productos"} que no siempre están en el catálogo online.{" "}
                   <span className="font-semibold text-foreground">Consultanos por WhatsApp</span> y lo conseguimos.
                 </p>
               </div>
