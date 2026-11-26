@@ -167,7 +167,7 @@ function ComboPage() {
               alt={banner.titulo ?? "Combo en oferta"}
               decoding="async"
               referrerPolicy="no-referrer"
-              className="h-full w-full object-contain"
+              className="h-full w-full object-cover"
               onError={onImageError(banner.imagen_url)}
             />
           </div>
