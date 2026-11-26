@@ -127,7 +127,11 @@ function Home() {
             </p>
 
             {/* Cuestionario: importar / mayorista / minorista → rubro del catálogo */}
-            <HomeQuiz categories={orderedCategories(products)} hasCombos={banners.length > 0} />
+            <HomeQuiz
+              categories={orderedCategories(products)}
+              hasCombos={banners.length > 0}
+              grupoUrl={grupoUrl}
+            />
 
             {/* Confianza: datos reales del negocio, sin números inventados */}
             <ul className="mx-auto mt-5 flex max-w-xl flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium text-muted-foreground sm:text-[13px]">

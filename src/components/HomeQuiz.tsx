@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { ArrowLeft, ChevronRight, Package, ShoppingBag, Store } from "lucide-react";
+import { ArrowLeft, ChevronRight, Package, ShoppingBag, Store, Users } from "lucide-react";
 
-import { track } from "@/lib/analytics";
+import { track, trackWhatsappClick } from "@/lib/analytics";
 
 type Perfil = "mayorista" | "minorista";
 
@@ -10,7 +10,16 @@ type Perfil = "mayorista" | "minorista";
  * Cuestionario de entrada de la home: en 1 o 2 toques lleva al visitante a lo que busca
  * (importar un producto, o el rubro del catálogo que le interesa) en vez del catálogo general.
  */
-export function HomeQuiz({ categories, hasCombos }: { categories: string[]; hasCombos: boolean }) {
+export function HomeQuiz({
+  categories,
+  hasCombos,
+  grupoUrl,
+}: {
+  categories: string[];
+  hasCombos: boolean;
+  /** Link al grupo de WhatsApp (ya validado). Vacío = se ofrece "Comprar para mí". */
+  grupoUrl?: string;
+}) {
   const [perfil, setPerfil] = useState<Perfil | null>(null);
 
   function choosePerfil(p: Perfil) {
@@ -34,12 +43,25 @@ export function HomeQuiz({ categories, hasCombos }: { categories: string[]; hasC
           sub="Precios de importador por rubro"
           onClick={() => choosePerfil("mayorista")}
         />
-        <QuizOption
-          icon={<ShoppingBag className="h-7 w-7" />}
-          title="Comprar para mí"
-          sub="Productos listos para comprar"
-          onClick={() => choosePerfil("minorista")}
-        />
+        {grupoUrl ? (
+          <QuizOption
+            icon={<Users className="h-7 w-7" />}
+            title="Entrar al grupo de WhatsApp"
+            sub="Grupo mayorista exclusivo: productos de China y combos para revender"
+            href={grupoUrl}
+            onClick={() => {
+              track("home_quiz_answer", { respuesta: "grupo_whatsapp" });
+              trackWhatsappClick({ destino: "grupos", ubicacion: "home_quiz" });
+            }}
+          />
+        ) : (
+          <QuizOption
+            icon={<ShoppingBag className="h-7 w-7" />}
+            title="Comprar para mí"
+            sub="Productos listos para comprar"
+            onClick={() => choosePerfil("minorista")}
+          />
+        )}
       </div>
     );
   }
@@ -105,12 +127,15 @@ function QuizOption({
   title,
   sub,
   to,
+  href,
   onClick,
 }: {
   icon: ReactNode;
   title: string;
   sub: string;
   to?: "/importar";
+  /** Link externo (se abre en otra pestaña) */
+  href?: string;
   onClick: () => void;
 }) {
   const className =
@@ -129,6 +154,13 @@ function QuizOption({
       <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
     </>
   );
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className}>
+        {content}
+      </a>
+    );
+  }
   return to ? (
     <Link to={to} onClick={onClick} className={className}>
       {content}
