@@ -444,6 +444,8 @@ function Home() {
           }
         }
 
+        if (minItems.length === 0) return null;
+
         // Categoría real del catálogo para cada mínimo, con la misma asociación que usa el carrito
         // (findRuleForCat). Si no hay productos de esa categoría, la tarjeta queda sin link.
         const realCats = orderedCategories(products);
@@ -465,12 +467,6 @@ function Home() {
         const productFor = (key: string) =>
           nfcProduct && isNfcGoogle(key.replace(/_/g, " ")) ? nfcProduct : undefined;
 
-        // Solo mostrar mínimos de categorías que hoy tienen productos a la venta
-        const visibleMinItems = minItems.filter(
-          (it) => productFor(it.key) ?? productFor(it.label) ?? catalogCatFor(it.key),
-        );
-        if (visibleMinItems.length === 0) return null;
-
         return (
           <section id="minimos" className="px-4 py-10 sm:px-6">
             <div className="mx-auto max-w-[1180px]">
@@ -484,7 +480,7 @@ function Home() {
               />
               <div className="rounded-2xl border border-border bg-card/60 p-3 sm:p-5">
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-4">
-                  {visibleMinItems.map((it) => {
+                  {minItems.map((it) => {
                     const product = productFor(it.key) ?? productFor(it.label);
                     const target = catalogCatFor(it.key);
                     const content = (
